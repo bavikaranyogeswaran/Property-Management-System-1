@@ -1,0 +1,971 @@
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+
+// Type definitions
+export interface Property {
+  id: string;
+  name: string;
+  address: string;
+  type: string;
+  createdAt: string;
+  image?: string;
+}
+
+export interface Unit {
+  id: string;
+  propertyId: string;
+  unitNumber: string;
+  type: string;
+  monthlyRent: number;
+  status: 'available' | 'occupied' | 'maintenance';
+  createdAt: string;
+  image?: string;
+}
+
+export interface Lead {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  interestedUnit: string;
+  status: 'interested' | 'negotiation' | 'converted' | 'dropped';
+  createdAt: string;
+  notes: string;
+  lastContactedAt?: string;
+  score?: number;
+}
+
+export interface LeadFollowUp {
+  id: string;
+  leadId: string;
+  date: string;
+  notes: string;
+  nextAction: string;
+}
+
+export interface LeadStageHistory {
+  id: string;
+  leadId: string;
+  fromStatus: Lead['status'] | null;
+  toStatus: Lead['status'];
+  changedAt: string;
+  notes?: string;
+  durationInPreviousStage?: number; // days spent in previous stage
+}
+
+export interface Tenant {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  leaseId?: string;
+  createdAt: string;
+}
+
+export interface Treasurer {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  password: string; // For login purposes
+  createdAt: string;
+  status: 'active' | 'inactive';
+}
+
+export interface Lease {
+  id: string;
+  tenantId: string;
+  unitId: string;
+  startDate: string;
+  endDate: string;
+  monthlyRent: number;
+  status: 'active' | 'ended' | 'terminated';
+  createdAt: string;
+}
+
+export interface RentInvoice {
+  id: string;
+  leaseId: string;
+  tenantId: string;
+  unitId: string;
+  amount: number;
+  dueDate: string;
+  status: 'pending' | 'paid' | 'overdue';
+  generatedDate: string;
+}
+
+export interface Payment {
+  id: string;
+  invoiceId: string;
+  tenantId: string;
+  amount: number;
+  paymentDate: string;
+  paymentMethod: string;
+  referenceNumber: string;
+  status: 'pending' | 'verified' | 'rejected';
+  submittedAt: string;
+  proofUrl?: string;
+}
+
+export interface Receipt {
+  id: string;
+  paymentId: string;
+  invoiceId: string;
+  tenantId: string;
+  amount: number;
+  generatedDate: string;
+  receiptNumber: string;
+}
+
+export interface MaintenanceRequest {
+  id: string;
+  tenantId: string;
+  unitId: string;
+  title: string;
+  description: string;
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  status: 'submitted' | 'in_progress' | 'completed' | 'cancelled';
+  submittedDate: string;
+  completedDate?: string;
+  images?: string[];
+}
+
+export interface MaintenanceCost {
+  id: string;
+  requestId: string;
+  amount: number;
+  description: string;
+  recordedDate: string;
+}
+
+export interface Notification {
+  id: string;
+  type: 'lease_expiring' | 'lease_expired' | 'invoice_overdue' | 'maintenance_urgent';
+  title: string;
+  message: string;
+  targetRole: 'owner' | 'tenant' | 'both';
+  targetUserId?: string; // For tenant-specific notifications
+  leaseId?: string;
+  unitId?: string;
+  severity: 'info' | 'warning' | 'urgent';
+  createdAt: string;
+  expiresAt?: string; // When lease expires
+  daysUntilExpiry?: number;
+  read: boolean;
+}
+
+interface AppContextType {
+  properties: Property[];
+  units: Unit[];
+  leads: Lead[];
+  leadFollowUps: LeadFollowUp[];
+  leadStageHistory: LeadStageHistory[];
+  tenants: Tenant[];
+  treasurers: Treasurer[];
+  leases: Lease[];
+  invoices: RentInvoice[];
+  payments: Payment[];
+  receipts: Receipt[];
+  maintenanceRequests: MaintenanceRequest[];
+  maintenanceCosts: MaintenanceCost[];
+  notifications: Notification[];
+
+  // Property operations
+  addProperty: (property: Omit<Property, 'id' | 'createdAt'>) => void;
+  updateProperty: (id: string, property: Partial<Property>) => void;
+  deleteProperty: (id: string) => void;
+
+  // Unit operations
+  addUnit: (unit: Omit<Unit, 'id' | 'createdAt'>) => void;
+  updateUnit: (id: string, unit: Partial<Unit>) => void;
+  deleteUnit: (id: string) => void;
+
+  // Lead operations
+  addLead: (lead: Omit<Lead, 'id' | 'createdAt'>) => void;
+  updateLead: (id: string, lead: Partial<Lead>) => void;
+  addLeadFollowUp: (followUp: Omit<LeadFollowUp, 'id'>) => void;
+  convertLeadToTenant: (leadId: string) => string;
+
+  // Tenant operations
+  addTenant: (tenant: Omit<Tenant, 'id' | 'createdAt'>) => void;
+
+  // Treasurer operations
+  addTreasurer: (treasurer: Omit<Treasurer, 'id' | 'createdAt'>) => void;
+  updateTreasurer: (id: string, treasurer: Partial<Treasurer>) => void;
+  deleteTreasurer: (id: string) => void;
+
+  // Lease operations
+  addLease: (lease: Omit<Lease, 'id' | 'createdAt'>) => void;
+  endLease: (id: string) => void;
+
+  // Invoice operations
+  generateMonthlyInvoices: () => void;
+
+  // Payment operations
+  submitPayment: (payment: Omit<Payment, 'id' | 'submittedAt'>) => void;
+  verifyPayment: (id: string, approved: boolean) => void;
+
+  // Maintenance operations
+  addMaintenanceRequest: (request: Omit<MaintenanceRequest, 'id' | 'submittedDate'>) => void;
+  updateMaintenanceRequest: (id: string, request: Partial<MaintenanceRequest>) => void;
+  addMaintenanceCost: (cost: Omit<MaintenanceCost, 'id' | 'recordedDate'>) => void;
+}
+
+const AppContext = createContext<AppContextType | undefined>(undefined);
+
+// Initialize with mock data
+const INITIAL_DATA = {
+  properties: [
+    {
+      id: 'prop-1',
+      name: 'Sunset Apartments',
+      address: '123 Main Street, Downtown',
+      type: 'Apartment Building',
+      createdAt: '2024-01-15',
+    },
+    {
+      id: 'prop-2',
+      name: 'Commercial Plaza',
+      address: '456 Business Ave, City Center',
+      type: 'Commercial Building',
+      createdAt: '2024-02-20',
+    },
+  ],
+  units: [
+    {
+      id: 'unit-1',
+      propertyId: 'prop-1',
+      unitNumber: 'A101',
+      type: 'Studio',
+      monthlyRent: 1200,
+      status: 'occupied' as const,
+      createdAt: '2024-01-15',
+    },
+    {
+      id: 'unit-2',
+      propertyId: 'prop-1',
+      unitNumber: 'A102',
+      type: '1 Bedroom',
+      monthlyRent: 1500,
+      status: 'available' as const,
+      createdAt: '2024-01-15',
+    },
+    {
+      id: 'unit-3',
+      propertyId: 'prop-1',
+      unitNumber: 'A103',
+      type: '2 Bedroom',
+      monthlyRent: 2000,
+      status: 'occupied' as const,
+      createdAt: '2024-01-15',
+    },
+  ],
+  leads: [
+    {
+      id: 'lead-1',
+      name: 'Alice Johnson',
+      email: 'alice@email.com',
+      phone: '+1-555-0101',
+      interestedUnit: 'unit-2',
+      status: 'interested' as const,
+      createdAt: '2025-01-05',
+      notes: 'Interested in viewing next week',
+      lastContactedAt: '2025-01-05',
+      score: 75,
+    },
+    {
+      id: 'lead-2',
+      name: 'David Martinez',
+      email: 'david@email.com',
+      phone: '+1-555-0104',
+      interestedUnit: 'unit-2',
+      status: 'negotiation' as const,
+      createdAt: '2024-12-20',
+      notes: 'Ready to sign lease, discussing move-in date',
+      lastContactedAt: '2026-01-10',
+      score: 90,
+    },
+    {
+      id: 'lead-3',
+      name: 'Emma Wilson',
+      email: 'emma@email.com',
+      phone: '+1-555-0105',
+      interestedUnit: 'unit-3',
+      status: 'dropped' as const,
+      createdAt: '2025-01-01',
+      notes: 'Found another place',
+      lastContactedAt: '2025-01-08',
+    },
+  ],
+  leadFollowUps: [
+    {
+      id: 'followup-1',
+      leadId: 'lead-1',
+      date: '2025-01-05',
+      notes: 'Initial contact made, sent property details',
+      nextAction: 'Schedule viewing',
+    },
+    {
+      id: 'followup-2',
+      leadId: 'lead-2',
+      date: '2025-01-10',
+      notes: 'Discussed lease terms, tenant agreed to monthly rent',
+      nextAction: 'Prepare lease agreement',
+    },
+  ],
+  leadStageHistory: [
+    {
+      id: 'history-1',
+      leadId: 'lead-1',
+      fromStatus: null,
+      toStatus: 'interested' as const,
+      changedAt: '2025-01-05T10:00:00Z',
+    },
+    {
+      id: 'history-2',
+      leadId: 'lead-2',
+      fromStatus: null,
+      toStatus: 'interested' as const,
+      changedAt: '2024-12-20T09:00:00Z',
+    },
+    {
+      id: 'history-3',
+      leadId: 'lead-2',
+      fromStatus: 'interested' as const,
+      toStatus: 'negotiation' as const,
+      changedAt: '2025-01-08T14:30:00Z',
+      durationInPreviousStage: 19,
+      notes: 'Viewing completed, tenant interested in proceeding',
+    },
+    {
+      id: 'history-4',
+      leadId: 'lead-3',
+      fromStatus: null,
+      toStatus: 'interested' as const,
+      changedAt: '2025-01-01T11:00:00Z',
+    },
+    {
+      id: 'history-5',
+      leadId: 'lead-3',
+      fromStatus: 'interested' as const,
+      toStatus: 'dropped' as const,
+      changedAt: '2025-01-08T16:00:00Z',
+      durationInPreviousStage: 7,
+      notes: 'Lead found alternative accommodation',
+    },
+  ],
+  tenants: [
+    {
+      id: 'tenant-1',
+      name: 'Bob Tenant',
+      email: 'tenant@pms.com',
+      phone: '+1-555-0102',
+      leaseId: 'lease-1',
+      createdAt: '2024-06-01',
+    },
+    {
+      id: 'tenant-2',
+      name: 'Carol Smith',
+      email: 'carol@email.com',
+      phone: '+1-555-0103',
+      leaseId: 'lease-2',
+      createdAt: '2024-07-01',
+    },
+  ],
+  treasurers: [
+    {
+      id: 'treasurer-1',
+      name: 'John Doe',
+      email: 'john.doe@pms.com',
+      phone: '+1-555-0106',
+      password: 'securepassword123', // For login purposes
+      createdAt: '2024-01-15',
+      status: 'active' as const,
+    },
+    {
+      id: 'treasurer-2',
+      name: 'Jane Smith',
+      email: 'jane.smith@pms.com',
+      phone: '+1-555-0107',
+      password: 'securepassword456', // For login purposes
+      createdAt: '2024-02-20',
+      status: 'active' as const,
+    },
+  ],
+  leases: [
+    {
+      id: 'lease-1',
+      tenantId: 'tenant-1',
+      unitId: 'unit-1',
+      startDate: '2024-06-01',
+      endDate: '2026-02-15', // Expiring in about 28 days from today (2026-01-18)
+      monthlyRent: 1200,
+      status: 'active' as const,
+      createdAt: '2024-06-01',
+    },
+    {
+      id: 'lease-2',
+      tenantId: 'tenant-2',
+      unitId: 'unit-3',
+      startDate: '2024-07-01',
+      endDate: '2026-01-25', // Expiring in 7 days from today (2026-01-18)
+      monthlyRent: 2000,
+      status: 'active' as const,
+      createdAt: '2024-07-01',
+    },
+  ],
+  invoices: [
+    {
+      id: 'inv-1',
+      leaseId: 'lease-1',
+      tenantId: 'tenant-1',
+      unitId: 'unit-1',
+      amount: 1200,
+      dueDate: '2026-01-05',
+      status: 'pending' as const,
+      generatedDate: '2025-12-28',
+    },
+    {
+      id: 'inv-2',
+      leaseId: 'lease-2',
+      tenantId: 'tenant-2',
+      unitId: 'unit-3',
+      amount: 2000,
+      dueDate: '2026-01-05',
+      status: 'paid' as const,
+      generatedDate: '2025-12-28',
+    },
+  ],
+  payments: [
+    {
+      id: 'pay-1',
+      invoiceId: 'inv-2',
+      tenantId: 'tenant-2',
+      amount: 2000,
+      paymentDate: '2026-01-03',
+      paymentMethod: 'Bank Transfer',
+      referenceNumber: 'BT-2026-001',
+      status: 'verified' as const,
+      submittedAt: '2026-01-03',
+    },
+  ],
+  receipts: [
+    {
+      id: 'rec-1',
+      paymentId: 'pay-1',
+      invoiceId: 'inv-2',
+      tenantId: 'tenant-2',
+      amount: 2000,
+      generatedDate: '2026-01-04',
+      receiptNumber: 'REC-2026-001',
+    },
+  ],
+  maintenanceRequests: [
+    {
+      id: 'maint-1',
+      tenantId: 'tenant-1',
+      unitId: 'unit-1',
+      title: 'Leaking faucet',
+      description: 'Kitchen faucet is dripping continuously',
+      priority: 'medium' as const,
+      status: 'submitted' as const,
+      submittedDate: '2026-01-08',
+    },
+  ],
+  maintenanceCosts: [],
+  notifications: [],
+};
+
+export function AppProvider({ children }: { children: ReactNode }) {
+  const [properties, setProperties] = useState<Property[]>([]);
+  const [units, setUnits] = useState<Unit[]>([]);
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [leadFollowUps, setLeadFollowUps] = useState<LeadFollowUp[]>([]);
+  const [leadStageHistory, setLeadStageHistory] = useState<LeadStageHistory[]>([]);
+  const [tenants, setTenants] = useState<Tenant[]>([]);
+  const [treasurers, setTreasurers] = useState<Treasurer[]>([]);
+  const [leases, setLeases] = useState<Lease[]>([]);
+  const [invoices, setInvoices] = useState<RentInvoice[]>([]);
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [receipts, setReceipts] = useState<Receipt[]>([]);
+  const [maintenanceRequests, setMaintenanceRequests] = useState<MaintenanceRequest[]>([]);
+  const [maintenanceCosts, setMaintenanceCosts] = useState<MaintenanceCost[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+
+  // Load data from localStorage or use initial data
+  useEffect(() => {
+    const stored = localStorage.getItem('pms_data');
+    const version = localStorage.getItem('pms_version');
+    const CURRENT_VERSION = '2.0'; // Updated version for FR-16 implementation
+
+    // If version mismatch, clear old data
+    if (version !== CURRENT_VERSION) {
+      localStorage.removeItem('pms_data');
+      localStorage.setItem('pms_version', CURRENT_VERSION);
+    }
+
+    if (stored && version === CURRENT_VERSION) {
+      const data = JSON.parse(stored);
+      setProperties(data.properties || []);
+      setUnits(data.units || []);
+      setLeads(data.leads || []);
+      setLeadFollowUps(data.leadFollowUps || []);
+      setLeadStageHistory(data.leadStageHistory || []);
+      setTenants(data.tenants || []);
+      setTreasurers(data.treasurers || []);
+      setLeases(data.leases || []);
+      setInvoices(data.invoices || []);
+      setPayments(data.payments || []);
+      setReceipts(data.receipts || []);
+      setMaintenanceRequests(data.maintenanceRequests || []);
+      setMaintenanceCosts(data.maintenanceCosts || []);
+      setNotifications(data.notifications || []);
+
+      // Migration: If leadStageHistory is missing but we have leads, create initial history
+      if (!data.leadStageHistory && data.leads && data.leads.length > 0) {
+        const initialHistory: LeadStageHistory[] = data.leads.map((lead: Lead) => ({
+          id: `history-migration-${lead.id}`,
+          leadId: lead.id,
+          fromStatus: null,
+          toStatus: lead.status,
+          changedAt: lead.createdAt + 'T10:00:00Z',
+        }));
+        setLeadStageHistory(initialHistory);
+      }
+    } else {
+      setProperties(INITIAL_DATA.properties);
+      setUnits(INITIAL_DATA.units);
+      setLeads(INITIAL_DATA.leads);
+      setLeadFollowUps(INITIAL_DATA.leadFollowUps);
+      setLeadStageHistory(INITIAL_DATA.leadStageHistory);
+      setTenants(INITIAL_DATA.tenants);
+      setTreasurers(INITIAL_DATA.treasurers);
+      setLeases(INITIAL_DATA.leases);
+      setInvoices(INITIAL_DATA.invoices);
+      setPayments(INITIAL_DATA.payments);
+      setReceipts(INITIAL_DATA.receipts);
+      setMaintenanceRequests(INITIAL_DATA.maintenanceRequests);
+      setMaintenanceCosts(INITIAL_DATA.maintenanceCosts);
+      setNotifications(INITIAL_DATA.notifications);
+    }
+  }, []);
+
+  // Save data to localStorage whenever it changes
+  useEffect(() => {
+    const data = {
+      properties,
+      units,
+      leads,
+      leadFollowUps,
+      leadStageHistory,
+      tenants,
+      treasurers,
+      leases,
+      invoices,
+      payments,
+      receipts,
+      maintenanceRequests,
+      maintenanceCosts,
+      notifications,
+    };
+    localStorage.setItem('pms_data', JSON.stringify(data));
+  }, [properties, units, leads, leadFollowUps, leadStageHistory, tenants, treasurers, leases, invoices, payments, receipts, maintenanceRequests, maintenanceCosts, notifications]);
+
+  // Generate lease expiration notifications
+  useEffect(() => {
+    if (leases.length === 0) return;
+
+    const today = new Date();
+    const generatedNotifications: Notification[] = [];
+
+    leases.forEach((lease) => {
+      if (lease.status !== 'active') return;
+
+      const endDate = new Date(lease.endDate);
+      const daysUntilExpiry = Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+      // Don't create notifications for leases that already expired
+      if (daysUntilExpiry < 0) return;
+
+      // Check if we should notify at these thresholds: 60, 30, 15, 7 days
+      const thresholds = [60, 30, 15, 7];
+      let shouldNotify = false;
+      let severity: 'info' | 'warning' | 'urgent' = 'info';
+
+      if (daysUntilExpiry <= 7) {
+        shouldNotify = true;
+        severity = 'urgent';
+      } else if (daysUntilExpiry <= 15) {
+        shouldNotify = true;
+        severity = 'urgent';
+      } else if (daysUntilExpiry <= 30) {
+        shouldNotify = true;
+        severity = 'warning';
+      } else if (daysUntilExpiry <= 60) {
+        shouldNotify = true;
+        severity = 'info';
+      }
+
+      if (shouldNotify) {
+        const unit = units.find(u => u.id === lease.unitId);
+        const tenant = tenants.find(t => t.id === lease.tenantId);
+        const property = unit ? properties.find(p => p.id === unit.propertyId) : null;
+
+        // Check if notification already exists for this lease and threshold
+        const existingNotification = notifications.find(
+          n => n.leaseId === lease.id && n.type === 'lease_expiring' && Math.abs((n.daysUntilExpiry || 0) - daysUntilExpiry) < 2
+        );
+
+        if (!existingNotification && unit && tenant && property) {
+          const message = daysUntilExpiry <= 7
+            ? `Lease for ${tenant.name} in ${property.name} Unit ${unit.unitNumber} expires in ${daysUntilExpiry} days on ${lease.endDate}.`
+            : daysUntilExpiry <= 15
+              ? `Lease expiring in ${daysUntilExpiry} days: ${property.name} Unit ${unit.unitNumber} (${tenant.name}) on ${lease.endDate}.`
+              : daysUntilExpiry <= 30
+                ? `Lease renewal reminder: ${property.name} Unit ${unit.unitNumber} expires on ${lease.endDate} (${daysUntilExpiry} days).`
+                : `Upcoming lease expiration in ${daysUntilExpiry} days for ${property.name} Unit ${unit.unitNumber} on ${lease.endDate}.`;
+
+          generatedNotifications.push({
+            id: `notif-${lease.id}-${daysUntilExpiry}`,
+            type: 'lease_expiring',
+            title: daysUntilExpiry <= 7 ? `⚠️ Urgent: Lease Expiring Soon` : daysUntilExpiry <= 30 ? 'Lease Expiring Soon' : 'Upcoming Lease Expiration',
+            message,
+            targetRole: 'both',
+            targetUserId: tenant.id,
+            leaseId: lease.id,
+            unitId: lease.unitId,
+            severity,
+            createdAt: today.toISOString(),
+            expiresAt: lease.endDate,
+            daysUntilExpiry,
+            read: false,
+          });
+        }
+      }
+    });
+
+    // Only update notifications if there are new ones to add
+    if (generatedNotifications.length > 0) {
+      setNotifications(prev => {
+        // Remove old notifications for the same leases to avoid duplicates
+        const filtered = prev.filter(n =>
+          !generatedNotifications.some(gn => gn.leaseId === n.leaseId && n.type === 'lease_expiring')
+        );
+        return [...filtered, ...generatedNotifications];
+      });
+    }
+  }, [leases, units, tenants, properties]); // Run when leases or related data changes
+
+  // Property operations
+  const addProperty = (property: Omit<Property, 'id' | 'createdAt'>) => {
+    const newProperty: Property = {
+      ...property,
+      id: `prop-${Date.now()}`,
+      createdAt: new Date().toISOString().split('T')[0],
+    };
+    setProperties([...properties, newProperty]);
+  };
+
+  const updateProperty = (id: string, updates: Partial<Property>) => {
+    setProperties(properties.map(p => p.id === id ? { ...p, ...updates } : p));
+  };
+
+  const deleteProperty = (id: string) => {
+    setProperties(properties.filter(p => p.id !== id));
+  };
+
+  // Unit operations
+  const addUnit = (unit: Omit<Unit, 'id' | 'createdAt'>) => {
+    const newUnit: Unit = {
+      ...unit,
+      id: `unit-${Date.now()}`,
+      createdAt: new Date().toISOString().split('T')[0],
+    };
+    setUnits([...units, newUnit]);
+  };
+
+  const updateUnit = (id: string, updates: Partial<Unit>) => {
+    setUnits(units.map(u => u.id === id ? { ...u, ...updates } : u));
+  };
+
+  const deleteUnit = (id: string) => {
+    setUnits(units.filter(u => u.id !== id));
+  };
+
+  // Lead operations
+  const addLead = (lead: Omit<Lead, 'id' | 'createdAt'>) => {
+    const newLead: Lead = {
+      ...lead,
+      id: `lead-${Date.now()}`,
+      createdAt: new Date().toISOString().split('T')[0],
+    };
+    setLeads([...leads, newLead]);
+
+    // Record initial stage history
+    const initialHistory: LeadStageHistory = {
+      id: `history-${Date.now()}`,
+      leadId: newLead.id,
+      fromStatus: null,
+      toStatus: lead.status,
+      changedAt: new Date().toISOString(),
+    };
+    setLeadStageHistory([...leadStageHistory, initialHistory]);
+  };
+
+  const updateLead = (id: string, updates: Partial<Lead>) => {
+    const currentLead = leads.find(l => l.id === id);
+
+    // If status is changing, record the transition
+    if (currentLead && updates.status && updates.status !== currentLead.status) {
+      // Calculate duration in previous stage
+      const previousStageHistory = leadStageHistory
+        .filter(h => h.leadId === id)
+        .sort((a, b) => new Date(b.changedAt).getTime() - new Date(a.changedAt).getTime())[0];
+
+      const durationInDays = previousStageHistory
+        ? Math.floor((new Date().getTime() - new Date(previousStageHistory.changedAt).getTime()) / (1000 * 60 * 60 * 24))
+        : 0;
+
+      const historyEntry: LeadStageHistory = {
+        id: `history-${Date.now()}`,
+        leadId: id,
+        fromStatus: currentLead.status,
+        toStatus: updates.status,
+        changedAt: new Date().toISOString(),
+        durationInPreviousStage: durationInDays,
+      };
+
+      setLeadStageHistory([...leadStageHistory, historyEntry]);
+    }
+
+    setLeads(leads.map(l => l.id === id ? { ...l, ...updates } : l));
+  };
+
+  const addLeadFollowUp = (followUp: Omit<LeadFollowUp, 'id'>) => {
+    const newFollowUp: LeadFollowUp = {
+      ...followUp,
+      id: `followup-${Date.now()}`,
+    };
+    setLeadFollowUps([...leadFollowUps, newFollowUp]);
+  };
+
+  const convertLeadToTenant = (leadId: string): string => {
+    const lead = leads.find(l => l.id === leadId);
+    if (!lead) return '';
+
+    const newTenant: Tenant = {
+      id: `tenant-${Date.now()}`,
+      name: lead.name,
+      email: lead.email,
+      phone: lead.phone,
+      createdAt: new Date().toISOString().split('T')[0],
+    };
+
+    setTenants([...tenants, newTenant]);
+    updateLead(leadId, { status: 'converted' });
+
+    return newTenant.id;
+  };
+
+  // Tenant operations
+  const addTenant = (tenant: Omit<Tenant, 'id' | 'createdAt'>) => {
+    const newTenant: Tenant = {
+      ...tenant,
+      id: `tenant-${Date.now()}`,
+      createdAt: new Date().toISOString().split('T')[0],
+    };
+    setTenants([...tenants, newTenant]);
+  };
+
+  // Treasurer operations
+  const addTreasurer = (treasurer: Omit<Treasurer, 'id' | 'createdAt'>) => {
+    const newTreasurer: Treasurer = {
+      ...treasurer,
+      id: `treasurer-${Date.now()}`,
+      createdAt: new Date().toISOString().split('T')[0],
+    };
+    setTreasurers([...treasurers, newTreasurer]);
+  };
+
+  const updateTreasurer = (id: string, updates: Partial<Treasurer>) => {
+    setTreasurers(treasurers.map(t => t.id === id ? { ...t, ...updates } : t));
+  };
+
+  const deleteTreasurer = (id: string) => {
+    setTreasurers(treasurers.filter(t => t.id !== id));
+  };
+
+  // Lease operations
+  const addLease = (lease: Omit<Lease, 'id' | 'createdAt'>) => {
+    const newLease: Lease = {
+      ...lease,
+      id: `lease-${Date.now()}`,
+      createdAt: new Date().toISOString().split('T')[0],
+    };
+    setLeases([...leases, newLease]);
+
+    // Update unit status to occupied
+    updateUnit(lease.unitId, { status: 'occupied' });
+
+    // Update tenant with lease ID
+    setTenants(tenants.map(t => t.id === lease.tenantId ? { ...t, leaseId: newLease.id } : t));
+  };
+
+  const endLease = (id: string) => {
+    const lease = leases.find(l => l.id === id);
+    if (lease) {
+      setLeases(leases.map(l => l.id === id ? { ...l, status: 'ended' } : l));
+      updateUnit(lease.unitId, { status: 'available' });
+    }
+  };
+
+  // Invoice operations
+  const generateMonthlyInvoices = () => {
+    const activeLeases = leases.filter(l => l.status === 'active');
+    const newInvoices: RentInvoice[] = [];
+
+    activeLeases.forEach(lease => {
+      // Check if invoice for this month already exists
+      const currentMonth = new Date().toISOString().slice(0, 7);
+      const existingInvoice = invoices.find(
+        inv => inv.leaseId === lease.id && inv.generatedDate.startsWith(currentMonth)
+      );
+
+      if (!existingInvoice) {
+        const dueDate = new Date();
+        dueDate.setDate(5); // Due on 5th of the month
+        if (dueDate < new Date()) {
+          dueDate.setMonth(dueDate.getMonth() + 1);
+        }
+
+        newInvoices.push({
+          id: `inv-${Date.now()}-${lease.id}`,
+          leaseId: lease.id,
+          tenantId: lease.tenantId,
+          unitId: lease.unitId,
+          amount: lease.monthlyRent,
+          dueDate: dueDate.toISOString().split('T')[0],
+          status: 'pending',
+          generatedDate: new Date().toISOString().split('T')[0],
+        });
+      }
+    });
+
+    if (newInvoices.length > 0) {
+      setInvoices([...invoices, ...newInvoices]);
+    }
+  };
+
+  // Payment operations
+  const submitPayment = (payment: Omit<Payment, 'id' | 'submittedAt'>) => {
+    const newPayment: Payment = {
+      ...payment,
+      id: `pay-${Date.now()}`,
+      submittedAt: new Date().toISOString(),
+    };
+    setPayments([...payments, newPayment]);
+  };
+
+  const verifyPayment = (id: string, approved: boolean) => {
+    const payment = payments.find(p => p.id === id);
+    if (!payment) return;
+
+    if (approved) {
+      setPayments(payments.map(p => p.id === id ? { ...p, status: 'verified' } : p));
+
+      // Update invoice status
+      setInvoices(invoices.map(inv =>
+        inv.id === payment.invoiceId ? { ...inv, status: 'paid' } : inv
+      ));
+
+      // Generate receipt
+      const newReceipt: Receipt = {
+        id: `rec-${Date.now()}`,
+        paymentId: id,
+        invoiceId: payment.invoiceId,
+        tenantId: payment.tenantId,
+        amount: payment.amount,
+        generatedDate: new Date().toISOString().split('T')[0],
+        receiptNumber: `REC-${new Date().getFullYear()}-${String(receipts.length + 1).padStart(3, '0')}`,
+      };
+      setReceipts([...receipts, newReceipt]);
+    } else {
+      setPayments(payments.map(p => p.id === id ? { ...p, status: 'rejected' } : p));
+    }
+  };
+
+  // Maintenance operations
+  const addMaintenanceRequest = (request: Omit<MaintenanceRequest, 'id' | 'submittedDate'>) => {
+    const newRequest: MaintenanceRequest = {
+      ...request,
+      id: `maint-${Date.now()}`,
+      submittedDate: new Date().toISOString().split('T')[0],
+    };
+    setMaintenanceRequests([...maintenanceRequests, newRequest]);
+  };
+
+  const updateMaintenanceRequest = (id: string, updates: Partial<MaintenanceRequest>) => {
+    setMaintenanceRequests(maintenanceRequests.map(m =>
+      m.id === id ? { ...m, ...updates } : m
+    ));
+  };
+
+  const addMaintenanceCost = (cost: Omit<MaintenanceCost, 'id' | 'recordedDate'>) => {
+    const newCost: MaintenanceCost = {
+      ...cost,
+      id: `cost-${Date.now()}`,
+      recordedDate: new Date().toISOString().split('T')[0],
+    };
+    setMaintenanceCosts([...maintenanceCosts, newCost]);
+  };
+
+  return (
+    <AppContext.Provider value={{
+      properties,
+      units,
+      leads,
+      leadFollowUps,
+      leadStageHistory,
+      tenants,
+      treasurers,
+      leases,
+      invoices,
+      payments,
+      receipts,
+      maintenanceRequests,
+      maintenanceCosts,
+      notifications,
+      addProperty,
+      updateProperty,
+      deleteProperty,
+      addUnit,
+      updateUnit,
+      deleteUnit,
+      addLead,
+      updateLead,
+      addLeadFollowUp,
+      convertLeadToTenant,
+      addTenant,
+      addTreasurer,
+      updateTreasurer,
+      deleteTreasurer,
+      addLease,
+      endLease,
+      generateMonthlyInvoices,
+      submitPayment,
+      verifyPayment,
+      addMaintenanceRequest,
+      updateMaintenanceRequest,
+      addMaintenanceCost,
+    }}>
+      {children}
+    </AppContext.Provider>
+  );
+}
+
+export function useApp() {
+  const context = useContext(AppContext);
+  if (context === undefined) {
+    throw new Error('useApp must be used within an AppProvider');
+  }
+  return context;
+}
