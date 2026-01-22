@@ -56,6 +56,10 @@ class UserService {
         return { message: 'Treasurer deleted successfully' };
     }
 
+    async getTreasurers() {
+        return await userModel.findByRole('treasurer');
+    }
+
     // Placeholder for convertLeadToTenant
     async convertLeadToTenant(leadId, tenantData) {
         // Todo: Implement lead conversion logic

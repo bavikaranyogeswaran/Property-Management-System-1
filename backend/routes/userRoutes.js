@@ -13,4 +13,7 @@ router.put('/:id', authenticateToken, userController.updateTreasurer);
 // Treasurer deletion (Owner only)
 router.delete('/:id', authenticateToken, userController.deleteTreasurer);
 
+// Get all treasurers (Owner only)
+router.get('/treasurers', authenticateToken, userController.getTreasurers);
+
 export default router;

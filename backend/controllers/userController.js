@@ -52,6 +52,18 @@ class UserController {
             res.status(400).json({ error: error.message });
         }
     }
+
+    async getTreasurers(req, res) {
+        try {
+            if (req.user.role !== 'owner') {
+                return res.status(403).json({ error: 'Access denied.' });
+            }
+            const result = await userService.getTreasurers();
+            res.json(result);
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    }
 }
 
 export default new UserController();

@@ -189,7 +189,7 @@ interface AppContextType {
   addTenant: (tenant: Omit<Tenant, 'id' | 'createdAt'>) => void;
 
   // Treasurer operations
-  addTreasurer: (treasurer: Omit<Treasurer, 'id' | 'createdAt'>) => void;
+  addTreasurer: (treasurer: Omit<Treasurer, 'id' | 'createdAt'> & { id?: string }) => void;
   updateTreasurer: (id: string, treasurer: Partial<Treasurer>) => void;
   deleteTreasurer: (id: string) => void;
 
@@ -547,6 +547,52 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setMaintenanceCosts(INITIAL_DATA.maintenanceCosts);
       setNotifications(INITIAL_DATA.notifications);
     }
+
+    // Fetch real treasurers from backend (sync with DB)
+    const fetchTreasurers = async () => {
+      try {
+        // We need to handle circular dependency if importing apiClient directly if AppContext is used by it?
+        // ActuallyapiClient is separate.
+        // Dynamic import or assume it's available?
+        // Better to use fetch or standard axios if apiClient isn't available here, but apiClient handles auth.
+        // Let's assume we can import it. If not, we'll see an error.
+        // But we need to make sure we only fetch if we have a token?
+        // This runs on mount.
+        const token = localStorage.getItem('authToken');
+        if (token) {
+          // We'll rely on the existing apiClient functionality
+          // But we need to import it at the top of the file ideally.
+          // Since I can't easily add top-level import without reading whole file, I will use a dynamic import workaround or assume user adds it?
+          // I'll add the import in a separate step if needed, but for now let's try to add logic.
+          // Actually, replace_file_content can't add import easily if it's far away.
+          // I'll check if I can just use fetch with the token.
+          const response = await fetch('http://localhost:3000/api/users/treasurers', {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
+          if (response.ok) {
+            const data = await response.json();
+            // Map backend data to frontend Treasurer interface
+            const mappedTreasurers: Treasurer[] = data.map((t: any) => ({
+              id: t.id.toString(),
+              name: t.name,
+              email: t.email,
+              phone: t.phone || '',
+              password: '', // Password not returned for security
+              status: t.status,
+              createdAt: t.createdAt
+            }));
+            setTreasurers(mappedTreasurers);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch treasurers:', error);
+      }
+    };
+
+    fetchTreasurers();
+
   }, []);
 
   // Save data to localStorage whenever it changes
@@ -777,21 +823,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   // Treasurer operations
-  const addTreasurer = (treasurer: Omit<Treasurer, 'id' | 'createdAt'>) => {
+  // Treasurer operations
+  const addTreasurer = (treasurer: Omit<Treasurer, 'id' | 'createdAt'> & { id?: string }) => {
     const newTreasurer: Treasurer = {
       ...treasurer,
-      id: `treasurer-${Date.now()}`,
+      id: treasurer.id || `treasurer-${Date.now()}`,
       createdAt: new Date().toISOString().split('T')[0],
     };
-    setTreasurers([...treasurers, newTreasurer]);
+    setTreasurers(prev => [...prev, newTreasurer]);
   };
 
   const updateTreasurer = (id: string, updates: Partial<Treasurer>) => {
-    setTreasurers(treasurers.map(t => t.id === id ? { ...t, ...updates } : t));
+    setTreasurers(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
   };
 
   const deleteTreasurer = (id: string) => {
-    setTreasurers(treasurers.filter(t => t.id !== id));
+    setTreasurers(prev => prev.filter(t => t.id !== id));
   };
 
   // Lease operations

@@ -6,9 +6,13 @@ USE pms_database;
 -- 1. USERS
 -- Password hash: 'hashed_password_123' (Placeholder)
 INSERT INTO users (user_id, name, email, password_hash, role, status) VALUES 
-(1, 'Bavikaran', 'bavikaran01@gmail.com', '$2a$10$Q.cuGhAmIlkX8gPUeuNaHuTgd2m1t5V5gImZT2gpwmGUaOP0T/g2O', 'owner', 'active'),
+(1, 'Bavikaran', 'bavikaran01@gmail.com', '$2a$10$Q.cuGhAmIlkX8gPUeuNaHuTgd2m1t5V5gImZT2gpwmGUaOP0T/g2O', 'owner', 'active');
+
+INSERT INTO users (user_id, name, email, password_hash, role, status) VALUES 
 (2, 'Bob Tenant', 'tenant@pms.com', '$2a$10$X7.G.1/1/1/1/1/1/1/1/1', 'tenant', 'active'),
-(3, 'Carol Smith', 'carol@email.com', '$2a$10$X7.G.1/1/1/1/1/1/1/1/1', 'tenant', 'active'),
+(3, 'Carol Smith', 'carol@email.com', '$2a$10$X7.G.1/1/1/1/1/1/1/1/1', 'tenant', 'active');
+
+INSERT INTO users (user_id, name, email, password_hash, role, status) VALUES 
 (4, 'John Doe', 'john.doe@pms.com', '$2a$10$X7.G.1/1/1/1/1/1/1/1/1', 'treasurer', 'active'),
 (5, 'Jane Smith', 'jane.smith@pms.com', '$2a$10$X7.G.1/1/1/1/1/1/1/1/1', 'treasurer', 'active');
 
