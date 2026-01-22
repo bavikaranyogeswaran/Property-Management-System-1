@@ -7,7 +7,6 @@ import { Toaster } from '@/components/ui/sonner';
 
 // Auth Pages
 import { LoginPage } from '@/components/pages/auth/LoginPage';
-import { RegisterPage } from '@/components/pages/auth/RegisterPage';
 import { ForgotPasswordPage } from '@/components/pages/auth/ForgotPasswordPage';
 
 // Owner Pages
@@ -57,7 +56,7 @@ function AppContent() {
     <Routes>
       {/* Public Routes */}
       <Route path="/login" element={<LoginPage />} />
-      <Route path="/register" element={<RegisterPage />} />
+
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
 
       {/* Protected Routes */}

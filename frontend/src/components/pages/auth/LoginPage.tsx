@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
-import { useAuth, UserRole } from '@/app/context/AuthContext';
+import { useAuth } from '@/app/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Building2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Link, useNavigate } from 'react-router-dom';
@@ -14,14 +13,13 @@ export function LoginPage() {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<UserRole>('owner');
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
-    const success = await login(email, password, role);
+    const success = await login(email, password);
 
     if (success) {
       toast.success('Login successful!');
@@ -47,20 +45,6 @@ export function LoginPage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="role">Role</Label>
-              <Select value={role} onValueChange={(value) => setRole(value as UserRole)}>
-                <SelectTrigger id="role">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="owner">Owner</SelectItem>
-                  <SelectItem value="treasurer">Treasurer</SelectItem>
-                  <SelectItem value="tenant">Tenant</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
@@ -96,28 +80,14 @@ export function LoginPage() {
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? 'Signing in...' : 'Sign In'}
             </Button>
-
-            <div className="text-center text-sm">
-              <span className="text-muted-foreground">Don't have an account? </span>
-              <Link
-                to="/register"
-                className="text-primary hover:underline font-medium"
-              >
-                Sign up
-              </Link>
-            </div>
           </form>
 
           <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-            <p className="text-sm font-medium text-blue-900 mb-2">Demo Credentials:</p>
+            <p className="text-sm font-medium text-blue-900 mb-2">Demo Credentials (seeded in DB):</p>
             <div className="space-y-1 text-xs text-blue-800">
-              <p><strong>Owner:</strong> owner@pms.com / owner123</p>
-              <p><strong>Treasurer:</strong> john.doe@pms.com / securepassword123</p>
-              <p><strong>Tenant:</strong> tenant@pms.com / tenant123</p>
+              <p><strong>Owner:</strong> owner@test.com / hashed_password_123</p>
+              <p><strong>Tenant:</strong> tenant@pms.com / hashed_password_123</p>
             </div>
-            <p className="text-xs text-blue-600 mt-3 italic">
-              Note: Treasurers registered by the owner can also login with their credentials
-            </p>
           </div>
         </CardContent>
       </Card>

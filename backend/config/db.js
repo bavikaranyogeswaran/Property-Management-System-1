@@ -1,5 +1,5 @@
 import { createPool } from 'mysql2';
-require('dotenv').config();
+import 'dotenv/config';
 
 const pool = createPool({
     host: process.env.DB_HOST || 'localhost',

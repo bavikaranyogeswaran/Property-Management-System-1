@@ -1,6 +1,6 @@
 import express, { json } from 'express';
 import cors from 'cors';
-require('dotenv').config();
+import 'dotenv/config';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -10,9 +10,11 @@ app.use(cors());
 app.use(json());
 
 // Routes
-import authRoutes from './routes/authRoutes';
+import authRoutes from './routes/authRoutes.js';
+import userRoutes from './routes/userRoutes.js';
 
 app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
 
 app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', message: 'PMS Backend is running' });

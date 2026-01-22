@@ -143,6 +143,7 @@ CREATE TABLE payments (
     payment_date DATE NOT NULL,
     payment_method VARCHAR(30),
     proof_url VARCHAR(255),
+    reference_number VARCHAR(100),
     status ENUM('pending','verified','rejected') DEFAULT 'pending',
     verified_by INT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,

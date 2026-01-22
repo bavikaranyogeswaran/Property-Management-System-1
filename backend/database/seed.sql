@@ -52,6 +52,7 @@ INSERT INTO payments (payment_id, invoice_id, tenant_id, amount, payment_date, p
 INSERT INTO receipts (receipt_id, payment_id, invoice_id, tenant_id, amount, receipt_date, receipt_number) VALUES 
 (1, 1, 2, 3, 2000.00, '2026-01-04', 'REC-2026-001');
 
--- 9. MAINTENANCE REQUESTS
-INSERT INTO maintenance_requests (request_id, unit_id, tenant_id, title, description, priority, status, submitted_date) VALUES 
+
+-- MAINTENANCE REQUESTS
+INSERT INTO maintenance_requests (request_id, unit_id, tenant_id, title, description, priority, status, created_at) VALUES 
 (1, 1, 2, 'Leaking faucet', 'Kitchen faucet is dripping continuously', 'medium', 'submitted', '2026-01-08 09:00:00');
