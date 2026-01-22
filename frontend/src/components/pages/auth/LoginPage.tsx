@@ -82,13 +82,7 @@ export function LoginPage() {
             </Button>
           </form>
 
-          <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-            <p className="text-sm font-medium text-blue-900 mb-2">Demo Credentials (seeded in DB):</p>
-            <div className="space-y-1 text-xs text-blue-800">
-              <p><strong>Owner:</strong> owner@test.com / hashed_password_123</p>
-              <p><strong>Tenant:</strong> tenant@pms.com / hashed_password_123</p>
-            </div>
-          </div>
+          
         </CardContent>
       </Card>
     </div>

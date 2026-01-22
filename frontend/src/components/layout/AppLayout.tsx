@@ -57,7 +57,6 @@ export function AppLayout({ children }: AppLayoutProps) {
     { path: '/invoices', label: 'My Invoices', icon: FileText },
     { path: '/payments', label: 'My Payments', icon: CreditCard },
     { path: '/maintenance', label: 'Maintenance Requests', icon: Wrench },
-    { path: '/maintenance', label: 'Maintenance Requests', icon: Wrench },
   ];
 
   // Add settings to all menus

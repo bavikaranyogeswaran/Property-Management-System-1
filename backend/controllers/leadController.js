@@ -11,6 +11,11 @@ class LeadController {
 
             const { id } = req.params;
             const { password } = req.body;
+
+            if (!password || password.length < 8) {
+                return res.status(400).json({ error: 'Password must be at least 8 characters long' });
+            }
+
             const result = await userService.convertLeadToTenant(id, password);
             res.status(200).json(result);
         } catch (error) {
@@ -32,12 +37,19 @@ class LeadController {
 
     async createLead(req, res) {
         try {
-            // Anyone can create a lead? Or only owner?
-            // Usually valid for public inquiries too, but let's assume auth required for now based on app structure
-            // If public, we wouldn't check req.user.role.
-            // But LeadsPage is for Owners.
             if (req.user.role !== 'owner') {
                 return res.status(403).json({ error: 'Access denied.' });
+            }
+
+            const { name, email, phone } = req.body;
+            if (!name || !email || !phone) {
+                return res.status(400).json({ error: 'Name, email, and phone are required' });
+            }
+
+            // Basic email validation regex
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(email)) {
+                return res.status(400).json({ error: 'Invalid email format' });
             }
 
             const leadId = await leadModel.create(req.body);

@@ -49,6 +49,14 @@ export function LeadsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Basic validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email)) {
+      toast.error('Please enter a valid email address');
+      return;
+    }
+
     try {
       await addLead({
         ...formData,
@@ -63,8 +71,10 @@ export function LeadsPage() {
         interestedUnit: '',
         notes: '',
       });
-    } catch (error) {
-      toast.error('Failed to add lead');
+    } catch (error: any) {
+      // If the error object has a response with an error message, show that
+      // otherwise show generic error
+      toast.error(error.response?.data?.error || 'Failed to add lead');
     }
   };
 
@@ -117,6 +127,11 @@ export function LeadsPage() {
     if (!selectedLead) return;
     if (!tenantPassword) {
       toast.error('Please enter a password for the tenant account');
+      return;
+    }
+
+    if (tenantPassword.length < 8) {
+      toast.error('Password must be at least 8 characters long');
       return;
     }
 
