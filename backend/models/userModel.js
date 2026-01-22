@@ -38,7 +38,21 @@ class UserModel {
     }
 
     async delete(id) {
-        const [result] = await pool.query('DELETE FROM users WHERE user_id = ?', [id]);
+        // Soft delete: 
+        // 1. Rename email to free it up (deleted_ID_Timestamp_email)
+        // 2. Set status to inactive
+        // 3. Keep row for FK referential integrity
+
+        // Fetch user first to get email
+        const user = await this.findById(id);
+        if (!user) return false;
+
+        const archivedEmail = `deleted_${id}_${Date.now()}_${user.email}`.substring(0, 100); // Ensure constraints
+
+        const [result] = await pool.query(
+            'UPDATE users SET email = ?, status = ?, name = CONCAT(name, " (Deleted)") WHERE user_id = ?',
+            [archivedEmail, 'inactive', id]
+        );
         return result.affectedRows > 0;
     }
 }
