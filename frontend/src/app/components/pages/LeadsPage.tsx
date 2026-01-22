@@ -24,14 +24,14 @@ export function LeadsPage() {
     addLeadFollowUp,
     convertLeadToTenant,
   } = useApp();
-  
+
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [isFollowUpDialogOpen, setIsFollowUpDialogOpen] = useState(false);
   const [isConvertDialogOpen, setIsConvertDialogOpen] = useState(false);
   const [isHistoryDialogOpen, setIsHistoryDialogOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'pipeline' | 'list'>('pipeline');
-  
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -87,10 +87,10 @@ export function LeadsPage() {
       leadId: selectedLead.id,
       ...followUpData,
     });
-    
+
     // Update last contacted date
     updateLead(selectedLead.id, { lastContactedAt: followUpData.date });
-    
+
     toast.success('Follow-up added successfully');
     setIsFollowUpDialogOpen(false);
     setFollowUpData({
@@ -100,13 +100,17 @@ export function LeadsPage() {
     });
   };
 
-  const handleConvert = () => {
+  const handleConvert = async () => {
     if (!selectedLead) return;
 
-    const tenantId = convertLeadToTenant(selectedLead.id);
-    toast.success('Lead converted to tenant successfully');
-    setIsConvertDialogOpen(false);
-    setSelectedLead(null);
+    try {
+      const tenantId = await convertLeadToTenant(selectedLead.id);
+      toast.success('Lead converted to tenant successfully');
+      setIsConvertDialogOpen(false);
+      setSelectedLead(null);
+    } catch (error: any) {
+      toast.error('Failed to convert lead: ' + (error.response?.data?.error || error.message));
+    }
   };
 
   const getStatusLabel = (status: Lead['status']) => {
@@ -177,7 +181,7 @@ export function LeadsPage() {
     const leadFollowUpsCount = leadFollowUps.filter(f => f.leadId === lead.id).length;
     const statusBadge = getStatusBadge(lead.status);
     const history = leadStageHistory.filter(h => h.leadId === lead.id);
-    
+
     return (
       <div className="p-3 bg-white rounded-lg border shadow-sm hover:shadow-md transition-shadow">
         <div className="flex items-start justify-between mb-2">
@@ -199,7 +203,7 @@ export function LeadsPage() {
             <Clock className="size-3.5" />
           </Button>
         </div>
-        
+
         <div className="space-y-1 mb-3">
           <p className="text-xs text-gray-600">
             <span className="font-medium">Unit:</span> {unit?.unitNumber || 'N/A'}
@@ -227,7 +231,7 @@ export function LeadsPage() {
             <Calendar className="size-3 mr-1 flex-shrink-0" />
             Follow-up {leadFollowUpsCount > 0 && `(${leadFollowUpsCount})`}
           </Button>
-          
+
           {lead.status !== 'converted' && lead.status !== 'dropped' && (
             <>
               {lead.status === 'interested' && (
@@ -289,7 +293,7 @@ export function LeadsPage() {
             const unit = units.find(u => u.id === lead.interestedUnit);
             const statusBadge = getStatusBadge(lead.status);
             const leadFollowUpsCount = leadFollowUps.filter(f => f.leadId === lead.id).length;
-            
+
             return (
               <TableRow key={lead.id}>
                 <TableCell className="font-medium">{lead.name}</TableCell>
@@ -714,9 +718,8 @@ export function LeadsPage() {
               .map((history, index, arr) => (
                 <div key={history.id} className="flex gap-4">
                   <div className="flex flex-col items-center">
-                    <div className={`size-8 rounded-full flex items-center justify-center ${
-                      getStatusBadge(history.toStatus).color
-                    }`}>
+                    <div className={`size-8 rounded-full flex items-center justify-center ${getStatusBadge(history.toStatus).color
+                      }`}>
                       {index === 0 ? <Clock className="size-4" /> : <CheckCircle className="size-4" />}
                     </div>
                     {index < arr.length - 1 && (

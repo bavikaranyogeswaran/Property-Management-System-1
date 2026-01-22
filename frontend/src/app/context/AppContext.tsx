@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import apiClient from '../../services/api';
 
 // Type definitions
 export interface Property {
@@ -183,7 +184,7 @@ interface AppContextType {
   addLead: (lead: Omit<Lead, 'id' | 'createdAt'>) => void;
   updateLead: (id: string, lead: Partial<Lead>) => void;
   addLeadFollowUp: (followUp: Omit<LeadFollowUp, 'id'>) => void;
-  convertLeadToTenant: (leadId: string) => string;
+  convertLeadToTenant: (leadId: string) => Promise<string>;
 
   // Tenant operations
   addTenant: (tenant: Omit<Tenant, 'id' | 'createdAt'>) => void;
@@ -593,6 +594,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     fetchTreasurers();
 
+    // Fetch leads
+    const fetchLeads = async () => {
+      try {
+        const token = localStorage.getItem('authToken');
+        if (token) {
+          const response = await apiClient.get('/leads');
+          if (response.status === 200) {
+            setLeads(response.data);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch leads:', error);
+      }
+    };
+    fetchLeads();
+
   }, []);
 
   // Save data to localStorage whenever it changes
@@ -794,22 +811,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setLeadFollowUps([...leadFollowUps, newFollowUp]);
   };
 
-  const convertLeadToTenant = (leadId: string): string => {
-    const lead = leads.find(l => l.id === leadId);
-    if (!lead) return '';
+  const convertLeadToTenant = async (leadId: string): Promise<string> => {
+    try {
+      const response = await apiClient.post(`/leads/${leadId}/convert`);
+      const { tenantId } = response.data;
 
-    const newTenant: Tenant = {
-      id: `tenant-${Date.now()}`,
-      name: lead.name,
-      email: lead.email,
-      phone: lead.phone,
-      createdAt: new Date().toISOString().split('T')[0],
-    };
-
-    setTenants([...tenants, newTenant]);
-    updateLead(leadId, { status: 'converted' });
-
-    return newTenant.id;
+      // Optimistic update or refetch?
+      // Let's optimistic update for now
+      const lead = leads.find(l => l.id === leadId);
+      if (lead) {
+        updateLead(leadId, { status: 'converted' });
+        // Add to local tenants list if we want immediate UI feedback without refetching tenants
+        // But tenants might need more data than we have here. 
+        // The backend creates the tenant. 
+        // Ideally we fetch tenants again.
+        // For now, let's just return api result.
+      }
+      return tenantId;
+    } catch (error) {
+      console.error("Failed to convert lead:", error);
+      throw error;
+    }
   };
 
   // Tenant operations

@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs';
 const { hash } = bcrypt;
 import userModel from '../models/userModel.js';
+import leadModel from '../models/leadModel.js';
 import emailService from '../utils/emailService.js';
 
 const SALT_ROUNDS = 10;
@@ -60,13 +61,61 @@ class UserService {
         return await userModel.findByRole('treasurer');
     }
 
-    // Placeholder for convertLeadToTenant
-    async convertLeadToTenant(leadId, tenantData) {
-        // Todo: Implement lead conversion logic
+    // Convert lead to tenant
+    async convertLeadToTenant(leadId) {
         // 1. Get lead details
-        // 2. Create user (tenant)
-        // 3. Update lead status
-        // 4. Send email
+        const lead = await leadModel.findById(leadId);
+        if (!lead) {
+            throw new Error('Lead not found');
+        }
+
+        if (lead.status === 'converted') {
+            throw new Error('Lead is already converted');
+        }
+
+        // 2. Check if user already exists
+        let userId;
+        const existingUser = await userModel.findByEmail(lead.email);
+
+        if (existingUser) {
+            // Use existing user if they match
+            userId = existingUser.user_id;
+            // Optionally check if they are already a tenant?
+            // Since roles are ENUM('owner','tenant','treasurer'), a user has ONE role.
+            // If they are an owner or treasurer, we might have an issue if we want them to be a tenant too.
+            // But usually this means creating a new account or just linking.
+            // For now, let's assume if they exist, we link them. 
+            // If their role is NOT tenant, maybe we can't fully "convert" them in the simple sense.
+            // But let's proceed with finding them.
+        } else {
+            // Create new tenant user
+            // Generate a random password or set a default one
+            const tempPassword = Math.random().toString(36).slice(-8);
+            const hashedPassword = await hash(tempPassword, SALT_ROUNDS);
+
+            userId = await userModel.create({
+                name: lead.name,
+                email: lead.email,
+                phone: lead.phone,
+                passwordHash: hashedPassword,
+                role: 'tenant',
+                status: 'active'
+            });
+
+            // Send credentials via email
+            await emailService.sendCredentials(lead.email, 'tenant', tempPassword);
+        }
+
+        // 3. Update lead status and link to tenant
+        await leadModel.update(leadId, {
+            status: 'converted',
+            tenantId: userId
+        });
+
+        // 4. (Optional) Create Tenant Profile entry if needed (not in strict requirements but good practice)
+        // await db.query('INSERT INTO tenant_profile (tenant_id, phone) VALUES (?, ?)', [userId, lead.phone]);
+
+        return { message: 'Lead converted successfully', tenantId: userId };
     }
 }
 
