@@ -31,6 +31,7 @@ export function LeadsPage() {
   const [isConvertDialogOpen, setIsConvertDialogOpen] = useState(false);
   const [isHistoryDialogOpen, setIsHistoryDialogOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'pipeline' | 'list'>('pipeline');
+  const [tenantPassword, setTenantPassword] = useState('');
 
   const [formData, setFormData] = useState({
     name: '',
@@ -46,24 +47,28 @@ export function LeadsPage() {
     nextAction: '',
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    addLead({
-      ...formData,
-      status: 'interested',
-    });
-    toast.success('Lead added successfully');
-    setIsAddDialogOpen(false);
-    setFormData({
-      name: '',
-      email: '',
-      phone: '',
-      interestedUnit: '',
-      notes: '',
-    });
+    try {
+      await addLead({
+        ...formData,
+        status: 'interested',
+      });
+      toast.success('Lead added successfully');
+      setIsAddDialogOpen(false);
+      setFormData({
+        name: '',
+        email: '',
+        phone: '',
+        interestedUnit: '',
+        notes: '',
+      });
+    } catch (error) {
+      toast.error('Failed to add lead');
+    }
   };
 
-  const handleStatusChange = (leadId: string, status: Lead['status']) => {
+  const handleStatusChange = async (leadId: string, status: Lead['status']) => {
     const lead = leads.find(l => l.id === leadId);
     if (!lead) return;
 
@@ -75,11 +80,15 @@ export function LeadsPage() {
       }
     }
 
-    updateLead(leadId, { status, lastContactedAt: new Date().toISOString().split('T')[0] });
-    toast.success(`Lead moved to ${getStatusLabel(status)}`);
+    try {
+      await updateLead(leadId, { status, lastContactedAt: new Date().toISOString().split('T')[0] });
+      toast.success(`Lead moved to ${getStatusLabel(status)}`);
+    } catch (error) {
+      toast.error('Failed to update status');
+    }
   };
 
-  const handleAddFollowUp = (e: React.FormEvent) => {
+  const handleAddFollowUp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedLead) return;
 
@@ -88,25 +97,38 @@ export function LeadsPage() {
       ...followUpData,
     });
 
-    // Update last contacted date
-    updateLead(selectedLead.id, { lastContactedAt: followUpData.date });
+    try {
+      // Update last contacted date
+      await updateLead(selectedLead.id, { lastContactedAt: followUpData.date });
 
-    toast.success('Follow-up added successfully');
-    setIsFollowUpDialogOpen(false);
-    setFollowUpData({
-      date: '',
-      notes: '',
-      nextAction: '',
-    });
+      toast.success('Follow-up added successfully');
+      setIsFollowUpDialogOpen(false);
+      setFollowUpData({
+        date: '',
+        notes: '',
+        nextAction: '',
+      });
+    } catch (error) {
+      toast.error('Failed to update lead');
+    }
   };
 
-  const handleConvert = () => {
+  const handleConvert = async () => {
     if (!selectedLead) return;
+    if (!tenantPassword) {
+      toast.error('Please enter a password for the tenant account');
+      return;
+    }
 
-    const tenantId = convertLeadToTenant(selectedLead.id);
-    toast.success('Lead converted to tenant successfully');
-    setIsConvertDialogOpen(false);
-    setSelectedLead(null);
+    try {
+      const tenantId = await convertLeadToTenant(selectedLead.id, tenantPassword);
+      toast.success('Lead converted to tenant successfully');
+      setIsConvertDialogOpen(false);
+      setSelectedLead(null);
+      setTenantPassword('');
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to convert lead');
+    }
   };
 
   const getStatusLabel = (status: Lead['status']) => {
@@ -772,6 +794,19 @@ export function LeadsPage() {
                 <strong>Note:</strong> After conversion, you'll need to create a lease for this tenant in the Leases section.
               </p>
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="tenant-password">Tenant Password</Label>
+              <Input
+                id="tenant-password"
+                type="password"
+                placeholder="Enter password for tenant login"
+                value={tenantPassword}
+                onChange={(e) => setTenantPassword(e.target.value)}
+              />
+              <p className="text-xs text-gray-500">
+                This password will be emailed to the tenant along with their login credentials.
+              </p>
+            </div>
             <div className="flex gap-2 justify-end">
               <Button
                 type="button"
@@ -779,6 +814,7 @@ export function LeadsPage() {
                 onClick={() => {
                   setIsConvertDialogOpen(false);
                   setSelectedLead(null);
+                  setTenantPassword('');
                 }}
               >
                 Cancel

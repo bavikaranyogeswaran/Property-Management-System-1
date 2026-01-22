@@ -16,4 +16,7 @@ router.delete('/:id', authenticateToken, userController.deleteTreasurer);
 // Get all treasurers (Owner only)
 router.get('/treasurers', authenticateToken, userController.getTreasurers);
 
+// Get user by ID (Generic)
+router.get('/:id', authenticateToken, userController.getUserById);
+
 export default router;

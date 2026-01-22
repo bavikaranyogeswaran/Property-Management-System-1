@@ -64,6 +64,25 @@ class UserController {
             res.status(500).json({ error: error.message });
         }
     }
+
+    async getUserById(req, res) {
+        try {
+            const { id } = req.params;
+            // RBAC: Owner can view anyone, Users can view themselves.
+            // Simplified: Owner only for now as requested feature is for Owner view.
+            if (req.user.role !== 'owner' && req.user.id !== parseInt(id)) {
+                return res.status(403).json({ error: 'Access denied.' });
+            }
+
+            const user = await userService.getUserById(id);
+            if (!user) {
+                return res.status(404).json({ error: 'User not found' });
+            }
+            res.json(user);
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    }
 }
 
 export default new UserController();

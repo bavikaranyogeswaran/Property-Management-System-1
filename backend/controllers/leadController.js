@@ -10,7 +10,8 @@ class LeadController {
             }
 
             const { id } = req.params;
-            const result = await userService.convertLeadToTenant(id);
+            const { password } = req.body;
+            const result = await userService.convertLeadToTenant(id, password);
             res.status(200).json(result);
         } catch (error) {
             res.status(400).json({ error: error.message });

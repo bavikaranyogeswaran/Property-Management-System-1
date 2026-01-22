@@ -12,7 +12,19 @@ class LeadModel {
     }
 
     async findById(id) {
-        const [rows] = await db.query('SELECT * FROM leads WHERE lead_id = ?', [id]);
+        const [rows] = await db.query(`
+            SELECT 
+                lead_id as id,
+                unit_id as interestedUnit,
+                name,
+                email,
+                phone,
+                notes,
+                status,
+                created_at as createdAt,
+                last_contacted_at as lastContactedAt,
+                tenant_id as tenantId
+            FROM leads WHERE lead_id = ?`, [id]);
         return rows[0];
     }
 
@@ -38,7 +50,19 @@ class LeadModel {
     }
 
     async findAll() {
-        const [rows] = await db.query('SELECT * FROM leads ORDER BY created_at DESC');
+        const [rows] = await db.query(`
+            SELECT 
+                lead_id as id,
+                unit_id as interestedUnit,
+                name,
+                email,
+                phone,
+                notes,
+                status,
+                created_at as createdAt,
+                last_contacted_at as lastContactedAt,
+                tenant_id as tenantId
+            FROM leads ORDER BY created_at DESC`);
         return rows;
     }
 }

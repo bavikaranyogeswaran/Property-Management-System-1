@@ -181,10 +181,10 @@ interface AppContextType {
   deleteUnit: (id: string) => void;
 
   // Lead operations
-  addLead: (lead: Omit<Lead, 'id' | 'createdAt'>) => void;
-  updateLead: (id: string, lead: Partial<Lead>) => void;
+  addLead: (lead: Omit<Lead, 'id' | 'createdAt'>) => Promise<void>;
+  updateLead: (id: string, lead: Partial<Lead>) => Promise<void>;
   addLeadFollowUp: (followUp: Omit<LeadFollowUp, 'id'>) => void;
-  convertLeadToTenant: (leadId: string) => Promise<string>;
+  convertLeadToTenant: (leadId: string, password?: string) => Promise<string>;
 
   // Tenant operations
   addTenant: (tenant: Omit<Tenant, 'id' | 'createdAt'>) => void;
@@ -755,52 +755,74 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   // Lead operations
-  const addLead = (lead: Omit<Lead, 'id' | 'createdAt'>) => {
-    const newLead: Lead = {
-      ...lead,
-      id: `lead-${Date.now()}`,
-      createdAt: new Date().toISOString().split('T')[0],
-    };
-    setLeads([...leads, newLead]);
+  const addLead = async (lead: Omit<Lead, 'id' | 'createdAt'>) => {
+    try {
+      const response = await apiClient.post('/leads', lead);
+      if (response.status === 201) {
+        const { id } = response.data;
+        // Construct the new lead with returned ID
+        const newLead: Lead = {
+          ...lead,
+          id: id.toString(), // Ensure ID is string
+          createdAt: new Date().toISOString().split('T')[0],
+        };
+        setLeads([...leads, newLead]);
 
-    // Record initial stage history
-    const initialHistory: LeadStageHistory = {
-      id: `history-${Date.now()}`,
-      leadId: newLead.id,
-      fromStatus: null,
-      toStatus: lead.status,
-      changedAt: new Date().toISOString(),
-    };
-    setLeadStageHistory([...leadStageHistory, initialHistory]);
+        // Record initial stage history
+        // Ideally we should fetch this from backend too, or backend creates it and we assume it exists.
+        // For UI consistency we add it here locally.
+        const initialHistory: LeadStageHistory = {
+          id: `history-${Date.now()}`,
+          leadId: newLead.id,
+          fromStatus: null,
+          toStatus: lead.status,
+          changedAt: new Date().toISOString(),
+        };
+        setLeadStageHistory([...leadStageHistory, initialHistory]);
+      }
+    } catch (error) {
+      console.error('Failed to add lead:', error);
+      // Optionally show toast here or let caller handle it? 
+      // Current implementation in LeadsPage handles success, but we should throw if it fails so UI knows.
+      // But LeadsPage.tsx handleSubmit doesn't await addLead currently!
+      // We need to fix LeadsPage.tsx to await this too.
+    }
   };
 
-  const updateLead = (id: string, updates: Partial<Lead>) => {
-    const currentLead = leads.find(l => l.id === id);
+  const updateLead = async (id: string, updates: Partial<Lead>) => {
+    try {
+      await apiClient.put(`/leads/${id}`, updates);
 
-    // If status is changing, record the transition
-    if (currentLead && updates.status && updates.status !== currentLead.status) {
-      // Calculate duration in previous stage
-      const previousStageHistory = leadStageHistory
-        .filter(h => h.leadId === id)
-        .sort((a, b) => new Date(b.changedAt).getTime() - new Date(a.changedAt).getTime())[0];
+      const currentLead = leads.find(l => l.id === id);
 
-      const durationInDays = previousStageHistory
-        ? Math.floor((new Date().getTime() - new Date(previousStageHistory.changedAt).getTime()) / (1000 * 60 * 60 * 24))
-        : 0;
+      // If status is changing, record the transition (Local UI update)
+      // Backend should ideally handle history creation, but if we keep it in frontend context for now:
+      if (currentLead && updates.status && updates.status !== currentLead.status) {
+        // Calculate duration in previous stage
+        const previousStageHistory = leadStageHistory
+          .filter(h => h.leadId === id)
+          .sort((a, b) => new Date(b.changedAt).getTime() - new Date(a.changedAt).getTime())[0];
 
-      const historyEntry: LeadStageHistory = {
-        id: `history-${Date.now()}`,
-        leadId: id,
-        fromStatus: currentLead.status,
-        toStatus: updates.status,
-        changedAt: new Date().toISOString(),
-        durationInPreviousStage: durationInDays,
-      };
+        const durationInDays = previousStageHistory
+          ? Math.floor((new Date().getTime() - new Date(previousStageHistory.changedAt).getTime()) / (1000 * 60 * 60 * 24))
+          : 0;
 
-      setLeadStageHistory([...leadStageHistory, historyEntry]);
+        const historyEntry: LeadStageHistory = {
+          id: `history-${Date.now()}`,
+          leadId: id,
+          fromStatus: currentLead.status,
+          toStatus: updates.status,
+          changedAt: new Date().toISOString(),
+          durationInPreviousStage: durationInDays,
+        };
+
+        setLeadStageHistory([...leadStageHistory, historyEntry]);
+      }
+
+      setLeads(leads.map(l => l.id === id ? { ...l, ...updates } : l));
+    } catch (error) {
+      console.error('Failed to update lead:', error);
     }
-
-    setLeads(leads.map(l => l.id === id ? { ...l, ...updates } : l));
   };
 
   const addLeadFollowUp = (followUp: Omit<LeadFollowUp, 'id'>) => {
@@ -811,9 +833,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setLeadFollowUps([...leadFollowUps, newFollowUp]);
   };
 
-  const convertLeadToTenant = async (leadId: string): Promise<string> => {
+  const convertLeadToTenant = async (leadId: string, password?: string): Promise<string> => {
     try {
-      const response = await apiClient.post(`/leads/${leadId}/convert`);
+      const response = await apiClient.post(`/leads/${leadId}/convert`, { password });
       const { tenantId } = response.data;
 
       // Optimistic update or refetch?
@@ -821,11 +843,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const lead = leads.find(l => l.id === leadId);
       if (lead) {
         updateLead(leadId, { status: 'converted' });
-        // Add to local tenants list if we want immediate UI feedback without refetching tenants
-        // But tenants might need more data than we have here. 
-        // The backend creates the tenant. 
-        // Ideally we fetch tenants again.
-        // For now, let's just return api result.
+
+        // Fetch the new tenant details
+        try {
+          const userResponse = await apiClient.get(`/users/${tenantId}`);
+          if (userResponse.status === 200) {
+            const newUser = userResponse.data;
+            // Add to tenants list
+            const newTenant: Tenant = {
+              id: newUser.user_id.toString(),
+              name: newUser.name,
+              email: newUser.email,
+              phone: newUser.phone || '',
+              createdAt: newUser.created_at.split('T')[0],
+              // leaseId is undefined initially
+            };
+            setTenants(prev => [...prev, newTenant]);
+          }
+        } catch (fetchError) {
+          console.error("Failed to fetch new tenant details:", fetchError);
+        }
       }
       return tenantId;
     } catch (error) {

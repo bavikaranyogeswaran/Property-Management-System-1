@@ -61,8 +61,17 @@ class UserService {
         return await userModel.findByRole('treasurer');
     }
 
+    async getUserById(id) {
+        const user = await userModel.findById(id);
+        if (user) {
+            // Remove sensitive data
+            delete user.password_hash;
+        }
+        return user;
+    }
+
     // Convert lead to tenant
-    async convertLeadToTenant(leadId) {
+    async convertLeadToTenant(leadId, providedPassword) {
         // 1. Get lead details
         const lead = await leadModel.findById(leadId);
         if (!lead) {
@@ -89,9 +98,9 @@ class UserService {
             // But let's proceed with finding them.
         } else {
             // Create new tenant user
-            // Generate a random password or set a default one
-            const tempPassword = Math.random().toString(36).slice(-8);
-            const hashedPassword = await hash(tempPassword, SALT_ROUNDS);
+            // Use provided password or fallback to random (though UI enforces it now)
+            const passwordToUse = providedPassword || Math.random().toString(36).slice(-8);
+            const hashedPassword = await hash(passwordToUse, SALT_ROUNDS);
 
             userId = await userModel.create({
                 name: lead.name,
@@ -103,7 +112,7 @@ class UserService {
             });
 
             // Send credentials via email
-            await emailService.sendCredentials(lead.email, 'tenant', tempPassword);
+            await emailService.sendCredentials(lead.email, 'tenant', passwordToUse);
         }
 
         // 3. Update lead status and link to tenant
