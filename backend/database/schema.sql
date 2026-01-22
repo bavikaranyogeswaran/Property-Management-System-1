@@ -1,0 +1,218 @@
+-- =========================
+-- PMS DATABASE (FINAL - ADJUSTED)
+-- =========================
+DROP DATABASE IF EXISTS pms_database;
+CREATE DATABASE pms_database;
+USE pms_database;
+
+-- =========================
+-- USERS (AUTH + RBAC)
+-- =========================
+CREATE TABLE users (
+    user_id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    email VARCHAR(100) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    role ENUM('owner','tenant','treasurer') NOT NULL,
+    status ENUM('active','inactive') DEFAULT 'active',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Tenant Profile (Optional extensions)
+CREATE TABLE tenant_profile (
+    tenant_id INT PRIMARY KEY,               -- same as users.user_id
+    phone VARCHAR(20),
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_tenant_profile_user
+        FOREIGN KEY (tenant_id) REFERENCES users(user_id)
+        ON DELETE CASCADE
+);
+
+-- =========================
+-- PROPERTIES & UNITS
+-- =========================
+CREATE TABLE properties (
+    property_id INT AUTO_INCREMENT PRIMARY KEY,
+    owner_id INT NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    type VARCHAR(100) NOT NULL,
+    address TEXT NOT NULL,
+    status ENUM('active','inactive') DEFAULT 'active',
+    image_url VARCHAR(255),                  -- [ADDED] For dashboard display
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (owner_id) REFERENCES users(user_id)
+);
+
+CREATE TABLE units (
+    unit_id INT AUTO_INCREMENT PRIMARY KEY,
+    property_id INT NOT NULL,
+    unit_number VARCHAR(50) NOT NULL,
+    unit_type VARCHAR(50) NOT NULL,
+    monthly_rent DECIMAL(10,2) NOT NULL,
+    status ENUM('available','occupied','maintenance') DEFAULT 'available',
+    image_url VARCHAR(255),                  -- [ADDED] For unit visualization
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (property_id, unit_number),
+    FOREIGN KEY (property_id) REFERENCES properties(property_id)
+);
+
+-- =========================
+-- LEADS & FOLLOW-UPS
+-- =========================
+CREATE TABLE leads (
+    lead_id INT AUTO_INCREMENT PRIMARY KEY,
+    unit_id INT NULL,
+    tenant_id INT,  -- set ONLY when converted
+    name VARCHAR(100) NOT NULL,
+    phone VARCHAR(20),
+    email VARCHAR(100),
+    status ENUM('interested','negotiation','converted','dropped') DEFAULT 'interested',
+    notes TEXT,
+    score INT DEFAULT 0,                     -- [ADDED] Lead scoring
+    last_contacted_at DATETIME,              -- [ADDED] For follow-up tracking
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (unit_id) REFERENCES units(unit_id),
+    FOREIGN KEY (tenant_id) REFERENCES users(user_id)
+);
+
+CREATE TABLE lead_followups (
+    followup_id INT AUTO_INCREMENT PRIMARY KEY,
+    lead_id INT NOT NULL,
+    followup_date DATE NOT NULL,
+    notes TEXT,
+    FOREIGN KEY (lead_id) REFERENCES leads(lead_id) ON DELETE CASCADE
+);
+
+CREATE TABLE lead_stage_history (
+    history_id INT AUTO_INCREMENT PRIMARY KEY,
+    lead_id INT NOT NULL,
+    from_status ENUM('interested','negotiation','converted','dropped') NULL,
+    to_status   ENUM('interested','negotiation','converted','dropped') NOT NULL,
+    changed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    notes TEXT,
+    duration_in_previous_stage INT,
+    CONSTRAINT fk_stage_history_lead
+        FOREIGN KEY (lead_id) REFERENCES leads(lead_id)
+        ON DELETE CASCADE
+);
+
+-- =========================
+-- LEASES
+-- =========================
+CREATE TABLE leases (
+    lease_id INT AUTO_INCREMENT PRIMARY KEY,
+    tenant_id INT NOT NULL,
+    unit_id INT NOT NULL,
+    start_date DATE NOT NULL,
+    end_date DATE,
+    monthly_rent DECIMAL(10,2) NOT NULL,
+    status ENUM('active','ended') DEFAULT 'active',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (tenant_id) REFERENCES users(user_id),
+    FOREIGN KEY (unit_id) REFERENCES units(unit_id)
+);
+
+-- =========================
+-- RENT INVOICES
+-- =========================
+CREATE TABLE rent_invoices (
+    invoice_id INT AUTO_INCREMENT PRIMARY KEY,
+    lease_id INT NOT NULL,
+    tenant_id INT NOT NULL,
+    unit_id INT NOT NULL,
+    year SMALLINT NOT NULL,
+    month TINYINT NOT NULL,
+    amount DECIMAL(10,2) NOT NULL,
+    due_date DATE NOT NULL,
+    status ENUM('pending','paid','overdue') DEFAULT 'pending',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (lease_id, year, month),
+    FOREIGN KEY (lease_id) REFERENCES leases(lease_id),
+    FOREIGN KEY (tenant_id) REFERENCES users(user_id),
+    FOREIGN KEY (unit_id) REFERENCES units(unit_id)
+);
+
+-- =========================
+-- PAYMENTS
+-- =========================
+CREATE TABLE payments (
+    payment_id INT AUTO_INCREMENT PRIMARY KEY,
+    invoice_id INT NOT NULL,
+    tenant_id INT NOT NULL,
+    amount DECIMAL(10,2) NOT NULL,
+    payment_date DATE NOT NULL,
+    payment_method VARCHAR(30),
+    proof_url VARCHAR(255),
+    status ENUM('pending','verified','rejected') DEFAULT 'pending',
+    verified_by INT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (invoice_id) REFERENCES rent_invoices(invoice_id),
+    FOREIGN KEY (tenant_id) REFERENCES users(user_id),
+    FOREIGN KEY (verified_by) REFERENCES users(user_id)
+);
+
+-- =========================
+-- RECEIPTS
+-- =========================
+CREATE TABLE receipts (
+    receipt_id INT AUTO_INCREMENT PRIMARY KEY,
+    payment_id INT UNIQUE NOT NULL,
+    invoice_id INT NOT NULL,
+    tenant_id INT NOT NULL,
+    amount DECIMAL(10,2) NOT NULL,
+    receipt_date DATE NOT NULL,
+    receipt_number VARCHAR(50) UNIQUE NOT NULL,
+    FOREIGN KEY (payment_id) REFERENCES payments(payment_id),
+    FOREIGN KEY (invoice_id) REFERENCES rent_invoices(invoice_id),
+    FOREIGN KEY (tenant_id) REFERENCES users(user_id)
+);
+
+-- =========================
+-- MAINTENANCE REQUESTS
+-- =========================
+CREATE TABLE maintenance_requests (
+    request_id INT AUTO_INCREMENT PRIMARY KEY,
+    unit_id INT NOT NULL,
+    tenant_id INT NOT NULL,
+    title VARCHAR(150) NOT NULL,
+    description TEXT NOT NULL,
+    priority ENUM('low','medium','high','urgent') DEFAULT 'medium',
+    images JSON,
+    status ENUM('submitted','in_progress','completed') DEFAULT 'submitted',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (unit_id) REFERENCES units(unit_id),
+    FOREIGN KEY (tenant_id) REFERENCES users(user_id)
+);
+
+CREATE TABLE maintenance_costs (
+    cost_id INT AUTO_INCREMENT PRIMARY KEY,
+    request_id INT NOT NULL,
+    description VARCHAR(255),
+    amount DECIMAL(10,2) NOT NULL,
+    recorded_date DATE NOT NULL,
+    FOREIGN KEY (request_id) REFERENCES maintenance_requests(request_id)
+);
+
+-- =========================
+-- NOTIFICATIONS
+-- =========================
+CREATE TABLE notifications (
+    notification_id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT,
+    message TEXT NOT NULL,
+    type ENUM('invoice','lease','maintenance') NOT NULL,
+    is_read BOOLEAN DEFAULT FALSE,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(user_id)
+);
+
+-- =========================
+-- INDEXES
+-- =========================
+CREATE INDEX idx_unit_status ON units(status);
+CREATE INDEX idx_lead_status ON leads(status);
+CREATE INDEX idx_lead_last_contacted ON leads(last_contacted_at);
+CREATE INDEX idx_lease_status ON leases(status);
+CREATE INDEX idx_invoice_status ON rent_invoices(status);
+CREATE INDEX idx_payment_status ON payments(status);
+CREATE INDEX idx_maintenance_status ON maintenance_requests(status);
