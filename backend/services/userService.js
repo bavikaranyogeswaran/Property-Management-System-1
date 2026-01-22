@@ -1,4 +1,5 @@
-import { hash } from 'bcryptjs';
+import bcrypt from 'bcryptjs';
+const { hash } = bcrypt;
 import userModel from '../models/userModel.js';
 import emailService from '../utils/emailService.js';
 

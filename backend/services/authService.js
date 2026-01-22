@@ -1,5 +1,7 @@
-import { compare } from 'bcryptjs';
-import { sign } from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
+const { compare } = bcrypt;
+import jwt from 'jsonwebtoken';
+const { sign } = jwt;
 import userModel from '../models/userModel.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'secret';
