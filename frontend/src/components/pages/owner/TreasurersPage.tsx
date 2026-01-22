@@ -30,6 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { apiClient } from '@/services/api';
 
 export function TreasurersPage() {
   const { treasurers, addTreasurer, updateTreasurer, deleteTreasurer } = useApp();
@@ -37,7 +38,7 @@ export function TreasurersPage() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedTreasurer, setSelectedTreasurer] = useState<Treasurer | null>(null);
   const [showPassword, setShowPassword] = useState(false);
-  
+
   // Form state
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -54,26 +55,46 @@ export function TreasurersPage() {
     setShowPassword(false);
   };
 
-  const handleAddTreasurer = (e: React.FormEvent) => {
+
+
+  const handleAddTreasurer = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validate email uniqueness
+    // Validate email uniqueness (local check, backend will also check)
     if (treasurers.some(t => t.email === email)) {
       toast.error('A treasurer with this email already exists');
       return;
     }
 
-    addTreasurer({
-      name,
-      email,
-      phone,
-      password,
-      status,
-    });
+    try {
+      // Call backend API
+      const response = await apiClient.post('/users/create-treasurer', {
+        name,
+        email,
+        phone,
+        password,
+      });
 
-    toast.success('Treasurer registered successfully');
-    setIsAddDialogOpen(false);
-    resetForm();
+      if (response.status === 201) {
+        // Update local state to reflect change immediately (using backend ID if possible or generating temp)
+        // Note: Backend doesn't return phone, so we keep local form value for UI consistency until refresh
+        addTreasurer({
+          name,
+          email,
+          phone,
+          password,
+          status,
+        });
+
+        toast.success('Treasurer registered successfully');
+        setIsAddDialogOpen(false);
+        resetForm();
+      }
+    } catch (error: any) {
+      console.error('Failed to register treasurer:', error);
+      const errorMessage = error.response?.data?.error || 'Failed to register treasurer';
+      toast.error(errorMessage);
+    }
   };
 
   const handleEditClick = (treasurer: Treasurer) => {
@@ -86,9 +107,9 @@ export function TreasurersPage() {
     setIsEditDialogOpen(true);
   };
 
-  const handleUpdateTreasurer = (e: React.FormEvent) => {
+  const handleUpdateTreasurer = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!selectedTreasurer) return;
 
     // Validate email uniqueness (excluding current treasurer)
@@ -97,31 +118,61 @@ export function TreasurersPage() {
       return;
     }
 
-    updateTreasurer(selectedTreasurer.id, {
-      name,
-      email,
-      phone,
-      password,
-      status,
-    });
+    try {
+      // Call backend API (password is excluded)
+      await apiClient.put(`/users/${selectedTreasurer.id}`, {
+        name,
+        email,
+        phone,
+        status,
+      });
 
-    toast.success('Treasurer updated successfully');
-    setIsEditDialogOpen(false);
-    setSelectedTreasurer(null);
-    resetForm();
-  };
+      // Update local context
+      updateTreasurer(selectedTreasurer.id, {
+        name,
+        email,
+        phone,
+        status,
+      });
 
-  const handleDelete = (treasurer: Treasurer) => {
-    if (window.confirm(`Are you sure you want to remove ${treasurer.name} as a treasurer?`)) {
-      deleteTreasurer(treasurer.id);
-      toast.success('Treasurer removed successfully');
+      toast.success('Treasurer updated successfully');
+      setIsEditDialogOpen(false);
+      setSelectedTreasurer(null);
+      resetForm();
+    } catch (error: any) {
+      console.error('Failed to update treasurer:', error);
+      toast.error(error.response?.data?.error || 'Failed to update treasurer');
     }
   };
 
-  const handleToggleStatus = (treasurer: Treasurer) => {
+  const handleDelete = async (treasurer: Treasurer) => {
+    if (window.confirm(`Are you sure you want to remove ${treasurer.name} as a treasurer?`)) {
+      try {
+        await apiClient.delete(`/users/${treasurer.id}`);
+        deleteTreasurer(treasurer.id);
+        toast.success('Treasurer removed successfully');
+      } catch (error: any) {
+        console.error('Failed to remove treasurer:', error);
+        toast.error(error.response?.data?.error || 'Failed to remove treasurer');
+      }
+    }
+  };
+
+  const handleToggleStatus = async (treasurer: Treasurer) => {
     const newStatus = treasurer.status === 'active' ? 'inactive' : 'active';
-    updateTreasurer(treasurer.id, { status: newStatus });
-    toast.success(`Treasurer ${newStatus === 'active' ? 'activated' : 'deactivated'} successfully`);
+    try {
+      await apiClient.put(`/users/${treasurer.id}`, {
+        name: treasurer.name,
+        email: treasurer.email,
+        phone: treasurer.phone,
+        status: newStatus,
+      });
+      updateTreasurer(treasurer.id, { status: newStatus });
+      toast.success(`Treasurer ${newStatus === 'active' ? 'activated' : 'deactivated'} successfully`);
+    } catch (error: any) {
+      console.error('Failed to update status:', error);
+      toast.error('Failed to update status');
+    }
   };
 
   const activeTreasurers = treasurers.filter(t => t.status === 'active').length;
