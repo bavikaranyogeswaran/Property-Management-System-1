@@ -14,11 +14,13 @@ import authRoutes from './routes/authRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import leadRoutes from './routes/leadRoutes.js';
 import propertyRoutes from './routes/propertyRoutes.js';
+import unitTypeRoutes from './routes/unitTypeRoutes.js';
 
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/leads', leadRoutes);
 app.use('/api/properties', propertyRoutes);
+app.use('/api/unit-types', unitTypeRoutes);
 
 app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', message: 'PMS Backend is running' });

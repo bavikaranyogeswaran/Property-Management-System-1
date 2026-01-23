@@ -20,11 +20,18 @@ export interface PropertyType {
   description: string;
 }
 
+export interface UnitType {
+  type_id: number;
+  name: string;
+  description?: string;
+}
+
 export interface Unit {
   id: string;
   propertyId: string;
   unitNumber: string;
-  type: string;
+  unitTypeId: number;       // FK to unit_types
+  type: string;             // Type name for display (legacy/computed)
   monthlyRent: number;
   status: 'available' | 'occupied' | 'maintenance';
   createdAt: string;
@@ -166,6 +173,7 @@ export interface Notification {
 interface AppContextType {
   properties: Property[];
   propertyTypes: PropertyType[];
+  unitTypes: UnitType[];
   units: Unit[];
   leads: Lead[];
   leadFollowUps: LeadFollowUp[];
@@ -250,6 +258,7 @@ const INITIAL_DATA = {
       id: 'unit-1',
       propertyId: 'prop-1',
       unitNumber: 'A101',
+      unitTypeId: 1,
       type: 'Studio',
       monthlyRent: 1200,
       status: 'occupied' as const,
@@ -259,6 +268,7 @@ const INITIAL_DATA = {
       id: 'unit-2',
       propertyId: 'prop-1',
       unitNumber: 'A102',
+      unitTypeId: 2,
       type: '1 Bedroom',
       monthlyRent: 1500,
       status: 'available' as const,
@@ -268,6 +278,7 @@ const INITIAL_DATA = {
       id: 'unit-3',
       propertyId: 'prop-1',
       unitNumber: 'A103',
+      unitTypeId: 3,
       type: '2 Bedroom',
       monthlyRent: 2000,
       status: 'occupied' as const,
@@ -493,6 +504,7 @@ const INITIAL_DATA = {
 export function AppProvider({ children }: { children: ReactNode }) {
   const [properties, setProperties] = useState<Property[]>([]);
   const [propertyTypes, setPropertyTypes] = useState<PropertyType[]>([]);
+  const [unitTypes, setUnitTypes] = useState<UnitType[]>([]);
   const [units, setUnits] = useState<Unit[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [leadFollowUps, setLeadFollowUps] = useState<LeadFollowUp[]>([]);
@@ -661,6 +673,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
     };
     fetchProperties();
+
+    // Fetch Unit Types
+    const fetchUnitTypes = async () => {
+      try {
+        const response = await apiClient.get('/unit-types');
+        if (response.status === 200) {
+          setUnitTypes(response.data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch unit types:', error);
+      }
+    };
+    fetchUnitTypes();
 
   }, []);
 
@@ -1127,6 +1152,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     <AppContext.Provider value={{
       properties,
       propertyTypes,
+      unitTypes,
       units,
       leads,
       leadFollowUps,

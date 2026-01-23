@@ -29,16 +29,25 @@ INSERT INTO property_types (type_id, name, description) VALUES
 (4, 'Condo', 'Individually owned unit in a building'),
 (5, 'Townhouse', 'Multi-floor home sharing walls');
 
+-- 2.5 UNIT TYPES
+INSERT INTO unit_types (type_id, name, description) VALUES 
+(1, 'Studio', 'Single room with kitchenette'),
+(2, '1 Bedroom', 'One bedroom unit'),
+(3, '2 Bedroom', 'Two bedroom unit'),
+(4, '3 Bedroom', 'Three bedroom unit'),
+(5, 'Penthouse', 'Luxury top-floor unit'),
+(6, 'Loft', 'Open-plan industrial-style unit');
+
 -- 3. PROPERTIES
 INSERT INTO properties (property_id, owner_id, name, property_type_id, address_line_1, address_line_2, address_line_3, image_url) VALUES 
 (1, 1, 'Sunset Apartments', 1, '123 Main Street', 'Downtown', NULL, '/images/prop1.jpg'),
 (2, 1, 'Commercial Plaza', 2, '456 Business Ave', 'City Center', 'Suite 100', '/images/prop2.jpg');
 
--- 3. UNITS
-INSERT INTO units (unit_id, property_id, unit_number, unit_type, monthly_rent, status) VALUES 
-(1, 1, 'A101', 'Studio', 1200.00, 'occupied'),
-(2, 1, 'A102', '1 Bedroom', 1500.00, 'available'),
-(3, 1, 'A103', '2 Bedroom', 2000.00, 'occupied');
+-- 4. UNITS
+INSERT INTO units (unit_id, property_id, unit_number, unit_type_id, monthly_rent, status) VALUES 
+(1, 1, 'A101', 1, 1200.00, 'occupied'),  -- Studio
+(2, 1, 'A102', 2, 1500.00, 'available'), -- 1 Bedroom
+(3, 1, 'A103', 3, 2000.00, 'occupied');  -- 2 Bedroom
 
 -- 4. LEADS
 INSERT INTO leads (lead_id, unit_id, name, email, phone, status, notes, score, last_contacted_at) VALUES 

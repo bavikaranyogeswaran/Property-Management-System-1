@@ -41,6 +41,15 @@ CREATE TABLE property_types (
 );
 
 -- =========================
+-- UNIT TYPES (3NF)
+-- =========================
+CREATE TABLE unit_types (
+    type_id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(50) NOT NULL UNIQUE,
+    description VARCHAR(255)
+);
+
+-- =========================
 -- PROPERTIES & UNITS
 -- =========================
 CREATE TABLE properties (
@@ -52,7 +61,7 @@ CREATE TABLE properties (
     address_line_2 VARCHAR(255),
     address_line_3 VARCHAR(255),
     status ENUM('active','inactive') DEFAULT 'active',
-    image_url VARCHAR(255),
+    image_url VARCHAR(255),                  -- [DEPRECATED] Use property_images table instead
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (owner_id) REFERENCES users(user_id),
     FOREIGN KEY (property_type_id) REFERENCES property_types(type_id)
@@ -62,13 +71,37 @@ CREATE TABLE units (
     unit_id INT AUTO_INCREMENT PRIMARY KEY,
     property_id INT NOT NULL,
     unit_number VARCHAR(50) NOT NULL,
-    unit_type VARCHAR(50) NOT NULL,
+    unit_type_id INT NOT NULL,               -- [MODIFIED] FK to unit_types
     monthly_rent DECIMAL(10,2) NOT NULL,
     status ENUM('available','occupied','maintenance') DEFAULT 'available',
-    image_url VARCHAR(255),                  -- [ADDED] For unit visualization
+    image_url VARCHAR(255),                  -- [DEPRECATED] Use unit_images table instead
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     UNIQUE (property_id, unit_number),
-    FOREIGN KEY (property_id) REFERENCES properties(property_id)
+    FOREIGN KEY (property_id) REFERENCES properties(property_id),
+    FOREIGN KEY (unit_type_id) REFERENCES unit_types(type_id)
+);
+
+-- =========================
+-- PROPERTY & UNIT IMAGES
+-- =========================
+CREATE TABLE property_images (
+    image_id INT AUTO_INCREMENT PRIMARY KEY,
+    property_id INT NOT NULL,
+    image_url VARCHAR(500) NOT NULL,
+    is_primary BOOLEAN DEFAULT FALSE,
+    display_order INT DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (property_id) REFERENCES properties(property_id) ON DELETE CASCADE
+);
+
+CREATE TABLE unit_images (
+    image_id INT AUTO_INCREMENT PRIMARY KEY,
+    unit_id INT NOT NULL,
+    image_url VARCHAR(500) NOT NULL,
+    is_primary BOOLEAN DEFAULT FALSE,
+    display_order INT DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (unit_id) REFERENCES units(unit_id) ON DELETE CASCADE
 );
 
 -- =========================

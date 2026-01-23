@@ -12,7 +12,7 @@ import { Home, Plus, Edit, Trash2, Filter, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 
 export function UnitsPage() {
-  const { units, properties, leases, addUnit, updateUnit, deleteUnit } = useApp();
+  const { units, properties, unitTypes, leases, addUnit, updateUnit, deleteUnit } = useApp();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingUnit, setEditingUnit] = useState<Unit | null>(null);
   const [filterProperty, setFilterProperty] = useState<string>('all');
@@ -20,6 +20,7 @@ export function UnitsPage() {
   const [formData, setFormData] = useState({
     propertyId: '',
     unitNumber: '',
+    unitTypeId: 0,
     type: '',
     monthlyRent: '',
     status: 'available' as Unit['status'],
@@ -63,6 +64,7 @@ export function UnitsPage() {
     setFormData({
       propertyId: '',
       unitNumber: '',
+      unitTypeId: 0,
       type: '',
       monthlyRent: '',
       status: 'available',
@@ -75,6 +77,7 @@ export function UnitsPage() {
     setFormData({
       propertyId: unit.propertyId,
       unitNumber: unit.unitNumber,
+      unitTypeId: unit.unitTypeId,
       type: unit.type,
       monthlyRent: unit.monthlyRent.toString(),
       status: unit.status,
@@ -183,13 +186,26 @@ export function UnitsPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="type">Unit Type</Label>
-                <Input
-                  id="type"
-                  placeholder="e.g., Studio, 1 Bedroom"
-                  value={formData.type}
-                  onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                <Select
+                  value={formData.unitTypeId.toString()}
+                  onValueChange={(value) => {
+                    const typeId = parseInt(value);
+                    const typeName = unitTypes.find(t => t.type_id === typeId)?.name || '';
+                    setFormData({ ...formData, unitTypeId: typeId, type: typeName });
+                  }}
                   required
-                />
+                >
+                  <SelectTrigger id="type">
+                    <SelectValue placeholder="Select unit type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {unitTypes.map((type) => (
+                      <SelectItem key={type.type_id} value={type.type_id.toString()}>
+                        {type.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="monthlyRent">Monthly Rent (LKR)</Label>
@@ -244,6 +260,7 @@ export function UnitsPage() {
                   setFormData({
                     propertyId: '',
                     unitNumber: '',
+                    unitTypeId: 0,
                     type: '',
                     monthlyRent: '',
                     status: 'available',
@@ -376,6 +393,7 @@ export function UnitsPage() {
                               setFormData({
                                 propertyId: '',
                                 unitNumber: '',
+                                unitTypeId: 0,
                                 type: '',
                                 monthlyRent: '',
                                 status: 'available',
@@ -426,12 +444,25 @@ export function UnitsPage() {
                                 </div>
                                 <div className="space-y-2">
                                   <Label htmlFor="edit-type">Unit Type</Label>
-                                  <Input
-                                    id="edit-type"
-                                    value={formData.type}
-                                    onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                                    required
-                                  />
+                                  <Select
+                                    value={formData.unitTypeId.toString()}
+                                    onValueChange={(value) => {
+                                      const typeId = parseInt(value);
+                                      const typeName = unitTypes.find(t => t.type_id === typeId)?.name || '';
+                                      setFormData({ ...formData, unitTypeId: typeId, type: typeName });
+                                    }}
+                                  >
+                                    <SelectTrigger id="edit-type">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {unitTypes.map((type) => (
+                                        <SelectItem key={type.type_id} value={type.type_id.toString()}>
+                                          {type.name}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
                                 </div>
                                 <div className="space-y-2">
                                   <Label htmlFor="edit-monthlyRent">Monthly Rent (LKR)</Label>
@@ -494,6 +525,7 @@ export function UnitsPage() {
                                     setFormData({
                                       propertyId: '',
                                       unitNumber: '',
+                                      unitTypeId: 0,
                                       type: '',
                                       monthlyRent: '',
                                       status: 'available',
