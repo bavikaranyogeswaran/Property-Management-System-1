@@ -9,13 +9,15 @@ import { Building2, Plus, Edit, Trash2, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 
 export function PropertiesPage() {
-  const { properties, units, addProperty, updateProperty, deleteProperty } = useApp();
+  const { properties, propertyTypes, units, addProperty, updateProperty, deleteProperty } = useApp();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingProperty, setEditingProperty] = useState<Property | null>(null);
   const [formData, setFormData] = useState({
     name: '',
-    address: '',
-    type: '',
+    addressLine1: '',
+    addressLine2: '',
+    addressLine3: '',
+    propertyTypeId: 0,
   });
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [viewProperty, setViewProperty] = useState<Property | null>(null);
@@ -28,6 +30,12 @@ export function PropertiesPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Validate type
+    if (formData.propertyTypeId === 0) {
+      toast.error('Please select a property type');
+      return;
+    }
 
     // Simulate image upload
     let image = editingProperty?.image;
@@ -45,7 +53,7 @@ export function PropertiesPage() {
       setIsAddDialogOpen(false);
     }
 
-    setFormData({ name: '', address: '', type: '' });
+    setFormData({ name: '', addressLine1: '', addressLine2: '', addressLine3: '', propertyTypeId: 0 });
     setSelectedImage(null);
   };
 
@@ -53,8 +61,10 @@ export function PropertiesPage() {
     setEditingProperty(property);
     setFormData({
       name: property.name,
-      address: property.address,
-      type: property.type,
+      addressLine1: property.addressLine1,
+      addressLine2: property.addressLine2 || '',
+      addressLine3: property.addressLine3 || '',
+      propertyTypeId: property.propertyTypeId,
     });
     setSelectedImage(null);
   };
@@ -105,25 +115,41 @@ export function PropertiesPage() {
                   required
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="address">Address</Label>
-                <Input
-                  id="address"
-                  placeholder="e.g., 123 Main Street, City"
-                  value={formData.address}
-                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                  required
-                />
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Address</Label>
+                  <Input
+                    placeholder="Address Line 1"
+                    value={formData.addressLine1}
+                    onChange={(e) => setFormData({ ...formData, addressLine1: e.target.value })}
+                    required
+                  />
+                  <Input
+                    placeholder="Address Line 2 (Optional)"
+                    value={formData.addressLine2}
+                    onChange={(e) => setFormData({ ...formData, addressLine2: e.target.value })}
+                  />
+                  <Input
+                    placeholder="Address Line 3 (Optional)"
+                    value={formData.addressLine3}
+                    onChange={(e) => setFormData({ ...formData, addressLine3: e.target.value })}
+                  />
+                </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="type">Property Type</Label>
-                <Input
+                <select
                   id="type"
-                  placeholder="e.g., Apartment Building, Commercial"
-                  value={formData.type}
-                  onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                  className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  value={formData.propertyTypeId}
+                  onChange={(e) => setFormData({ ...formData, propertyTypeId: parseInt(e.target.value) })}
                   required
-                />
+                >
+                  <option value={0}>Select Type</option>
+                  {propertyTypes.map((t) => (
+                    <option key={t.type_id} value={t.type_id}>{t.name}</option>
+                  ))}
+                </select>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="image">Property Image</Label>
@@ -147,7 +173,7 @@ export function PropertiesPage() {
               <div className="flex gap-2 justify-end">
                 <Button type="button" variant="outline" onClick={() => {
                   setIsAddDialogOpen(false);
-                  setFormData({ name: '', address: '', type: '' });
+                  setFormData({ name: '', addressLine1: '', addressLine2: '', addressLine3: '', propertyTypeId: 0 });
                   setSelectedImage(null);
                 }}>
                   Cancel
@@ -182,7 +208,7 @@ export function PropertiesPage() {
                   )}
                   <div>
                     <CardTitle className="text-base">{property.name}</CardTitle>
-                    <p className="text-xs text-gray-500 mt-1">{property.type}</p>
+                    <p className="text-xs text-gray-500 mt-1">{property.typeName}</p>
                   </div>
                 </div>
               </div>
@@ -191,7 +217,9 @@ export function PropertiesPage() {
               <div className="space-y-3">
                 <div>
                   <p className="text-xs text-gray-500">Address</p>
-                  <p className="text-sm">{property.address}</p>
+                  <p className="text-sm">{property.addressLine1}</p>
+                  {property.addressLine2 && <p className="text-sm text-gray-500">{property.addressLine2}</p>}
+                  {property.addressLine3 && <p className="text-sm text-gray-500">{property.addressLine3}</p>}
                 </div>
                 <div className="flex justify-between items-center pt-3 border-t">
                   <div>
@@ -209,7 +237,7 @@ export function PropertiesPage() {
                     <Dialog open={editingProperty?.id === property.id} onOpenChange={(open) => {
                       if (!open) {
                         setEditingProperty(null);
-                        setFormData({ name: '', address: '', type: '' });
+                        setFormData({ name: '', addressLine1: '', addressLine2: '', addressLine3: '', propertyTypeId: 0 });
                         setSelectedImage(null);
                       }
                     }}>
@@ -236,23 +264,41 @@ export function PropertiesPage() {
                               required
                             />
                           </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="edit-address">Address</Label>
-                            <Input
-                              id="edit-address"
-                              value={formData.address}
-                              onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                              required
-                            />
+                          <div className="space-y-4">
+                            <div className="space-y-2">
+                              <Label>Address</Label>
+                              <Input
+                                placeholder="Address Line 1"
+                                value={formData.addressLine1}
+                                onChange={(e) => setFormData({ ...formData, addressLine1: e.target.value })}
+                                required
+                              />
+                              <Input
+                                placeholder="Address Line 2 (Optional)"
+                                value={formData.addressLine2}
+                                onChange={(e) => setFormData({ ...formData, addressLine2: e.target.value })}
+                              />
+                              <Input
+                                placeholder="Address Line 3 (Optional)"
+                                value={formData.addressLine3}
+                                onChange={(e) => setFormData({ ...formData, addressLine3: e.target.value })}
+                              />
+                            </div>
                           </div>
                           <div className="space-y-2">
                             <Label htmlFor="edit-type">Property Type</Label>
-                            <Input
+                            <select
                               id="edit-type"
-                              value={formData.type}
-                              onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                              className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                              value={formData.propertyTypeId}
+                              onChange={(e) => setFormData({ ...formData, propertyTypeId: parseInt(e.target.value) })}
                               required
-                            />
+                            >
+                              <option value={0}>Select Type</option>
+                              {propertyTypes.map((t) => (
+                                <option key={t.type_id} value={t.type_id}>{t.name}</option>
+                              ))}
+                            </select>
                           </div>
                           <div className="space-y-2">
                             <Label htmlFor="edit-image">Property Image</Label>
@@ -285,7 +331,7 @@ export function PropertiesPage() {
                           <div className="flex gap-2 justify-end">
                             <Button type="button" variant="outline" onClick={() => {
                               setEditingProperty(null);
-                              setFormData({ name: '', address: '', type: '' });
+                              setFormData({ name: '', addressLine1: '', addressLine2: '', addressLine3: '', propertyTypeId: 0 });
                               setSelectedImage(null);
                             }}>
                               Cancel
@@ -349,11 +395,14 @@ export function PropertiesPage() {
                   <h3 className="text-2xl font-bold text-gray-900">{viewProperty.name}</h3>
                   <div className="mt-2 space-y-1 text-gray-600">
                     <p className="flex items-center gap-2">
-                      <span className="font-medium text-gray-900">Type:</span> {viewProperty.type}
+                      <span className="font-medium text-gray-900">Type:</span> {viewProperty.typeName}
                     </p>
-                    <p className="flex items-center gap-2">
-                      <span className="font-medium text-gray-900">Address:</span> {viewProperty.address}
-                    </p>
+                    <div>
+                      <span className="font-medium text-gray-900">Address:</span>
+                      <p className="ml-2">{viewProperty.addressLine1}</p>
+                      {viewProperty.addressLine2 && <p className="ml-2">{viewProperty.addressLine2}</p>}
+                      {viewProperty.addressLine3 && <p className="ml-2">{viewProperty.addressLine3}</p>}
+                    </div>
                   </div>
                 </div>
 

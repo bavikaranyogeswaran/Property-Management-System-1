@@ -5,10 +5,19 @@ import apiClient from '../../services/api';
 export interface Property {
   id: string;
   name: string;
-  address: string;
-  type: string;
+  propertyTypeId: number;
+  typeName?: string;
+  addressLine1: string;
+  addressLine2?: string;
+  addressLine3?: string;
   createdAt: string;
   image?: string;
+}
+
+export interface PropertyType {
+  type_id: number;
+  name: string;
+  description: string;
 }
 
 export interface Unit {
@@ -156,6 +165,7 @@ export interface Notification {
 
 interface AppContextType {
   properties: Property[];
+  propertyTypes: PropertyType[];
   units: Unit[];
   leads: Lead[];
   leadFollowUps: LeadFollowUp[];
@@ -171,9 +181,9 @@ interface AppContextType {
   notifications: Notification[];
 
   // Property operations
-  addProperty: (property: Omit<Property, 'id' | 'createdAt'>) => void;
-  updateProperty: (id: string, property: Partial<Property>) => void;
-  deleteProperty: (id: string) => void;
+  addProperty: (property: Omit<Property, 'id' | 'createdAt'>) => Promise<void>;
+  updateProperty: (id: string, property: Partial<Property>) => Promise<void>;
+  deleteProperty: (id: string) => Promise<void>;
 
   // Unit operations
   addUnit: (unit: Omit<Unit, 'id' | 'createdAt'>) => void;
@@ -219,15 +229,19 @@ const INITIAL_DATA = {
     {
       id: 'prop-1',
       name: 'Sunset Apartments',
-      address: '123 Main Street, Downtown',
-      type: 'Apartment Building',
+      addressLine1: '123 Main Street',
+      addressLine2: 'Downtown',
+      propertyTypeId: 1,
+      typeName: 'Apartment Building',
       createdAt: '2024-01-15',
     },
     {
       id: 'prop-2',
       name: 'Commercial Plaza',
-      address: '456 Business Ave, City Center',
-      type: 'Commercial Building',
+      addressLine1: '456 Business Ave',
+      addressLine2: 'City Center',
+      propertyTypeId: 2,
+      typeName: 'Commercial Building',
       createdAt: '2024-02-20',
     },
   ],
@@ -478,6 +492,7 @@ const INITIAL_DATA = {
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [properties, setProperties] = useState<Property[]>([]);
+  const [propertyTypes, setPropertyTypes] = useState<PropertyType[]>([]);
   const [units, setUnits] = useState<Unit[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [leadFollowUps, setLeadFollowUps] = useState<LeadFollowUp[]>([]);
@@ -610,12 +625,54 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
     fetchLeads();
 
+    // Fetch Properties and Types
+    const fetchProperties = async () => {
+      try {
+        const token = localStorage.getItem('authToken');
+        if (token) {
+          // Types
+          const typesResponse = await apiClient.get('/properties/types');
+          if (typesResponse.status === 200) {
+            setPropertyTypes(typesResponse.data);
+          }
+
+          // Properties
+          const response = await apiClient.get('/properties');
+          if (response.status === 200) {
+            // Map backend to frontend model if needed, but names match mostly
+            // Backend returns snake_case for DB fields? 
+            // Wait, controller returns what service returns, which returns what model returns.
+            // Model returns `type_name` and `type_id`.
+            // Frontend expects `propertyTypeId` (camelCase) and `typeName`.
+            // Model also returns `address_line_1` etc.
+            // We need to map it here.
+            const mappedProps = response.data.map((p: any) => ({
+              id: p.property_id.toString(),
+              name: p.name,
+              propertyTypeId: p.type_id,
+              typeName: p.type_name,
+              addressLine1: p.address_line_1,
+              addressLine2: p.address_line_2,
+              addressLine3: p.address_line_3,
+              image: p.image_url,
+              createdAt: p.created_at
+            }));
+            setProperties(mappedProps);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch properties:', error);
+      }
+    };
+    fetchProperties();
+
   }, []);
 
   // Save data to localStorage whenever it changes
   useEffect(() => {
     const data = {
       properties,
+      propertyTypes,
       units,
       leads,
       leadFollowUps,
@@ -631,7 +688,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       notifications,
     };
     localStorage.setItem('pms_data', JSON.stringify(data));
-  }, [properties, units, leads, leadFollowUps, leadStageHistory, tenants, treasurers, leases, invoices, payments, receipts, maintenanceRequests, maintenanceCosts, notifications]);
+  }, [properties, propertyTypes, units, leads, leadFollowUps, leadStageHistory, tenants, treasurers, leases, invoices, payments, receipts, maintenanceRequests, maintenanceCosts, notifications]);
 
   // Generate lease expiration notifications
   useEffect(() => {
@@ -719,21 +776,67 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [leases, units, tenants, properties]); // Run when leases or related data changes
 
   // Property operations
-  const addProperty = (property: Omit<Property, 'id' | 'createdAt'>) => {
-    const newProperty: Property = {
-      ...property,
-      id: `prop-${Date.now()}`,
-      createdAt: new Date().toISOString().split('T')[0],
-    };
-    setProperties([...properties, newProperty]);
+  const addProperty = async (property: Omit<Property, 'id' | 'createdAt'>) => {
+    try {
+      const response = await apiClient.post('/properties', {
+        ...property,
+        imageUrl: property.image // Map frontend 'image' to backend 'imageUrl'
+      });
+      if (response.status === 201) {
+        // Re-fetch or append. Since we need type name etc., might be easier to re-fetch or construct carefully.
+        // But we can append what we have + what returned.
+        // Actually, backend should return the full object or we fetch.
+        // For now, let's just re-fetch or naive append for UI snappiness if valid.
+        // But better:
+        const newProp = response.data; // Ideally backend returns the created object with ID.
+        // But wait, our backend create returns `findById` which includes joins.
+        // So we can map it directly.
+        const mapped: Property = {
+          id: newProp.property_id.toString(),
+          name: newProp.name,
+          propertyTypeId: newProp.type_id,
+          typeName: newProp.type_name,
+          addressLine1: newProp.address_line_1,
+          addressLine2: newProp.address_line_2,
+          addressLine3: newProp.address_line_3,
+          image: newProp.image_url,
+          createdAt: newProp.created_at
+        };
+        setProperties([...properties, mapped]);
+      }
+    } catch (e) {
+      console.error("Failed to add property", e);
+      throw e;
+    }
   };
 
-  const updateProperty = (id: string, updates: Partial<Property>) => {
-    setProperties(properties.map(p => p.id === id ? { ...p, ...updates } : p));
+  const updateProperty = async (id: string, updates: Partial<Property>) => {
+    try {
+      await apiClient.put(`/properties/${id}`, {
+        ...updates,
+        imageUrl: updates.image
+      });
+      // Optimistic update or re-fetch
+      // If we change typeId, we need new typeName.
+      if (updates.propertyTypeId) {
+        const type = propertyTypes.find(t => t.type_id === updates.propertyTypeId);
+        if (type) updates.typeName = type.name;
+      }
+      setProperties(properties.map(p => p.id === id ? { ...p, ...updates } : p));
+    } catch (e) {
+      console.error("Failed to update property", e);
+      throw e; // Rethrow to let UI handle error state
+    }
   };
 
-  const deleteProperty = (id: string) => {
-    setProperties(properties.filter(p => p.id !== id));
+  const deleteProperty = async (id: string) => {
+    try {
+      await apiClient.delete(`/properties/${id}`);
+      setProperties(properties.filter(p => p.id !== id));
+    } catch (e) {
+      console.error("Failed to delete property", e);
+      throw e;
+    }
   };
 
   // Unit operations

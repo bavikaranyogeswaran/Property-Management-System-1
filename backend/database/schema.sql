@@ -1,9 +1,9 @@
 -- =========================
 -- PMS DATABASE (FINAL - ADJUSTED)
 -- =========================
-DROP DATABASE IF EXISTS pms_database;
-CREATE DATABASE pms_database;
-USE pms_database;
+DROP DATABASE IF EXISTS pms_database2;
+CREATE DATABASE pms_database2;
+USE pms_database2;
 
 -- =========================
 -- USERS (AUTH + RBAC)
@@ -31,16 +31,31 @@ CREATE TABLE tenant_profile (
 -- =========================
 -- PROPERTIES & UNITS
 -- =========================
+-- =========================
+-- PROPERTY TYPES (3NF)
+-- =========================
+CREATE TABLE property_types (
+    type_id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(50) NOT NULL UNIQUE,
+    description VARCHAR(255)
+);
+
+-- =========================
+-- PROPERTIES & UNITS
+-- =========================
 CREATE TABLE properties (
     property_id INT AUTO_INCREMENT PRIMARY KEY,
     owner_id INT NOT NULL,
     name VARCHAR(100) NOT NULL,
-    type VARCHAR(100) NOT NULL,
-    address TEXT NOT NULL,
+    property_type_id INT NOT NULL,           -- [MODIFIED] FK to property_types
+    address_line_1 VARCHAR(255) NOT NULL,    -- [MODIFIED] Split address
+    address_line_2 VARCHAR(255),
+    address_line_3 VARCHAR(255),
     status ENUM('active','inactive') DEFAULT 'active',
-    image_url VARCHAR(255),                  -- [ADDED] For dashboard display
+    image_url VARCHAR(255),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (owner_id) REFERENCES users(user_id)
+    FOREIGN KEY (owner_id) REFERENCES users(user_id),
+    FOREIGN KEY (property_type_id) REFERENCES property_types(type_id)
 );
 
 CREATE TABLE units (

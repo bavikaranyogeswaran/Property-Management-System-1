@@ -1,7 +1,7 @@
 -- =========================
 -- PMS SEED DATA
 -- =========================
-USE pms_database;
+USE pms_database2;
 
 -- 1. USERS
 -- Password hash: 'hashed_password_123' (Placeholder)
@@ -21,10 +21,18 @@ INSERT INTO tenant_profile (tenant_id, phone) VALUES
 (2, '+1-555-0102'),
 (3, '+1-555-0103');
 
--- 2. PROPERTIES
-INSERT INTO properties (property_id, owner_id, name, type, address, image_url) VALUES 
-(1, 1, 'Sunset Apartments', 'Apartment Building', '123 Main Street, Downtown', '/images/prop1.jpg'),
-(2, 1, 'Commercial Plaza', 'Commercial Building', '456 Business Ave, City Center', '/images/prop2.jpg');
+-- 2. PROPERTY TYPES
+INSERT INTO property_types (type_id, name, description) VALUES 
+(1, 'Apartment Building', 'Multi-unit residential building'),
+(2, 'Commercial Building', 'Office or retail space'),
+(3, 'Single Family Home', 'Standalone residential house'),
+(4, 'Condo', 'Individually owned unit in a building'),
+(5, 'Townhouse', 'Multi-floor home sharing walls');
+
+-- 3. PROPERTIES
+INSERT INTO properties (property_id, owner_id, name, property_type_id, address_line_1, address_line_2, address_line_3, image_url) VALUES 
+(1, 1, 'Sunset Apartments', 1, '123 Main Street', 'Downtown', NULL, '/images/prop1.jpg'),
+(2, 1, 'Commercial Plaza', 2, '456 Business Ave', 'City Center', 'Suite 100', '/images/prop2.jpg');
 
 -- 3. UNITS
 INSERT INTO units (unit_id, property_id, unit_number, unit_type, monthly_rent, status) VALUES 
