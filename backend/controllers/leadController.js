@@ -37,9 +37,7 @@ class LeadController {
 
     async createLead(req, res) {
         try {
-            if (req.user.role !== 'owner') {
-                return res.status(403).json({ error: 'Access denied.' });
-            }
+            // Public endpoint - no role check needed
 
             const { name, email, phone } = req.body;
             if (!name || !email || !phone) {

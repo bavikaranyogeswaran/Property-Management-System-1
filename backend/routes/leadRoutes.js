@@ -4,10 +4,13 @@ import authenticateToken from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-router.use(authenticateToken); // Protect all lead routes
+// Public route - Create Lead
+router.post('/', leadController.createLead);
+
+// Protected routes
+router.use(authenticateToken);
 
 router.get('/', leadController.getLeads);
-router.post('/', leadController.createLead);
 router.put('/:id', leadController.updateLead);
 router.post('/:id/convert', leadController.convertLead);
 

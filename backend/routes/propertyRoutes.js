@@ -4,12 +4,12 @@ import authenticateToken, { authorizeRoles } from '../middleware/authMiddleware.
 
 const router = Router();
 
-// Types (Authenticated)
-router.get('/types', authenticateToken, propertyController.getPropertyTypes);
+// Types (Public)
+router.get('/types', propertyController.getPropertyTypes);
 
 // CRUD
-// GET / - Allow all authenticated users
-router.get('/', authenticateToken, propertyController.getProperties);
+// GET / - Public listing of all properties
+router.get('/', propertyController.getProperties);
 
 // POST / - Owner only
 router.post('/', authenticateToken, authorizeRoles('owner'), propertyController.createProperty);

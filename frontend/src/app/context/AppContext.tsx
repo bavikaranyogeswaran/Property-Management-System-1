@@ -629,36 +629,32 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const fetchProperties = async () => {
       try {
         const token = localStorage.getItem('authToken');
-        if (token) {
-          // Types
+
+        // Fetch types (public or protected? assuming public now)
+        try {
           const typesResponse = await apiClient.get('/properties/types');
           if (typesResponse.status === 200) {
             setPropertyTypes(typesResponse.data);
           }
+        } catch (e) {
+          console.error("Failed to fetch types", e);
+        }
 
-          // Properties
-          const response = await apiClient.get('/properties');
-          if (response.status === 200) {
-            // Map backend to frontend model if needed, but names match mostly
-            // Backend returns snake_case for DB fields? 
-            // Wait, controller returns what service returns, which returns what model returns.
-            // Model returns `type_name` and `type_id`.
-            // Frontend expects `propertyTypeId` (camelCase) and `typeName`.
-            // Model also returns `address_line_1` etc.
-            // We need to map it here.
-            const mappedProps = response.data.map((p: any) => ({
-              id: p.property_id.toString(),
-              name: p.name,
-              propertyTypeId: p.type_id,
-              typeName: p.type_name,
-              addressLine1: p.address_line_1,
-              addressLine2: p.address_line_2,
-              addressLine3: p.address_line_3,
-              image: p.image_url,
-              createdAt: p.created_at
-            }));
-            setProperties(mappedProps);
-          }
+        // Fetch properties (public)
+        const response = await apiClient.get('/properties');
+        if (response.status === 200) {
+          const mappedProps = response.data.map((p: any) => ({
+            id: p.property_id.toString(),
+            name: p.name,
+            propertyTypeId: p.type_id,
+            typeName: p.type_name,
+            addressLine1: p.address_line_1,
+            addressLine2: p.address_line_2,
+            addressLine3: p.address_line_3,
+            image: p.image_url,
+            createdAt: p.created_at
+          }));
+          setProperties(mappedProps);
         }
       } catch (error) {
         console.error('Failed to fetch properties:', error);

@@ -1,8 +1,42 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import { AppProviders } from './providers';
+import { LandingPage } from '@/components/pages/LandingPage';
 import { AppLayout } from '@/components/layout/AppLayout';
+
+// Wrapper for Landing Page to handle navigation
+function LandingPageWrapper() {
+  const navigate = useNavigate();
+  return <LandingPage onNavigate={(page) => navigate(page === 'login' ? '/login' : `/${page}`)} />;
+}
+
+// Layout for Public Pages (Properties) - reuse AppLayout but maybe simpler?
+// For now, if user is not logged in, AppLayout might break or show empty sidebar.
+// Let's assume AppLayout handles 'no user' gracefully or we use a separate PublicLayout.
+// Given time constraints, I'll use a simple container for public /properties.
+// Or better: reused Nav from Landing Page? 
+// Let's create a PublicPropertiesWrapper that adds the Landing Page Nav.
+
+function PublicPropertiesWrapper() {
+  const navigate = useNavigate();
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <nav className="bg-white border-b px-6 py-4 flex justify-between items-center mb-6">
+        <div onClick={() => navigate('/')} className="font-bold text-xl cursor-pointer flex items-center gap-2">
+          <span className="text-blue-600">PMS</span>
+        </div>
+        <div className="flex gap-4">
+          <button onClick={() => navigate('/')} className="text-gray-600 hover:text-blue-600">Home</button>
+          <button onClick={() => navigate('/login')} className="text-blue-600 font-medium">Login</button>
+        </div>
+      </nav>
+      <div className="container mx-auto px-6 pb-12">
+        <PropertiesPage />
+      </div>
+    </div>
+  );
+}
 import { Toaster } from '@/components/ui/sonner';
 
 // Auth Pages
@@ -55,19 +89,29 @@ function AppContent() {
   return (
     <Routes>
       {/* Public Routes */}
+      <Route path="/" element={<LandingPageWrapper />} />
       <Route path="/login" element={<LoginPage />} />
-
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
 
-      {/* Protected Routes */}
-      <Route path="/" element={<Navigate to="/dashboard" replace />} />
+      {/* Public/Shared Properties Route */}
+      <Route path="/properties" element={
+        user ? (
+          <ProtectedRoute><PropertiesPage /></ProtectedRoute>
+        ) : (
+          <PublicPropertiesWrapper />
+        )
+      } />
+
+      {/* Protected Routes */}{/* Dashboard */}
       <Route path="/dashboard" element={<ProtectedRoute><DashboardRoute /></ProtectedRoute>} />
       <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
 
       {/* Owner Routes */}
       {user?.role === 'owner' && (
         <>
-          <Route path="/properties" element={<ProtectedRoute><PropertiesPage /></ProtectedRoute>} />
+          {/* Properties already handled above, but maybe mapped as sub-route? No, it's fine. */}
+          {/* Note: If user is owner, they hit the conditional above. */}
+
           <Route path="/units" element={<ProtectedRoute><UnitsPage /></ProtectedRoute>} />
           <Route path="/leads" element={<ProtectedRoute><LeadsPage /></ProtectedRoute>} />
           <Route path="/tenants" element={<ProtectedRoute><TenantsPage /></ProtectedRoute>} />
