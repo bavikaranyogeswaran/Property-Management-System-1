@@ -1130,6 +1130,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   return (
     <AppContext.Provider value={{
       properties,
+      propertyTypes,
       units,
       leads,
       leadFollowUps,
