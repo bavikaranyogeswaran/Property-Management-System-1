@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import apiClient from '../../services/api';
+import { toast } from 'sonner';
 
 // Type definitions
 export interface Property {
@@ -192,6 +193,12 @@ interface AppContextType {
   addProperty: (property: Omit<Property, 'id' | 'createdAt'>) => Promise<void>;
   updateProperty: (id: string, property: Partial<Property>) => Promise<void>;
   deleteProperty: (id: string) => Promise<void>;
+
+  // Type operations
+  addPropertyType: (type: Omit<PropertyType, 'type_id'>) => Promise<void>;
+  deletePropertyType: (id: number) => Promise<void>;
+  addUnitType: (type: Omit<UnitType, 'type_id'>) => Promise<void>;
+  deleteUnitType: (id: number) => Promise<void>;
 
   // Unit operations
   addUnit: (unit: Omit<Unit, 'id' | 'createdAt'>) => void;
@@ -1148,6 +1155,53 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setMaintenanceCosts([...maintenanceCosts, newCost]);
   };
 
+  // Type Management Operations
+  const addPropertyType = async (type: Omit<PropertyType, 'type_id'>) => {
+    try {
+      const response = await apiClient.post('/property-types', type);
+      setPropertyTypes([...propertyTypes, response.data]);
+      toast.success('Property type added');
+    } catch (error) {
+      console.error('Failed to add property type:', error);
+      // @ts-ignore
+      const errMsg = error.response?.data?.error || error.message || 'Failed to add property type';
+      toast.error(errMsg);
+    }
+  };
+
+  const deletePropertyType = async (id: number) => {
+    try {
+      await apiClient.delete(`/property-types/${id}`);
+      setPropertyTypes(prev => prev.filter(t => t.type_id !== id));
+      toast.success('Property type deleted');
+    } catch (error) {
+      console.error('Failed to delete property type:', error);
+      toast.error('Failed to delete property type');
+    }
+  };
+
+  const addUnitType = async (type: Omit<UnitType, 'type_id'>) => {
+    try {
+      const response = await apiClient.post('/unit-types', type);
+      setUnitTypes([...unitTypes, response.data]);
+      toast.success('Unit type added');
+    } catch (error) {
+      console.error('Failed to add unit type:', error);
+      toast.error('Failed to add unit type');
+    }
+  };
+
+  const deleteUnitType = async (id: number) => {
+    try {
+      await apiClient.delete(`/unit-types/${id}`);
+      setUnitTypes(prev => prev.filter(t => t.type_id !== id));
+      toast.success('Unit type deleted');
+    } catch (error) {
+      console.error('Failed to delete unit type:', error);
+      toast.error('Failed to delete unit type');
+    }
+  };
+
   return (
     <AppContext.Provider value={{
       properties,
@@ -1188,6 +1242,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       addMaintenanceRequest,
       updateMaintenanceRequest,
       addMaintenanceCost,
+      addPropertyType,
+      deletePropertyType,
+      addUnitType,
+      deleteUnitType,
     }}>
       {children}
     </AppContext.Provider>

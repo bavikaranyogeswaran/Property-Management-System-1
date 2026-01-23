@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '@/app/context/AuthContext';
+import { useApp } from '@/app/context/AppContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -71,6 +72,10 @@ export function SettingsPage() {
                     <TabsTrigger value="notifications">
                         <Bell className="size-4 mr-2" />
                         Notifications
+                    </TabsTrigger>
+                    <TabsTrigger value="types">
+                        <Shield className="size-4 mr-2" />
+                        Types
                     </TabsTrigger>
                 </TabsList>
 
@@ -212,7 +217,107 @@ export function SettingsPage() {
                         </CardContent>
                     </Card>
                 </TabsContent>
+                <TabsContent value="types">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Property & Unit Types</CardTitle>
+                            <CardDescription>Manage the types available for your properties and units</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                            <TypeManager />
+                        </CardContent>
+                    </Card>
+                </TabsContent>
             </Tabs>
+        </div>
+    );
+}
+
+function TypeManager() {
+    const { propertyTypes, unitTypes, addPropertyType, deletePropertyType, addUnitType, deleteUnitType } = useApp();
+    const [newPropType, setNewPropType] = useState('');
+    const [newUnitType, setNewUnitType] = useState('');
+
+    const handleAddPropType = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (newPropType.trim()) {
+            addPropertyType({ name: newPropType, description: '' });
+            setNewPropType('');
+        }
+    };
+
+    const handleAddUnitType = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (newUnitType.trim()) {
+            addUnitType({ name: newUnitType, description: '' });
+            setNewUnitType('');
+        }
+    };
+
+    return (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Property Types */}
+            <div className="space-y-4">
+                <h3 className="font-medium text-sm text-gray-900">Property Types</h3>
+                <form onSubmit={handleAddPropType} className="flex gap-2">
+                    <Input
+                        placeholder="Add property type..."
+                        value={newPropType}
+                        onChange={(e) => setNewPropType(e.target.value)}
+                    />
+                    <Button type="submit" size="sm">Add</Button>
+                </form>
+                <div className="border rounded-md divide-y">
+                    {propertyTypes.map(type => (
+                        <div key={type.type_id} className="p-2.5 flex justify-between items-center text-sm">
+                            <span>{type.name}</span>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                onClick={() => deletePropertyType(type.type_id)}
+                            >
+                                <Lock className="size-3" /> {/* Using Lock icon as placeholder for protected/delete if allowed */}
+                                <span className="sr-only">Delete</span>
+                            </Button>
+                        </div>
+                    ))}
+                    {propertyTypes.length === 0 && (
+                        <div className="p-4 text-center text-gray-500 text-sm">No types defined</div>
+                    )}
+                </div>
+            </div>
+
+            {/* Unit Types */}
+            <div className="space-y-4">
+                <h3 className="font-medium text-sm text-gray-900">Unit Types</h3>
+                <form onSubmit={handleAddUnitType} className="flex gap-2">
+                    <Input
+                        placeholder="Add unit type..."
+                        value={newUnitType}
+                        onChange={(e) => setNewUnitType(e.target.value)}
+                    />
+                    <Button type="submit" size="sm">Add</Button>
+                </form>
+                <div className="border rounded-md divide-y">
+                    {unitTypes.map(type => (
+                        <div key={type.type_id} className="p-2.5 flex justify-between items-center text-sm">
+                            <span>{type.name}</span>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                onClick={() => deleteUnitType(type.type_id)}
+                            >
+                                <Lock className="size-3" />
+                            </Button>
+                        </div>
+                    ))}
+                    {unitTypes.length === 0 && (
+                        <div className="p-4 text-center text-gray-500 text-sm">No types defined</div>
+                    )}
+                </div>
+            </div>
         </div>
     );
 }

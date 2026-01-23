@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Home, Plus, Edit, Trash2, Filter, Eye } from 'lucide-react';
 import { toast } from 'sonner';
+import { MultiImageUpload } from '@/components/ui/multi-image-upload';
 
 export function UnitsPage() {
   const { units, properties, unitTypes, leases, addUnit, updateUnit, deleteUnit } = useApp();
@@ -25,29 +26,26 @@ export function UnitsPage() {
     monthlyRent: '',
     status: 'available' as Unit['status'],
   });
-  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [uploadFiles, setUploadFiles] = useState<File[]>([]);
+  const [primaryImageIndex, setPrimaryImageIndex] = useState(0);
   const [viewUnit, setViewUnit] = useState<Unit | null>(null);
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setSelectedImage(e.target.files[0]);
-    }
+  const handleImagesChange = (images: { file: File; isPrimary: boolean }[]) => {
+    const files = images.map(img => img.file);
+    const primaryIndex = images.findIndex(img => img.isPrimary);
+    setUploadFiles(files);
+    setPrimaryImageIndex(primaryIndex >= 0 ? primaryIndex : 0);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Simulate image upload
-    let image = editingUnit?.image;
-    if (selectedImage) {
-      image = URL.createObjectURL(selectedImage);
-    }
-
     if (editingUnit) {
+      // In production: upload files via FormData
       updateUnit(editingUnit.id, {
         ...formData,
         monthlyRent: parseFloat(formData.monthlyRent),
-        image,
+        image: uploadFiles.length > 0 ? '/placeholder.jpg' : editingUnit.image,
       });
       toast.success('Unit updated successfully');
       setEditingUnit(null);
@@ -55,7 +53,7 @@ export function UnitsPage() {
       addUnit({
         ...formData,
         monthlyRent: parseFloat(formData.monthlyRent),
-        image,
+        image: uploadFiles.length > 0 ? '/placeholder.jpg' : undefined,
       });
       toast.success('Unit added successfully');
       setIsAddDialogOpen(false);
@@ -69,8 +67,11 @@ export function UnitsPage() {
       monthlyRent: '',
       status: 'available',
     });
-    setSelectedImage(null);
+    setUploadFiles([]);
+    setPrimaryImageIndex(0);
   };
+
+
 
   const handleEdit = (unit: Unit) => {
     setEditingUnit(unit);
@@ -82,7 +83,8 @@ export function UnitsPage() {
       monthlyRent: unit.monthlyRent.toString(),
       status: unit.status,
     });
-    setSelectedImage(null);
+    setUploadFiles([]);
+    setPrimaryImageIndex(0);
   };
 
   const handleDelete = (id: string) => {
@@ -150,7 +152,7 @@ export function UnitsPage() {
               Add Unit
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Add New Unit</DialogTitle>
             </DialogHeader>
@@ -236,23 +238,10 @@ export function UnitsPage() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="image">Unit Image</Label>
-                <Input
-                  id="image"
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageChange}
-                  className="cursor-pointer"
+                <MultiImageUpload
+                  maxImages={10}
+                  onImagesChange={handleImagesChange}
                 />
-                {selectedImage && (
-                  <div className="mt-2 relative h-32 w-full rounded-md overflow-hidden bg-gray-100">
-                    <img
-                      src={URL.createObjectURL(selectedImage)}
-                      alt="Preview"
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                )}
               </div>
               <div className="flex gap-2 justify-end">
                 <Button type="button" variant="outline" onClick={() => {
@@ -265,7 +254,8 @@ export function UnitsPage() {
                     monthlyRent: '',
                     status: 'available',
                   });
-                  setSelectedImage(null);
+                  setUploadFiles([]);
+                  setPrimaryImageIndex(0);
                 }}>
                   Cancel
                 </Button>
@@ -398,7 +388,8 @@ export function UnitsPage() {
                                 monthlyRent: '',
                                 status: 'available',
                               });
-                              setSelectedImage(null);
+                              setUploadFiles([]);
+                              setPrimaryImageIndex(0);
                             }
                           }}>
                             <DialogTrigger asChild>
@@ -410,7 +401,7 @@ export function UnitsPage() {
                                 <Edit className="size-4" />
                               </Button>
                             </DialogTrigger>
-                            <DialogContent>
+                            <DialogContent className="max-h-[90vh] overflow-y-auto">
                               <DialogHeader>
                                 <DialogTitle>Edit Unit</DialogTitle>
                               </DialogHeader>
@@ -492,32 +483,10 @@ export function UnitsPage() {
                                   </Select>
                                 </div>
                                 <div className="space-y-2">
-                                  <Label htmlFor="edit-image">Unit Image</Label>
-                                  {editingUnit?.image && !selectedImage && (
-                                    <div className="mb-2 relative h-32 w-full rounded-md overflow-hidden bg-gray-100">
-                                      <img
-                                        src={editingUnit.image}
-                                        alt="Current"
-                                        className="w-full h-full object-cover"
-                                      />
-                                    </div>
-                                  )}
-                                  <Input
-                                    id="edit-image"
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={handleImageChange}
-                                    className="cursor-pointer"
+                                  <MultiImageUpload
+                                    maxImages={10}
+                                    onImagesChange={handleImagesChange}
                                   />
-                                  {selectedImage && (
-                                    <div className="mt-2 relative h-32 w-full rounded-md overflow-hidden bg-gray-100">
-                                      <img
-                                        src={URL.createObjectURL(selectedImage)}
-                                        alt="Preview"
-                                        className="w-full h-full object-cover"
-                                      />
-                                    </div>
-                                  )}
                                 </div>
                                 <div className="flex gap-2 justify-end">
                                   <Button type="button" variant="outline" onClick={() => {
@@ -530,7 +499,8 @@ export function UnitsPage() {
                                       monthlyRent: '',
                                       status: 'available',
                                     });
-                                    setSelectedImage(null);
+                                    setUploadFiles([]);
+                                    setPrimaryImageIndex(0);
                                   }}>
                                     Cancel
                                   </Button>
@@ -631,6 +601,6 @@ export function UnitsPage() {
           )}
         </DialogContent>
       </Dialog>
-    </div >
+    </div>
   );
 }
