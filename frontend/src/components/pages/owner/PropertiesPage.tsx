@@ -8,7 +8,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Building2, Plus, Edit, Trash2, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { useAuth } from '@/app/context/AuthContext';
+
 export function PropertiesPage() {
+  const { user } = useAuth();
   const { properties, propertyTypes, units, addProperty, updateProperty, deleteProperty } = useApp();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingProperty, setEditingProperty] = useState<Property | null>(null);
@@ -21,6 +24,12 @@ export function PropertiesPage() {
   });
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [viewProperty, setViewProperty] = useState<Property | null>(null);
+
+  // ... (keep existing handler functions unchanged) ...
+  // Since I can't easily skip lines in replacement, I'll use multi_replace for safer edits if possible, or careful replace.
+  // Actually, `replace_file_content` is better for single block, but I need to modify imports AND JSX which are far apart.
+  // I'll use `multi_replace_file_content`.
+
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -93,96 +102,98 @@ export function PropertiesPage() {
           <h2 className="text-2xl font-semibold text-gray-900">Properties</h2>
           <p className="text-sm text-gray-500 mt-1">Manage your properties</p>
         </div>
-        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="size-4 mr-2" />
-              Add Property
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add New Property</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4 mt-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Property Name</Label>
-                <Input
-                  id="name"
-                  placeholder="e.g., Sunset Apartments"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  required
-                />
-              </div>
-              <div className="space-y-4">
+        {user?.role === 'owner' && (
+          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="size-4 mr-2" />
+                Add Property
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add New Property</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleSubmit} className="space-y-4 mt-4">
                 <div className="space-y-2">
-                  <Label>Address</Label>
+                  <Label htmlFor="name">Property Name</Label>
                   <Input
-                    placeholder="Address Line 1"
-                    value={formData.addressLine1}
-                    onChange={(e) => setFormData({ ...formData, addressLine1: e.target.value })}
+                    id="name"
+                    placeholder="e.g., Sunset Apartments"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     required
                   />
-                  <Input
-                    placeholder="Address Line 2 (Optional)"
-                    value={formData.addressLine2}
-                    onChange={(e) => setFormData({ ...formData, addressLine2: e.target.value })}
-                  />
-                  <Input
-                    placeholder="Address Line 3 (Optional)"
-                    value={formData.addressLine3}
-                    onChange={(e) => setFormData({ ...formData, addressLine3: e.target.value })}
-                  />
                 </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="type">Property Type</Label>
-                <select
-                  id="type"
-                  className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  value={formData.propertyTypeId}
-                  onChange={(e) => setFormData({ ...formData, propertyTypeId: parseInt(e.target.value) })}
-                  required
-                >
-                  <option value={0}>Select Type</option>
-                  {propertyTypes.map((t) => (
-                    <option key={t.type_id} value={t.type_id}>{t.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="image">Property Image</Label>
-                <Input
-                  id="image"
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageChange}
-                  className="cursor-pointer"
-                />
-                {selectedImage && (
-                  <div className="mt-2 relative h-32 w-full rounded-md overflow-hidden bg-gray-100">
-                    <img
-                      src={URL.createObjectURL(selectedImage)}
-                      alt="Preview"
-                      className="w-full h-full object-cover"
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Address</Label>
+                    <Input
+                      placeholder="Address Line 1"
+                      value={formData.addressLine1}
+                      onChange={(e) => setFormData({ ...formData, addressLine1: e.target.value })}
+                      required
+                    />
+                    <Input
+                      placeholder="Address Line 2 (Optional)"
+                      value={formData.addressLine2}
+                      onChange={(e) => setFormData({ ...formData, addressLine2: e.target.value })}
+                    />
+                    <Input
+                      placeholder="Address Line 3 (Optional)"
+                      value={formData.addressLine3}
+                      onChange={(e) => setFormData({ ...formData, addressLine3: e.target.value })}
                     />
                   </div>
-                )}
-              </div>
-              <div className="flex gap-2 justify-end">
-                <Button type="button" variant="outline" onClick={() => {
-                  setIsAddDialogOpen(false);
-                  setFormData({ name: '', addressLine1: '', addressLine2: '', addressLine3: '', propertyTypeId: 0 });
-                  setSelectedImage(null);
-                }}>
-                  Cancel
-                </Button>
-                <Button type="submit">Add Property</Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="type">Property Type</Label>
+                  <select
+                    id="type"
+                    className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    value={formData.propertyTypeId}
+                    onChange={(e) => setFormData({ ...formData, propertyTypeId: parseInt(e.target.value) })}
+                    required
+                  >
+                    <option value={0}>Select Type</option>
+                    {propertyTypes.map((t) => (
+                      <option key={t.type_id} value={t.type_id}>{t.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="image">Property Image</Label>
+                  <Input
+                    id="image"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageChange}
+                    className="cursor-pointer"
+                  />
+                  {selectedImage && (
+                    <div className="mt-2 relative h-32 w-full rounded-md overflow-hidden bg-gray-100">
+                      <img
+                        src={URL.createObjectURL(selectedImage)}
+                        alt="Preview"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  )}
+                </div>
+                <div className="flex gap-2 justify-end">
+                  <Button type="button" variant="outline" onClick={() => {
+                    setIsAddDialogOpen(false);
+                    setFormData({ name: '', addressLine1: '', addressLine2: '', addressLine3: '', propertyTypeId: 0 });
+                    setSelectedImage(null);
+                  }}>
+                    Cancel
+                  </Button>
+                  <Button type="submit">Add Property</Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
       {/* Properties Grid */}
@@ -234,120 +245,124 @@ export function PropertiesPage() {
                     >
                       <Eye className="size-4" />
                     </Button>
-                    <Dialog open={editingProperty?.id === property.id} onOpenChange={(open) => {
-                      if (!open) {
-                        setEditingProperty(null);
-                        setFormData({ name: '', addressLine1: '', addressLine2: '', addressLine3: '', propertyTypeId: 0 });
-                        setSelectedImage(null);
-                      }
-                    }}>
-                      <DialogTrigger asChild>
+                    {user?.role === 'owner' && (
+                      <>
+                        <Dialog open={editingProperty?.id === property.id} onOpenChange={(open) => {
+                          if (!open) {
+                            setEditingProperty(null);
+                            setFormData({ name: '', addressLine1: '', addressLine2: '', addressLine3: '', propertyTypeId: 0 });
+                            setSelectedImage(null);
+                          }
+                        }}>
+                          <DialogTrigger asChild>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleEdit(property)}
+                            >
+                              <Edit className="size-4" />
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle>Edit Property</DialogTitle>
+                            </DialogHeader>
+                            <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+                              <div className="space-y-2">
+                                <Label htmlFor="edit-name">Property Name</Label>
+                                <Input
+                                  id="edit-name"
+                                  value={formData.name}
+                                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                  required
+                                />
+                              </div>
+                              <div className="space-y-4">
+                                <div className="space-y-2">
+                                  <Label>Address</Label>
+                                  <Input
+                                    placeholder="Address Line 1"
+                                    value={formData.addressLine1}
+                                    onChange={(e) => setFormData({ ...formData, addressLine1: e.target.value })}
+                                    required
+                                  />
+                                  <Input
+                                    placeholder="Address Line 2 (Optional)"
+                                    value={formData.addressLine2}
+                                    onChange={(e) => setFormData({ ...formData, addressLine2: e.target.value })}
+                                  />
+                                  <Input
+                                    placeholder="Address Line 3 (Optional)"
+                                    value={formData.addressLine3}
+                                    onChange={(e) => setFormData({ ...formData, addressLine3: e.target.value })}
+                                  />
+                                </div>
+                              </div>
+                              <div className="space-y-2">
+                                <Label htmlFor="edit-type">Property Type</Label>
+                                <select
+                                  id="edit-type"
+                                  className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                  value={formData.propertyTypeId}
+                                  onChange={(e) => setFormData({ ...formData, propertyTypeId: parseInt(e.target.value) })}
+                                  required
+                                >
+                                  <option value={0}>Select Type</option>
+                                  {propertyTypes.map((t) => (
+                                    <option key={t.type_id} value={t.type_id}>{t.name}</option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div className="space-y-2">
+                                <Label htmlFor="edit-image">Property Image</Label>
+                                {editingProperty?.image && !selectedImage && (
+                                  <div className="mb-2 relative h-32 w-full rounded-md overflow-hidden bg-gray-100">
+                                    <img
+                                      src={editingProperty.image}
+                                      alt="Current"
+                                      className="w-full h-full object-cover"
+                                    />
+                                  </div>
+                                )}
+                                <Input
+                                  id="edit-image"
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={handleImageChange}
+                                  className="cursor-pointer"
+                                />
+                                {selectedImage && (
+                                  <div className="mt-2 relative h-32 w-full rounded-md overflow-hidden bg-gray-100">
+                                    <img
+                                      src={URL.createObjectURL(selectedImage)}
+                                      alt="Preview"
+                                      className="w-full h-full object-cover"
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                              <div className="flex gap-2 justify-end">
+                                <Button type="button" variant="outline" onClick={() => {
+                                  setEditingProperty(null);
+                                  setFormData({ name: '', addressLine1: '', addressLine2: '', addressLine3: '', propertyTypeId: 0 });
+                                  setSelectedImage(null);
+                                }}>
+                                  Cancel
+                                </Button>
+                                <Button type="submit">Save Changes</Button>
+                              </div>
+                            </form>
+                          </DialogContent>
+                        </Dialog>
                         <Button
                           size="sm"
                           variant="ghost"
-                          onClick={() => handleEdit(property)}
+                          onClick={() => handleDelete(property.id)}
                         >
-                          <Edit className="size-4" />
+                          <Trash2 className="size-4 text-red-600" />
                         </Button>
-                      </DialogTrigger>
-                      <DialogContent>
-                        <DialogHeader>
-                          <DialogTitle>Edit Property</DialogTitle>
-                        </DialogHeader>
-                        <form onSubmit={handleSubmit} className="space-y-4 mt-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="edit-name">Property Name</Label>
-                            <Input
-                              id="edit-name"
-                              value={formData.name}
-                              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                              required
-                            />
-                          </div>
-                          <div className="space-y-4">
-                            <div className="space-y-2">
-                              <Label>Address</Label>
-                              <Input
-                                placeholder="Address Line 1"
-                                value={formData.addressLine1}
-                                onChange={(e) => setFormData({ ...formData, addressLine1: e.target.value })}
-                                required
-                              />
-                              <Input
-                                placeholder="Address Line 2 (Optional)"
-                                value={formData.addressLine2}
-                                onChange={(e) => setFormData({ ...formData, addressLine2: e.target.value })}
-                              />
-                              <Input
-                                placeholder="Address Line 3 (Optional)"
-                                value={formData.addressLine3}
-                                onChange={(e) => setFormData({ ...formData, addressLine3: e.target.value })}
-                              />
-                            </div>
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="edit-type">Property Type</Label>
-                            <select
-                              id="edit-type"
-                              className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                              value={formData.propertyTypeId}
-                              onChange={(e) => setFormData({ ...formData, propertyTypeId: parseInt(e.target.value) })}
-                              required
-                            >
-                              <option value={0}>Select Type</option>
-                              {propertyTypes.map((t) => (
-                                <option key={t.type_id} value={t.type_id}>{t.name}</option>
-                              ))}
-                            </select>
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="edit-image">Property Image</Label>
-                            {editingProperty?.image && !selectedImage && (
-                              <div className="mb-2 relative h-32 w-full rounded-md overflow-hidden bg-gray-100">
-                                <img
-                                  src={editingProperty.image}
-                                  alt="Current"
-                                  className="w-full h-full object-cover"
-                                />
-                              </div>
-                            )}
-                            <Input
-                              id="edit-image"
-                              type="file"
-                              accept="image/*"
-                              onChange={handleImageChange}
-                              className="cursor-pointer"
-                            />
-                            {selectedImage && (
-                              <div className="mt-2 relative h-32 w-full rounded-md overflow-hidden bg-gray-100">
-                                <img
-                                  src={URL.createObjectURL(selectedImage)}
-                                  alt="Preview"
-                                  className="w-full h-full object-cover"
-                                />
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex gap-2 justify-end">
-                            <Button type="button" variant="outline" onClick={() => {
-                              setEditingProperty(null);
-                              setFormData({ name: '', addressLine1: '', addressLine2: '', addressLine3: '', propertyTypeId: 0 });
-                              setSelectedImage(null);
-                            }}>
-                              Cancel
-                            </Button>
-                            <Button type="submit">Save Changes</Button>
-                          </div>
-                        </form>
-                      </DialogContent>
-                    </Dialog>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => handleDelete(property.id)}
-                    >
-                      <Trash2 className="size-4 text-red-600" />
-                    </Button>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -419,13 +434,15 @@ export function PropertiesPage() {
 
               <div className="flex justify-end gap-2 pt-4 border-t">
                 <Button variant="outline" onClick={() => setViewProperty(null)}>Close</Button>
-                <Button onClick={() => {
-                  handleEdit(viewProperty);
-                  setViewProperty(null);
-                }}>
-                  <Edit className="size-4 mr-2" />
-                  Edit Property
-                </Button>
+                {user?.role === 'owner' && (
+                  <Button onClick={() => {
+                    handleEdit(viewProperty);
+                    setViewProperty(null);
+                  }}>
+                    <Edit className="size-4 mr-2" />
+                    Edit Property
+                  </Button>
+                )}
               </div>
             </div>
           )}

@@ -39,9 +39,12 @@ export const renderPage = (activePage: string, user: User | null) => {
         return <SettingsPage />;
     }
 
+    if (activePage === 'properties') {
+        return <PropertiesPage />;
+    }
+
     // Owner pages
     if (user?.role === 'owner') {
-        if (activePage === 'properties') return <PropertiesPage />;
         if (activePage === 'units') return <UnitsPage />;
         if (activePage === 'leads') return <LeadsPage />;
         if (activePage === 'tenants') return <TenantsPage />;
