@@ -512,7 +512,7 @@ export function PropertiesPage() {
                 <Label htmlFor="lead-phone">Phone</Label>
                 <Input
                   id="lead-phone"
-                  placeholder="+1-555-0000"
+                  placeholder="+94 77 123 4567"
                   value={interestFormData.phone}
                   onChange={(e) => setInterestFormData({ ...interestFormData, phone: e.target.value })}
                   required

@@ -480,7 +480,7 @@ export function LeadsPage() {
                   <Label htmlFor="phone">Phone</Label>
                   <Input
                     id="phone"
-                    placeholder="+1-555-0000"
+                    placeholder="+94 77 123 4567"
                     value={formData.phone}
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                     required

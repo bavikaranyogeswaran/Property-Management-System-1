@@ -14,7 +14,7 @@ export function LandingPage({ onNavigate }: { onNavigate: (page: string) => void
                     <span className="text-xl font-bold text-gray-900">PMS</span>
                 </div>
                 <div className="flex items-center gap-4">
-                    <Button variant="ghost" onClick={() => onNavigate('properties')}>Properties</Button>
+                    <Button variant="ghost" onClick={() => onNavigate('browse-properties')}>Properties</Button>
                     <Button onClick={() => onNavigate('login')}>Login</Button>
                 </div>
             </nav>
@@ -31,7 +31,7 @@ export function LandingPage({ onNavigate }: { onNavigate: (page: string) => void
                             Seamless leasing, transparent management, and a community you'll love.
                         </p>
                         <div className="flex gap-4">
-                            <Button size="lg" className="h-12 px-8 text-lg" onClick={() => onNavigate('properties')}>
+                            <Button size="lg" className="h-12 px-8 text-lg" onClick={() => onNavigate('browse-properties')}>
                                 Browse Properties <ArrowRight className="ml-2 size-5" />
                             </Button>
                             <Button size="lg" variant="outline" className="h-12 px-8 text-lg" onClick={() => onNavigate('login')}>
@@ -114,7 +114,7 @@ export function LandingPage({ onNavigate }: { onNavigate: (page: string) => void
                         <div>
                             <h4 className="font-semibold mb-4">Quick Links</h4>
                             <ul className="space-y-2 text-gray-400">
-                                <li><button onClick={() => onNavigate('properties')} className="hover:text-blue-400">Properties</button></li>
+                                <li><button onClick={() => onNavigate('browse-properties')} className="hover:text-blue-400">Properties</button></li>
                                 <li><button onClick={() => onNavigate('login')} className="hover:text-blue-400">Login</button></li>
                             </ul>
                         </div>

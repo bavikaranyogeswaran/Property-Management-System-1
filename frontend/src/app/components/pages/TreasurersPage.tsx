@@ -37,7 +37,7 @@ export function TreasurersPage() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedTreasurer, setSelectedTreasurer] = useState<Treasurer | null>(null);
   const [showPassword, setShowPassword] = useState(false);
-  
+
   // Form state
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -88,7 +88,7 @@ export function TreasurersPage() {
 
   const handleUpdateTreasurer = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!selectedTreasurer) return;
 
     // Validate email uniqueness (excluding current treasurer)
@@ -180,7 +180,7 @@ export function TreasurersPage() {
                   type="tel"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  placeholder="+1-555-0100"
+                  placeholder="+94 77 123 4567"
                   required
                 />
               </div>
@@ -392,7 +392,7 @@ export function TreasurersPage() {
                 type="tel"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                placeholder="+1-555-0100"
+                placeholder="+94 77 123 4567"
                 required
               />
             </div>

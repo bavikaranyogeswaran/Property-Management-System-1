@@ -18,7 +18,7 @@ function LandingPageWrapper() {
 // Or better: reused Nav from Landing Page? 
 // Let's create a PublicPropertiesWrapper that adds the Landing Page Nav.
 
-function PublicPropertiesWrapper() {
+function PublicPropertiesWrapper({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   return (
     <div className="min-h-screen bg-gray-50">
@@ -32,7 +32,7 @@ function PublicPropertiesWrapper() {
         </div>
       </nav>
       <div className="container mx-auto px-6 pb-12">
-        <PropertiesPage />
+        {children}
       </div>
     </div>
   );
@@ -68,6 +68,7 @@ import { PaymentVerificationPage } from '@/components/pages/treasurer/PaymentVer
 // Shared Pages
 import { AnalyticsPage } from '@/components/reports/AnalyticsPage';
 import { SettingsPage } from '@/components/pages/common/SettingsPage';
+import { PublicListingPage } from '@/components/pages/public/PublicListingPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -85,6 +86,11 @@ function DashboardRoute() {
 
 function AppContent() {
   const { user } = useAuth();
+  const navigate = useNavigate();
+
+  const handleNavigate = (page: string) => {
+    navigate(page === 'login' ? '/login' : `/${page}`);
+  };
 
   return (
     <Routes>
@@ -94,11 +100,16 @@ function AppContent() {
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
 
       {/* Public/Shared Properties Route */}
+      <Route path="/browse-properties" element={
+        <PublicPropertiesWrapper>
+          <PublicListingPage onNavigate={(page) => handleNavigate(page)} />
+        </PublicPropertiesWrapper>
+      } />
       <Route path="/properties" element={
         user ? (
           <ProtectedRoute><PropertiesPage /></ProtectedRoute>
         ) : (
-          <PublicPropertiesWrapper />
+          <Navigate to="/browse-properties" replace />
         )
       } />
 

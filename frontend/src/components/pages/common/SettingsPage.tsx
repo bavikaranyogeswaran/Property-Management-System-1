@@ -16,7 +16,7 @@ export function SettingsPage() {
     const [profileData, setProfileData] = useState({
         name: user?.name || '',
         email: user?.email || '',
-        phone: '+1-555-0123', // Mock phone as it's not in user object yet
+        phone: '+94 77 123 4567', // Mock phone as it's not in user object yet
     });
 
     const [passwords, setPasswords] = useState({

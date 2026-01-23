@@ -234,7 +234,7 @@ export function TreasurersPage() {
                   type="tel"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  placeholder="+1-555-0100"
+                  placeholder="+94 77 123 4567"
                   required
                 />
               </div>
@@ -446,7 +446,7 @@ export function TreasurersPage() {
                 type="tel"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                placeholder="+1-555-0100"
+                placeholder="+94 77 123 4567"
                 required
               />
             </div>
