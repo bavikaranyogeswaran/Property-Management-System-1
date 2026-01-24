@@ -45,6 +45,7 @@ export interface Lead {
   email: string;
   phone: string;
   interestedUnit: string;
+  propertyId: string; // Added for correct linkage
   status: 'interested' | 'negotiation' | 'converted' | 'dropped';
   createdAt: string;
   notes: string;
@@ -299,6 +300,7 @@ const INITIAL_DATA = {
       email: 'alice@email.com',
       phone: '+94 77 123 4567',
       interestedUnit: 'unit-2',
+      propertyId: 'prop-1',
       status: 'interested' as const,
       createdAt: '2025-01-05',
       notes: 'Interested in viewing next week',
@@ -311,6 +313,7 @@ const INITIAL_DATA = {
       email: 'david@email.com',
       phone: '+94 77 123 4568',
       interestedUnit: 'unit-2',
+      propertyId: 'prop-1',
       status: 'negotiation' as const,
       createdAt: '2024-12-20',
       notes: 'Ready to sign lease, discussing move-in date',
@@ -323,6 +326,7 @@ const INITIAL_DATA = {
       email: 'emma@email.com',
       phone: '+94 77 123 4569',
       interestedUnit: 'unit-3',
+      propertyId: 'prop-1',
       status: 'dropped' as const,
       createdAt: '2025-01-01',
       notes: 'Found another place',

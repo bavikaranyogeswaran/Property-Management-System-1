@@ -69,6 +69,7 @@ import { PaymentVerificationPage } from '@/components/pages/treasurer/PaymentVer
 import { AnalyticsPage } from '@/components/reports/AnalyticsPage';
 import { SettingsPage } from '@/components/pages/common/SettingsPage';
 import { PublicListingPage } from '@/components/pages/public/PublicListingPage';
+import { PublicPropertyDetailsPage } from '@/components/pages/public/PublicPropertyDetailsPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -103,6 +104,11 @@ function AppContent() {
       <Route path="/browse-properties" element={
         <PublicPropertiesWrapper>
           <PublicListingPage onNavigate={(page) => handleNavigate(page)} />
+        </PublicPropertiesWrapper>
+      } />
+      <Route path="/property/:id" element={
+        <PublicPropertiesWrapper>
+          <PublicPropertyDetailsPage />
         </PublicPropertiesWrapper>
       } />
       <Route path="/properties" element={

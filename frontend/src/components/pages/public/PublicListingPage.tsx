@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useApp, Property } from '@/app/context/AppContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,6 +10,7 @@ import { Building2, Plus, Edit, Trash2, Eye, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 
 export function PublicListingPage({ onNavigate }: { onNavigate?: (page: string) => void }) {
+
     const { properties, units, addLead } = useApp();
     const [isInterestDialogOpen, setIsInterestDialogOpen] = useState(false);
     const [interestFormData, setInterestFormData] = useState({
@@ -19,7 +21,8 @@ export function PublicListingPage({ onNavigate }: { onNavigate?: (page: string) 
         notes: '',
     });
     const [interestProperty, setInterestProperty] = useState<Property | null>(null);
-    const [viewProperty, setViewProperty] = useState<Property | null>(null);
+
+    const navigate = useNavigate();
 
     const handleInterestSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -39,13 +42,8 @@ export function PublicListingPage({ onNavigate }: { onNavigate?: (page: string) 
 
     const openInterestDialog = (property: Property) => {
         setInterestProperty(property);
-        const availableUnit = units.find(u => u.propertyId === property.id && u.status === 'available');
-        setInterestFormData(prev => ({ ...prev, interestedUnit: availableUnit?.id || '' }));
+        setInterestFormData(prev => ({ ...prev, interestedUnit: '' }));
         setIsInterestDialogOpen(true);
-    };
-
-    const getUnitCount = (propertyId: string) => {
-        return units.filter(u => u.propertyId === propertyId).length;
     };
 
     return (
@@ -67,7 +65,7 @@ export function PublicListingPage({ onNavigate }: { onNavigate?: (page: string) 
                 {properties.map((property) => (
                     <Card key={property.id} className="overflow-hidden flex flex-col hover:shadow-lg transition-shadow duration-300">
                         {property.image ? (
-                            <div className="h-64 w-full bg-gray-100 relative group cursor-pointer" onClick={() => setViewProperty(property)}>
+                            <div className="h-64 w-full bg-gray-100 relative group cursor-pointer" onClick={() => navigate(`/property/${property.id}`)}>
                                 <img
                                     src={property.image}
                                     alt={property.name}
@@ -79,7 +77,7 @@ export function PublicListingPage({ onNavigate }: { onNavigate?: (page: string) 
                                 </div>
                             </div>
                         ) : (
-                            <div className="h-64 w-full bg-blue-50 flex items-center justify-center cursor-pointer" onClick={() => setViewProperty(property)}>
+                            <div className="h-64 w-full bg-blue-50 flex items-center justify-center cursor-pointer" onClick={() => navigate(`/property/${property.id}`)}>
                                 <Building2 className="size-16 text-blue-200" />
                             </div>
                         )}
@@ -121,7 +119,7 @@ export function PublicListingPage({ onNavigate }: { onNavigate?: (page: string) 
                                 <Button
                                     className="flex-1"
                                     variant="outline"
-                                    onClick={() => setViewProperty(property)}
+                                    onClick={() => navigate(`/property/${property.id}`)}
                                 >
                                     View Details
                                 </Button>
@@ -147,141 +145,6 @@ export function PublicListingPage({ onNavigate }: { onNavigate?: (page: string) 
                 </div>
             )}
 
-            {/* View Property Details Dialog */}
-            <Dialog open={!!viewProperty} onOpenChange={(open) => !open && setViewProperty(null)}>
-                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-                    <DialogHeader>
-                        <DialogTitle className="text-2xl">Property Details</DialogTitle>
-                    </DialogHeader>
-                    {viewProperty && (
-                        <div className="space-y-8 mt-4">
-                            {/* Large Image View */}
-                            <div className="w-full aspect-[21/9] bg-gray-100 rounded-xl overflow-hidden shadow-inner">
-                                {viewProperty.image ? (
-                                    <img
-                                        src={viewProperty.image}
-                                        alt={viewProperty.name}
-                                        className="w-full h-full object-cover"
-                                    />
-                                ) : (
-                                    <div className="w-full h-full flex flex-col items-center justify-center text-gray-400">
-                                        <Building2 className="size-16 mb-2 opacity-20" />
-                                        <p>No image available</p>
-                                    </div>
-                                )}
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                                <div className="md:col-span-2 space-y-6">
-                                    <div>
-                                        <h3 className="text-3xl font-bold text-gray-900 mb-2">{viewProperty.name}</h3>
-                                        <div className="flex items-center gap-2 text-blue-600 font-medium">
-                                            <Building2 className="size-5" />
-                                            {viewProperty.typeName}
-                                        </div>
-                                    </div>
-
-                                    <div className="prose max-w-none text-gray-600">
-                                        <p>
-                                            Located at {viewProperty.addressLine1}, {viewProperty.addressLine2} {viewProperty.addressLine3}.
-                                            This Premium property offers modern amenities and comfortable living spaces designed for your lifestyle.
-                                        </p>
-                                    </div>
-
-                                    <div className="border-t pt-6">
-                                        <h4 className="font-semibold text-gray-900 mb-4">Features & Amenities</h4>
-                                        <ul className="grid grid-cols-2 gap-3 text-sm text-gray-600">
-                                            <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 bg-blue-500 rounded-full" /> 24/7 Security</li>
-                                            <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 bg-blue-500 rounded-full" /> Parking Available</li>
-                                            <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 bg-blue-500 rounded-full" /> Maintenance Support</li>
-                                        </ul>
-                                    </div>
-
-                                    {/* Units Listing Section */}
-                                    <div className="border-t pt-6">
-                                        <h4 className="font-semibold text-gray-900 mb-4">Available Units</h4>
-                                        <div className="space-y-4">
-                                            {units.filter(u => u.propertyId === viewProperty.id).length > 0 ? (
-                                                <div className="grid grid-cols-1 gap-4">
-                                                    {units
-                                                        .filter(u => u.propertyId === viewProperty.id)
-                                                        .sort((a, b) => (a.status === 'available' ? -1 : 1)) // Show available first
-                                                        .map((unit) => (
-                                                            <div key={unit.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border hover:border-blue-200 transition-colors">
-                                                                <div className="flex items-center gap-4">
-                                                                    {unit.image ? (
-                                                                        <div className="h-16 w-16 bg-gray-200 rounded-md overflow-hidden flex-shrink-0">
-                                                                            <img src={unit.image} alt={`Unit ${unit.unitNumber}`} className="w-full h-full object-cover" />
-                                                                        </div>
-                                                                    ) : (
-                                                                        <div className="h-16 w-16 bg-gray-200 rounded-md flex items-center justify-center flex-shrink-0">
-                                                                            <Building2 className="size-8 text-gray-400" />
-                                                                        </div>
-                                                                    )}
-                                                                    <div>
-                                                                        <div className="flex items-center gap-2 mb-1">
-                                                                            <span className="font-bold text-gray-900">Unit {unit.unitNumber}</span>
-                                                                            <span className={`text-[10px] px-2 py-0.5 rounded-full uppercase font-bold tracking-wide ${unit.status === 'available'
-                                                                                    ? 'bg-green-100 text-green-700'
-                                                                                    : unit.status === 'maintenance'
-                                                                                        ? 'bg-amber-100 text-amber-700'
-                                                                                        : 'bg-gray-200 text-gray-600'
-                                                                                }`}>
-                                                                                {unit.status}
-                                                                            </span>
-                                                                        </div>
-                                                                        <p className="text-sm text-gray-600">{unit.type}</p>
-                                                                        <p className="font-semibold text-blue-600">LKR {unit.monthlyRent.toLocaleString()}</p>
-                                                                    </div>
-                                                                </div>
-
-                                                                {unit.status === 'available' && (
-                                                                    <Button
-                                                                        size="sm"
-                                                                        onClick={() => {
-                                                                            setInterestProperty(viewProperty);
-                                                                            setInterestFormData(prev => ({ ...prev, interestedUnit: unit.id }));
-                                                                            setViewProperty(null);
-                                                                            setIsInterestDialogOpen(true);
-                                                                        }}
-                                                                    >
-                                                                        I'm Interested
-                                                                    </Button>
-                                                                )}
-                                                            </div>
-                                                        ))
-                                                    }
-                                                </div>
-                                            ) : (
-                                                <p className="text-gray-500 italic">No units listed for this property yet.</p>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="space-y-6">
-                                    <div className="bg-gray-50 p-6 rounded-xl border space-y-4">
-                                        <h4 className="font-semibold text-gray-900">Availability</h4>
-                                        <div className="flex justify-between items-center py-2 border-b">
-                                            <span className="text-gray-600">Total Units</span>
-                                            <span className="font-bold">{getUnitCount(viewProperty.id)}</span>
-                                        </div>
-                                        <div className="flex justify-between items-center py-2 border-b">
-                                            <span className="text-gray-600">Vacant</span>
-                                            <span className="font-bold text-green-600">
-                                                {units.filter(u => u.propertyId === viewProperty.id && u.status === 'available').length}
-                                            </span>
-                                        </div>
-                                        <Button className="w-full" size="lg" onClick={() => { openInterestDialog(viewProperty); setViewProperty(null); }}>
-                                            I'm Interested
-                                        </Button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </DialogContent>
-            </Dialog>
 
             {/* Interest Dialog (Same as before) */}
             <Dialog open={isInterestDialogOpen} onOpenChange={setIsInterestDialogOpen}>
@@ -325,7 +188,7 @@ export function PublicListingPage({ onNavigate }: { onNavigate?: (page: string) 
                             </div>
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="lead-unit">Interested Unit (Optional)</Label>
+                            <Label htmlFor="lead-unit">Interested In</Label>
                             <div className="relative">
                                 <select
                                     id="lead-unit"
@@ -333,7 +196,7 @@ export function PublicListingPage({ onNavigate }: { onNavigate?: (page: string) 
                                     value={interestFormData.interestedUnit}
                                     onChange={(e) => setInterestFormData({ ...interestFormData, interestedUnit: e.target.value })}
                                 >
-                                    <option value="">Any available unit</option>
+                                    <option value="">Whole Property / Any Available Unit</option>
                                     {interestProperty && units
                                         .filter(u => u.propertyId === interestProperty.id && u.status === 'available')
                                         .map(u => (

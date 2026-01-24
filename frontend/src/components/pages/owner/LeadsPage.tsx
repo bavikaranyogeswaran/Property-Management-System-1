@@ -25,7 +25,7 @@ export function LeadsPage() {
     convertLeadToTenant,
   } = useApp();
 
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [isFollowUpDialogOpen, setIsFollowUpDialogOpen] = useState(false);
   const [isConvertDialogOpen, setIsConvertDialogOpen] = useState(false);
@@ -33,13 +33,7 @@ export function LeadsPage() {
   const [viewMode, setViewMode] = useState<'pipeline' | 'list'>('pipeline');
   const [tenantPassword, setTenantPassword] = useState('');
 
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    interestedUnit: '',
-    notes: '',
-  });
+
 
   const [followUpData, setFollowUpData] = useState({
     date: '',
@@ -47,36 +41,7 @@ export function LeadsPage() {
     nextAction: '',
   });
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
 
-    // Basic validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(formData.email)) {
-      toast.error('Please enter a valid email address');
-      return;
-    }
-
-    try {
-      await addLead({
-        ...formData,
-        status: 'interested',
-      });
-      toast.success('Lead added successfully');
-      setIsAddDialogOpen(false);
-      setFormData({
-        name: '',
-        email: '',
-        phone: '',
-        interestedUnit: '',
-        notes: '',
-      });
-    } catch (error: any) {
-      // If the error object has a response with an error message, show that
-      // otherwise show generic error
-      toast.error(error.response?.data?.error || 'Failed to add lead');
-    }
-  };
 
   const handleStatusChange = async (leadId: string, status: Lead['status']) => {
     const lead = leads.find(l => l.id === leadId);
@@ -443,99 +408,6 @@ export function LeadsPage() {
               List
             </Button>
           </div>
-          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <UserPlus className="size-4 mr-2" />
-                Add Lead
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Add New Lead</DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleSubmit} className="space-y-4 mt-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Name</Label>
-                  <Input
-                    id="name"
-                    placeholder="Lead's full name"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="email@example.com"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Phone</Label>
-                  <Input
-                    id="phone"
-                    placeholder="+94 77 123 4567"
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="interestedUnit">Interested Unit</Label>
-                  <Select
-                    value={formData.interestedUnit}
-                    onValueChange={(value) => setFormData({ ...formData, interestedUnit: value })}
-                  >
-                    <SelectTrigger id="interestedUnit">
-                      <SelectValue placeholder="Select a unit" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {units.filter(u => u.status === 'available').map((unit) => (
-                        <SelectItem key={unit.id} value={unit.id}>
-                          {unit.unitNumber} - {unit.type} (LKR {unit.monthlyRent}/mo)
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="notes">Notes</Label>
-                  <Textarea
-                    id="notes"
-                    placeholder="Any additional information..."
-                    value={formData.notes}
-                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                    rows={3}
-                  />
-                </div>
-                <div className="flex gap-2 justify-end">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      setIsAddDialogOpen(false);
-                      setFormData({
-                        name: '',
-                        email: '',
-                        phone: '',
-                        interestedUnit: '',
-                        notes: '',
-                      });
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                  <Button type="submit">Add Lead</Button>
-                </div>
-              </form>
-            </DialogContent>
-          </Dialog>
         </div>
       </div>
 

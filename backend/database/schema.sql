@@ -109,6 +109,7 @@ CREATE TABLE unit_images (
 -- =========================
 CREATE TABLE leads (
     lead_id INT AUTO_INCREMENT PRIMARY KEY,
+    property_id INT NOT NULL,                -- [ADDED] Link to property
     unit_id INT NULL,
     tenant_id INT,  -- set ONLY when converted
     name VARCHAR(100) NOT NULL,
@@ -119,6 +120,7 @@ CREATE TABLE leads (
     score INT DEFAULT 0,                     -- [ADDED] Lead scoring
     last_contacted_at DATETIME,              -- [ADDED] For follow-up tracking
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (property_id) REFERENCES properties(property_id),
     FOREIGN KEY (unit_id) REFERENCES units(unit_id),
     FOREIGN KEY (tenant_id) REFERENCES users(user_id)
 );

@@ -2,11 +2,18 @@ import db from '../config/db.js';
 
 class LeadModel {
     async create(data) {
-        const { unitId, name, phone, email, notes, status = 'interested' } = data;
+        const { propertyId, unitId, interestedUnit, name, phone, email, notes, status = 'interested' } = data;
+
+        // Handle alias and empty string
+        let finalUnitId = unitId || interestedUnit;
+        if (finalUnitId === '' || finalUnitId === 'null') {
+            finalUnitId = null;
+        }
+
         const [result] = await db.query(
-            `INSERT INTO leads (unit_id, name, phone, email, notes, status) 
-             VALUES (?, ?, ?, ?, ?, ?)`,
-            [unitId, name, phone, email, notes, status]
+            `INSERT INTO leads (property_id, unit_id, name, phone, email, notes, status) 
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [propertyId, finalUnitId, name, phone, email, notes, status]
         );
         return result.insertId;
     }
@@ -53,6 +60,7 @@ class LeadModel {
         const [rows] = await db.query(`
             SELECT 
                 lead_id as id,
+                property_id as propertyId,
                 unit_id as interestedUnit,
                 name,
                 email,
