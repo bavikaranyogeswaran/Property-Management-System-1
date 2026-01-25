@@ -14,7 +14,6 @@ export function LandingPage({ onNavigate }: { onNavigate: (page: string) => void
                     <span className="text-xl font-bold text-gray-900">PMS</span>
                 </div>
                 <div className="flex items-center gap-4">
-                    <Button variant="ghost" onClick={() => onNavigate('browse-properties')}>Properties</Button>
                     <Button onClick={() => onNavigate('login')}>Login</Button>
                 </div>
             </nav>
@@ -33,9 +32,6 @@ export function LandingPage({ onNavigate }: { onNavigate: (page: string) => void
                         <div className="flex gap-4">
                             <Button size="lg" className="h-12 px-8 text-lg" onClick={() => onNavigate('browse-properties')}>
                                 Browse Properties <ArrowRight className="ml-2 size-5" />
-                            </Button>
-                            <Button size="lg" variant="outline" className="h-12 px-8 text-lg" onClick={() => onNavigate('login')}>
-                                Owner Login
                             </Button>
                         </div>
                         <div className="flex items-center gap-6 pt-4 text-sm text-gray-500">
@@ -120,7 +116,7 @@ export function LandingPage({ onNavigate }: { onNavigate: (page: string) => void
                         </div>
                         <div>
                             <h4 className="font-semibold mb-4">Contact</h4>
-                            <p className="text-gray-400">123 Business Avenue<br />City, State 12345<br />contact@pms.com</p>
+                            <p className="text-gray-400">34/3, Sabapathy Road<br />Jaffna, Sri Lanka<br />contact@pms.com</p>
                         </div>
                     </div>
                     <div className="text-center text-gray-500 text-sm">

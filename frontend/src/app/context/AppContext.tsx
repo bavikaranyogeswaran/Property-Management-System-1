@@ -191,9 +191,13 @@ interface AppContextType {
   notifications: Notification[];
 
   // Property operations
-  addProperty: (property: Omit<Property, 'id' | 'createdAt'>) => Promise<void>;
+  addProperty: (property: Omit<Property, 'id' | 'createdAt'>) => Promise<Property | undefined>;
   updateProperty: (id: string, property: Partial<Property>) => Promise<void>;
   deleteProperty: (id: string) => Promise<void>;
+  uploadPropertyImages: (propertyId: string, files: File[]) => Promise<any>;
+  getPropertyImages: (propertyId: string) => Promise<any[]>;
+  setPropertyPrimaryImage: (propertyId: string, imageId: string) => Promise<void>;
+  deletePropertyImage: (propertyId: string, imageId: string) => Promise<void>;
 
   // Type operations
   addPropertyType: (type: Omit<PropertyType, 'type_id'>) => Promise<void>;
@@ -808,7 +812,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [leases, units, tenants, properties]); // Run when leases or related data changes
 
   // Property operations
-  const addProperty = async (property: Omit<Property, 'id' | 'createdAt'>) => {
+  const addProperty = async (property: Omit<Property, 'id' | 'createdAt'>): Promise<Property | undefined> => {
     try {
       const response = await apiClient.post('/properties', {
         ...property,
@@ -835,9 +839,74 @@ export function AppProvider({ children }: { children: ReactNode }) {
           createdAt: newProp.created_at
         };
         setProperties([...properties, mapped]);
+        return mapped;
       }
     } catch (e) {
       console.error("Failed to add property", e);
+      throw e;
+    }
+  };
+
+  const uploadPropertyImages = async (propertyId: string, files: File[]) => {
+    try {
+      const formData = new FormData();
+      files.forEach(file => {
+        formData.append('images', file);
+      });
+
+      const response = await apiClient.post(`/properties/${propertyId}/images`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      // We might want to update the property's main image if it was the first upload
+      if (response.status === 201 && response.data.images && response.data.images.length > 0) {
+        const primary = response.data.images.find((img: any) => img.is_primary);
+        if (primary) {
+          setProperties(prev => prev.map(p => p.id === propertyId ? { ...p, image: primary.image_url } : p));
+        }
+      }
+
+      return response.data;
+    } catch (e) {
+      console.error("Failed to upload images", e);
+      throw e;
+    }
+  };
+
+  const setPropertyPrimaryImage = async (propertyId: string, imageId: string) => {
+    try {
+      await apiClient.put(`/properties/${propertyId}/images/${imageId}/primary`);
+      // Note: we'd need to fetch images again or know the URL to update local state perfectly, 
+      // but typically we might just re-fetch the property or rely on next page load.
+      // For now, let's just return success.
+    } catch (e) {
+      console.error("Failed to set primary image", e);
+      throw e;
+    }
+  };
+
+  const getPropertyImages = async (propertyId: string) => {
+    try {
+      const response = await apiClient.get(`/properties/${propertyId}/images`);
+      return response.data.images;
+    } catch (e) {
+      console.error("Failed to fetch property images", e);
+      throw e;
+    }
+  };
+
+  const deletePropertyImage = async (propertyId: string, imageId: string) => {
+    try {
+      await apiClient.delete(`/properties/images/${imageId}`);
+      // If we choose to update local state immediately, we can do it here.
+      // Currently properties list only holds primary image.
+      // If the deleted image was primary, we should probably refresh properties.
+      // But for now, let's just allow the caller to handle state updates if needed, 
+      // OR we can refetch properties.
+    } catch (e) {
+      console.error("Failed to delete property image", e);
       throw e;
     }
   };
@@ -917,10 +986,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
     } catch (error) {
       console.error('Failed to add lead:', error);
-      // Optionally show toast here or let caller handle it? 
-      // Current implementation in LeadsPage handles success, but we should throw if it fails so UI knows.
-      // But LeadsPage.tsx handleSubmit doesn't await addLead currently!
-      // We need to fix LeadsPage.tsx to await this too.
+      throw error;
     }
   };
 
@@ -1227,6 +1293,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       addProperty,
       updateProperty,
       deleteProperty,
+      uploadPropertyImages,
+      getPropertyImages,
+      setPropertyPrimaryImage,
+      deletePropertyImage,
       addUnit,
       updateUnit,
       deleteUnit,

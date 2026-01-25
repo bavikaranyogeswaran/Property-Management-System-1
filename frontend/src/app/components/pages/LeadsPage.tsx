@@ -46,25 +46,29 @@ export function LeadsPage() {
     nextAction: '',
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const selectedUnit = units.find(u => u.id === formData.interestedUnit);
+    try {
+      const selectedUnit = units.find(u => u.id === formData.interestedUnit);
 
-    addLead({
-      ...formData,
-      propertyId: selectedUnit?.propertyId || '',
-      status: 'interested',
-    });
-    toast.success('Lead added successfully');
-    setIsAddDialogOpen(false);
-    setFormData({
-      name: '',
-      email: '',
-      phone: '',
-      interestedUnit: '',
-      notes: '',
-    });
+      await addLead({
+        ...formData,
+        propertyId: selectedUnit?.propertyId || '',
+        status: 'interested',
+      });
+      toast.success('Lead added successfully');
+      setIsAddDialogOpen(false);
+      setFormData({
+        name: '',
+        email: '',
+        phone: '',
+        interestedUnit: '',
+        notes: '',
+      });
+    } catch (error) {
+      toast.error('Failed to add lead');
+    }
   };
 
   const handleStatusChange = (leadId: string, status: Lead['status']) => {

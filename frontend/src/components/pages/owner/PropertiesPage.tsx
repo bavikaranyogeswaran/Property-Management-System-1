@@ -13,7 +13,19 @@ import { useAuth } from '@/app/context/AuthContext';
 
 export function PropertiesPage() {
   const { user } = useAuth();
-  const { properties, propertyTypes, units, addProperty, updateProperty, deleteProperty, addLead } = useApp();
+  const {
+    properties,
+    addProperty,
+    updateProperty,
+    deleteProperty,
+    propertyTypes,
+    units,
+    addLead,
+    uploadPropertyImages,
+    getPropertyImages,
+    setPropertyPrimaryImage,
+    deletePropertyImage
+  } = useApp();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingProperty, setEditingProperty] = useState<Property | null>(null);
   const [isInterestDialogOpen, setIsInterestDialogOpen] = useState(false);
@@ -25,6 +37,7 @@ export function PropertiesPage() {
     notes: '',
   });
   const [interestProperty, setInterestProperty] = useState<Property | null>(null);
+  const [existingImages, setExistingImages] = useState<any[]>([]);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -63,12 +76,34 @@ export function PropertiesPage() {
     try {
       if (editingProperty) {
         await updateProperty(editingProperty.id, formData);
+
+        if (uploadFiles.length > 0) {
+          const response = await uploadPropertyImages(editingProperty.id, uploadFiles);
+
+          if (primaryImageIndex > 0 && response.images && response.images.length > primaryImageIndex) {
+            const targetImage = response.images[primaryImageIndex];
+            if (targetImage) {
+              await setPropertyPrimaryImage(editingProperty.id, targetImage.image_id || targetImage.id);
+            }
+          }
+        }
+
         toast.success('Property updated successfully');
         setEditingProperty(null);
       } else {
-        // For demo: just add property without real upload
-        // In production, you'd create property first, get ID, then upload images
-        await addProperty({ ...formData, image: uploadFiles.length > 0 ? '/placeholder.jpg' : undefined });
+        const newProperty = await addProperty({ ...formData });
+
+        if (newProperty && uploadFiles.length > 0) {
+          const response = await uploadPropertyImages(newProperty.id, uploadFiles);
+
+          if (primaryImageIndex > 0 && response.images && response.images.length > primaryImageIndex) {
+            const targetImage = response.images[primaryImageIndex];
+            if (targetImage) {
+              await setPropertyPrimaryImage(newProperty.id, targetImage.image_id || targetImage.id);
+            }
+          }
+        }
+
         toast.success('Property added successfully');
         setIsAddDialogOpen(false);
       }
@@ -81,7 +116,7 @@ export function PropertiesPage() {
     }
   };
 
-  const handleEdit = (property: Property) => {
+  const handleEdit = async (property: Property) => {
     setEditingProperty(property);
     setFormData({
       name: property.name,
@@ -92,6 +127,57 @@ export function PropertiesPage() {
     });
     setUploadFiles([]);
     setPrimaryImageIndex(0);
+    setExistingImages([]);
+
+    try {
+      const images = await getPropertyImages(property.id);
+      if (images) {
+        setExistingImages(images.map((img: any) => ({
+          id: img.image_id?.toString() || img.id?.toString(),
+          url: img.image_url || img.url, // Handle backend naming
+          isPrimary: Boolean(img.is_primary)
+        })));
+      }
+    } catch (e) {
+      console.error("Failed to load images", e);
+      toast.error("Failed to load property images");
+    }
+  };
+
+  const handleRemoveExistingImage = async (image: any) => {
+    if (!editingProperty) return;
+    if (confirm('Delete this image?')) {
+      try {
+        await deletePropertyImage(editingProperty.id, image.id);
+        // Refresh images
+        const images = await getPropertyImages(editingProperty.id);
+        setExistingImages(images.map((img: any) => ({
+          id: img.image_id?.toString() || img.id?.toString(),
+          url: img.image_url,
+          isPrimary: Boolean(img.is_primary)
+        })));
+        toast.success('Image deleted');
+      } catch (e) {
+        toast.error('Failed to delete image');
+      }
+    }
+  };
+
+  const handleSetPrimaryExistingImage = async (image: any) => {
+    if (!editingProperty) return;
+    try {
+      await setPropertyPrimaryImage(editingProperty.id, image.id);
+      // Refresh images
+      const images = await getPropertyImages(editingProperty.id);
+      setExistingImages(images.map((img: any) => ({
+        id: img.image_id?.toString() || img.id?.toString(),
+        url: img.image_url,
+        isPrimary: Boolean(img.is_primary)
+      })));
+      toast.success('Primary image updated');
+    } catch (e) {
+      toast.error('Failed to set primary image');
+    }
   };
 
   const handleDelete = (id: string) => {
@@ -212,6 +298,9 @@ export function PropertiesPage() {
                 <MultiImageUpload
                   maxImages={10}
                   onImagesChange={handleImagesChange}
+                  existingImages={existingImages}
+                  onRemoveExisting={handleRemoveExistingImage}
+                  onSetPrimaryExisting={handleSetPrimaryExistingImage}
                 />
                 <div className="flex gap-2 justify-end">
                   <Button type="button" variant="outline" onClick={() => {

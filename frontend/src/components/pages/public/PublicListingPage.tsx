@@ -30,6 +30,7 @@ export function PublicListingPage({ onNavigate }: { onNavigate?: (page: string) 
             await addLead({
                 ...interestFormData,
                 status: 'interested',
+                propertyId: interestProperty?.id || '',
             });
             toast.success('Interest registered! We will contact you soon.');
             setIsInterestDialogOpen(false);
