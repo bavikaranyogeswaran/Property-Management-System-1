@@ -119,6 +119,7 @@ export function PropertiesPage() {
 
       await addLead({
         ...interestFormData,
+        propertyId: interestProperty?.id || '',
         status: 'interested',
       });
       toast.success('Interest registered! We will contact you soon.');

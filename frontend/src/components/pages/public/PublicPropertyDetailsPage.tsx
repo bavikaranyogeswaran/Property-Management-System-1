@@ -31,6 +31,7 @@ export function PublicPropertyDetailsPage() {
     });
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isMobileInterestOpen, setIsMobileInterestOpen] = useState(false);
+    const [isUnitLocked, setIsUnitLocked] = useState(false); // Validating feature request: lock unit if selected via card
 
     useEffect(() => {
         if (id && properties.length > 0) {
@@ -63,28 +64,12 @@ export function PublicPropertyDetailsPage() {
         }
     };
 
-    const scrollToInterest = (unitId?: string) => {
-        if (unitId) {
-            setInterestFormData(prev => ({ ...prev, interestedUnit: unitId }));
-        }
-
-        if (window.innerWidth < 1024) {
-            setIsMobileInterestOpen(true);
-            return;
-        }
-
-        const element = document.getElementById('interest-form-card');
-        if (element) {
-            // Offset for sticky header
-            const y = element.getBoundingClientRect().top + window.scrollY - 100;
-            window.scrollTo({ top: y, behavior: 'smooth' });
-            // Highlight effect
-            setTimeout(() => {
-                element.classList.add('ring-2', 'ring-blue-500', 'ring-offset-2');
-                setTimeout(() => element.classList.remove('ring-2', 'ring-blue-500', 'ring-offset-2'), 1000);
-            }, 500);
-        }
+    const handleOpenInterestModal = (unitId: string = '') => {
+        setInterestFormData(prev => ({ ...prev, interestedUnit: unitId }));
+        setIsUnitLocked(!!unitId); // Lock if a specific unit ID is passed
+        setIsMobileInterestOpen(true);
     };
+
 
     if (!property) {
         return (
@@ -103,72 +88,83 @@ export function PublicPropertyDetailsPage() {
         : 0;
 
     return (
-        <div className="bg-white min-h-screen pb-20 font-sans">
-            {/* Sticky Nav */}
-            <nav className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-gray-100">
-                <div className="container mx-auto px-4 md:px-6 h-16 flex items-center justify-between">
-                    <Button
-                        variant="ghost"
-                        onClick={() => navigate('/browse-properties')}
-                        className="text-gray-600 hover:text-gray-900 -ml-2 hover:bg-gray-100/50"
-                    >
-                        <ArrowLeft className="w-4 h-4 mr-2" />
-                        Back to Listings
-                    </Button>
-                    <div className="flex items-center gap-2">
+        <>
+            <div className="min-h-screen bg-white">
+                {/* Navigation Bar - Transparent/Blurry */}
+                <nav className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-gray-100">
+                    <div className="container mx-auto px-4 md:px-6 h-16 flex items-center justify-between">
                         <Button
-                            variant="outline"
-                            size="sm"
-                            className="text-gray-600 border-gray-200 hover:bg-gray-50"
-                            onClick={() => {
-                                navigator.clipboard.writeText(window.location.href);
-                                toast.success('Link copied to clipboard');
-                            }}
+                            variant="ghost"
+                            onClick={() => navigate('/browse-properties')}
+                            className="text-gray-600 hover:text-gray-900 -ml-2 hover:bg-gray-100/50"
                         >
-                            <Share2 className="w-4 h-4 mr-2" />
-                            Share
+                            <ArrowLeft className="w-4 h-4 mr-2" />
+                            Back to Listings
                         </Button>
+                        <div className="flex items-center gap-2">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-gray-600 border-gray-200 hover:bg-gray-50"
+                                onClick={() => {
+                                    navigator.clipboard.writeText(window.location.href);
+                                    toast.success('Link copied to clipboard');
+                                }}
+                            >
+                                <Share2 className="w-4 h-4 mr-2" />
+                                Share
+                            </Button>
+                        </div>
                     </div>
-                </div>
-            </nav>
+                </nav>
 
-            {/* Hero Section */}
-            <div className="relative w-full h-[50vh] min-h-[400px] md:h-[60vh] bg-gray-900 overflow-hidden">
-                {property.image ? (
-                    <img
-                        src={property.image}
-                        alt={property.name}
-                        className="w-full h-full object-cover opacity-90 transition-transform duration-1000 hover:scale-105"
-                    />
-                ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-gray-800 text-gray-600">
-                        <Building2 className="w-32 h-32 opacity-20" />
-                    </div>
-                )}
-                {/* Gradient Overlay */}
-                <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/40 to-transparent" />
+                {/* Hero Section */}
+                <div className="relative w-full h-[50vh] min-h-[400px] md:h-[60vh] bg-gray-900 overflow-hidden">
+                    {property.image ? (
+                        <img
+                            src={property.image}
+                            alt={property.name}
+                            className="w-full h-full object-cover opacity-90 transition-transform duration-1000 hover:scale-105"
+                        />
+                    ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-gray-800 text-gray-600">
+                            <Building2 className="w-32 h-32 opacity-20" />
+                        </div>
+                    )}
+                    {/* Gradient Overlay */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/40 to-transparent" />
 
-                {/* Hero Content */}
-                <div className="absolute bottom-0 left-0 right-0 pb-12 pt-24 bg-gradient-to-t from-black/80 to-transparent">
-                    <div className="container mx-auto px-4 md:px-6">
-                        <div className="max-w-4xl">
-                            <div className="flex flex-wrap items-center gap-3 mb-4">
-                                <Badge className="bg-blue-600 hover:bg-blue-700 text-white border-none px-3 py-1 text-sm font-medium tracking-wide">
-                                    {property.typeName}
-                                </Badge>
-                                {availableUnitsCount > 0 ? (
-                                    <Badge variant="secondary" className="bg-green-500/90 text-white backdrop-blur-sm border-none">
-                                        {availableUnitsCount} Units Available
+                    {/* Hero Content */}
+                    <div className="absolute bottom-0 left-0 right-0 pb-12 pt-24 bg-gradient-to-t from-black/80 to-transparent">
+                        <div className="container mx-auto px-4 md:px-6">
+                            <div className="max-w-4xl">
+                                <div className="flex flex-wrap items-center gap-3 mb-4">
+                                    <Badge className="bg-blue-600 hover:bg-blue-700 text-white border-none px-3 py-1 text-sm font-medium tracking-wide">
+                                        {property.typeName}
                                     </Badge>
-                                ) : (
-                                    <Badge variant="secondary" className="bg-gray-500/90 text-white backdrop-blur-sm border-none">
-                                        No Vacancy
-                                    </Badge>
-                                )}
+                                    {availableUnitsCount > 0 ? (
+                                        <Badge variant="secondary" className="bg-green-500/90 text-white backdrop-blur-sm border-none">
+                                            {availableUnitsCount} Units Available
+                                        </Badge>
+                                    ) : (
+                                        <Badge variant="secondary" className="bg-gray-500/90 text-white backdrop-blur-sm border-none">
+                                            No Vacancy
+                                        </Badge>
+                                    )}
+                                </div>
                             </div>
-                            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-4 leading-tight shadow-sm">
-                                {property.name}
-                            </h1>
+                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+                                <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white leading-tight shadow-sm">
+                                    {property.name}
+                                </h1>
+                                <Button
+                                    size="lg"
+                                    className="bg-white text-blue-600 hover:bg-gray-100 font-bold shadow-lg md:self-start"
+                                    onClick={() => handleOpenInterestModal()}
+                                >
+                                    I'm Interested
+                                </Button>
+                            </div>
                             <div className="flex items-center text-gray-200 text-lg md:text-xl font-light">
                                 <MapPin className="w-5 h-5 mr-2 text-blue-400 shrink-0" />
                                 {property.addressLine1}, {property.addressLine2} {property.addressLine3}
@@ -182,7 +178,8 @@ export function PublicPropertyDetailsPage() {
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
 
                     {/* Main Content */}
-                    <div className="lg:col-span-8 space-y-12">
+                    {/* Main Content - Full Width */}
+                    <div className="col-span-12 space-y-12">
 
                         {/* Stats Grid */}
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-6 py-8 border-y border-gray-100">
@@ -334,7 +331,7 @@ export function PublicPropertyDetailsPage() {
                                                 <div className="mt-auto pt-4 border-t border-gray-50 flex items-center justify-end">
                                                     {unit.status === 'available' ? (
                                                         <Button
-                                                            onClick={() => scrollToInterest(unit.id)}
+                                                            onClick={() => handleOpenInterestModal(unit.id)}
                                                             className="px-6"
                                                         >
                                                             I'm Interested
@@ -360,95 +357,9 @@ export function PublicPropertyDetailsPage() {
 
                     </div>
 
-                    {/* Right Sidebar */}
-                    <div className="lg:col-span-4 relative">
-                        <div id="interest-form-card" className="sticky top-24 bg-white rounded-2xl shadow-xl shadow-gray-200/50 border border-gray-100 overflow-hidden">
-                            <div className="bg-blue-600 p-6 text-white text-center">
-                                <h3 className="text-xl font-bold mb-1">Interested in this property?</h3>
-                                <p className="text-blue-100 text-sm">Fill out the form below to schedule a viewing.</p>
-                            </div>
-
-                            <div className="p-6 md:p-8 space-y-6">
-                                <div className="flex items-center justify-center gap-3 text-sm text-gray-600 pb-4 border-b">
-                                    <div className="flex items-center">
-                                        <Phone className="w-4 h-4 mr-2 text-blue-600" />
-                                        <span>+94 77 123 4567</span>
-                                    </div>
-                                </div>
-
-                                <form onSubmit={handleInterestSubmit} className="space-y-4">
-                                    <div className="space-y-1.5">
-                                        <Label htmlFor="name" className="text-gray-700 font-medium">Full Name</Label>
-                                        <Input
-                                            id="name"
-                                            placeholder="Your name"
-                                            className="h-11 bg-gray-50 border-gray-200 focus:bg-white transition-colors"
-                                            value={interestFormData.name}
-                                            onChange={e => setInterestFormData(prev => ({ ...prev, name: e.target.value }))}
-                                            required
-                                        />
-                                    </div>
-                                    <div className="space-y-1.5">
-                                        <Label htmlFor="email" className="text-gray-700 font-medium">Email Address</Label>
-                                        <Input
-                                            id="email"
-                                            type="email"
-                                            placeholder="name@example.com"
-                                            className="h-11 bg-gray-50 border-gray-200 focus:bg-white transition-colors"
-                                            value={interestFormData.email}
-                                            onChange={e => setInterestFormData(prev => ({ ...prev, email: e.target.value }))}
-                                            required
-                                        />
-                                    </div>
-                                    <div className="space-y-1.5">
-                                        <Label htmlFor="phone" className="text-gray-700 font-medium">Phone Number</Label>
-                                        <Input
-                                            id="phone"
-                                            placeholder="+94 77..."
-                                            className="h-11 bg-gray-50 border-gray-200 focus:bg-white transition-colors"
-                                            value={interestFormData.phone}
-                                            onChange={e => setInterestFormData(prev => ({ ...prev, phone: e.target.value }))}
-                                            required
-                                        />
-                                    </div>
-                                    <div className="space-y-1.5">
-                                        <Label htmlFor="unit" className="text-gray-700 font-medium">Interested Unit</Label>
-                                        <select
-                                            id="unit"
-                                            className="flex h-11 w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2020%2020%22%3E%3Cpath%20stroke%3D%22%236B7280%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%221.5%22%20d%3D%22M6%208l4%204%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1.25rem_1.25rem] bg-no-repeat bg-[right_0.75rem_center]"
-                                            value={interestFormData.interestedUnit}
-                                            onChange={e => setInterestFormData(prev => ({ ...prev, interestedUnit: e.target.value }))}
-                                        >
-                                            <option value="">Whole Property / Any</option>
-                                            {propertyUnits
-                                                .filter(u => u.status === 'available')
-                                                .map(u => (
-                                                    <option key={u.id} value={u.id}>Unit {u.unitNumber} - LKR {u.monthlyRent.toLocaleString()}</option>
-                                                ))
-                                            }
-                                        </select>
-                                    </div>
-                                    <div className="space-y-1.5">
-                                        <Label htmlFor="message" className="text-gray-700 font-medium">Message</Label>
-                                        <Textarea
-                                            id="message"
-                                            placeholder="I would like to schedule a viewing..."
-                                            className="min-h-[100px] bg-gray-50 border-gray-200 focus:bg-white transition-colors"
-                                            value={interestFormData.notes}
-                                            onChange={e => setInterestFormData(prev => ({ ...prev, notes: e.target.value }))}
-                                        />
-                                    </div>
-                                    <Button size="lg" type="submit" className="w-full font-bold shadow-lg shadow-blue-500/20" disabled={isSubmitting}>
-                                        {isSubmitting ? 'Sending...' : 'Send Inquiry'}
-                                    </Button>
-                                </form>
-                                <p className="text-center text-xs text-gray-400">
-                                    Your information is secure and will only be used to contact you regarding this property.
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-
+                    {/* Right Sidebar Removed - Full Width Layout Now */}
+                    {/* We can keep this empty col or remove the grid layout entirely in a later refactor. 
+                       For now, let's just make the main content span full width. */}
                 </div>
             </div>
 
@@ -465,6 +376,7 @@ export function PublicPropertyDetailsPage() {
                                 id="mobile-name"
                                 value={interestFormData.name}
                                 onChange={e => setInterestFormData(prev => ({ ...prev, name: e.target.value }))}
+                                className="bg-white border-gray-200"
                                 required
                             />
                         </div>
@@ -475,6 +387,7 @@ export function PublicPropertyDetailsPage() {
                                 type="email"
                                 value={interestFormData.email}
                                 onChange={e => setInterestFormData(prev => ({ ...prev, email: e.target.value }))}
+                                className="bg-white border-gray-200"
                                 required
                             />
                         </div>
@@ -484,25 +397,34 @@ export function PublicPropertyDetailsPage() {
                                 id="mobile-phone"
                                 value={interestFormData.phone}
                                 onChange={e => setInterestFormData(prev => ({ ...prev, phone: e.target.value }))}
+                                className="bg-white border-gray-200"
                                 required
                             />
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="mobile-unit">Ref Unit</Label>
-                            <select
-                                id="mobile-unit"
-                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                value={interestFormData.interestedUnit}
-                                onChange={e => setInterestFormData(prev => ({ ...prev, interestedUnit: e.target.value }))}
-                            >
-                                <option value="">Whole Property / Any</option>
-                                {propertyUnits
-                                    .filter(u => u.status === 'available')
-                                    .map(u => (
-                                        <option key={u.id} value={u.id}>Unit {u.unitNumber} (LKR {u.monthlyRent.toLocaleString()})</option>
-                                    ))
-                                }
-                            </select>
+                            {isUnitLocked ? (
+                                <div className="flex h-10 w-full rounded-md border border-input bg-gray-100 px-3 py-2 text-sm items-center text-gray-600 cursor-not-allowed">
+                                    {propertyUnits.find(u => u.id === interestFormData.interestedUnit)?.unitNumber
+                                        ? `Unit ${propertyUnits.find(u => u.id === interestFormData.interestedUnit)?.unitNumber}`
+                                        : 'Selected Unit'}
+                                </div>
+                            ) : (
+                                <select
+                                    id="mobile-unit"
+                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                    value={interestFormData.interestedUnit}
+                                    onChange={e => setInterestFormData(prev => ({ ...prev, interestedUnit: e.target.value }))}
+                                >
+                                    <option value="">Whole Property / Any</option>
+                                    {propertyUnits
+                                        .filter(u => u.status === 'available')
+                                        .map(u => (
+                                            <option key={u.id} value={u.id}>Unit {u.unitNumber} (LKR {u.monthlyRent.toLocaleString()})</option>
+                                        ))
+                                    }
+                                </select>
+                            )}
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="mobile-message">Message</Label>
@@ -510,6 +432,7 @@ export function PublicPropertyDetailsPage() {
                                 id="mobile-message"
                                 value={interestFormData.notes}
                                 onChange={e => setInterestFormData(prev => ({ ...prev, notes: e.target.value }))}
+                                className="bg-white border-gray-200 min-h-[100px]"
                             />
                         </div>
                         <Button type="submit" className="w-full" disabled={isSubmitting}>
@@ -518,18 +441,6 @@ export function PublicPropertyDetailsPage() {
                     </form>
                 </DialogContent>
             </Dialog>
-
-            {/* Mobile Lead FAB (Floating Action Button) */}
-            <div className="lg:hidden fixed bottom-6 right-6 z-40">
-                <Button
-                    size="lg"
-                    className="shadow-xl rounded-full px-6 h-14 bg-blue-600 hover:bg-blue-700 text-white"
-                    onClick={() => setIsMobileInterestOpen(true)}
-                >
-                    <CheckCircle2 className="w-5 h-5 mr-2" />
-                    I'm Interested
-                </Button>
-            </div>
-        </div>
+        </>
     );
 }

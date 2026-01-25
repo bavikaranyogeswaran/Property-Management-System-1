@@ -48,8 +48,12 @@ export function LeadsPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    const selectedUnit = units.find(u => u.id === formData.interestedUnit);
+
     addLead({
       ...formData,
+      propertyId: selectedUnit?.propertyId || '',
       status: 'interested',
     });
     toast.success('Lead added successfully');
