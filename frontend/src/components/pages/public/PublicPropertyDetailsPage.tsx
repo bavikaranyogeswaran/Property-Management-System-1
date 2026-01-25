@@ -510,6 +510,86 @@ export function PublicPropertyDetailsPage() {
                 If user wants full screen lightbox for unit images, we can add it. 
                 For now, let's skip full lightbox for unit images inside dialog to avoid nesting complexity unless requested.) 
             */}
+
+            {/* Interest Dialog */}
+            <Dialog open={isMobileInterestOpen} onOpenChange={setIsMobileInterestOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>I'm Interested in {property.name}</DialogTitle>
+                        <p className="text-sm text-gray-500">Leave your details and we'll get back to you.</p>
+                    </DialogHeader>
+                    <form onSubmit={handleInterestSubmit} className="space-y-4 mt-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="lead-name">Name</Label>
+                            <Input
+                                id="lead-name"
+                                placeholder="Your full name"
+                                value={interestFormData.name}
+                                onChange={(e) => setInterestFormData({ ...interestFormData, name: e.target.value })}
+                                required
+                            />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="lead-email">Email</Label>
+                                <Input
+                                    id="lead-email"
+                                    type="email"
+                                    placeholder="email@example.com"
+                                    value={interestFormData.email}
+                                    onChange={(e) => setInterestFormData({ ...interestFormData, email: e.target.value })}
+                                    required
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="lead-phone">Phone</Label>
+                                <Input
+                                    id="lead-phone"
+                                    placeholder="+94 77 123 4567"
+                                    value={interestFormData.phone}
+                                    onChange={(e) => setInterestFormData({ ...interestFormData, phone: e.target.value })}
+                                    required
+                                />
+                            </div>
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="lead-unit">Interested In</Label>
+                            <div className="relative">
+                                <select
+                                    id="lead-unit"
+                                    className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                    value={interestFormData.interestedUnit}
+                                    onChange={(e) => setInterestFormData({ ...interestFormData, interestedUnit: e.target.value })}
+                                    disabled={isUnitLocked}
+                                >
+                                    <option value="">Whole Property / Any Available Unit</option>
+                                    {propertyUnits
+                                        .filter(u => u.status === 'available')
+                                        .map(u => (
+                                            <option key={u.id} value={u.id}>Unit {u.unitNumber} - {u.type} (LKR {u.monthlyRent}/mo)</option>
+                                        ))
+                                    }
+                                </select>
+                            </div>
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="lead-notes">Notes / Questions</Label>
+                            <Textarea
+                                id="lead-notes"
+                                placeholder="I'm interested in viewing this property..."
+                                value={interestFormData.notes}
+                                onChange={(e: any) => setInterestFormData({ ...interestFormData, notes: e.target.value })}
+                            />
+                        </div>
+                        <div className="flex gap-2 justify-end pt-2">
+                            <Button type="button" variant="outline" onClick={() => setIsMobileInterestOpen(false)}>Cancel</Button>
+                            <Button type="submit" disabled={isSubmitting}>
+                                {isSubmitting ? 'Submitting...' : 'Submit Interest'}
+                            </Button>
+                        </div>
+                    </form>
+                </DialogContent>
+            </Dialog>
         </>
     );
 }
