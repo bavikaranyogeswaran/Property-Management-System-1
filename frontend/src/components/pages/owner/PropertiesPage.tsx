@@ -38,6 +38,9 @@ export function PropertiesPage() {
   });
   const [interestProperty, setInterestProperty] = useState<Property | null>(null);
   const [existingImages, setExistingImages] = useState<any[]>([]);
+  const [viewGalleryOpen, setViewGalleryOpen] = useState(false);
+  const [galleryImages, setGalleryImages] = useState<any[]>([]);
+  const [viewPropertyTitle, setViewPropertyTitle] = useState('');
 
   const [formData, setFormData] = useState({
     name: '',
@@ -177,6 +180,18 @@ export function PropertiesPage() {
       toast.success('Primary image updated');
     } catch (e) {
       toast.error('Failed to set primary image');
+    }
+  };
+
+  const handleViewGallery = async (property: Property) => {
+    setViewPropertyTitle(property.name);
+    setGalleryImages([]);
+    setViewGalleryOpen(true);
+    try {
+      const images = await getPropertyImages(property.id);
+      if (images) setGalleryImages(images);
+    } catch (e) {
+      toast.error("Failed to load images");
     }
   };
 
@@ -375,11 +390,11 @@ export function PropertiesPage() {
                   <Button
                     className="flex-1"
                     variant={user?.role === 'owner' ? 'secondary' : 'default'}
-                    onClick={() => user?.role === 'owner' ? setViewProperty(property) : openInterestDialog(property)}
+                    onClick={() => user?.role === 'owner' ? handleViewGallery(property) : openInterestDialog(property)}
                   >
                     {user?.role === 'owner' ? (
                       <>
-                        <Eye className="size-4 mr-2" /> View Details
+                        <Eye className="size-4 mr-2" /> View Gallery
                       </>
                     ) : (
                       <>
@@ -643,6 +658,43 @@ export function PropertiesPage() {
               <Button type="submit">Submit Interest</Button>
             </div>
           </form>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={viewGalleryOpen} onOpenChange={setViewGalleryOpen}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Gallery: {viewPropertyTitle}</DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 py-4">
+            {galleryImages.length > 0 ? (
+              galleryImages.map((img, idx) => (
+                <div key={idx} className="relative aspect-square rounded-lg overflow-hidden border border-gray-100 group">
+                  <img
+                    src={img.image_url || img.url}
+                    alt={`Gallery ${idx}`}
+                    className="w-full h-full object-cover"
+                  />
+                  {img.is_primary && (
+                    <div className="absolute top-2 right-2 bg-blue-600 text-white text-xs px-2 py-1 rounded-full shadow-sm">
+                      Primary
+                    </div>
+                  )}
+                  <a
+                    href={img.image_url || img.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100"
+                  >
+                    <span className="bg-white/90 text-gray-900 px-3 py-1 rounded-full text-sm font-medium shadow-sm">View Full</span>
+                  </a>
+                </div>
+              ))
+            ) : (
+              <div className="col-span-full text-center py-10 text-gray-500">
+                No images uploaded for this property.
+              </div>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>

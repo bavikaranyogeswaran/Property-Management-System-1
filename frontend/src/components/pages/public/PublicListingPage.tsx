@@ -135,7 +135,6 @@ export function PublicListingPage({ onNavigate }: { onNavigate?: (page: string) 
                     </Card>
                 ))}
             </div>
-
             {properties.length === 0 && (
                 <div className="text-center py-20">
                     <div className="bg-gray-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">

@@ -1,4 +1,5 @@
 import propertyImageModel from '../models/propertyImageModel.js';
+import propertyModel from '../models/propertyModel.js';
 import unitImageModel from '../models/unitImageModel.js';
 
 class ImageController {
@@ -27,7 +28,14 @@ class ImageController {
             }));
 
             await propertyImageModel.createMultiple(propertyId, images);
+
             const allImages = await propertyImageModel.findByPropertyId(propertyId);
+
+            // Sync primary image to properties table
+            const currentPrimary = allImages.find(img => img.is_primary);
+            if (currentPrimary) {
+                await propertyModel.update(propertyId, { imageUrl: currentPrimary.image_url });
+            }
 
             res.status(201).json({ images: allImages });
         } catch (error) {
@@ -54,10 +62,19 @@ class ImageController {
                 return res.status(404).json({ error: 'Image not found' });
             }
 
+            // Sync with properties table
+            // We need to fetch the image URL first or just get it from DB
+            const images = await propertyImageModel.findByPropertyId(propertyId);
+            const primary = images.find(img => img.is_primary);
+            if (primary) {
+                await propertyModel.update(propertyId, { imageUrl: primary.image_url });
+            }
+
             res.json({ message: 'Primary image updated' });
         } catch (error) {
             res.status(500).json({ error: error.message });
         }
+
     }
 
     async deletePropertyImage(req, res) {
