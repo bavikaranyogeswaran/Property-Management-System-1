@@ -10,7 +10,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { UserPlus, Calendar, CheckCircle, ArrowRight, Clock, TrendingUp, LayoutGrid, List, XCircle } from 'lucide-react';
+import { UserPlus, Calendar, CheckCircle, ArrowRight, Clock, TrendingUp, LayoutGrid, List, XCircle, MessageSquare } from 'lucide-react';
+import { ChatInterface } from '@/components/common/ChatInterface';
 import { toast } from 'sonner';
 
 export function LeadsPage() {
@@ -30,6 +31,7 @@ export function LeadsPage() {
   const [isFollowUpDialogOpen, setIsFollowUpDialogOpen] = useState(false);
   const [isConvertDialogOpen, setIsConvertDialogOpen] = useState(false);
   const [isHistoryDialogOpen, setIsHistoryDialogOpen] = useState(false);
+  const [isNegotiationDialogOpen, setIsNegotiationDialogOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'pipeline' | 'list'>('pipeline');
   const [tenantPassword, setTenantPassword] = useState('');
 
@@ -230,6 +232,19 @@ export function LeadsPage() {
             Follow-up {leadFollowUpsCount > 0 && `(${leadFollowUpsCount})`}
           </Button>
 
+          <Button
+            size="sm"
+            variant="ghost"
+            className="flex-1 h-7 text-xs inline-flex items-center justify-center text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+            onClick={() => {
+              setSelectedLead(lead);
+              setIsNegotiationDialogOpen(true);
+            }}
+          >
+            <MessageSquare className="size-3 mr-1 flex-shrink-0" />
+            Chat
+          </Button>
+
           {lead.status !== 'converted' && lead.status !== 'dropped' && (
             <>
               {lead.status === 'interested' && (
@@ -339,6 +354,17 @@ export function LeadsPage() {
                       {leadFollowUpsCount > 0 && (
                         <span className="ml-1 text-xs">({leadFollowUpsCount})</span>
                       )}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        setSelectedLead(lead);
+                        setIsNegotiationDialogOpen(true);
+                      }}
+                      title="Negotiate / Chat"
+                    >
+                      <MessageSquare className="size-4 text-blue-600" />
                     </Button>
                     <Button
                       size="sm"
@@ -709,6 +735,18 @@ export function LeadsPage() {
               <Button onClick={handleConvert}>Convert to Tenant</Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Negotiation Chat Dialog */}
+      <Dialog open={isNegotiationDialogOpen} onOpenChange={setIsNegotiationDialogOpen}>
+        <DialogContent className="max-w-3xl h-[80vh] flex flex-col p-6">
+          <DialogHeader>
+            <DialogTitle>Negotiation with {selectedLead?.name}</DialogTitle>
+          </DialogHeader>
+          {selectedLead && (
+            <ChatInterface leadId={selectedLead.id} />
+          )}
         </DialogContent>
       </Dialog>
     </div>

@@ -2,12 +2,28 @@ import React from 'react';
 import { useApp } from '@/app/context/AppContext';
 import { useAuth } from '@/app/context/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Home, FileText, CreditCard, Wrench, AlertCircle, CheckCircle } from 'lucide-react';
+import { Home, FileText, CreditCard, Wrench, AlertCircle, CheckCircle, MessageSquare, History } from 'lucide-react';
 import { NotificationBanner } from '@/components/common/NotificationBanner';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ChatInterface } from '@/components/common/ChatInterface';
+import apiClient from '@/services/api';
 
 export function TenantDashboard() {
   const { user } = useAuth();
   const { units, leases, invoices, payments, receipts, maintenanceRequests, tenants, notifications } = useApp();
+  const [leadHistory, setLeadHistory] = React.useState<any>(null);
+  const [isHistoryOpen, setIsHistoryOpen] = React.useState(false);
+
+  React.useEffect(() => {
+    // Fetch lead history
+    apiClient.get('/leads/my-profile').then(res => {
+      setLeadHistory(res.data);
+    }).catch(err => {
+      // Ignore if no history found
+      console.log('No negotiation history found');
+    });
+  }, []);
 
   // Find tenant's data - in real app, user.id would match tenant.id
   const tenantLeases = leases.filter(l => l.status === 'active');
@@ -70,7 +86,15 @@ export function TenantDashboard() {
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-semibold text-gray-900">Tenant Dashboard</h2>
-        <p className="text-sm text-gray-500 mt-1">Welcome back, {user?.name}</p>
+        <div className="flex justify-between items-center">
+          <p className="text-sm text-gray-500 mt-1">Welcome back, {user?.name}</p>
+          {leadHistory && (
+            <Button variant="outline" size="sm" onClick={() => setIsHistoryOpen(true)}>
+              <History className="size-4 mr-2" />
+              Negotiation History
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Current Lease Info */}
@@ -184,8 +208,8 @@ export function TenantDashboard() {
                       <div className="text-right">
                         <p className="text-sm font-semibold">LKR {invoice.amount}</p>
                         <p className={`text-xs ${isPaid ? 'text-green-600' :
-                            isOverdue ? 'text-red-600' :
-                              'text-orange-600'
+                          isOverdue ? 'text-red-600' :
+                            'text-orange-600'
                           }`}>
                           {isPaid ? 'Paid' : isOverdue ? 'Overdue' : 'Pending'}
                         </p>
@@ -212,9 +236,9 @@ export function TenantDashboard() {
                     <div className="flex justify-between items-start mb-1">
                       <p className="text-sm font-medium">{request.title}</p>
                       <span className={`text-xs px-2 py-1 rounded-full ${request.status === 'submitted' ? 'bg-yellow-100 text-yellow-800' :
-                          request.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
-                            request.status === 'completed' ? 'bg-green-100 text-green-800' :
-                              'bg-gray-100 text-gray-800'
+                        request.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
+                          request.status === 'completed' ? 'bg-green-100 text-green-800' :
+                            'bg-gray-100 text-gray-800'
                         }`}>
                         {request.status.replace('_', ' ')}
                       </span>
@@ -231,6 +255,18 @@ export function TenantDashboard() {
           </CardContent>
         </Card>
       </div>
-    </div>
+
+
+      <Dialog open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
+        <DialogContent className="max-w-3xl h-[80vh] flex flex-col p-6">
+          <DialogHeader>
+            <DialogTitle>Negotiation History</DialogTitle>
+          </DialogHeader>
+          {leadHistory && (
+            <ChatInterface leadId={leadHistory.id} readOnly={true} title="Archived Chat" />
+          )}
+        </DialogContent>
+      </Dialog>
+    </div >
   );
 }

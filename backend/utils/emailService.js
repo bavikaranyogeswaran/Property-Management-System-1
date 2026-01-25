@@ -70,6 +70,40 @@ class EmailService {
             return false;
         }
     }
+
+    async sendWelcomeLead(email, name) {
+        if (!this.transporter) {
+            console.log(`[EMAIL MOCK] Welcome Lead: ${email}`);
+            return true;
+        }
+        try {
+            await this.transporter.sendMail({
+                from: process.env.SMTP_USER,
+                to: email,
+                subject: 'Welcome to Property Management System',
+                html: `<h1>Welcome ${name}!</h1><p>Thanks for your interest. We will contact you soon.</p>`
+            });
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    async sendTenantConfirmation(email, name) {
+        if (!this.transporter) {
+            console.log(`[EMAIL MOCK] Tenant Confirmation: ${email}`);
+            return true;
+        }
+        try {
+            await this.transporter.sendMail({
+                from: process.env.SMTP_USER,
+                to: email,
+                subject: 'Application Approved - Welcome Tenant',
+                html: `<h1>Congratulations ${name}!</h1><p>Your application has been approved. You are now a tenant.</p>`
+            });
+        } catch (e) {
+            console.error(e);
+        }
+    }
 }
 
 export default new EmailService();

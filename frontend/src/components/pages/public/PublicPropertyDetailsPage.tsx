@@ -28,7 +28,9 @@ export function PublicPropertyDetailsPage() {
         email: '',
         phone: '',
         interestedUnit: '',
+
         propertyId: '',
+        password: '',
         notes: '',
     });
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -77,11 +79,13 @@ export function PublicPropertyDetailsPage() {
                 ...interestFormData,
                 status: 'interested',
             });
-            toast.success('Interest registered! We will contact you soon.');
-            setInterestFormData({ name: '', email: '', phone: '', interestedUnit: '', notes: '', propertyId: id || '' });
+            toast.success('Account created and interest registered! We will contact you soon.');
+            setInterestFormData({ name: '', email: '', phone: '', interestedUnit: '', notes: '', propertyId: id || '', password: '' });
             setIsMobileInterestOpen(false);
-        } catch (error) {
-            toast.error('Failed to submit interest');
+        } catch (error: any) {
+            console.error(error);
+            const errorMessage = error.response?.data?.error || 'Failed to submit interest';
+            toast.error(errorMessage);
         } finally {
             setIsSubmitting(false);
         }
@@ -572,6 +576,19 @@ export function PublicPropertyDetailsPage() {
                                 </select>
                             </div>
                         </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="lead-password">Create Password (for your account)</Label>
+                            <Input
+                                id="lead-password"
+                                type="password"
+                                placeholder="Min 8 characters"
+                                value={interestFormData.password}
+                                onChange={(e) => setInterestFormData({ ...interestFormData, password: e.target.value })}
+                                required
+                                minLength={8}
+                            />
+                        </div>
                         <div className="space-y-2">
                             <Label htmlFor="lead-notes">Notes / Questions</Label>
                             <Textarea
@@ -587,9 +604,9 @@ export function PublicPropertyDetailsPage() {
                                 {isSubmitting ? 'Submitting...' : 'Submit Interest'}
                             </Button>
                         </div>
-                    </form>
-                </DialogContent>
-            </Dialog>
+                    </form >
+                </DialogContent >
+            </Dialog >
         </>
     );
 }

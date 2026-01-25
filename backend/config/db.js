@@ -8,7 +8,8 @@ const pool = createPool({
     database: process.env.DB_NAME || 'pms_database',
     waitForConnections: true,
     connectionLimit: 10,
-    queueLimit: 0
+    queueLimit: 0,
+    timezone: '+05:30'
 });
 
 export default pool.promise();

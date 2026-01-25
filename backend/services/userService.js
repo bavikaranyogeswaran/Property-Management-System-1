@@ -31,6 +31,30 @@ class UserService {
         return { id: userId, name, email, phone, role: 'treasurer' };
     }
 
+    async createLeadUser(name, email, phone, password) {
+        // Validation handled in Controller or here (DAL checks duplicate email)
+        const existingUser = await userModel.findByEmail(email);
+        if (existingUser) {
+            throw new Error('Email already in use');
+        }
+
+        const hashedPassword = await hash(password, SALT_ROUNDS);
+
+        const userId = await userModel.create({
+            name,
+            email,
+            phone,
+            passwordHash: hashedPassword,
+            role: 'lead',
+            status: 'active'
+        });
+
+        // Send welcome email
+        await emailService.sendWelcomeLead(email, name);
+
+        return userId;
+    }
+
     async updateTreasurer(id, data) {
         const { name, email, phone, status } = data;
 
@@ -87,15 +111,15 @@ class UserService {
         const existingUser = await userModel.findByEmail(lead.email);
 
         if (existingUser) {
-            // Use existing user if they match
+            // User exists (likely as a Lead)
             userId = existingUser.user_id;
-            // Optionally check if they are already a tenant?
-            // Since roles are ENUM('owner','tenant','treasurer'), a user has ONE role.
-            // If they are an owner or treasurer, we might have an issue if we want them to be a tenant too.
-            // But usually this means creating a new account or just linking.
-            // For now, let's assume if they exist, we link them. 
-            // If their role is NOT tenant, maybe we can't fully "convert" them in the simple sense.
-            // But let's proceed with finding them.
+
+            // If they are a lead, upgrade them to tenant
+            if (existingUser.role === 'lead') {
+                await userModel.update(userId, { role: 'tenant' });
+                // Send confirmation
+                await emailService.sendTenantConfirmation(existingUser.email, existingUser.name);
+            }
         } else {
             // Create new tenant user
             // Use provided password or fallback to random (though UI enforces it now)
@@ -120,9 +144,6 @@ class UserService {
             status: 'converted',
             tenantId: userId
         });
-
-        // 4. (Optional) Create Tenant Profile entry if needed (not in strict requirements but good practice)
-        // await db.query('INSERT INTO tenant_profile (tenant_id, phone) VALUES (?, ?)', [userId, lead.phone]);
 
         return { message: 'Lead converted successfully', tenantId: userId };
     }

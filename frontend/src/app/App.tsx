@@ -71,6 +71,9 @@ import { SettingsPage } from '@/components/pages/common/SettingsPage';
 import { PublicListingPage } from '@/components/pages/public/PublicListingPage';
 import { PublicPropertyDetailsPage } from '@/components/pages/public/PublicPropertyDetailsPage';
 
+// Lead Pages
+import { LeadDashboard } from '@/components/pages/lead/LeadDashboard';
+
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
   if (!isAuthenticated) return <Navigate to="/login" replace />;
@@ -82,6 +85,7 @@ function DashboardRoute() {
   if (user?.role === 'owner') return <OwnerDashboard />;
   if (user?.role === 'tenant') return <TenantDashboard />;
   if (user?.role === 'treasurer') return <TreasurerDashboard />;
+  if (user?.role === 'lead') return <LeadDashboard />;
   return <Navigate to="/login" />;
 }
 

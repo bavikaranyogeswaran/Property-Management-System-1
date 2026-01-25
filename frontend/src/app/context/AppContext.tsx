@@ -213,7 +213,7 @@ interface AppContextType {
   getUnitImages: (unitId: string) => Promise<any[]>;
 
   // Lead operations
-  addLead: (lead: Omit<Lead, 'id' | 'createdAt'>) => Promise<void>;
+  addLead: (lead: Omit<Lead, 'id' | 'createdAt'> & { password?: string }) => Promise<void>;
   updateLead: (id: string, lead: Partial<Lead>) => Promise<void>;
   addLeadFollowUp: (followUp: Omit<LeadFollowUp, 'id'>) => void;
   convertLeadToTenant: (leadId: string, password?: string) => Promise<string>;
@@ -1056,7 +1056,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   // Lead operations
-  const addLead = async (lead: Omit<Lead, 'id' | 'createdAt'>) => {
+  const addLead = async (lead: Omit<Lead, 'id' | 'createdAt'> & { password?: string }) => {
     try {
       const response = await apiClient.post('/leads', lead);
       if (response.status === 201) {
