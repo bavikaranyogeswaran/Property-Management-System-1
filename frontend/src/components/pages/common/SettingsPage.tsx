@@ -73,10 +73,12 @@ export function SettingsPage() {
                         <Bell className="size-4 mr-2" />
                         Notifications
                     </TabsTrigger>
-                    <TabsTrigger value="types">
-                        <Shield className="size-4 mr-2" />
-                        Types
-                    </TabsTrigger>
+                    {user?.role === 'owner' && (
+                        <TabsTrigger value="types">
+                            <Shield className="size-4 mr-2" />
+                            Types
+                        </TabsTrigger>
+                    )}
                 </TabsList>
 
                 <TabsContent value="profile">
@@ -217,17 +219,19 @@ export function SettingsPage() {
                         </CardContent>
                     </Card>
                 </TabsContent>
-                <TabsContent value="types">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Property & Unit Types</CardTitle>
-                            <CardDescription>Manage the types available for your properties and units</CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-6">
-                            <TypeManager />
-                        </CardContent>
-                    </Card>
-                </TabsContent>
+                {user?.role === 'owner' && (
+                    <TabsContent value="types">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Property & Unit Types</CardTitle>
+                                <CardDescription>Manage the types available for your properties and units</CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-6">
+                                <TypeManager />
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+                )}
             </Tabs>
         </div>
     );
