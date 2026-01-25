@@ -206,9 +206,11 @@ interface AppContextType {
   deleteUnitType: (id: number) => Promise<void>;
 
   // Unit operations
-  addUnit: (unit: Omit<Unit, 'id' | 'createdAt'>) => void;
-  updateUnit: (id: string, unit: Partial<Unit>) => void;
-  deleteUnit: (id: string) => void;
+  addUnit: (unit: Omit<Unit, 'id' | 'createdAt'>) => Promise<Unit | undefined>;
+  updateUnit: (id: string, unit: Partial<Unit>) => Promise<void>;
+  deleteUnit: (id: string) => Promise<void>;
+  uploadUnitImages: (unitId: string, files: File[]) => Promise<any>;
+  getUnitImages: (unitId: string) => Promise<any[]>;
 
   // Lead operations
   addLead: (lead: Omit<Lead, 'id' | 'createdAt'>) => Promise<void>;
@@ -592,49 +594,73 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
 
     // Fetch real treasurers from backend (sync with DB)
-    const fetchTreasurers = async () => {
+    const fetchData = async () => {
       try {
-        // We need to handle circular dependency if importing apiClient directly if AppContext is used by it?
-        // ActuallyapiClient is separate.
-        // Dynamic import or assume it's available?
-        // Better to use fetch or standard axios if apiClient isn't available here, but apiClient handles auth.
-        // Let's assume we can import it. If not, we'll see an error.
-        // But we need to make sure we only fetch if we have a token?
-        // This runs on mount.
-        const token = localStorage.getItem('authToken');
-        if (token) {
-          // We'll rely on the existing apiClient functionality
-          // But we need to import it at the top of the file ideally.
-          // Since I can't easily add top-level import without reading whole file, I will use a dynamic import workaround or assume user adds it?
-          // I'll add the import in a separate step if needed, but for now let's try to add logic.
-          // Actually, replace_file_content can't add import easily if it's far away.
-          // I'll check if I can just use fetch with the token.
-          const response = await fetch('http://localhost:3000/api/users/treasurers', {
-            headers: {
-              'Authorization': `Bearer ${token}`
-            }
-          });
-          if (response.ok) {
-            const data = await response.json();
-            // Map backend data to frontend Treasurer interface
-            const mappedTreasurers: Treasurer[] = data.map((t: any) => ({
-              id: t.id.toString(),
-              name: t.name,
-              email: t.email,
-              phone: t.phone || '',
-              password: '', // Password not returned for security
-              status: t.status,
-              createdAt: t.createdAt
+        // Fetch Treasurers
+        try {
+          const trRes = await apiClient.get('/users?role=treasurer');
+          if (trRes.data) {
+            const mappedTreasurers = trRes.data.map((u: any) => ({
+              id: u.user_id.toString(),
+              name: u.name,
+              email: u.email,
+              phone: '',
+              password: '',
+              createdAt: u.created_at,
+              status: u.status
             }));
             setTreasurers(mappedTreasurers);
           }
-        }
+        } catch (e) { console.error("Failed to fetch treasurers", e); }
+
+        // Fetch Units
+        try {
+          const uRes = await apiClient.get('/units');
+          if (uRes.data) {
+            const mappedUnits = uRes.data.map((u: any) => ({
+              id: u.id, // unitModel maps it
+              propertyId: u.propertyId,
+              unitNumber: u.unitNumber,
+              unitTypeId: u.unitTypeId,
+              type: u.type,
+              monthlyRent: u.monthlyRent,
+              status: u.status,
+              image: u.image,
+              createdAt: u.createdAt,
+              // propertyName: u.propertyName
+            }));
+            // Only replace if we got data, to avoid flashing empty if local exists? 
+            // Actually we want DB truth.
+            setUnits(mappedUnits);
+          }
+        } catch (e) { console.error("Failed to fetch units", e); }
+
+        // Fetch Properties (if not already fetched via initial props or whatever)
+        try {
+          const pRes = await apiClient.get('/properties');
+          if (pRes.data) {
+            const mappedProps = pRes.data.map((p: any) => ({
+              id: p.property_id.toString(),
+              name: p.name,
+              propertyTypeId: p.type_id,
+              typeName: p.type_name,
+              addressLine1: p.address_line_1,
+              addressLine2: p.address_line_2,
+              addressLine3: p.address_line_3,
+              image: p.image_url,
+              createdAt: p.created_at
+            }));
+            setProperties(mappedProps);
+          }
+        } catch (e) { console.error("Failed to fetch properties", e); }
+
       } catch (error) {
-        console.error('Failed to fetch treasurers:', error);
+        console.error("Failed to fetch initial data", error);
       }
     };
 
-    fetchTreasurers();
+    fetchData();
+
 
     // Fetch leads
     const fetchLeads = async () => {
@@ -941,21 +967,92 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   // Unit operations
-  const addUnit = (unit: Omit<Unit, 'id' | 'createdAt'>) => {
-    const newUnit: Unit = {
-      ...unit,
-      id: `unit-${Date.now()}`,
-      createdAt: new Date().toISOString().split('T')[0],
-    };
-    setUnits([...units, newUnit]);
+  const addUnit = async (unit: Omit<Unit, 'id' | 'createdAt'>): Promise<Unit | undefined> => {
+    try {
+      const response = await apiClient.post('/units', {
+        ...unit,
+        imageUrl: unit.image // Map frontend 'image' to backend 'imageUrl'
+      });
+      if (response.status === 201) {
+        const newUnit: Unit = {
+          id: response.data.id,
+          propertyId: response.data.propertyId,
+          unitNumber: response.data.unitNumber,
+          unitTypeId: response.data.unitTypeId,
+          type: response.data.type,
+          monthlyRent: response.data.monthlyRent,
+          status: response.data.status,
+          image: response.data.image,
+          createdAt: response.data.createdAt,
+          // propertyName not in interface but backend returns it
+        };
+        setUnits([...units, newUnit]);
+        return newUnit;
+      }
+    } catch (e) {
+      console.error("Failed to add unit", e);
+      throw e;
+    }
   };
 
-  const updateUnit = (id: string, updates: Partial<Unit>) => {
-    setUnits(units.map(u => u.id === id ? { ...u, ...updates } : u));
+  const updateUnit = async (id: string, updates: Partial<Unit>) => {
+    try {
+      const response = await apiClient.put(`/units/${id}`, updates);
+      if (response.status === 200) {
+        setUnits(units.map(u => u.id === id ? { ...u, ...response.data, id: response.data.id || u.id } : u));
+      }
+    } catch (e) {
+      console.error("Failed to update unit", e);
+      throw e;
+    }
   };
 
-  const deleteUnit = (id: string) => {
-    setUnits(units.filter(u => u.id !== id));
+  const deleteUnit = async (id: string) => {
+    try {
+      await apiClient.delete(`/units/${id}`);
+      setUnits(units.filter(u => u.id !== id));
+    } catch (e) {
+      console.error("Failed to delete unit", e);
+      throw e;
+    }
+  };
+
+  const uploadUnitImages = async (unitId: string, files: File[]) => {
+    try {
+      const formData = new FormData();
+      files.forEach(file => {
+        formData.append('images', file);
+      });
+
+      const response = await apiClient.post(`/units/${unitId}/images`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      // Update local state if primary image set
+      if (response.status === 201 && response.data.images && response.data.images.length > 0) {
+        const primary = response.data.images.find((img: any) => img.is_primary) || response.data.images[0];
+        if (primary) {
+          setUnits(prev => prev.map(u => u.id === unitId ? { ...u, image: primary.image_url } : u));
+        }
+      }
+
+      return response.data;
+    } catch (e) {
+      console.error("Failed to upload unit images", e);
+      throw e;
+    }
+  };
+
+  const getUnitImages = async (unitId: string) => {
+    try {
+      const response = await apiClient.get(`/units/${unitId}/images`);
+      return response.data.images;
+    } catch (e) {
+      console.error("Failed to fetch unit images", e);
+      return []; // Return empty array instead of throwing to avoid breaking UI
+    }
   };
 
   // Lead operations
@@ -1297,9 +1394,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       getPropertyImages,
       setPropertyPrimaryImage,
       deletePropertyImage,
+
       addUnit,
       updateUnit,
       deleteUnit,
+      uploadUnitImages,
+      getUnitImages,
       addLead,
       updateLead,
       addLeadFollowUp,

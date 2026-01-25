@@ -16,7 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 export function PublicPropertyDetailsPage() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
-    const { properties, units, addLead, getPropertyImages } = useApp();
+    const { properties, units, addLead, getPropertyImages, getUnitImages } = useApp();
     const [property, setProperty] = useState<Property | null>(null);
     const [propertyUnits, setPropertyUnits] = useState<Unit[]>([]);
     const [galleryImages, setGalleryImages] = useState<any[]>([]);
@@ -34,6 +34,22 @@ export function PublicPropertyDetailsPage() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isMobileInterestOpen, setIsMobileInterestOpen] = useState(false);
     const [isUnitLocked, setIsUnitLocked] = useState(false); // Validating feature request: lock unit if selected via card
+
+    // Unit Gallery State
+    const [selectedUnit, setSelectedUnit] = useState<Unit | null>(null);
+    const [unitImages, setUnitImages] = useState<any[]>([]);
+    const [unitLightboxIndex, setUnitLightboxIndex] = useState<number | null>(null);
+
+    const handleViewUnit = async (unit: Unit) => {
+        setSelectedUnit(unit);
+        setUnitImages([]); // Reset
+        try {
+            const images = await getUnitImages(unit.id);
+            setUnitImages(images || []);
+        } catch (e) {
+            console.error("Failed to fetch unit images", e);
+        }
+    };
 
     useEffect(() => {
         if (id && properties.length > 0) {
@@ -331,8 +347,36 @@ export function PublicPropertyDetailsPage() {
                                             </div>
 
                                             {/* Unit Details (unchanged) */}
-                                            <div className="flex-1 flex flex-col justify-between">
-                                                {/* ... content ... */}
+                                            <div className="flex-1 flex flex-col justify-between p-2">
+                                                <div>
+                                                    <div className="flex justify-between items-start mb-2">
+                                                        <div>
+                                                            <h3 className="text-xl font-bold text-gray-900">Unit {unit.unitNumber}</h3>
+                                                            <p className="text-gray-500">{unit.type}</p>
+                                                        </div>
+                                                        <p className="text-xl font-bold text-blue-600">
+                                                            LKR {unit.monthlyRent.toLocaleString()}
+                                                            <span className="text-sm font-normal text-gray-500">/mo</span>
+                                                        </p>
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex gap-3 mt-4">
+                                                    <Button
+                                                        variant="outline"
+                                                        className="flex-1"
+                                                        onClick={() => handleViewUnit(unit)}
+                                                    >
+                                                        View Details
+                                                    </Button>
+                                                    <Button
+                                                        className="flex-1"
+                                                        disabled={unit.status !== 'available'}
+                                                        onClick={() => handleOpenInterestModal(unit.id)}
+                                                    >
+                                                        {unit.status === 'available' ? 'Enquire Now' : 'Unavailable'}
+                                                    </Button>
+                                                </div>
                                             </div>
                                         </div>
                                     ))}
@@ -387,6 +431,85 @@ export function PublicPropertyDetailsPage() {
                     <div className="absolute inset-0 -z-10" onClick={() => setLightboxIndex(null)} />
                 </div>
             )}
+
+            {/* Unit Details Dialog */}
+            <Dialog open={!!selectedUnit} onOpenChange={(open) => !open && setSelectedUnit(null)}>
+                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle>Unit {selectedUnit?.unitNumber} Details</DialogTitle>
+                    </DialogHeader>
+
+                    {selectedUnit && (
+                        <div className="space-y-6">
+                            {/* Unit Gallery */}
+                            <div className="space-y-4">
+                                <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden relative">
+                                    {selectedUnit.image ? (
+                                        <img
+                                            src={selectedUnit.image}
+                                            alt={selectedUnit.unitNumber}
+                                            className="w-full h-full object-cover"
+                                        />
+                                    ) : (
+                                        <div className="w-full h-full flex items-center justify-center text-gray-400">
+                                            <Home className="w-16 h-16 opacity-20" />
+                                            <span className="ml-2">No main image</span>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {unitImages.length > 0 && (
+                                    <div>
+                                        <h4 className="font-semibold mb-2">Gallery</h4>
+                                        <div className="grid grid-cols-4 gap-2">
+                                            {unitImages.map((img, idx) => (
+                                                <div
+                                                    key={idx}
+                                                    className="aspect-square bg-gray-100 rounded-md overflow-hidden cursor-pointer hover:opacity-90"
+                                                    onClick={() => setUnitLightboxIndex(idx)}
+                                                >
+                                                    <img src={img.image_url} alt="" className="w-full h-full object-cover" />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4 border-t pt-4">
+                                <div>
+                                    <p className="text-sm text-gray-500">Monthly Rent</p>
+                                    <p className="text-xl font-bold text-blue-600">LKR {selectedUnit.monthlyRent.toLocaleString()}</p>
+                                </div>
+                                <div>
+                                    <p className="text-sm text-gray-500">Unit Type</p>
+                                    <p className="text-lg font-medium">{selectedUnit.type}</p>
+                                </div>
+                                <div>
+                                    <p className="text-sm text-gray-500">Status</p>
+                                    <Badge variant={selectedUnit.status === 'available' ? 'default' : 'secondary'}>
+                                        {selectedUnit.status.toUpperCase()}
+                                    </Badge>
+                                </div>
+                            </div>
+
+                            <div className="flex justify-end pt-4">
+                                <Button onClick={() => {
+                                    handleOpenInterestModal(selectedUnit.id);
+                                    setSelectedUnit(null);
+                                }}>
+                                    I'm Interested
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+                </DialogContent>
+            </Dialog>
+
+            {/* Unit Lightbox (Reuse logic or create new component? For simplicity, basic overlay if needed, but Dialog covers mostly. 
+                If user wants full screen lightbox for unit images, we can add it. 
+                For now, let's skip full lightbox for unit images inside dialog to avoid nesting complexity unless requested.) 
+            */}
         </>
     );
 }

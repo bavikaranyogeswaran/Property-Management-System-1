@@ -13,7 +13,7 @@ import { toast } from 'sonner';
 import { MultiImageUpload } from '@/components/ui/multi-image-upload';
 
 export function UnitsPage() {
-  const { units, properties, unitTypes, leases, addUnit, updateUnit, deleteUnit } = useApp();
+  const { units, properties, unitTypes, leases, addUnit, updateUnit, deleteUnit, uploadUnitImages, getUnitImages } = useApp();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingUnit, setEditingUnit] = useState<Unit | null>(null);
   const [filterProperty, setFilterProperty] = useState<string>('all');
@@ -29,6 +29,17 @@ export function UnitsPage() {
   const [uploadFiles, setUploadFiles] = useState<File[]>([]);
   const [primaryImageIndex, setPrimaryImageIndex] = useState(0);
   const [viewUnit, setViewUnit] = useState<Unit | null>(null);
+  const [viewUnitImages, setViewUnitImages] = useState<any[]>([]);
+
+  // Fetch images when viewing a unit
+  React.useEffect(() => {
+    if (viewUnit) {
+      setViewUnitImages([]);
+      getUnitImages(viewUnit.id).then(images => {
+        if (images) setViewUnitImages(images);
+      }).catch(err => console.error(err));
+    }
+  }, [viewUnit, getUnitImages]);
 
   const handleImagesChange = (images: { file: File; isPrimary: boolean }[]) => {
     const files = images.map(img => img.file);
@@ -37,39 +48,65 @@ export function UnitsPage() {
     setPrimaryImageIndex(primaryIndex >= 0 ? primaryIndex : 0);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (editingUnit) {
-      // In production: upload files via FormData
-      updateUnit(editingUnit.id, {
-        ...formData,
-        monthlyRent: parseFloat(formData.monthlyRent),
-        image: uploadFiles.length > 0 ? '/placeholder.jpg' : editingUnit.image,
-      });
-      toast.success('Unit updated successfully');
-      setEditingUnit(null);
-    } else {
-      addUnit({
-        ...formData,
-        monthlyRent: parseFloat(formData.monthlyRent),
-        image: uploadFiles.length > 0 ? '/placeholder.jpg' : undefined,
-      });
-      toast.success('Unit added successfully');
-      setIsAddDialogOpen(false);
-    }
+    try {
+      if (editingUnit) {
+        // Update unit text fields
+        await updateUnit(editingUnit.id, {
+          ...formData,
+          monthlyRent: parseFloat(formData.monthlyRent),
+          image: editingUnit.image // Keep existing image if no new ones, or placeholder logic handled in upload
+        });
 
-    setFormData({
-      propertyId: '',
-      unitNumber: '',
-      unitTypeId: 0,
-      type: '',
-      monthlyRent: '',
-      status: 'available',
-    });
-    setUploadFiles([]);
-    setPrimaryImageIndex(0);
+        // Upload new images if any
+        if (uploadFiles.length > 0) {
+          await uploadUnitImages(editingUnit.id, uploadFiles);
+          // Actually call uploadUnitImages from context
+          // But I destructured it? No, need to add it to destructuring.
+        }
+
+        toast.success('Unit updated successfully');
+        setEditingUnit(null);
+      } else {
+        const newUnit = await addUnit({
+          ...formData,
+          monthlyRent: parseFloat(formData.monthlyRent),
+          image: undefined // let backend handle or upload logic
+        });
+
+        if (newUnit && uploadFiles.length > 0) {
+          // We need to access uploadUnitImages. 
+          // Since I can't easily change destructuring in this single replacement block without accessing line 16, 
+          // I will assume I update line 16 separately OR use `useApp().uploadUnitImages` here if React allows (it doesn't in callback).
+          // Wait, I can't use hook in callback.
+          // I must update Line 16 to destructure `uploadUnitImages`.
+          // For this block, I'll assume `uploadUnitImages` is available in scope. 
+          // I will make sure to update line 16 in a separate call.
+          await uploadUnitImages(newUnit.id, uploadFiles);
+        }
+
+        toast.success('Unit added successfully');
+        setIsAddDialogOpen(false);
+      }
+
+      setFormData({
+        propertyId: '',
+        unitNumber: '',
+        unitTypeId: 0,
+        type: '',
+        monthlyRent: '',
+        status: 'available',
+      });
+      setUploadFiles([]);
+      setPrimaryImageIndex(0);
+    } catch (error) {
+      toast.error("Failed to save unit");
+    }
   };
+
+
 
 
 
@@ -559,6 +596,19 @@ export function UnitsPage() {
                   </div>
                 )}
               </div>
+
+              {viewUnitImages.length > 0 && (
+                <div>
+                  <h4 className="font-medium mb-2 text-sm text-gray-500 uppercase tracking-wider">Gallery</h4>
+                  <div className="grid grid-cols-4 gap-2">
+                    {viewUnitImages.map((img, idx) => (
+                      <div key={idx} className="aspect-square rounded-md overflow-hidden bg-gray-100 border">
+                        <img src={img.image_url} alt="" className="w-full h-full object-cover" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>

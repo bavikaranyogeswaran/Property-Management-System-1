@@ -1,6 +1,7 @@
 import propertyImageModel from '../models/propertyImageModel.js';
 import propertyModel from '../models/propertyModel.js';
 import unitImageModel from '../models/unitImageModel.js';
+import db from '../config/db.js';
 
 class ImageController {
     // Property Images
@@ -119,6 +120,12 @@ class ImageController {
             await unitImageModel.createMultiple(unitId, images);
             const allImages = await unitImageModel.findByUnitId(unitId);
 
+            // Sync with units table
+            const currentPrimary = allImages.find(img => img.is_primary) || allImages[0];
+            if (currentPrimary) {
+                await db.query('UPDATE units SET image_url = ? WHERE unit_id = ?', [currentPrimary.image_url, unitId]);
+            }
+
             res.status(201).json({ images: allImages });
         } catch (error) {
             res.status(500).json({ error: error.message });
@@ -142,6 +149,13 @@ class ImageController {
 
             if (!success) {
                 return res.status(404).json({ error: 'Image not found' });
+            }
+
+            // Sync with units table
+            const images = await unitImageModel.findByUnitId(unitId);
+            const primary = images.find(img => img.is_primary);
+            if (primary) {
+                await db.query('UPDATE units SET image_url = ? WHERE unit_id = ?', [primary.image_url, unitId]);
             }
 
             res.json({ message: 'Primary image updated' });
