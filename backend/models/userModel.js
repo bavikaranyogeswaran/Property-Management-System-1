@@ -97,6 +97,21 @@ class UserModel {
             throw error;
         }
     }
+    async verifyEmail(id) {
+        const [result] = await pool.query(
+            'UPDATE users SET is_email_verified = TRUE, email_verified_at = NOW(), status = "active" WHERE user_id = ?',
+            [id]
+        );
+        return result.affectedRows > 0;
+    }
+
+    async setupPassword(id, passwordHash) {
+        const [result] = await pool.query(
+            'UPDATE users SET password_hash = ?, is_email_verified = TRUE, email_verified_at = NOW(), status = "active" WHERE user_id = ?',
+            [passwordHash, id]
+        );
+        return result.affectedRows > 0;
+    }
 }
 
 export default new UserModel();

@@ -9,12 +9,14 @@ class UserController {
                 return res.status(403).json({ error: 'Access denied. Only Owners can create Treasurers.' });
             }
 
-            const { name, email, phone, password } = req.body;
-            if (!name || !email || !password || !phone) {
+            const { name, email, phone } = req.body;
+            if (!name || !email || !phone) {
                 return res.status(400).json({ error: 'All fields are required' });
             }
 
-            const result = await userService.createTreasurer(name, email, phone, password);
+            // Password is NOT required here as we send an invite link.
+            // We pass 'null' or empty string to service, which generates a random temp password.
+            const result = await userService.createTreasurer(name, email, phone, null);
             res.status(201).json(result);
         } catch (error) {
             res.status(400).json({ error: error.message });

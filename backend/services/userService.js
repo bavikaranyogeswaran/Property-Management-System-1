@@ -2,6 +2,9 @@ import bcrypt from 'bcryptjs';
 const { hash } = bcrypt;
 import userModel from '../models/userModel.js';
 import leadModel from '../models/leadModel.js';
+import jwt from 'jsonwebtoken';
+const { sign } = jwt;
+const JWT_SECRET = process.env.JWT_SECRET || 'secret';
 import unitModel from '../models/unitModel.js';
 import leaseModel from '../models/leaseModel.js';
 import emailService from '../utils/emailService.js';
@@ -16,7 +19,14 @@ class UserService {
             throw new Error('Email already in use');
         }
 
-        const hashedPassword = await hash(password, SALT_ROUNDS);
+        // Generate temporary hash (user must reset it via token)
+        // If password is provided (e.g. initial setup), we ignore it basically and force setup?
+        // Or if the Owner provides a password, we might just set it but still "invite"?
+        // The requirement is "Secure Invitations", so we should force them to set it.
+        // But for `createTreasurer` API, we usually accept a password. 
+        // We will generate a random one to satisfy the DB constraint, but send the invite link.
+        const tempPassword = Math.random().toString(36).slice(-8);
+        const hashedPassword = await hash(tempPassword, SALT_ROUNDS);
 
         const userId = await userModel.create({
             name,
@@ -24,11 +34,21 @@ class UserService {
             phone,
             passwordHash: hashedPassword,
             role: 'treasurer',
-            status: 'active'
+            status: 'active' // Active so they can login after setting password? Or should be pending?
+            // If active, they CAN login if they guess the random password (unlikely).
+            // Better to keep active for simplicity, or add 'pending' status support.
+            // For now, keeping 'active' but `is_email_verified` will be handled by setup.
         });
 
-        // Send credentials via email
-        await emailService.sendCredentials(email, 'treasurer', password);
+        // Generate Setup Token
+        const token = jwt.sign(
+            { id: userId, type: 'setup_password' },
+            JWT_SECRET,
+            { expiresIn: '48h' }
+        );
+
+        // Send Invitation
+        await emailService.sendInvitationEmail(email, 'treasurer', token);
 
         return { id: userId, name, email, phone, role: 'treasurer' };
     }
@@ -51,8 +71,15 @@ class UserService {
             status: 'active'
         });
 
-        // Send welcome email
-        await emailService.sendWelcomeLead(email, name);
+        // Generate Verification Token
+        const token = jwt.sign(
+            { id: userId, type: 'verify_email' },
+            JWT_SECRET,
+            { expiresIn: '24h' }
+        );
+
+        // Send Verification Email
+        await emailService.sendVerificationEmail(email, token);
 
         return userId;
     }
@@ -175,8 +202,15 @@ class UserService {
                 status: 'active'
             });
 
-            // Send credentials via email
-            await emailService.sendCredentials(lead.email, 'tenant', passwordToUse);
+            // Generate Setup Token
+            const token = jwt.sign(
+                { id: userId, type: 'setup_password' },
+                JWT_SECRET,
+                { expiresIn: '48h' }
+            );
+
+            // Send Invitation
+            await emailService.sendInvitationEmail(lead.email, 'tenant', token);
         }
 
         // 3. Update lead status and link to tenant

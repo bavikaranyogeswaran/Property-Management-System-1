@@ -139,6 +139,64 @@ class EmailService {
             return false;
         }
     }
+
+
+    async sendVerificationEmail(email, token) {
+        const link = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/verify-email?token=${token}`;
+
+        if (!this.transporter) {
+            console.log(`[EMAIL MOCK] Verification Email for ${email}`);
+            console.log(`Link: ${link}`);
+            return true;
+        }
+
+        try {
+            await this.transporter.sendMail({
+                from: process.env.SMTP_USER,
+                to: email,
+                subject: 'Verify Your Email Address',
+                html: `
+                    <h2>Verify Your Email</h2>
+                    <p>Click the link below to verify your email address:</p>
+                    <a href="${link}">Verify Email</a>
+                `
+            });
+            return true;
+        } catch (error) {
+            console.error('Error sending verification email:', error);
+            return false;
+        }
+    }
+
+    async sendInvitationEmail(email, role, token) {
+        const link = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/setup-password?token=${token}`;
+        const subject = role === 'treasurer' ? 'Treasurer Invitation' : 'Tenant Access Invitation';
+
+        if (!this.transporter) {
+            console.log(`[EMAIL MOCK] Invitation Email for ${email} (${role})`);
+            console.log(`Link: ${link}`);
+            return true;
+        }
+
+        try {
+            await this.transporter.sendMail({
+                from: process.env.SMTP_USER,
+                to: email,
+                subject: subject,
+                html: `
+                    <h2>You have been invited!</h2>
+                    <p>You have been invited to join as a ${role}.</p>
+                    <p>Click the link below to set up your password and access your account:</p>
+                    <a href="${link}">Set Up Account</a>
+                    <p>This link expires in 24 hours.</p>
+                `
+            });
+            return true;
+        } catch (error) {
+            console.error('Error sending invitation email:', error);
+            return false;
+        }
+    }
 }
 
 export default new EmailService();

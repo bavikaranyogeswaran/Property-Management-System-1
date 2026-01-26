@@ -37,22 +37,18 @@ export function TreasurersPage() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedTreasurer, setSelectedTreasurer] = useState<Treasurer | null>(null);
-  const [showPassword, setShowPassword] = useState(false);
 
   // Form state
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-  const [password, setPassword] = useState('');
   const [status, setStatus] = useState<'active' | 'inactive'>('active');
 
   const resetForm = () => {
     setName('');
     setEmail('');
     setPhone('');
-    setPassword('');
     setStatus('active');
-    setShowPassword(false);
   };
 
 
@@ -72,7 +68,6 @@ export function TreasurersPage() {
         name,
         email,
         phone,
-        password,
       });
 
       if (response.status === 201) {
@@ -84,8 +79,8 @@ export function TreasurersPage() {
           id: newTreasurer.id.toString(), // Ensure ID is string
           name: newTreasurer.name,
           email: newTreasurer.email,
-          phone: newTreasurer.phone || phone, // Fallback if backend doesn't return it (though it should now)
-          password, // Keep local password for UI display if needed
+          phone: newTreasurer.phone || phone,
+          password: '', // Password is set via invite now
           status: newTreasurer.status || 'active',
         });
 
@@ -105,7 +100,6 @@ export function TreasurersPage() {
     setName(treasurer.name);
     setEmail(treasurer.email);
     setPhone(treasurer.phone);
-    setPassword(treasurer.password);
     setStatus(treasurer.status);
     setIsEditDialogOpen(true);
   };
@@ -239,27 +233,10 @@ export function TreasurersPage() {
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <div className="relative">
-                  <Input
-                    id="password"
-                    type={showPassword ? 'text' : 'password'}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Enter secure password"
-                    required
-                    minLength={8}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
-                  >
-                    {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                  </button>
-                </div>
-                <p className="text-xs text-gray-500">Password must be at least 8 characters</p>
+              <div className="bg-blue-50 p-4 rounded-md text-sm text-blue-700 mb-4">
+                <p>
+                  <strong>Note:</strong> An invitation email will be sent to the treasurer to set their own password.
+                </p>
               </div>
 
               <div className="space-y-2">

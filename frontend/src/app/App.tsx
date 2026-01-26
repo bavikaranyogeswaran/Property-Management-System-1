@@ -43,6 +43,8 @@ import { Toaster } from '@/components/ui/sonner';
 import { LoginPage } from '@/components/pages/auth/LoginPage';
 import { ForgotPasswordPage } from '@/components/pages/auth/ForgotPasswordPage';
 import { ResetPasswordPage } from '@/components/pages/auth/ResetPasswordPage';
+import { VerifyEmailPage } from '@/components/pages/auth/VerifyEmailPage';
+import { SetupPasswordPage } from '@/components/pages/auth/SetupPasswordPage';
 
 // Owner Pages
 import { OwnerDashboard } from '@/components/pages/owner/OwnerDashboard';
@@ -105,6 +107,8 @@ function AppContent() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
+      <Route path="/verify-email" element={<VerifyEmailPage />} />
+      <Route path="/setup-password" element={<SetupPasswordPage />} />
 
       {/* Public/Shared Properties Route */}
       <Route path="/browse-properties" element={

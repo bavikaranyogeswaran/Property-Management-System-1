@@ -66,6 +66,16 @@ export const authService = {
         const response = await apiClient.post('/auth/change-password', data);
         return response.data;
     },
+
+    verifyEmail: async (token: string) => {
+        const response = await apiClient.post('/auth/verify-email', { token });
+        return response.data;
+    },
+
+    setupPassword: async (token: string, password: string) => {
+        const response = await apiClient.post('/auth/setup-password', { token, password });
+        return response.data;
+    },
 };
 
 export default authService;

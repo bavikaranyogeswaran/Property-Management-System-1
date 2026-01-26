@@ -136,7 +136,7 @@ class LeadController {
             // Let's rely on email matching for conversion logic as implemented in `convertLeadToTenant`.
 
             const leadId = await leadModel.create({ ...req.body, status: 'interested' });
-            res.status(201).json({ id: leadId, message: 'Account created and interest registered successfully' });
+            res.status(201).json({ id: leadId, message: 'Account created. Please check your email to verify your account.' });
         } catch (error) {
             res.status(400).json({ error: error.message });
         }
