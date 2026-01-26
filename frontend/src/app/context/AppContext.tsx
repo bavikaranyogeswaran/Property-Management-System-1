@@ -8,12 +8,17 @@ export interface Property {
   name: string;
   propertyTypeId: number;
   typeName?: string;
-  addressLine1: string;
-  addressLine2?: string;
-  addressLine3?: string;
+  propertyNo: string;
+  street: string;
+  city: string;
+  district: string;
   createdAt: string;
   image?: string;
 }
+
+// ... (skipping unchanged interfaces)
+
+
 
 export interface PropertyType {
   type_id: number;
@@ -254,8 +259,10 @@ const INITIAL_DATA = {
     {
       id: 'prop-1',
       name: 'Sunset Apartments',
-      addressLine1: '123 Main Street',
-      addressLine2: 'Downtown',
+      propertyNo: '12',
+      street: 'Main Street',
+      city: 'Colombo',
+      district: 'Western',
       propertyTypeId: 1,
       typeName: 'Apartment Building',
       createdAt: '2024-01-15',
@@ -263,8 +270,10 @@ const INITIAL_DATA = {
     {
       id: 'prop-2',
       name: 'Commercial Plaza',
-      addressLine1: '456 Business Ave',
-      addressLine2: 'City Center',
+      propertyNo: '45',
+      street: 'Business Ave',
+      city: 'Colombo',
+      district: 'Western',
       propertyTypeId: 2,
       typeName: 'Commercial Building',
       createdAt: '2024-02-20',
@@ -671,9 +680,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
               name: p.name,
               propertyTypeId: p.type_id,
               typeName: p.type_name,
-              addressLine1: p.address_line_1,
-              addressLine2: p.address_line_2,
-              addressLine3: p.address_line_3,
+              propertyNo: p.propertyNo,
+              street: p.street,
+              city: p.city,
+              district: p.district,
               image: p.image_url,
               createdAt: p.created_at
             }));
@@ -735,9 +745,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
             name: p.name,
             propertyTypeId: p.type_id,
             typeName: p.type_name,
-            addressLine1: p.address_line_1,
-            addressLine2: p.address_line_2,
-            addressLine3: p.address_line_3,
+            propertyNo: p.propertyNo || '',
+            street: p.street || '',
+            city: p.city || '',
+            district: p.district || '',
             image: p.image_url,
             createdAt: p.created_at
           }));
@@ -892,9 +903,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
           name: newProp.name,
           propertyTypeId: newProp.type_id,
           typeName: newProp.type_name,
-          addressLine1: newProp.address_line_1,
-          addressLine2: newProp.address_line_2,
-          addressLine3: newProp.address_line_3,
+          propertyNo: newProp.propertyNo,
+          street: newProp.street,
+          city: newProp.city,
+          district: newProp.district,
           image: newProp.image_url,
           createdAt: newProp.created_at
         };

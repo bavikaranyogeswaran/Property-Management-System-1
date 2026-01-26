@@ -57,9 +57,11 @@ CREATE TABLE properties (
     owner_id INT NOT NULL,
     name VARCHAR(100) NOT NULL,
     property_type_id INT NOT NULL,           -- [MODIFIED] FK to property_types
-    address_line_1 VARCHAR(255) NOT NULL,    -- [MODIFIED] Split address
-    address_line_2 VARCHAR(255),
-    address_line_3 VARCHAR(255),
+    property_no VARCHAR(50),             -- [ADDED] Property Number
+    street VARCHAR(255) NOT NULL,        -- [ADDED] Street Name
+    city VARCHAR(100) NOT NULL,          -- [ADDED] City
+    district VARCHAR(100) NOT NULL,      -- [ADDED] District
+    -- address_line_1/2/3 Removed
     status ENUM('active','inactive') DEFAULT 'active',
     image_url VARCHAR(255),                  -- [DEPRECATED] Use property_images table instead
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,

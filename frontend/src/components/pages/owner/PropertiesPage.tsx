@@ -44,9 +44,10 @@ export function PropertiesPage() {
 
   const [formData, setFormData] = useState({
     name: '',
-    addressLine1: '',
-    addressLine2: '',
-    addressLine3: '',
+    propertyNo: '',
+    street: '',
+    city: '',
+    district: '',
     propertyTypeId: 0,
   });
   const [uploadFiles, setUploadFiles] = useState<File[]>([]);
@@ -61,12 +62,6 @@ export function PropertiesPage() {
   };
 
   // ... (keep existing handler functions unchanged) ...
-  // Since I can't easily skip lines in replacement, I'll use multi_replace for safer edits if possible, or careful replace.
-  // Actually, `replace_file_content` is better for single block, but I need to modify imports AND JSX which are far apart.
-  // I'll use `multi_replace_file_content`.
-
-
-  // Removed old handleImageChange - using MultiImageUpload component now
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -111,7 +106,7 @@ export function PropertiesPage() {
         setIsAddDialogOpen(false);
       }
 
-      setFormData({ name: '', addressLine1: '', addressLine2: '', addressLine3: '', propertyTypeId: 0 });
+      setFormData({ name: '', propertyNo: '', street: '', city: '', district: '', propertyTypeId: 0 });
       setUploadFiles([]);
       setPrimaryImageIndex(0);
     } catch (error: any) {
@@ -125,9 +120,10 @@ export function PropertiesPage() {
     setEditingProperty(property);
     setFormData({
       name: property.name,
-      addressLine1: property.addressLine1,
-      addressLine2: property.addressLine2 || '',
-      addressLine3: property.addressLine3 || '',
+      propertyNo: property.propertyNo || '',
+      street: property.street || '',
+      city: property.city || '',
+      district: property.district || '',
       propertyTypeId: property.propertyTypeId,
     });
     setUploadFiles([]);
@@ -277,24 +273,45 @@ export function PropertiesPage() {
                   />
                 </div>
                 <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label>Address</Label>
-                    <Input
-                      placeholder="Address Line 1"
-                      value={formData.addressLine1}
-                      onChange={(e) => setFormData({ ...formData, addressLine1: e.target.value })}
-                      required
-                    />
-                    <Input
-                      placeholder="Address Line 2 (Optional)"
-                      value={formData.addressLine2}
-                      onChange={(e) => setFormData({ ...formData, addressLine2: e.target.value })}
-                    />
-                    <Input
-                      placeholder="Address Line 3 (Optional)"
-                      value={formData.addressLine3}
-                      onChange={(e) => setFormData({ ...formData, addressLine3: e.target.value })}
-                    />
+                  <div className="grid grid-cols-4 gap-2">
+                    <div className="col-span-1 space-y-2">
+                      <Label>No.</Label>
+                      <Input
+                        placeholder="10/A"
+                        value={formData.propertyNo}
+                        onChange={(e) => setFormData({ ...formData, propertyNo: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div className="col-span-3 space-y-2">
+                      <Label>Street</Label>
+                      <Input
+                        placeholder="Main Street"
+                        value={formData.street}
+                        onChange={(e) => setFormData({ ...formData, street: e.target.value })}
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>City</Label>
+                      <Input
+                        placeholder="Colombo"
+                        value={formData.city}
+                        onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>District</Label>
+                      <Input
+                        placeholder="Western"
+                        value={formData.district}
+                        onChange={(e) => setFormData({ ...formData, district: e.target.value })}
+                        required
+                      />
+                    </div>
                   </div>
                 </div>
                 <div className="space-y-2">
@@ -322,7 +339,7 @@ export function PropertiesPage() {
                 <div className="flex gap-2 justify-end">
                   <Button type="button" variant="outline" onClick={() => {
                     setIsAddDialogOpen(false);
-                    setFormData({ name: '', addressLine1: '', addressLine2: '', addressLine3: '', propertyTypeId: 0 });
+                    setFormData({ name: '', propertyNo: '', street: '', city: '', district: '', propertyTypeId: 0 });
                     setUploadFiles([]);
                     setPrimaryImageIndex(0);
                   }}>
@@ -371,8 +388,10 @@ export function PropertiesPage() {
               <div className="space-y-3">
                 <div>
                   <p className="text-xs text-gray-500 uppercase tracking-wider font-medium mb-1">Location</p>
-                  <p className="text-sm text-gray-700">{property.addressLine1}</p>
-                  {property.addressLine2 && <p className="text-sm text-gray-500">{property.addressLine2}</p>}
+                  <p className="text-sm text-gray-700">
+                    {property.propertyNo ? `No. ${property.propertyNo}, ` : ''}{property.street}
+                  </p>
+                  <p className="text-sm text-gray-500">{property.city}, {property.district}</p>
                 </div>
 
                 <div className="pt-3 border-t grid grid-cols-2 gap-4">
@@ -410,7 +429,7 @@ export function PropertiesPage() {
                       <Dialog open={editingProperty?.id === property.id} onOpenChange={(open) => {
                         if (!open) {
                           setEditingProperty(null);
-                          setFormData({ name: '', addressLine1: '', addressLine2: '', addressLine3: '', propertyTypeId: 0 });
+                          setFormData({ name: '', propertyNo: '', street: '', city: '', district: '', propertyTypeId: 0 });
                           setUploadFiles([]);
                           setPrimaryImageIndex(0);
                         }
@@ -439,24 +458,46 @@ export function PropertiesPage() {
                               />
                             </div>
                             <div className="space-y-4">
-                              <div className="space-y-2">
-                                <Label>Address</Label>
-                                <Input
-                                  placeholder="Address Line 1"
-                                  value={formData.addressLine1}
-                                  onChange={(e) => setFormData({ ...formData, addressLine1: e.target.value })}
-                                  required
-                                />
-                                <Input
-                                  placeholder="Address Line 2 (Optional)"
-                                  value={formData.addressLine2}
-                                  onChange={(e) => setFormData({ ...formData, addressLine2: e.target.value })}
-                                />
-                                <Input
-                                  placeholder="Address Line 3 (Optional)"
-                                  value={formData.addressLine3}
-                                  onChange={(e) => setFormData({ ...formData, addressLine3: e.target.value })}
-                                />
+                              <div className="space-y-4">
+                                <div className="grid grid-cols-4 gap-2">
+                                  <div className="col-span-1 space-y-2">
+                                    <Label>No.</Label>
+                                    <Input
+                                      placeholder="10/A"
+                                      value={formData.propertyNo}
+                                      onChange={(e) => setFormData({ ...formData, propertyNo: e.target.value })}
+                                    />
+                                  </div>
+                                  <div className="col-span-3 space-y-2">
+                                    <Label>Street</Label>
+                                    <Input
+                                      placeholder="Main Street"
+                                      value={formData.street}
+                                      onChange={(e) => setFormData({ ...formData, street: e.target.value })}
+                                      required
+                                    />
+                                  </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                  <div className="space-y-2">
+                                    <Label>City</Label>
+                                    <Input
+                                      placeholder="Colombo"
+                                      value={formData.city}
+                                      onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                                      required
+                                    />
+                                  </div>
+                                  <div className="space-y-2">
+                                    <Label>District</Label>
+                                    <Input
+                                      placeholder="Western"
+                                      value={formData.district}
+                                      onChange={(e) => setFormData({ ...formData, district: e.target.value })}
+                                      required
+                                    />
+                                  </div>
+                                </div>
                               </div>
                             </div>
                             <div className="space-y-2">
@@ -481,7 +522,7 @@ export function PropertiesPage() {
                             <div className="flex gap-2 justify-end">
                               <Button type="button" variant="outline" onClick={() => {
                                 setEditingProperty(null);
-                                setFormData({ name: '', addressLine1: '', addressLine2: '', addressLine3: '', propertyTypeId: 0 });
+                                setFormData({ name: '', propertyNo: '', street: '', city: '', district: '', propertyTypeId: 0 });
                                 setUploadFiles([]);
                                 setPrimaryImageIndex(0);
                               }}>
@@ -552,9 +593,10 @@ export function PropertiesPage() {
                     </p>
                     <div>
                       <span className="font-medium text-gray-900">Address:</span>
-                      <p className="ml-2">{viewProperty.addressLine1}</p>
-                      {viewProperty.addressLine2 && <p className="ml-2">{viewProperty.addressLine2}</p>}
-                      {viewProperty.addressLine3 && <p className="ml-2">{viewProperty.addressLine3}</p>}
+                      <p className="ml-2">
+                        {viewProperty.propertyNo ? `No. ${viewProperty.propertyNo}, ` : ''}{viewProperty.street}
+                      </p>
+                      <p className="ml-2">{viewProperty.city}, {viewProperty.district}</p>
                     </div>
                   </div>
                 </div>
