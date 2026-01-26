@@ -21,7 +21,7 @@ class AuthService {
         }
 
         const token = sign(
-            { id: user.user_id, role: user.role, name: user.name },
+            { id: user.user_id, role: user.role, name: user.name, email: user.email },
             JWT_SECRET,
             { expiresIn: '24h' }
         );

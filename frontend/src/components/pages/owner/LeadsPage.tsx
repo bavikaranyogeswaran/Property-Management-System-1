@@ -745,7 +745,7 @@ export function LeadsPage() {
             <DialogTitle>Negotiation with {selectedLead?.name}</DialogTitle>
           </DialogHeader>
           {selectedLead && (
-            <ChatInterface leadId={selectedLead.id} />
+            <ChatInterface leadId={selectedLead.id} className="flex-1 min-h-0 border-0 shadow-none" />
           )}
         </DialogContent>
       </Dialog>

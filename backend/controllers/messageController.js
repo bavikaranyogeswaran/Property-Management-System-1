@@ -13,32 +13,32 @@ class MessageController {
             }
 
             // Verify lead exists
+            // Verify lead exists
             const lead = await leadModel.findById(leadId);
             if (!lead) {
                 return res.status(404).json({ error: 'Lead not found' });
             }
 
-            // Authorization: Only the lead owner (if implemented) or the lead themselves or an Admin/Owner can send
-            // For now, allow Owner and the specific Lead User
-            // Assuming req.user is populated by auth middleware
-            if (req.user.role === 'lead') {
-                // If user is a lead, they can only send to their own lead record?
-                // Wait, leadModel.findById doesn't currently return the user_id linked to the lead if we didn't store it?
-                // In leadController.createLead, we created a User.
-                // We depend on email matching or if we link 'tenant_id' / 'user_id' in leads table.
-                // Current schema: `tenant_id` INT NULL (set only when converted).
-                // But we have `email`.
+            console.log(`[DEBUG] sendMessage: Request by ${req.user.email} (${req.user.role}) to lead ${leadId} (Lead Email: ${lead.email})`);
 
-                // If `req.user.email` matches `lead.email`, it's them.
-                if (lead.email !== req.user.email) {
-                    return res.status(403).json({ error: 'Access denied' });
+            // Authorization
+            if (req.user.role === 'lead') {
+                const leadEmail = lead.email ? lead.email.toLowerCase() : '';
+                const userEmail = req.user.email ? req.user.email.toLowerCase() : '';
+
+                if (leadEmail !== userEmail) {
+                    console.error('[DEBUG] Access denied: Lead email mismatch');
+                    return res.status(403).json({
+                        error: `Access denied: Email mismatch. You are '${req.user.role}' (${userEmail}). Lead is (${leadEmail}).`
+                    });
                 }
             } else if (req.user.role !== 'owner' && req.user.role !== 'admin') {
-                // Determine who can chat. Owners can chat with any lead.
+                console.error(`[DEBUG] Access denied: Role ${req.user.role} not authorized`);
                 return res.status(403).json({ error: 'Access denied' });
             }
 
             const messageId = await messageModel.create(leadId, senderId, content);
+            console.log(`[DEBUG] Message created with ID: ${messageId}`);
 
             // If sender is Owner, update status to 'negotiation' if it's currently 'interested'
             if (req.user.role === 'owner' && lead.status === 'interested') {
@@ -75,7 +75,9 @@ class MessageController {
             }
 
             if (req.user.role === 'lead') {
-                if (lead.email !== req.user.email) {
+                const leadEmail = lead.email ? lead.email.toLowerCase() : '';
+                const userEmail = req.user.email ? req.user.email.toLowerCase() : '';
+                if (leadEmail !== userEmail) {
                     // Check if this user is the "converted tenant" for this lead?
                     if (lead.tenantId !== req.user.id) {
                         return res.status(403).json({ error: 'Access denied' });

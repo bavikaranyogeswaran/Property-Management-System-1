@@ -59,6 +59,10 @@ export function AppLayout({ children }: AppLayoutProps) {
     { path: '/maintenance', label: 'Maintenance Requests', icon: Wrench },
   ];
 
+  const leadMenu = [
+    { path: '/dashboard', label: 'Dashboard', icon: Home },
+  ];
+
   // Add settings to all menus
   const commonItems = [
     { path: '/settings', label: 'Settings', icon: Settings },
@@ -68,6 +72,7 @@ export function AppLayout({ children }: AppLayoutProps) {
     ...(user?.role === 'owner' ? ownerMenu : []),
     ...(user?.role === 'treasurer' ? treasurerMenu : []),
     ...(user?.role === 'tenant' ? tenantMenu : []),
+    ...(user?.role === 'lead' ? leadMenu : []),
     ...commonItems
   ];
 

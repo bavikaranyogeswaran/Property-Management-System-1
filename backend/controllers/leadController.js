@@ -51,11 +51,27 @@ class LeadController {
             // I'll filter findAll for now as a quick solution, or just add the query here.
 
             const leads = await leadModel.findAll();
-            // Find the most recent active lead for this email
-            const myLead = leads.find(l => l.email === email && l.status !== 'dropped');
+
+            console.log(`[DEBUG] getMyLead: User Email: '${email}'`);
+
+            // Find the most recent active lead for this email (case-insensitive & trimmed)
+            const myLead = leads.find(l => {
+                const leadEmail = l.email ? l.email.trim().toLowerCase() : '';
+                const userEmail = email ? email.trim().toLowerCase() : '';
+
+                // Debug matching logic for first few items or if match found
+                if (leadEmail === userEmail) console.log(`[DEBUG] Match found with lead ${l.id}`);
+
+                return leadEmail === userEmail && l.status !== 'dropped';
+            });
 
             if (!myLead) {
-                return res.status(404).json({ error: 'Lead profile not found' });
+                console.log(`[DEBUG] No matching lead found for email: '${email}' among ${leads.length} leads.`);
+                // Log all lead emails to see what's in DB
+                console.log('Available Lead Emails:', leads.map(l => l.email));
+                return res.status(404).json({
+                    error: `Lead profile not found. UserEmail: '${email}' (len: ${email?.length}). Leads: ${leads.length}. First: ${leads[0]?.email} (${leads[0]?.status})`
+                });
             }
             res.json(myLead);
         } catch (error) {

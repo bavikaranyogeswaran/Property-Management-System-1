@@ -20,12 +20,13 @@ interface Message {
 }
 
 interface ChatInterfaceProps {
-    leadId: string;
+    leadId: string | number;
     title?: string;
     readOnly?: boolean;
+    className?: string; // Add className prop
 }
 
-export function ChatInterface({ leadId, title = "Negotiation Chat", readOnly = false }: ChatInterfaceProps) {
+export function ChatInterface({ leadId, title = "Negotiation Chat", readOnly = false, className }: ChatInterfaceProps) {
     const { user } = useAuth();
     const [messages, setMessages] = useState<Message[]>([]);
     const [newMessage, setNewMessage] = useState('');
@@ -70,23 +71,24 @@ export function ChatInterface({ leadId, title = "Negotiation Chat", readOnly = f
             // Optimistic update or just append response
             setMessages([...messages, { ...response.data, senderName: user?.name, senderRole: user?.role }]);
             setNewMessage('');
-        } catch (error) {
+            setNewMessage('');
+        } catch (error: any) {
             console.error("Failed to send message", error);
-            toast.error("Failed to send message");
+            toast.error(error.response?.data?.error || "Failed to send message");
         } finally {
             setIsLoading(false);
         }
     };
 
     return (
-        <Card className="h-[600px] flex flex-col">
+        <Card className={`flex flex-col ${className || 'h-[600px]'}`}>
             <CardHeader className="border-b px-4 py-3">
                 <CardTitle className="text-base font-medium flex items-center gap-2">
                     {title}
                 </CardTitle>
             </CardHeader>
             <CardContent className="flex-1 flex flex-col p-0 overflow-hidden">
-                <ScrollArea className="flex-1 p-4" ref={scrollRef}>
+                <div className="flex-1 p-4 overflow-y-auto" ref={scrollRef}>
                     <div className="space-y-4">
                         {messages.length === 0 ? (
                             <div className="text-center text-gray-500 py-10 text-sm">
@@ -128,9 +130,8 @@ export function ChatInterface({ leadId, title = "Negotiation Chat", readOnly = f
                                 );
                             })
                         )}
-                        <div ref={scrollRef} />
                     </div>
-                </ScrollArea>
+                </div>
 
                 {!readOnly && (
                     <div className="p-4 border-t bg-gray-50">

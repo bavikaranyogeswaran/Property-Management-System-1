@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import authService from '../../services/auth';
 
-export type UserRole = 'owner' | 'tenant' | 'treasurer';
+export type UserRole = 'owner' | 'tenant' | 'treasurer' | 'lead';
 
 export interface User {
   id: string;

@@ -28,6 +28,7 @@ export function LeadDashboard() {
     const [lead, setLead] = useState<LeadProfile | null>(null);
     const [property, setProperty] = useState<PropertyDetails | null>(null);
     const [loading, setLoading] = useState(true);
+    const [errorMsg, setErrorMsg] = useState('');
 
     useEffect(() => {
         const fetchLeadProfile = async () => {
@@ -46,8 +47,9 @@ export function LeadDashboard() {
                         console.error("Failed to load property details", e);
                     }
                 }
-            } catch (error) {
+            } catch (error: any) {
                 console.error("Failed to fetch lead profile", error);
+                setErrorMsg(error.response?.data?.error || 'Could not load your application details.');
             } finally {
                 setLoading(false);
             }
@@ -68,7 +70,8 @@ export function LeadDashboard() {
         return (
             <div className="p-8 text-center">
                 <h2 className="text-xl font-semibold text-red-600">Profile Not Found</h2>
-                <p className="text-gray-600 mt-2">Could not load your application details. Please contact support.</p>
+                <p className="text-gray-600 mt-2">{errorMsg}</p>
+                <p className="text-xs text-gray-400 mt-4">User: {user?.email}</p>
             </div>
         );
     }
@@ -94,6 +97,7 @@ export function LeadDashboard() {
                 <div>
                     <h1 className="text-3xl font-bold text-gray-900">Application Dashboard</h1>
                     <p className="text-gray-500 mt-1">Hello, {user?.name}</p>
+                    <p className="text-xs text-gray-400">Lead ID: {lead.id}</p>
                 </div>
                 {getStatusBadge(lead.status)}
             </div>
