@@ -8,6 +8,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'secret';
 import unitModel from '../models/unitModel.js';
 import leaseModel from '../models/leaseModel.js';
 import emailService from '../utils/emailService.js';
+import pool from '../config/db.js';
 
 const SALT_ROUNDS = 10;
 
@@ -211,6 +212,13 @@ class UserService {
 
             // Send Invitation
             await emailService.sendInvitationEmail(lead.email, 'tenant', token);
+        }
+
+        // Ensure tenant_profile exists (for phone or other details)
+        // We do this for both existing (upgraded) and new users to ensure consistency
+        const [profileCheck] = await pool.query('SELECT * FROM tenant_profile WHERE tenant_id = ?', [userId]);
+        if (profileCheck.length === 0) {
+            await pool.query('INSERT INTO tenant_profile (tenant_id, phone) VALUES (?, ?)', [userId, lead.phone]);
         }
 
         // 3. Update lead status and link to tenant

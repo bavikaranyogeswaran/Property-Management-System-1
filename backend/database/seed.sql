@@ -52,7 +52,7 @@ INSERT INTO units (unit_id, property_id, unit_number, unit_type_id, monthly_rent
 -- 4. LEADS
 INSERT INTO leads (lead_id, unit_id, name, email, phone, status, notes, score, last_contacted_at) VALUES 
 (1, 2, 'Alice Johnson', 'alice@email.com', '+1-555-0101', 'interested', 'Interested in viewing next week', 75, '2025-01-05 10:00:00'),
-(2, 2, 'David Martinez', 'david@email.com', '+1-555-0104', 'negotiation', 'Ready to sign lease', 90, '2026-01-10 14:00:00'),
+(2, 2, 'David Martinez', 'david@email.com', '+1-555-0104', 'interested', 'Ready to sign lease', 90, '2026-01-10 14:00:00'),
 (3, 3, 'Emma Wilson', 'emma@email.com', '+1-555-0105', 'dropped', 'Found another place', 10, '2025-01-08 16:00:00');
 
 -- 5. LEASES

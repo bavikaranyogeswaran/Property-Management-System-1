@@ -12,7 +12,7 @@ interface LeadProfile {
     name: string;
     email: string;
     phone: string;
-    status: 'interested' | 'negotiation' | 'converted' | 'dropped';
+    status: 'interested' | 'converted' | 'dropped';
     propertyId: string;
     interestedUnit?: string;
     createdAt: string;
@@ -96,7 +96,6 @@ export function LeadDashboard() {
     const getStatusBadge = (status: string) => {
         const variants: any = {
             interested: { label: 'Interested', color: 'bg-blue-100 text-blue-700' },
-            negotiation: { label: 'Negotiation', color: 'bg-orange-100 text-orange-700' },
             converted: { label: 'Converted', color: 'bg-green-100 text-green-700' },
             dropped: { label: 'Dropped', color: 'bg-gray-100 text-gray-700' },
         };

@@ -21,7 +21,7 @@ export function TenantDashboard() {
       setLeadHistory(res.data);
     }).catch(err => {
       // Ignore if no history found
-      console.log('No negotiation history found');
+      console.log('No application history found');
     });
   }, []);
 
@@ -91,7 +91,7 @@ export function TenantDashboard() {
           {leadHistory && (
             <Button variant="outline" size="sm" onClick={() => setIsHistoryOpen(true)}>
               <History className="size-4 mr-2" />
-              Negotiation History
+              Application Chat
             </Button>
           )}
         </div>
@@ -260,7 +260,7 @@ export function TenantDashboard() {
       <Dialog open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
         <DialogContent className="max-w-3xl h-[80vh] flex flex-col p-6">
           <DialogHeader>
-            <DialogTitle>Negotiation History</DialogTitle>
+            <DialogTitle>Application Chat History</DialogTitle>
           </DialogHeader>
           {leadHistory && (
             <ChatInterface leadId={leadHistory.id} readOnly={true} title="Archived Chat" />

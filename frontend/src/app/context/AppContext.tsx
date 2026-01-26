@@ -51,7 +51,7 @@ export interface Lead {
   phone: string;
   interestedUnit: string;
   propertyId: string; // Added for correct linkage
-  status: 'interested' | 'negotiation' | 'converted' | 'dropped';
+  status: 'interested' | 'converted' | 'dropped';
   createdAt: string;
   notes: string;
   lastContactedAt?: string;

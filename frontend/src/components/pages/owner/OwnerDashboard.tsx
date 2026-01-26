@@ -189,17 +189,7 @@ export function OwnerDashboard() {
                 </div>
               </div>
 
-              <div className="flex justify-between items-center p-3 bg-orange-50 rounded-lg">
-                <div>
-                  <p className="text-xs text-gray-600">In Negotiation</p>
-                  <p className="text-xl font-semibold text-orange-700">
-                    {leads.filter(l => l.status === 'negotiation').length}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="text-xs text-gray-500">Close to signing</p>
-                </div>
-              </div>
+
 
               <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
                 <div>
@@ -239,8 +229,8 @@ export function OwnerDashboard() {
                         </p>
                       </div>
                       <span className={`text-xs px-2 py-1 rounded-full ${request.status === 'submitted' ? 'bg-yellow-100 text-yellow-800' :
-                          request.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
-                            'bg-green-100 text-green-800'
+                        request.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
+                          'bg-green-100 text-green-800'
                         }`}>
                         {request.status.replace('_', ' ')}
                       </span>

@@ -40,10 +40,7 @@ class MessageController {
             const messageId = await messageModel.create(leadId, senderId, content);
             console.log(`[DEBUG] Message created with ID: ${messageId}`);
 
-            // If sender is Owner, update status to 'negotiation' if it's currently 'interested'
-            if (req.user.role === 'owner' && lead.status === 'interested') {
-                await leadModel.update(leadId, { status: 'negotiation' });
-            }
+
 
             // Update last contacted
             await leadModel.update(leadId, { lastContactedAt: new Date() });

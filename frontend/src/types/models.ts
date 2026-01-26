@@ -63,7 +63,7 @@ export interface Lead {
     phone: string;
     propertyId?: string;
     unitType?: string;
-    status: 'interested' | 'negotiation' | 'converted' | 'dropped';
+    status: 'interested' | 'converted' | 'dropped';
     source: string;
     notes?: string;
     createdAt?: string;

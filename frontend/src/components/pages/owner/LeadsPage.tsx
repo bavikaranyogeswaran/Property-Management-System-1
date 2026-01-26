@@ -107,7 +107,6 @@ export function LeadsPage() {
   const getStatusLabel = (status: Lead['status']) => {
     const labels: Record<Lead['status'], string> = {
       interested: 'Interested',
-      negotiation: 'Negotiation',
       converted: 'Converted',
       dropped: 'Dropped',
     };
@@ -117,7 +116,6 @@ export function LeadsPage() {
   const getStatusBadge = (status: Lead['status']) => {
     const variants: Record<Lead['status'], { variant: any, label: string, color: string }> = {
       interested: { variant: 'default', label: 'Interested', color: 'bg-blue-100 text-blue-700' },
-      negotiation: { variant: 'default', label: 'Negotiation', color: 'bg-yellow-100 text-yellow-700' },
       converted: { variant: 'default', label: 'Converted', color: 'bg-green-100 text-green-700' },
       dropped: { variant: 'destructive', label: 'Dropped', color: 'bg-gray-100 text-gray-700' },
     };
@@ -157,7 +155,6 @@ export function LeadsPage() {
   // Pipeline view data
   const pipelineStages: Array<{ status: Lead['status'], label: string, color: string }> = [
     { status: 'interested', label: 'Interested', color: 'border-blue-200 bg-blue-50' },
-    { status: 'negotiation', label: 'Negotiation', color: 'border-yellow-200 bg-yellow-50' },
     { status: 'converted', label: 'Converted', color: 'border-green-200 bg-green-50' },
   ];
 
@@ -241,6 +238,21 @@ export function LeadsPage() {
               View Tenant
             </Button>
           )}
+
+          {lead.status === 'interested' && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 text-xs border-green-200 text-green-700 bg-green-50 hover:bg-green-100"
+              onClick={() => {
+                setSelectedLead(lead);
+                setIsConvertDialogOpen(true);
+              }}
+              title="Convert to Tenant"
+            >
+              Convert
+            </Button>
+          )}
           <Button
             size="sm"
             variant="ghost"
@@ -296,7 +308,6 @@ export function LeadsPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="interested">Interested</SelectItem>
-                      <SelectItem value="negotiation">Negotiation</SelectItem>
                       <SelectItem value="converted">Converted</SelectItem>
                       <SelectItem value="dropped">Dropped</SelectItem>
                     </SelectContent>
@@ -380,7 +391,7 @@ export function LeadsPage() {
         <div>
           <h2 className="text-2xl font-semibold text-gray-900">Lead Conversion Pipeline</h2>
           <p className="text-sm text-gray-500 mt-1">
-            Track leads through stages: Interested → Negotiation → Converted
+            Track leads through stages: Interested → Converted
           </p>
         </div>
         <div className="flex gap-2">

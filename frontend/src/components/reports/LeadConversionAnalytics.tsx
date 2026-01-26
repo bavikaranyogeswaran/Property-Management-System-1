@@ -28,7 +28,6 @@ export function LeadConversionAnalytics({ leads, leadStageHistory }: LeadConvers
   // Calculate lead metrics
   const totalLeads = leads.length;
   const interestedLeads = leads.filter(l => l.status === 'interested').length;
-  const negotiationLeads = leads.filter(l => l.status === 'negotiation').length;
   const convertedLeads = leads.filter(l => l.status === 'converted').length;
   const droppedLeads = leads.filter(l => l.status === 'dropped').length;
 
@@ -37,47 +36,36 @@ export function LeadConversionAnalytics({ leads, leadStageHistory }: LeadConvers
 
   // Funnel data
   const funnelData = [
-    { stage: 'Interested', value: interestedLeads + negotiationLeads + convertedLeads, fill: '#3b82f6' },
-    { stage: 'Negotiation', value: negotiationLeads + convertedLeads, fill: '#f59e0b' },
+    { stage: 'Interested', value: interestedLeads + convertedLeads, fill: '#3b82f6' },
     { stage: 'Converted', value: convertedLeads, fill: '#10b981' },
   ];
 
   // Stage distribution
   const stageDistribution = [
     { name: 'Interested', value: interestedLeads, color: '#3b82f6' },
-    { name: 'Negotiation', value: negotiationLeads, color: '#f59e0b' },
     { name: 'Converted', value: convertedLeads, color: '#10b981' },
     { name: 'Dropped', value: droppedLeads, color: '#ef4444' },
   ];
 
   // Calculate conversion from each stage
-  const interestedToNegotiation = leadStageHistory.filter(
-    h => h.fromStatus === 'interested' && h.toStatus === 'negotiation'
-  ).length;
-  
-  const negotiationToConverted = leadStageHistory.filter(
-    h => h.fromStatus === 'negotiation' && h.toStatus === 'converted'
+  const interestedToConverted = leadStageHistory.filter(
+    h => h.fromStatus === 'interested' && h.toStatus === 'converted'
   ).length;
 
   const interestedToDropped = leadStageHistory.filter(
     h => h.fromStatus === 'interested' && h.toStatus === 'dropped'
   ).length;
 
-  const negotiationToDropped = leadStageHistory.filter(
-    h => h.fromStatus === 'negotiation' && h.toStatus === 'dropped'
-  ).length;
-
   // Calculate average time in each stage
   const calculateAvgTimeInStage = (stage: Lead['status']) => {
     const transitionsFromStage = leadStageHistory.filter(h => h.fromStatus === stage);
     if (transitionsFromStage.length === 0) return 0;
-    
+
     const totalDays = transitionsFromStage.reduce((sum, h) => sum + (h.durationInPreviousStage || 0), 0);
     return Math.round(totalDays / transitionsFromStage.length);
   };
 
   const avgTimeInterested = calculateAvgTimeInStage('interested');
-  const avgTimeNegotiation = calculateAvgTimeInStage('negotiation');
 
   // Calculate average time to convert
   const convertedLeadsHistory = leads
@@ -95,25 +83,16 @@ export function LeadConversionAnalytics({ leads, leadStageHistory }: LeadConvers
   // Stage velocity data
   const stageVelocityData = [
     { stage: 'Interested', avgDays: avgTimeInterested },
-    { stage: 'Negotiation', avgDays: avgTimeNegotiation },
   ];
 
   // Conversion rate by stage
   const conversionByStageData = [
     {
-      stage: 'Interested → Negotiation',
-      converted: interestedToNegotiation,
+      stage: 'Interested → Converted',
+      converted: interestedToConverted,
       dropped: interestedToDropped,
-      rate: interestedToNegotiation + interestedToDropped > 0 
-        ? ((interestedToNegotiation / (interestedToNegotiation + interestedToDropped)) * 100).toFixed(1)
-        : '0.0'
-    },
-    {
-      stage: 'Negotiation → Converted',
-      converted: negotiationToConverted,
-      dropped: negotiationToDropped,
-      rate: negotiationToConverted + negotiationToDropped > 0 
-        ? ((negotiationToConverted / (negotiationToConverted + negotiationToDropped)) * 100).toFixed(1)
+      rate: interestedToConverted + interestedToDropped > 0
+        ? ((interestedToConverted / (interestedToConverted + interestedToDropped)) * 100).toFixed(1)
         : '0.0'
     },
   ];
@@ -317,34 +296,16 @@ export function LeadConversionAnalytics({ leads, leadStageHistory }: LeadConvers
                   <td className="py-3">{avgTimeInterested} days</td>
                   <td className="py-3">
                     <div className="flex items-center gap-2">
-                      <span className="text-green-700 font-semibold">{interestedToNegotiation}</span>
+                      <span className="text-green-700 font-semibold">{interestedToConverted}</span>
                       <span className="text-xs text-gray-500">
-                        ({interestedToNegotiation + interestedToDropped > 0 
-                          ? ((interestedToNegotiation / (interestedToNegotiation + interestedToDropped)) * 100).toFixed(0)
+                        ({interestedToConverted + interestedToDropped > 0
+                          ? ((interestedToConverted / (interestedToConverted + interestedToDropped)) * 100).toFixed(0)
                           : 0}%)
                       </span>
                     </div>
                   </td>
                   <td className="py-3">
                     <span className="text-red-700 font-semibold">{interestedToDropped}</span>
-                  </td>
-                </tr>
-                <tr className="border-b">
-                  <td className="py-3 font-medium">Negotiation</td>
-                  <td className="py-3">{negotiationLeads}</td>
-                  <td className="py-3">{avgTimeNegotiation} days</td>
-                  <td className="py-3">
-                    <div className="flex items-center gap-2">
-                      <span className="text-green-700 font-semibold">{negotiationToConverted}</span>
-                      <span className="text-xs text-gray-500">
-                        ({negotiationToConverted + negotiationToDropped > 0 
-                          ? ((negotiationToConverted / (negotiationToConverted + negotiationToDropped)) * 100).toFixed(0)
-                          : 0}%)
-                      </span>
-                    </div>
-                  </td>
-                  <td className="py-3">
-                    <span className="text-red-700 font-semibold">{negotiationToDropped}</span>
                   </td>
                 </tr>
                 <tr className="bg-green-50">
@@ -377,35 +338,33 @@ export function LeadConversionAnalytics({ leads, leadStageHistory }: LeadConvers
             <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
               <h4 className="font-medium text-sm text-blue-900 mb-2">Pipeline Health</h4>
               <p className="text-sm text-blue-800">
-                {interestedLeads + negotiationLeads} leads currently in active stages. 
-                Focus on nurturing {interestedLeads} interested leads to move them to negotiation.
+                {interestedLeads} leads currently in active stages.
+                Focus on converting {interestedLeads} interested leads.
               </p>
             </div>
-            
+
             <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
               <h4 className="font-medium text-sm text-green-900 mb-2">Conversion Performance</h4>
               <p className="text-sm text-green-800">
-                Overall conversion rate of {conversionRate}% with an average time of {avgTimeToConvert} days. 
+                Overall conversion rate of {conversionRate}% with an average time of {avgTimeToConvert} days.
                 {parseFloat(conversionRate) > 30 ? ' Excellent performance!' : ' Room for improvement.'}
               </p>
             </div>
-            
+
             <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
               <h4 className="font-medium text-sm text-orange-900 mb-2">Stage Bottleneck</h4>
               <p className="text-sm text-orange-800">
-                {avgTimeInterested > avgTimeNegotiation 
+                {avgTimeInterested > 14
                   ? `Leads spend ${avgTimeInterested} days in Interested stage. Consider faster follow-ups.`
-                  : `Negotiation takes ${avgTimeNegotiation} days on average. Streamline the process.`}
+                  : `Average conversion time is good.`}
               </p>
             </div>
-            
+
             <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
               <h4 className="font-medium text-sm text-red-900 mb-2">Drop-off Analysis</h4>
               <p className="text-sm text-red-800">
-                {droppedLeads} leads lost ({dropOffRate}% drop-off rate). 
-                {interestedToDropped > negotiationToDropped 
-                  ? ` Most drop-offs happen at the Interested stage.`
-                  : ` Focus on improving negotiation process.`}
+                {droppedLeads} leads lost ({dropOffRate}% drop-off rate).
+                {droppedLeads} leads lost ({dropOffRate}% drop-off rate).
               </p>
             </div>
           </div>
