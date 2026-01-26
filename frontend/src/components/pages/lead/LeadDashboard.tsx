@@ -23,10 +23,17 @@ interface PropertyDetails {
     address_line_1: string;
 }
 
+interface UnitDetails {
+    unitNumber: string;
+    type: string;
+    monthlyRent: number;
+}
+
 export function LeadDashboard() {
     const { user } = useAuth();
     const [lead, setLead] = useState<LeadProfile | null>(null);
     const [property, setProperty] = useState<PropertyDetails | null>(null);
+    const [unit, setUnit] = useState<UnitDetails | null>(null);
     const [loading, setLoading] = useState(true);
     const [errorMsg, setErrorMsg] = useState('');
 
@@ -45,6 +52,16 @@ export function LeadDashboard() {
                         setProperty(propRes.data);
                     } catch (e) {
                         console.error("Failed to load property details", e);
+                    }
+                }
+
+                // Fetch unit details if interested
+                if (response.data.interestedUnit) {
+                    try {
+                        const unitRes = await apiClient.get(`/units/${response.data.interestedUnit}`);
+                        setUnit(unitRes.data);
+                    } catch (e) {
+                        console.error("Failed to load unit details", e);
                     }
                 }
             } catch (error: any) {
@@ -124,7 +141,7 @@ export function LeadDashboard() {
                             <div>
                                 <p className="text-sm font-medium text-gray-500 mb-1">Unit of Interest</p>
                                 <p className="font-medium text-gray-900">
-                                    {lead.interestedUnit ? `Unit ID: ${lead.interestedUnit}` : 'General Inquiry'}
+                                    {unit ? `Unit ${unit.unitNumber} (${unit.type})` : (lead.interestedUnit ? `Unit ID: ${lead.interestedUnit}` : 'General Inquiry')}
                                 </p>
                             </div>
 

@@ -685,7 +685,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
         // Fetch types (public or protected? assuming public now)
         try {
-          const typesResponse = await apiClient.get('/properties/types');
+          const typesResponse = await apiClient.get('/property-types');
           if (typesResponse.status === 200) {
             setPropertyTypes(typesResponse.data);
           }
@@ -880,11 +880,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         formData.append('images', file);
       });
 
-      const response = await apiClient.post(`/properties/${propertyId}/images`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
+      const response = await apiClient.post(`/properties/${propertyId}/images`, formData);
 
       // We might want to update the property's main image if it was the first upload
       if (response.status === 201 && response.data.images && response.data.images.length > 0) {
@@ -1024,11 +1020,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         formData.append('images', file);
       });
 
-      const response = await apiClient.post(`/units/${unitId}/images`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
+      const response = await apiClient.post(`/units/${unitId}/images`, formData);
 
       // Update local state if primary image set
       if (response.status === 201 && response.data.images && response.data.images.length > 0) {

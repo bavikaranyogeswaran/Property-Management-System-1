@@ -114,8 +114,10 @@ export function PropertiesPage() {
       setFormData({ name: '', addressLine1: '', addressLine2: '', addressLine3: '', propertyTypeId: 0 });
       setUploadFiles([]);
       setPrimaryImageIndex(0);
-    } catch (error) {
-      toast.error('Failed to save property');
+    } catch (error: any) {
+      console.error(error);
+      const msg = error.response?.data?.error || 'Failed to save property';
+      toast.error(msg);
     }
   };
 
