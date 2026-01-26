@@ -27,6 +27,10 @@ import unitTypeRoutes from './routes/unitTypeRoutes.js';
 import unitRoutes from './routes/unitRoutes.js';
 import leaseRoutes from './routes/leaseRoutes.js';
 import imageRoutes from './routes/imageRoutes.js';
+import maintenanceRequestRoutes from './routes/maintenanceRequestRoutes.js';
+import maintenanceCostRoutes from './routes/maintenanceCostRoutes.js';
+import paymentRoutes from './routes/paymentRoutes.js';
+import invoiceRoutes from './routes/invoiceRoutes.js';
 
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
@@ -36,6 +40,10 @@ app.use('/api/property-types', propertyTypeRoutes);
 app.use('/api/unit-types', unitTypeRoutes);
 app.use('/api/units', unitRoutes);
 app.use('/api/leases', leaseRoutes);
+app.use('/api/maintenance-requests', maintenanceRequestRoutes);
+app.use('/api/maintenance-costs', maintenanceCostRoutes);
+app.use('/api/payments', paymentRoutes);
+app.use('/api/invoices', invoiceRoutes);
 app.use('/api', imageRoutes);
 
 app.get('/api/health', (req, res) => {

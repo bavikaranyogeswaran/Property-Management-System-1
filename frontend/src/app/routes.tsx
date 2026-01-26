@@ -13,6 +13,7 @@ import { OwnerInvoicesPage } from '@/components/pages/owner/OwnerInvoicesPage';
 import { TenantInvoicesPage } from '@/components/pages/tenant/TenantInvoicesPage';
 import { TenantPaymentsPage } from '@/app/components/pages/TenantPaymentsPage';
 import { PaymentVerificationPage } from '@/components/pages/treasurer/PaymentVerificationPage';
+import { MaintenanceExpensesPage } from '@/components/pages/treasurer/MaintenanceExpensesPage';
 import { TenantMaintenancePage } from '@/components/pages/tenant/TenantMaintenancePage';
 import { OwnerMaintenancePage } from '@/components/pages/owner/OwnerMaintenancePage';
 import { AnalyticsPage } from '@/components/reports/AnalyticsPage';
@@ -68,6 +69,7 @@ export const renderPage = (activePage: string, user: User | null) => {
     // Treasurer pages
     if (user?.role === 'treasurer') {
         if (activePage === 'payments') return <PaymentVerificationPage />;
+        if (activePage === 'expenses') return <MaintenanceExpensesPage />;
         if (activePage === 'analytics') return <AnalyticsPage />;
     }
 

@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Wrench, DollarSign, Clock, CheckCircle, AlertCircle, Edit, Eye } from 'lucide-react';
+import { Wrench, DollarSign, Clock, CheckCircle, AlertCircle, Edit, Eye, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 export function OwnerMaintenancePage() {
@@ -21,6 +21,7 @@ export function OwnerMaintenancePage() {
     properties,
     updateMaintenanceRequest,
     addMaintenanceCost,
+    deleteMaintenanceCost,
   } = useApp();
 
   const [selectedRequest, setSelectedRequest] = useState<MaintenanceRequest | null>(null);
@@ -368,9 +369,26 @@ export function OwnerMaintenancePage() {
                   <p className="text-sm font-medium mb-2">Existing Costs:</p>
                   <div className="space-y-2">
                     {getRequestCosts(selectedRequest.id).map((cost) => (
-                      <div key={cost.id} className="flex justify-between text-sm">
-                        <span className="text-gray-600">{cost.description}</span>
-                        <span className="font-semibold">LKR {cost.amount}</span>
+                      <div key={cost.id} className="flex justify-between text-sm group items-center">
+                        <div className="flex items-center gap-2">
+                          <span className="text-gray-600">{cost.description}</span>
+                          <span className="text-gray-400 text-xs">({cost.recordedDate})</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="font-semibold">LKR {cost.amount}</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (confirm('Are you sure you want to delete this cost?')) {
+                                deleteMaintenanceCost(cost.id);
+                              }
+                            }}
+                            className="text-red-500 hover:text-red-700 opacity-0 group-hover:opacity-100 transition-opacity"
+                            title="Delete Cost"
+                          >
+                            <Trash2 className="size-3.5" />
+                          </button>
+                        </div>
                       </div>
                     ))}
                     <div className="pt-2 border-t flex justify-between font-semibold">

@@ -67,6 +67,7 @@ import { TenantPaymentsPage } from '@/app/components/pages/TenantPaymentsPage';
 // Treasurer Pages
 import { TreasurerDashboard } from '@/components/pages/treasurer/TreasurerDashboard';
 import { PaymentVerificationPage } from '@/components/pages/treasurer/PaymentVerificationPage';
+import { MaintenanceExpensesPage } from '@/components/pages/treasurer/MaintenanceExpensesPage';
 
 // Shared Pages
 import { AnalyticsPage } from '@/components/reports/AnalyticsPage';
@@ -164,6 +165,7 @@ function AppContent() {
       {user?.role === 'treasurer' && (
         <>
           <Route path="/payments" element={<ProtectedRoute><PaymentVerificationPage /></ProtectedRoute>} />
+          <Route path="/expenses" element={<ProtectedRoute><MaintenanceExpensesPage /></ProtectedRoute>} />
           <Route path="/analytics" element={<ProtectedRoute><AnalyticsPage /></ProtectedRoute>} />
         </>
       )}

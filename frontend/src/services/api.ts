@@ -22,6 +22,30 @@ apiClient.interceptors.request.use(
     (error) => Promise.reject(error)
 );
 
+// Maintenance API
+export const maintenanceApi = {
+    createRequest: (data: any) => apiClient.post('/maintenance-requests', data),
+    getRequests: () => apiClient.get('/maintenance-requests'),
+    updateStatus: (id: string, status: string) => apiClient.put(`/maintenance-requests/${id}/status`, { status }),
+
+    addCost: (data: any) => apiClient.post('/maintenance-costs', data),
+    getCosts: (requestId: string) => apiClient.get(`/maintenance-costs?requestId=${requestId}`),
+    deleteCost: (id: string) => apiClient.delete(`/maintenance-costs/${id}`),
+};
+
+// Payment API
+export const paymentApi = {
+    submitPayment: (data: any) => apiClient.post('/payments', data),
+    getPayments: () => apiClient.get('/payments'),
+    verifyPayment: (id: string, status: string) => apiClient.put(`/payments/${id}/verify`, { status }),
+};
+
+// Invoice API
+export const invoiceApi = {
+    getInvoices: () => apiClient.get('/invoices'),
+    createInvoice: (data: any) => apiClient.post('/invoices', data),
+};
+
 export default apiClient;
 
 

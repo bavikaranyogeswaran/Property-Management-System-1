@@ -14,7 +14,8 @@ import {
   Menu,
   X,
   Shield,
-  Settings
+  Settings,
+  DollarSign
 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 
@@ -49,6 +50,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   const treasurerMenu = [
     { path: '/dashboard', label: 'Dashboard', icon: Home },
     { path: '/payments', label: 'Payment Verification', icon: CreditCard },
+    { path: '/expenses', label: 'Expenses', icon: DollarSign },
     { path: '/analytics', label: 'Financial Reports', icon: BarChart3 },
   ];
 
