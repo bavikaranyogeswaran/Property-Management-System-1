@@ -115,7 +115,7 @@ CREATE TABLE leads (
     name VARCHAR(100) NOT NULL,
     phone VARCHAR(20),
     email VARCHAR(100),
-    status ENUM('interested','negotiation','converted','dropped') DEFAULT 'interested',
+    status ENUM('interested','converted','dropped') DEFAULT 'interested',
     notes TEXT,
     score INT DEFAULT 0,                     -- [ADDED] Lead scoring
     last_contacted_at DATETIME,              -- [ADDED] For follow-up tracking
@@ -136,8 +136,8 @@ CREATE TABLE lead_followups (
 CREATE TABLE lead_stage_history (
     history_id INT AUTO_INCREMENT PRIMARY KEY,
     lead_id INT NOT NULL,
-    from_status ENUM('interested','negotiation','converted','dropped') NULL,
-    to_status   ENUM('interested','negotiation','converted','dropped') NOT NULL,
+    from_status ENUM('interested','converted','dropped') NULL,
+    to_status   ENUM('interested','converted','dropped') NOT NULL,
     changed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     notes TEXT,
     duration_in_previous_stage INT,

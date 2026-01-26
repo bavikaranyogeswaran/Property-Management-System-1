@@ -46,7 +46,7 @@ export interface Lead {
   phone: string;
   interestedUnit: string;
   propertyId: string; // Added for correct linkage
-  status: 'interested' | 'negotiation' | 'converted' | 'dropped';
+  status: 'interested' | 'converted' | 'dropped';
   createdAt: string;
   notes: string;
   lastContactedAt?: string;
@@ -320,7 +320,7 @@ const INITIAL_DATA = {
       phone: '+94 77 123 4568',
       interestedUnit: 'unit-2',
       propertyId: 'prop-1',
-      status: 'negotiation' as const,
+      status: 'interested' as const,
       createdAt: '2024-12-20',
       notes: 'Ready to sign lease, discussing move-in date',
       lastContactedAt: '2026-01-10',
@@ -374,7 +374,7 @@ const INITIAL_DATA = {
       id: 'history-3',
       leadId: 'lead-2',
       fromStatus: 'interested' as const,
-      toStatus: 'negotiation' as const,
+      toStatus: 'interested' as const, // Legacy or maybe just remove this history item?
       changedAt: '2025-01-08T14:30:00Z',
       durationInPreviousStage: 19,
       notes: 'Viewing completed, tenant interested in proceeding',

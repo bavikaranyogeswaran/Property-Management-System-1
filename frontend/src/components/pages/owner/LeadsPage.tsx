@@ -105,7 +105,6 @@ export function LeadsPage() {
   const getStatusLabel = (status: Lead['status']) => {
     const labels: Record<Lead['status'], string> = {
       interested: 'Interested',
-      negotiation: 'Negotiation',
       converted: 'Converted',
       dropped: 'Dropped',
     };
@@ -115,7 +114,6 @@ export function LeadsPage() {
   const getStatusBadge = (status: Lead['status']) => {
     const variants: Record<Lead['status'], { variant: any, label: string, color: string }> = {
       interested: { variant: 'default', label: 'Interested', color: 'bg-blue-100 text-blue-700' },
-      negotiation: { variant: 'secondary', label: 'Negotiation', color: 'bg-orange-100 text-orange-700' },
       converted: { variant: 'default', label: 'Converted', color: 'bg-green-100 text-green-700' },
       dropped: { variant: 'destructive', label: 'Dropped', color: 'bg-gray-100 text-gray-700' },
     };
@@ -134,12 +132,6 @@ export function LeadsPage() {
       value: leads.filter(l => l.status === 'interested').length,
       icon: TrendingUp,
       color: 'bg-purple-50 text-purple-700',
-    },
-    {
-      label: 'In Negotiation',
-      value: leads.filter(l => l.status === 'negotiation').length,
-      icon: Clock,
-      color: 'bg-orange-50 text-orange-700',
     },
     {
       label: 'Converted',
@@ -161,7 +153,6 @@ export function LeadsPage() {
   // Pipeline view data
   const pipelineStages: Array<{ status: Lead['status'], label: string, color: string }> = [
     { status: 'interested', label: 'Interested', color: 'border-blue-200 bg-blue-50' },
-    { status: 'negotiation', label: 'Negotiation', color: 'border-orange-200 bg-orange-50' },
     { status: 'converted', label: 'Converted', color: 'border-green-200 bg-green-50' },
   ];
 
@@ -240,17 +231,6 @@ export function LeadsPage() {
                 <Button
                   size="sm"
                   variant="ghost"
-                  className="h-7 w-7 p-0 inline-flex items-center justify-center flex-shrink-0"
-                  onClick={() => handleStatusChange(lead.id, 'negotiation')}
-                  title="Move to Negotiation"
-                >
-                  <ArrowRight className="size-3.5" />
-                </Button>
-              )}
-              {lead.status === 'negotiation' && (
-                <Button
-                  size="sm"
-                  variant="ghost"
                   className="h-7 w-7 p-0 text-green-600 inline-flex items-center justify-center flex-shrink-0"
                   onClick={() => {
                     setSelectedLead(lead);
@@ -317,7 +297,6 @@ export function LeadsPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="interested">Interested</SelectItem>
-                      <SelectItem value="negotiation">Negotiation</SelectItem>
                       <SelectItem value="converted">Converted</SelectItem>
                       <SelectItem value="dropped">Dropped</SelectItem>
                     </SelectContent>
@@ -718,7 +697,7 @@ export function LeadsPage() {
       <Dialog open={isNegotiationDialogOpen} onOpenChange={setIsNegotiationDialogOpen}>
         <DialogContent className="max-w-3xl h-[80vh] flex flex-col p-6">
           <DialogHeader>
-            <DialogTitle>Negotiation with {selectedLead?.name}</DialogTitle>
+            <DialogTitle>Chat with {selectedLead?.name}</DialogTitle>
           </DialogHeader>
           {selectedLead && (
             <ChatInterface leadId={selectedLead.id} className="flex-1 min-h-0 border-0 shadow-none" />
