@@ -1187,6 +1187,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
         } catch (fetchError) {
           console.error("Failed to fetch new tenant details:", fetchError);
         }
+
+        // Update Unit Status if applicable
+        if (lead.interestedUnit) {
+          const unitId = lead.interestedUnit.toString();
+          setUnits(prev => prev.map(u => u.id === unitId ? { ...u, status: 'occupied' } : u));
+
+          // Also fetch leases to ensure the new lease is loaded
+          try {
+            const lRes = await apiClient.get('/leases');
+            if (lRes.data) {
+              setLeases(lRes.data);
+            }
+          } catch (e) { console.error("Failed to refresh leases", e); }
+        }
       }
       return tenantId;
     } catch (error) {
