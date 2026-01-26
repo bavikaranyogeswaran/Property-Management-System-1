@@ -7,6 +7,9 @@ const router = Router();
 // Treasurer creation (Owner only)
 router.post('/create-treasurer', authenticateToken, userController.createTreasurer);
 
+// Update own profile (Specific route must come before generic /:id)
+router.put('/profile', authenticateToken, userController.updateProfile);
+
 // Treasurer update (Owner only)
 router.put('/:id', authenticateToken, userController.updateTreasurer);
 
@@ -18,5 +21,7 @@ router.get('/treasurers', authenticateToken, userController.getTreasurers);
 
 // Get user by ID (Generic)
 router.get('/:id', authenticateToken, userController.getUserById);
+
+
 
 export default router;

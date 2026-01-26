@@ -12,12 +12,23 @@ import { User, Lock, Bell, Shield } from 'lucide-react';
 import { toast } from 'sonner';
 
 export function SettingsPage() {
-    const { user } = useAuth();
+    const { user, updateProfile, changePassword } = useAuth();
     const [profileData, setProfileData] = useState({
         name: user?.name || '',
         email: user?.email || '',
-        phone: '+94 77 123 4567', // Mock phone as it's not in user object yet
+        phone: user?.phone || '',
     });
+
+    // Fix: Update profileData when user loads/updates
+    React.useEffect(() => {
+        if (user) {
+            setProfileData({
+                name: user.name || '',
+                email: user.email || '',
+                phone: user.phone || '',
+            });
+        }
+    }, [user]);
 
     const [passwords, setPasswords] = useState({
         current: '',
@@ -31,25 +42,37 @@ export function SettingsPage() {
         marketing: false,
     });
 
-    const handleProfileUpdate = (e: React.FormEvent) => {
+    const handleProfileUpdate = async (e: React.FormEvent) => {
         e.preventDefault();
-        // Simulate API call
-        setTimeout(() => {
+        try {
+            // Send only updatable fields
+            const { name, phone } = profileData;
+            await updateProfile({ name, phone });
             toast.success('Profile updated successfully');
-        }, 500);
+        } catch (error: any) {
+            console.error(error);
+            toast.error(error.response?.data?.error || 'Failed to update profile');
+        }
     };
 
-    const handlePasswordUpdate = (e: React.FormEvent) => {
+    const handlePasswordUpdate = async (e: React.FormEvent) => {
         e.preventDefault();
         if (passwords.new !== passwords.confirm) {
             toast.error('New passwords do not match');
             return;
         }
-        // Simulate API call
-        setTimeout(() => {
+
+        try {
+            await changePassword({
+                currentPassword: passwords.current,
+                newPassword: passwords.new
+            });
             toast.success('Password updated successfully');
             setPasswords({ current: '', new: '', confirm: '' });
-        }, 500);
+        } catch (error: any) {
+            console.error(error);
+            toast.error(error.response?.data?.error || 'Failed to update password');
+        }
     };
 
     return (
@@ -99,12 +122,17 @@ export function SettingsPage() {
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="email">Email Address</Label>
-                                    <Input
-                                        id="email"
-                                        type="email"
-                                        value={profileData.email}
-                                        onChange={(e) => setProfileData({ ...profileData, email: e.target.value })}
-                                    />
+                                    <div className="relative">
+                                        <Input
+                                            id="email"
+                                            type="email"
+                                            value={profileData.email}
+                                            disabled
+                                            className="bg-gray-50 text-gray-500"
+                                        />
+                                        <Lock className="w-4 h-4 text-gray-400 absolute right-3 top-3" />
+                                    </div>
+                                    <p className="text-xs text-gray-500">Email cannot be changed. Contact owner for support.</p>
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="phone">Phone Number</Label>

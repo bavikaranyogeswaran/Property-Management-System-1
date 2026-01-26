@@ -74,6 +74,33 @@ class UserService {
         return { id, name, email, phone, status };
     }
 
+    async updateUserProfile(id, data) {
+        const { name, phone } = data;
+
+        // Fetch current user to preserve email and status
+        const currentUser = await userModel.findById(id);
+        if (!currentUser) {
+            throw new Error('User not found');
+        }
+
+        // Email cannot be updated by user profile, use existing.
+        // Status should also be preserved.
+        const updated = await userModel.update(id, {
+            name,
+            phone,
+            email: currentUser.email,
+            status: currentUser.status
+        });
+
+        if (!updated) {
+            throw new Error('Update failed');
+        }
+
+        // Return current email from user object (not passed data)
+        const user = await userModel.findById(id);
+        return { id, name, email: user.email, phone };
+    }
+
     async deleteTreasurer(id) {
         const deleted = await userModel.delete(id);
         if (!deleted) {

@@ -39,6 +39,19 @@ class UserController {
         }
     }
 
+    async updateProfile(req, res) {
+        try {
+            // Self-update only
+            const id = req.user.id;
+            const { name, email, phone } = req.body;
+
+            const result = await userService.updateUserProfile(id, { name, email, phone });
+            res.json(result);
+        } catch (error) {
+            res.status(400).json({ error: error.message });
+        }
+    }
+
     async deleteTreasurer(req, res) {
         try {
             if (req.user.role !== 'owner') {

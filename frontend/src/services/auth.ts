@@ -50,6 +50,22 @@ export const authService = {
         const response = await apiClient.post('/auth/reset-password', { token, newPassword });
         return response.data;
     },
+
+    updateProfile: async (data: any) => {
+        const response = await apiClient.put('/users/profile', data);
+        // Update local storage if user details changed
+        const currentUser = storage.getUser();
+        if (currentUser) {
+            const updatedUser = { ...currentUser, ...response.data };
+            storage.setUser(updatedUser);
+        }
+        return response.data;
+    },
+
+    changePassword: async (data: any) => {
+        const response = await apiClient.post('/auth/change-password', data);
+        return response.data;
+    },
 };
 
 export default authService;

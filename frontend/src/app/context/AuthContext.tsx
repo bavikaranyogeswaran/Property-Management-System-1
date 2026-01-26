@@ -7,6 +7,7 @@ export interface User {
   id: string;
   email: string;
   name: string;
+  phone?: string;
   role: UserRole;
 }
 
@@ -15,6 +16,8 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
   isAuthenticated: boolean;
+  updateProfile: (data: Partial<User>) => Promise<void>;
+  changePassword: (data: any) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -41,6 +44,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const updateProfile = async (data: Partial<User>) => {
+    try {
+      const updatedUser = await authService.updateProfile(data);
+      setUser(prev => prev ? { ...prev, ...updatedUser } : null);
+    } catch (error) {
+      console.error("Profile update failed", error);
+      throw error;
+    }
+  };
+
+  const changePassword = async (data: any) => {
+    try {
+      await authService.changePassword(data);
+    } catch (error) {
+      console.error("Password change failed", error);
+      throw error;
+    }
+  };
+
   const logout = () => {
     authService.logout();
     setUser(null);
@@ -52,6 +74,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login,
       logout,
       isAuthenticated: !!user,
+      updateProfile,
+      changePassword,
     }}>
       {children}
     </AuthContext.Provider>
