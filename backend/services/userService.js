@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs';
 const { hash } = bcrypt;
 import userModel from '../models/userModel.js';
 import leadModel from '../models/leadModel.js';
+import unitModel from '../models/unitModel.js';
 import emailService from '../utils/emailService.js';
 
 const SALT_ROUNDS = 10;
@@ -95,7 +96,7 @@ class UserService {
     }
 
     // Convert lead to tenant
-    async convertLeadToTenant(leadId, providedPassword) {
+    async convertLeadToTenant(leadId) {
         // 1. Get lead details
         const lead = await leadModel.findById(leadId);
         if (!lead) {
@@ -116,14 +117,21 @@ class UserService {
 
             // If they are a lead, upgrade them to tenant
             if (existingUser.role === 'lead') {
-                await userModel.update(userId, { role: 'tenant' });
+                await userModel.updateRole(userId, 'tenant');
                 // Send confirmation
                 await emailService.sendTenantConfirmation(existingUser.email, existingUser.name);
             }
         } else {
-            // Create new tenant user
-            // Use provided password or fallback to random (though UI enforces it now)
-            const passwordToUse = providedPassword || Math.random().toString(36).slice(-8);
+            // This case should ideally not happen if every lead must have an account to be a lead
+            // But if leads can be created manually by owner without accounts, we need to handle it.
+            // If they don't have an account, we generate a password or throw error?
+            // User requirement: "tenant can use the password when he created for lead account creation"
+            // This implies the user ALREADY exists.
+
+            // If user doesn't exist, we might need to create one.
+            // Let's generate a temporary password and email it.
+
+            const passwordToUse = Math.random().toString(36).slice(-8);
             const hashedPassword = await hash(passwordToUse, SALT_ROUNDS);
 
             userId = await userModel.create({
@@ -144,6 +152,12 @@ class UserService {
             status: 'converted',
             tenantId: userId
         });
+
+        // 4. Mark Unit as Occupied if one was selected
+        if (lead.interestedUnit) {
+            console.log(`[INFO] Marking unit ${lead.interestedUnit} as occupied due to lead conversion.`);
+            await unitModel.update(lead.interestedUnit, { status: 'occupied' });
+        }
 
         return { message: 'Lead converted successfully', tenantId: userId };
     }

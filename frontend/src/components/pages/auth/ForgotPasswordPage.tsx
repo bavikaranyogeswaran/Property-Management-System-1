@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import authService from '@/services/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -16,13 +17,17 @@ export function ForgotPasswordPage() {
         e.preventDefault();
         setIsLoading(true);
 
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 1000));
-
-        toast.success('If an account exists, a reset link has been sent.');
-        setIsLoading(false);
-        // Optional: redirect back to login after success
-        // navigate('/login');
+        try {
+            await authService.forgotPassword(email);
+            toast.success('If an account exists, a reset link has been sent.');
+            // Optional: redirect back to login after success
+            // navigate('/login');
+        } catch (error) {
+            console.error('Forgot password error:', error);
+            toast.error('Failed to send reset link. Please try again.');
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     return (

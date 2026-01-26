@@ -11,13 +11,8 @@ class LeadController {
             }
 
             const { id } = req.params;
-            const { password } = req.body;
 
-            if (!password || password.length < 8) {
-                return res.status(400).json({ error: 'Password must be at least 8 characters long' });
-            }
-
-            const result = await userService.convertLeadToTenant(id, password);
+            const result = await userService.convertLeadToTenant(id);
             res.status(200).json(result);
         } catch (error) {
             res.status(400).json({ error: error.message });

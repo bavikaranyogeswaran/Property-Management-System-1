@@ -33,7 +33,6 @@ export function LeadsPage() {
   const [isHistoryDialogOpen, setIsHistoryDialogOpen] = useState(false);
   const [isNegotiationDialogOpen, setIsNegotiationDialogOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'pipeline' | 'list'>('pipeline');
-  const [tenantPassword, setTenantPassword] = useState('');
 
 
 
@@ -92,22 +91,12 @@ export function LeadsPage() {
 
   const handleConvert = async () => {
     if (!selectedLead) return;
-    if (!tenantPassword) {
-      toast.error('Please enter a password for the tenant account');
-      return;
-    }
-
-    if (tenantPassword.length < 8) {
-      toast.error('Password must be at least 8 characters long');
-      return;
-    }
 
     try {
-      const tenantId = await convertLeadToTenant(selectedLead.id, tenantPassword);
+      const tenantId = await convertLeadToTenant(selectedLead.id);
       toast.success('Lead converted to tenant successfully');
       setIsConvertDialogOpen(false);
       setSelectedLead(null);
-      setTenantPassword('');
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to convert lead');
     }
@@ -692,7 +681,6 @@ export function LeadsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Convert to Tenant Dialog */}
       <Dialog open={isConvertDialogOpen} onOpenChange={setIsConvertDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -704,22 +692,11 @@ export function LeadsPage() {
             </p>
             <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
               <p className="text-sm text-blue-900">
-                <strong>Note:</strong> After conversion, you'll need to create a lease for this tenant in the Leases section.
+                <strong>Note:</strong> The lead will be promoted to a Tenant. They can use their existing credentials to log in.
+                After conversion, you can create a lease for them in the Leases section.
               </p>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="tenant-password">Tenant Password</Label>
-              <Input
-                id="tenant-password"
-                type="password"
-                placeholder="Enter password for tenant login"
-                value={tenantPassword}
-                onChange={(e) => setTenantPassword(e.target.value)}
-              />
-              <p className="text-xs text-gray-500">
-                This password will be emailed to the tenant along with their login credentials.
-              </p>
-            </div>
+
             <div className="flex gap-2 justify-end">
               <Button
                 type="button"
@@ -727,7 +704,6 @@ export function LeadsPage() {
                 onClick={() => {
                   setIsConvertDialogOpen(false);
                   setSelectedLead(null);
-                  setTenantPassword('');
                 }}
               >
                 Cancel

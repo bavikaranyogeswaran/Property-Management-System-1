@@ -216,7 +216,7 @@ interface AppContextType {
   addLead: (lead: Omit<Lead, 'id' | 'createdAt'> & { password?: string }) => Promise<void>;
   updateLead: (id: string, lead: Partial<Lead>) => Promise<void>;
   addLeadFollowUp: (followUp: Omit<LeadFollowUp, 'id'>) => void;
-  convertLeadToTenant: (leadId: string, password?: string) => Promise<string>;
+  convertLeadToTenant: (leadId: string) => Promise<string>;
 
   // Tenant operations
   addTenant: (tenant: Omit<Tenant, 'id' | 'createdAt'>) => void;
@@ -1123,9 +1123,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setLeadFollowUps([...leadFollowUps, newFollowUp]);
   };
 
-  const convertLeadToTenant = async (leadId: string, password?: string): Promise<string> => {
+  const convertLeadToTenant = async (leadId: string): Promise<string> => {
     try {
-      const response = await apiClient.post(`/leads/${leadId}/convert`, { password });
+      const response = await apiClient.post(`/leads/${leadId}/convert`, {});
       const { tenantId } = response.data;
 
       // Optimistic update or refetch?

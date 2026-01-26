@@ -54,6 +54,22 @@ class UserModel {
         return result.affectedRows > 0;
     }
 
+    async updatePassword(id, passwordHash) {
+        const [result] = await pool.query(
+            'UPDATE users SET password_hash = ? WHERE user_id = ?',
+            [passwordHash, id]
+        );
+        return result.affectedRows > 0;
+    }
+
+    async updateRole(id, role) {
+        const [result] = await pool.query(
+            'UPDATE users SET role = ? WHERE user_id = ?',
+            [role, id]
+        );
+        return result.affectedRows > 0;
+    }
+
     async delete(id) {
         try {
             // 1. Try Hard Delete first (Permanent removal)

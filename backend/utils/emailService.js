@@ -104,6 +104,41 @@ class EmailService {
             console.error(e);
         }
     }
+    async sendPasswordResetEmail(email, resetToken) {
+        if (!this.transporter) {
+            console.log('==================================================');
+            console.log(`[EMAIL MOCK] Password Reset for ${email}`);
+            console.log(`Token: ${resetToken}`);
+            console.log(`Link: ${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${resetToken}`);
+            console.log('==================================================');
+            return true;
+        }
+
+        try {
+            const resetLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${resetToken}`;
+
+            await this.transporter.sendMail({
+                from: process.env.SMTP_USER,
+                to: email,
+                subject: 'Password Reset Request',
+                html: `
+                    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                        <h2 style="color: #333;">Password Reset Request</h2>
+                        <p>You requested a password reset. Click the button below to reset your password.</p>
+                        <div style="text-align: center; margin: 30px 0;">
+                            <a href="${resetLink}" style="background-color: #0070f3; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold;">Reset Password</a>
+                        </div>
+                        <p style="color: #666; font-size: 14px;">If you didn't request this, you can safely ignore this email.</p>
+                        <p style="color: #666; font-size: 12px; margin-top: 30px;">Link expires in 1 hour.</p>
+                    </div>
+                `
+            });
+            return true;
+        } catch (error) {
+            console.error('Error sending password reset email:', error);
+            return false;
+        }
+    }
 }
 
 export default new EmailService();

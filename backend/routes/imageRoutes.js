@@ -5,18 +5,20 @@ import upload from '../middleware/upload.js';
 
 const router = Router();
 
-// All image routes require authentication and owner role
+// Public Routes (No Auth)
+router.get('/properties/:propertyId/images', imageController.getPropertyImages);
+router.get('/units/:unitId/images', imageController.getUnitImages);
+
+// Protected Routes (Owner Only)
 router.use(authenticateToken, authorizeRoles('owner'));
 
-// Property Images
+// Property Images (Write)
 router.post('/properties/:propertyId/images', upload.array('images', 10), imageController.uploadPropertyImages);
-router.get('/properties/:propertyId/images', imageController.getPropertyImages);
 router.put('/properties/:propertyId/images/:imageId/primary', imageController.setPropertyPrimaryImage);
 router.delete('/properties/images/:imageId', imageController.deletePropertyImage);
 
-// Unit Images
+// Unit Images (Write)
 router.post('/units/:unitId/images', upload.array('images', 10), imageController.uploadUnitImages);
-router.get('/units/:unitId/images', imageController.getUnitImages);
 router.put('/units/:unitId/images/:imageId/primary', imageController.setUnitPrimaryImage);
 router.delete('/units/images/:imageId', imageController.deleteUnitImage);
 
