@@ -25,6 +25,7 @@ import propertyRoutes from './routes/propertyRoutes.js';
 import propertyTypeRoutes from './routes/propertyTypeRoutes.js';
 import unitTypeRoutes from './routes/unitTypeRoutes.js';
 import unitRoutes from './routes/unitRoutes.js';
+import leaseRoutes from './routes/leaseRoutes.js';
 import imageRoutes from './routes/imageRoutes.js';
 
 app.use('/api/auth', authRoutes);
@@ -34,6 +35,7 @@ app.use('/api/properties', propertyRoutes);
 app.use('/api/property-types', propertyTypeRoutes);
 app.use('/api/unit-types', unitTypeRoutes);
 app.use('/api/units', unitRoutes);
+app.use('/api/leases', leaseRoutes);
 app.use('/api', imageRoutes);
 
 app.get('/api/health', (req, res) => {

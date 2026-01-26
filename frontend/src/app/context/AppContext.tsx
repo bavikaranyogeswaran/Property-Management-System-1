@@ -654,6 +654,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
           }
         } catch (e) { console.error("Failed to fetch units", e); }
 
+        // Fetch Leases
+        try {
+          const lRes = await apiClient.get('/leases');
+          if (lRes.data) {
+            setLeases(lRes.data);
+          }
+        } catch (e) { console.error("Failed to fetch leases", e); }
+
         // Fetch Properties (if not already fetched via initial props or whatever)
         try {
           const pRes = await apiClient.get('/properties');
@@ -688,7 +696,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (token) {
           const response = await apiClient.get('/leads');
           if (response.status === 200) {
-            setLeads(response.data);
+            const mappedLeads = response.data.map((l: any) => ({
+              ...l,
+              id: l.id.toString(),
+              interestedUnit: l.interestedUnit ? l.interestedUnit.toString() : undefined,
+              propertyId: l.propertyId ? l.propertyId.toString() : undefined,
+              tenantId: l.tenantId ? l.tenantId.toString() : undefined,
+            }));
+            setLeads(mappedLeads);
           }
         }
       } catch (error) {
