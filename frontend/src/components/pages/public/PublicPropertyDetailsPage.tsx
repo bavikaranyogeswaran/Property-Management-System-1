@@ -194,7 +194,7 @@ export function PublicPropertyDetailsPage() {
                             </div>
                             <div className="flex items-center text-gray-200 text-lg md:text-xl font-light">
                                 <MapPin className="w-5 h-5 mr-2 text-blue-400 shrink-0" />
-                                {property.addressLine1}, {property.addressLine2} {property.addressLine3}
+                                {property.propertyNo} {property.street}, {property.city} {property.district}
                             </div>
                         </div>
                     </div>

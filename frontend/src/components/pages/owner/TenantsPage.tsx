@@ -288,7 +288,9 @@ export function TenantsPage() {
                       <div>
                         <p className="text-sm text-gray-600">Property</p>
                         <p className="font-medium">{property.name}</p>
-                        <p className="text-sm text-gray-500">{property.address}</p>
+                        <p className="text-sm text-gray-500">
+                          {property.propertyNo} {property.street}, {property.city} {property.district}
+                        </p>
                       </div>
                       <div>
                         <p className="text-sm text-gray-600">Unit</p>

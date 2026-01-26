@@ -95,8 +95,8 @@ export function PublicListingPage({ onNavigate }: { onNavigate?: (page: string) 
                             <div className="space-y-4 flex-1">
                                 <div className="text-gray-600">
                                     <p className="font-medium text-gray-900 mb-1">Location</p>
-                                    <p className="text-sm">{property.addressLine1}</p>
-                                    <p className="text-sm">{property.addressLine2} {property.addressLine3}</p>
+                                    <p className="text-sm">{property.propertyNo} {property.street}</p>
+                                    <p className="text-sm">{property.city} {property.district}</p>
                                 </div>
 
                                 <div className="pt-4 border-t grid grid-cols-2 gap-4">

@@ -36,8 +36,11 @@ export interface RegisterResponse {
 // Property API types
 export interface CreatePropertyRequest {
     name: string;
-    address: string;
-    type: string;
+    propertyNo: string;
+    street: string;
+    city: string;
+    district: string;
+    propertyTypeId: number;
 }
 
 export interface UpdatePropertyRequest extends Partial<CreatePropertyRequest> {

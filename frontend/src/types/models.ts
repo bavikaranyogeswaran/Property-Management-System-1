@@ -12,9 +12,14 @@ export interface Property {
     id: string;
     ownerId: string;
     name: string;
-    address: string;
-    type: string;
+    propertyNo: string;
+    street: string;
+    city: string;
+    district: string;
+    propertyTypeId: number;
+    typeName?: string;
     totalUnits: number;
+    image?: string;
     createdAt?: string;
 }
 
@@ -58,7 +63,7 @@ export interface Lead {
     phone: string;
     propertyId?: string;
     unitType?: string;
-    status: 'new' | 'contacted' | 'viewing_scheduled' | 'converted' | 'lost';
+    status: 'interested' | 'negotiation' | 'converted' | 'dropped';
     source: string;
     notes?: string;
     createdAt?: string;

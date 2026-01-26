@@ -489,7 +489,7 @@ export function OwnerMaintenancePage() {
                     return (
                       <div className="text-sm text-gray-600">
                         <p className="font-medium text-gray-900">{property?.name}</p>
-                        <p>{property?.address}</p>
+                        <p>{property?.propertyNo} {property?.street}, {property?.city} {property?.district}</p>
                         <p className="mt-1">Unit: {unit?.unitNumber}</p>
                       </div>
                     );
