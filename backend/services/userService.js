@@ -113,6 +113,10 @@ class UserService {
         return await userModel.findByRole('treasurer');
     }
 
+    async getTenants() {
+        return await userModel.findByRole('tenant');
+    }
+
     async getUserById(id) {
         const user = await userModel.findById(id);
         if (user) {

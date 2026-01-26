@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useApp, Lead, LeadStageHistory } from '@/app/context/AppContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,6 +16,7 @@ import { ChatInterface } from '@/components/common/ChatInterface';
 import { toast } from 'sonner';
 
 export function LeadsPage() {
+  const navigate = useNavigate();
   const {
     leads,
     units,
@@ -225,33 +227,27 @@ export function LeadsPage() {
             Chat
           </Button>
 
-          {lead.status !== 'converted' && lead.status !== 'dropped' && (
-            <>
-              {lead.status === 'interested' && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-7 w-7 p-0 text-green-600 inline-flex items-center justify-center flex-shrink-0"
-                  onClick={() => {
-                    setSelectedLead(lead);
-                    setIsConvertDialogOpen(true);
-                  }}
-                  title="Convert to Tenant"
-                >
-                  <CheckCircle className="size-3.5" />
-                </Button>
-              )}
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 inline-flex items-center justify-center flex-shrink-0"
-                onClick={() => handleStatusChange(lead.id, 'dropped')}
-                title="Drop Lead"
-              >
-                <XCircle className="size-3.5" />
-              </Button>
-            </>
+          {lead.status === 'converted' && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 text-xs border-green-200 text-green-700 bg-green-50 hover:bg-green-100 dark:border-green-800 dark:bg-green-950/30 dark:text-green-400"
+              onClick={() => navigate('/tenants')}
+              title="View Tenant Details"
+            >
+              View Tenant
+            </Button>
           )}
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 inline-flex items-center justify-center flex-shrink-0"
+            onClick={() => handleStatusChange(lead.id, 'dropped')}
+            title="Drop Lead"
+          >
+            <XCircle className="size-3.5" />
+          </Button>
+
         </div>
       </div>
     );

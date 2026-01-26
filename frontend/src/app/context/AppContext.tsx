@@ -50,6 +50,8 @@ export interface Lead {
   createdAt: string;
   notes: string;
   lastContactedAt?: string;
+  items?: any[];
+  tenantId?: string;
   score?: number;
 }
 
@@ -78,6 +80,7 @@ export interface Tenant {
   phone: string;
   leaseId?: string;
   createdAt: string;
+  status?: string;
 }
 
 export interface Treasurer {
@@ -612,6 +615,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
             setTreasurers(mappedTreasurers);
           }
         } catch (e) { console.error("Failed to fetch treasurers", e); }
+
+        // Fetch Tenants
+        try {
+          const tRes = await apiClient.get('/users/tenants');
+          if (tRes.data) {
+            const mappedTenants = tRes.data.map((u: any) => ({
+              id: (u.id || u.user_id).toString(),
+              name: u.name,
+              email: u.email,
+              phone: u.phone,
+              createdAt: u.createdAt,
+              status: u.status
+            }));
+            setTenants(mappedTenants);
+          }
+        } catch (e) { console.error("Failed to fetch tenants", e); }
 
         // Fetch Units
         try {
