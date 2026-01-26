@@ -219,6 +219,8 @@ interface AppContextType {
   deleteUnit: (id: string) => Promise<void>;
   uploadUnitImages: (unitId: string, files: File[]) => Promise<any>;
   getUnitImages: (unitId: string) => Promise<any[]>;
+  setUnitPrimaryImage: (unitId: string, imageId: string) => Promise<void>;
+  deleteUnitImage: (unitId: string, imageId: string) => Promise<void>;
 
   // Lead operations
   addLead: (lead: Omit<Lead, 'id' | 'createdAt'> & { password?: string }) => Promise<void>;
@@ -1093,6 +1095,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const setUnitPrimaryImage = async (unitId: string, imageId: string) => {
+    try {
+      await apiClient.put(`/units/${unitId}/images/${imageId}/primary`);
+    } catch (e) {
+      console.error("Failed to set primary unit image", e);
+      throw e;
+    }
+  };
+
+  const deleteUnitImage = async (unitId: string, imageId: string) => {
+    try {
+      await apiClient.delete(`/units/images/${imageId}`);
+    } catch (e) {
+      console.error("Failed to delete unit image", e);
+      throw e;
+    }
+  };
+
   // Lead operations
   const addLead = async (lead: Omit<Lead, 'id' | 'createdAt'> & { password?: string }) => {
     try {
@@ -1452,6 +1472,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       deleteUnit,
       uploadUnitImages,
       getUnitImages,
+      setUnitPrimaryImage,
+      deleteUnitImage,
       addLead,
       updateLead,
       addLeadFollowUp,

@@ -13,7 +13,7 @@ import { toast } from 'sonner';
 import { MultiImageUpload } from '@/components/ui/multi-image-upload';
 
 export function UnitsPage() {
-  const { units, properties, unitTypes, leases, addUnit, updateUnit, deleteUnit, uploadUnitImages, getUnitImages } = useApp();
+  const { units, properties, unitTypes, leases, addUnit, updateUnit, deleteUnit, uploadUnitImages, getUnitImages, deleteUnitImage, setUnitPrimaryImage } = useApp();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingUnit, setEditingUnit] = useState<Unit | null>(null);
   const [filterProperty, setFilterProperty] = useState<string>('all');
@@ -30,6 +30,7 @@ export function UnitsPage() {
   const [primaryImageIndex, setPrimaryImageIndex] = useState(0);
   const [viewUnit, setViewUnit] = useState<Unit | null>(null);
   const [viewUnitImages, setViewUnitImages] = useState<any[]>([]);
+  const [existingImages, setExistingImages] = useState<any[]>([]);
 
   // Fetch images when viewing a unit
   React.useEffect(() => {
@@ -110,7 +111,44 @@ export function UnitsPage() {
 
 
 
-  const handleEdit = (unit: Unit) => {
+
+  const handleRemoveExistingImage = async (image: any) => {
+    if (!editingUnit) return;
+    if (confirm('Delete this image?')) {
+      try {
+        await deleteUnitImage(editingUnit.id, image.id);
+        // Refresh images
+        const images = await getUnitImages(editingUnit.id);
+        setExistingImages(images.map((img: any) => ({
+          id: img.image_id?.toString() || img.id?.toString(),
+          url: img.image_url,
+          isPrimary: Boolean(img.is_primary)
+        })));
+        toast.success('Image deleted');
+      } catch (e) {
+        toast.error('Failed to delete image');
+      }
+    }
+  };
+
+  const handleSetPrimaryExistingImage = async (image: any) => {
+    if (!editingUnit) return;
+    try {
+      await setUnitPrimaryImage(editingUnit.id, image.id);
+      // Refresh images
+      const images = await getUnitImages(editingUnit.id);
+      setExistingImages(images.map((img: any) => ({
+        id: img.image_id?.toString() || img.id?.toString(),
+        url: img.image_url,
+        isPrimary: Boolean(img.is_primary)
+      })));
+      toast.success('Primary image updated');
+    } catch (e) {
+      toast.error('Failed to set primary image');
+    }
+  };
+
+  const handleEdit = async (unit: Unit) => {
     setEditingUnit(unit);
     setFormData({
       propertyId: unit.propertyId,
@@ -122,6 +160,21 @@ export function UnitsPage() {
     });
     setUploadFiles([]);
     setPrimaryImageIndex(0);
+    setExistingImages([]);
+
+    try {
+      const images = await getUnitImages(unit.id);
+      if (images) {
+        setExistingImages(images.map((img: any) => ({
+          id: img.image_id?.toString() || img.id?.toString(),
+          url: img.image_url || img.url,
+          isPrimary: Boolean(img.is_primary)
+        })));
+      }
+    } catch (e) {
+      console.error("Failed to load images", e);
+      toast.error("Failed to load unit images");
+    }
   };
 
   const handleDelete = (id: string) => {
@@ -427,6 +480,7 @@ export function UnitsPage() {
                               });
                               setUploadFiles([]);
                               setPrimaryImageIndex(0);
+                              setExistingImages([]);
                             }
                           }}>
                             <DialogTrigger asChild>
@@ -523,6 +577,9 @@ export function UnitsPage() {
                                   <MultiImageUpload
                                     maxImages={10}
                                     onImagesChange={handleImagesChange}
+                                    existingImages={existingImages}
+                                    onRemoveExisting={handleRemoveExistingImage}
+                                    onSetPrimaryExisting={handleSetPrimaryExistingImage}
                                   />
                                 </div>
                                 <div className="flex gap-2 justify-end">
@@ -538,6 +595,7 @@ export function UnitsPage() {
                                     });
                                     setUploadFiles([]);
                                     setPrimaryImageIndex(0);
+                                    setExistingImages([]);
                                   }}>
                                     Cancel
                                   </Button>

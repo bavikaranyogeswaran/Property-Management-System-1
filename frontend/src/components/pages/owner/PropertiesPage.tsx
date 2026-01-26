@@ -518,6 +518,9 @@ export function PropertiesPage() {
                             <MultiImageUpload
                               maxImages={10}
                               onImagesChange={handleImagesChange}
+                              existingImages={existingImages}
+                              onRemoveExisting={handleRemoveExistingImage}
+                              onSetPrimaryExisting={handleSetPrimaryExistingImage}
                             />
                             <div className="flex gap-2 justify-end">
                               <Button type="button" variant="outline" onClick={() => {
