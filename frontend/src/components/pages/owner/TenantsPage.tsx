@@ -203,7 +203,7 @@ export function TenantsPage() {
                       <TableCell>
                         <div className="flex items-center gap-1 text-sm text-gray-600">
                           <Calendar className="size-3" />
-                          {tenant.createdAt}
+                          {new Date(tenant.createdAt).toLocaleDateString()}
                         </div>
                       </TableCell>
                       <TableCell className="text-right">
@@ -265,7 +265,7 @@ export function TenantsPage() {
                       </div>
                       <div className="flex items-center gap-2 text-sm text-gray-600">
                         <Calendar className="size-4" />
-                        Member since {selectedTenant.createdAt}
+                        Member since {new Date(selectedTenant.createdAt).toLocaleDateString()}
                       </div>
                     </div>
                   </div>

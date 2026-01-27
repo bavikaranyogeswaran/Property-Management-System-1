@@ -45,6 +45,11 @@ export function LeadsPage() {
     nextAction: '',
   });
 
+  const [conversionData, setConversionData] = useState({
+    startDate: new Date().toISOString().split('T')[0],
+    endDate: ''
+  });
+
 
 
   const handleStatusChange = async (leadId: string, status: Lead['status']) => {
@@ -96,10 +101,19 @@ export function LeadsPage() {
     if (!selectedLead) return;
 
     try {
-      const tenantId = await convertLeadToTenant(selectedLead.id);
+      const tenantId = await convertLeadToTenant(
+        selectedLead.id,
+        conversionData.startDate,
+        conversionData.endDate || undefined
+      );
       toast.success('Lead converted to tenant successfully');
       setIsConvertDialogOpen(false);
       setSelectedLead(null);
+      // Reset dates
+      setConversionData({
+        startDate: new Date().toISOString().split('T')[0],
+        endDate: ''
+      });
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to convert lead');
     }
@@ -196,11 +210,11 @@ export function LeadsPage() {
             <span className="font-medium">Unit:</span> {unitDisplay}
           </p>
           <p className="text-xs text-gray-600">
-            <span className="font-medium">Created:</span> {lead.createdAt}
+            <span className="font-medium">Created:</span> {new Date(lead.createdAt).toLocaleString()}
           </p>
           {lead.lastContactedAt && (
             <p className="text-xs text-gray-600">
-              <span className="font-medium">Last Contact:</span> {lead.lastContactedAt}
+              <span className="font-medium">Last Contact:</span> {new Date(lead.lastContactedAt).toLocaleString()}
             </p>
           )}
         </div>
@@ -322,7 +336,7 @@ export function LeadsPage() {
                 </TableCell>
                 <TableCell>
                   <span className="text-sm text-gray-600">
-                    {lead.lastContactedAt || '-'}
+                    {lead.lastContactedAt ? new Date(lead.lastContactedAt).toLocaleDateString() : '-'}
                   </span>
                 </TableCell>
                 <TableCell className="text-right">
@@ -687,10 +701,33 @@ export function LeadsPage() {
             <p className="text-sm text-gray-600">
               Are you sure you want to convert <strong>{selectedLead?.name}</strong> to a tenant?
             </p>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="conv-start-date">Lease Start Date</Label>
+                <Input
+                  id="conv-start-date"
+                  type="date"
+                  value={conversionData.startDate}
+                  onChange={(e) => setConversionData({ ...conversionData, startDate: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="conv-end-date">Lease End Date</Label>
+                <Input
+                  id="conv-end-date"
+                  type="date"
+                  value={conversionData.endDate}
+                  onChange={(e) => setConversionData({ ...conversionData, endDate: e.target.value })}
+                />
+                <p className="text-[10px] text-gray-500">Leave empty for 1 year default</p>
+              </div>
+            </div>
+
             <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
               <p className="text-sm text-blue-900">
                 <strong>Note:</strong> The lead will be promoted to a Tenant. They can use their existing credentials to log in.
-                After conversion, you can create a lease for them in the Leases section.
+                After conversion, a lease will be created automatically with the dates selected above.
               </p>
             </div>
 

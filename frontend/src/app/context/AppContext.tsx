@@ -226,7 +226,7 @@ interface AppContextType {
   addLead: (lead: Omit<Lead, 'id' | 'createdAt'> & { password?: string }) => Promise<void>;
   updateLead: (id: string, lead: Partial<Lead>) => Promise<void>;
   addLeadFollowUp: (followUp: Omit<LeadFollowUp, 'id'>) => void;
-  convertLeadToTenant: (leadId: string) => Promise<string>;
+  convertLeadToTenant: (leadId: string, startDate?: string, endDate?: string) => Promise<string>;
 
   // Tenant operations
   addTenant: (tenant: Omit<Tenant, 'id' | 'createdAt'>) => void;
@@ -237,7 +237,7 @@ interface AppContextType {
   deleteTreasurer: (id: string) => void;
 
   // Lease operations
-  addLease: (lease: Omit<Lease, 'id' | 'createdAt'>) => void;
+  addLease: (lease: Omit<Lease, 'id' | 'createdAt'>) => Promise<void>;
   endLease: (id: string) => void;
 
   // Invoice operations
@@ -570,15 +570,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
       try {
         // Fetch Treasurers
         try {
-          const trRes = await apiClient.get('/users?role=treasurer');
+          const trRes = await apiClient.get('/users/treasurers');
           if (trRes.data) {
             const mappedTreasurers = trRes.data.map((u: any) => ({
-              id: u.user_id.toString(),
+              id: (u.id || u.user_id).toString(),
               name: u.name,
               email: u.email,
-              phone: '',
+              phone: u.phone || '',
               password: '',
-              createdAt: u.created_at,
+              createdAt: u.createdAt || u.created_at,
               status: u.status
             }));
             setTreasurers(mappedTreasurers);
@@ -1223,54 +1223,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setLeadFollowUps([...leadFollowUps, newFollowUp]);
   };
 
-  const convertLeadToTenant = async (leadId: string): Promise<string> => {
+  const convertLeadToTenant = async (leadId: string, startDate?: string, endDate?: string) => {
     try {
-      const response = await apiClient.post(`/leads/${leadId}/convert`, {});
-      const { tenantId } = response.data;
+      const response = await apiClient.post(`/leads/${leadId}/convert`, { startDate, endDate });
 
-      // Optimistic update or refetch?
-      // Let's optimistic update for now
-      const lead = leads.find(l => l.id === leadId);
-      if (lead) {
-        updateLead(leadId, { status: 'converted' });
+      // Since leads, tenants, units, and leases are all affected, 
+      // and we haven't refactored the fetch functions to be accessible here yet,
+      // a full page reload is the safest way to sync everything.
+      window.location.reload();
 
-        // Fetch the new tenant details
-        try {
-          const userResponse = await apiClient.get(`/users/${tenantId}`);
-          if (userResponse.status === 200) {
-            const newUser = userResponse.data;
-            // Add to tenants list
-            const newTenant: Tenant = {
-              id: newUser.user_id.toString(),
-              name: newUser.name,
-              email: newUser.email,
-              phone: newUser.phone || '',
-              createdAt: newUser.created_at.split('T')[0],
-              // leaseId is undefined initially
-            };
-            setTenants(prev => [...prev, newTenant]);
-          }
-        } catch (fetchError) {
-          console.error("Failed to fetch new tenant details:", fetchError);
-        }
-
-        // Update Unit Status if applicable
-        if (lead.interestedUnit) {
-          const unitId = lead.interestedUnit.toString();
-          setUnits(prev => prev.map(u => u.id === unitId ? { ...u, status: 'occupied' } : u));
-
-          // Also fetch leases to ensure the new lease is loaded
-          try {
-            const lRes = await apiClient.get('/leases');
-            if (lRes.data) {
-              setLeases(lRes.data);
-            }
-          } catch (e) { console.error("Failed to refresh leases", e); }
-        }
-      }
-      return tenantId;
+      return response.data.tenantId;
     } catch (error) {
-      console.error("Failed to convert lead:", error);
+      console.error('Failed to convert lead:', error);
       throw error;
     }
   };
@@ -1305,19 +1269,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   // Lease operations
-  const addLease = (lease: Omit<Lease, 'id' | 'createdAt'>) => {
-    const newLease: Lease = {
-      ...lease,
-      id: `lease-${Date.now()}`,
-      createdAt: new Date().toISOString().split('T')[0],
-    };
-    setLeases([...leases, newLease]);
+  const addLease = async (lease: Omit<Lease, 'id' | 'createdAt'>) => {
+    try {
+      const response = await apiClient.post('/leases', lease);
+      const newLease = response.data; // backend should return { id: ... } or full object? Controller returns { id, message }
 
-    // Update unit status to occupied
-    updateUnit(lease.unitId, { status: 'occupied' });
+      // If controller returns { id, message }, we need to construct the object or fetch it.
+      // Let's assume we construct it for UI responsiveness
+      const constructedLease: Lease = {
+        ...lease,
+        id: newLease.id,
+        createdAt: new Date().toISOString().split('T')[0],
+      };
 
-    // Update tenant with lease ID
-    setTenants(tenants.map(t => t.id === lease.tenantId ? { ...t, leaseId: newLease.id } : t));
+      setLeases([...leases, constructedLease]);
+      updateUnit(lease.unitId, { status: 'occupied' });
+
+      // Also update tenant leasing info if needed, but tenant object here is simple.
+    } catch (error) {
+      console.error("Failed to create lease:", error);
+      throw error;
+    }
   };
 
   const endLease = (id: string) => {

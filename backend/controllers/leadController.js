@@ -13,8 +13,9 @@ class LeadController {
             }
 
             const { id } = req.params;
+            const { startDate, endDate } = req.body;
 
-            const result = await userService.convertLeadToTenant(id);
+            const result = await userService.convertLeadToTenant(id, startDate, endDate);
             res.status(200).json(result);
         } catch (error) {
             res.status(400).json({ error: error.message });

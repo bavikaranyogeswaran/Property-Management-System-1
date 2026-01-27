@@ -24,7 +24,7 @@ export function LeasesPage() {
     monthlyRent: '',
   });
 
-  const handleLeaseSubmit = (e: React.FormEvent) => {
+  const handleLeaseSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const unit = units.find(u => u.id === leaseFormData.unitId);
@@ -33,21 +33,25 @@ export function LeasesPage() {
       return;
     }
 
-    addLease({
-      ...leaseFormData,
-      monthlyRent: parseFloat(leaseFormData.monthlyRent),
-      status: 'active',
-    });
+    try {
+      await addLease({
+        ...leaseFormData,
+        monthlyRent: parseFloat(leaseFormData.monthlyRent),
+        status: 'active',
+      });
 
-    toast.success('Lease created successfully');
-    setIsAddLeaseDialogOpen(false);
-    setLeaseFormData({
-      tenantId: '',
-      unitId: '',
-      startDate: '',
-      endDate: '',
-      monthlyRent: '',
-    });
+      toast.success('Lease created successfully');
+      setIsAddLeaseDialogOpen(false);
+      setLeaseFormData({
+        tenantId: '',
+        unitId: '',
+        startDate: '',
+        endDate: '',
+        monthlyRent: '',
+      });
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to create lease');
+    }
   };
 
   const handleEndLease = (leaseId: string) => {

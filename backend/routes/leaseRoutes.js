@@ -5,6 +5,7 @@ import authenticateToken from '../middleware/authMiddleware.js';
 const router = Router();
 
 router.get('/', authenticateToken, leaseController.getLeases);
+router.post('/', authenticateToken, leaseController.createLease);
 router.get('/:id', authenticateToken, leaseController.getLeaseById);
 
 export default router;

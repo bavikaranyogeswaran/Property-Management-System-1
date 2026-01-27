@@ -159,7 +159,7 @@ class UserService {
     }
 
     // Convert lead to tenant
-    async convertLeadToTenant(leadId) {
+    async convertLeadToTenant(leadId, startDate, endDate) {
         // 1. Get lead details
         const lead = await leadModel.findById(leadId);
         if (!lead) {
@@ -240,14 +240,22 @@ class UserService {
                 const unit = await unitModel.findById(lead.interestedUnit);
                 if (unit) {
                     const today = new Date();
-                    const nextYear = new Date(today);
-                    nextYear.setFullYear(today.getFullYear() + 1);
+                    // Use provided dates or default to 1 year from today
+                    const leaseStart = startDate ? new Date(startDate) : today;
+
+                    let leaseEnd;
+                    if (endDate) {
+                        leaseEnd = new Date(endDate);
+                    } else {
+                        leaseEnd = new Date(leaseStart);
+                        leaseEnd.setFullYear(leaseStart.getFullYear() + 1);
+                    }
 
                     await leaseModel.create({
                         tenantId: userId,
                         unitId: lead.interestedUnit,
-                        startDate: today.toISOString().split('T')[0],
-                        endDate: nextYear.toISOString().split('T')[0],
+                        startDate: leaseStart.toISOString().split('T')[0],
+                        endDate: leaseEnd.toISOString().split('T')[0],
                         monthlyRent: unit.monthlyRent,
                         status: 'active'
                     });
