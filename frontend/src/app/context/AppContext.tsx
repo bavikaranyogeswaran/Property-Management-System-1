@@ -562,62 +562,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [maintenanceCosts, setMaintenanceCosts] = useState<MaintenanceCost[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
-  // Load data from localStorage or use initial data
+  // Load data from Backend
   useEffect(() => {
-    const stored = localStorage.getItem('pms_data');
-    const version = localStorage.getItem('pms_version');
-    const CURRENT_VERSION = '2.1'; // Bump version to force clear localStorage cache
-
-    // If version mismatch, clear old data
-    if (version !== CURRENT_VERSION) {
-      localStorage.removeItem('pms_data');
-      localStorage.setItem('pms_version', CURRENT_VERSION);
-    }
-
-    if (stored && version === CURRENT_VERSION) {
-      const data = JSON.parse(stored);
-      setProperties(data.properties || []);
-      setUnits(data.units || []);
-      setLeads(data.leads || []);
-      setLeadFollowUps(data.leadFollowUps || []);
-      setLeadStageHistory(data.leadStageHistory || []);
-      setTenants(data.tenants || []);
-      setTreasurers(data.treasurers || []);
-      setLeases(data.leases || []);
-      setInvoices(data.invoices || []);
-      setPayments(data.payments || []);
-      setReceipts(data.receipts || []);
-      setMaintenanceRequests(data.maintenanceRequests || []);
-      setMaintenanceCosts(data.maintenanceCosts || []);
-      setNotifications(data.notifications || []);
-
-      // Migration: If leadStageHistory is missing but we have leads, create initial history
-      if (!data.leadStageHistory && data.leads && data.leads.length > 0) {
-        const initialHistory: LeadStageHistory[] = data.leads.map((lead: Lead) => ({
-          id: `history-migration-${lead.id}`,
-          leadId: lead.id,
-          fromStatus: null,
-          toStatus: lead.status,
-          changedAt: lead.createdAt + 'T10:00:00Z',
-        }));
-        setLeadStageHistory(initialHistory);
-      }
-    } else {
-      setProperties([]);
-      setUnits([]);
-      setLeads([]);
-      setLeadFollowUps([]);
-      setLeadStageHistory([]);
-      setTenants([]);
-      setTreasurers([]);
-      setLeases([]);
-      setInvoices([]);
-      setPayments([]);
-      setReceipts([]);
-      setMaintenanceRequests([]);
-      setMaintenanceCosts([]);
-      setNotifications([]);
-    }
 
     // Fetch real treasurers from backend (sync with DB)
     const fetchData = async () => {
@@ -865,27 +811,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   }, []);
 
-  // Save data to localStorage whenever it changes
-  useEffect(() => {
-    const data = {
-      properties,
-      propertyTypes,
-      units,
-      leads,
-      leadFollowUps,
-      leadStageHistory,
-      tenants,
-      treasurers,
-      leases,
-      invoices,
-      payments,
-      receipts,
-      maintenanceRequests,
-      maintenanceCosts,
-      notifications,
-    };
-    localStorage.setItem('pms_data', JSON.stringify(data));
-  }, [properties, propertyTypes, units, leads, leadFollowUps, leadStageHistory, tenants, treasurers, leases, invoices, payments, receipts, maintenanceRequests, maintenanceCosts, notifications]);
+
 
   // Generate lease expiration notifications
   useEffect(() => {

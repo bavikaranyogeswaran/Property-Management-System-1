@@ -2,8 +2,8 @@ import propertyModel from '../models/propertyModel.js';
 
 class PropertyService {
     async createProperty(data) {
-        // data contains: name, propertyTypeId, addressLine1, addressLine2, addressLine3, imageUrl, ownerId
-        if (!data.name || !data.addressLine1 || !data.propertyTypeId) {
+        // data contains: name, propertyTypeId, propertyNo, street, city, district, imageUrl, ownerId
+        if (!data.name || !data.street || !data.city || !data.district || !data.propertyTypeId) {
             throw new Error('Missing required fields');
         }
 

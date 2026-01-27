@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Building2, Plus, Edit, Trash2, Eye, ArrowLeft } from 'lucide-react';
+import { Building2, Plus, Edit, Trash2, Eye, ArrowLeft, Search, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 export function PublicListingPage({ onNavigate }: { onNavigate?: (page: string) => void }) {
@@ -21,8 +21,21 @@ export function PublicListingPage({ onNavigate }: { onNavigate?: (page: string) 
         notes: '',
     });
     const [interestProperty, setInterestProperty] = useState<Property | null>(null);
+    const [searchQuery, setSearchQuery] = useState('');
 
     const navigate = useNavigate();
+
+    // Filter properties based on search query
+    const filteredProperties = properties.filter(property => {
+        const query = searchQuery.toLowerCase().trim();
+        if (!query) return true;
+
+        return (
+            (property.street && property.street.toLowerCase().includes(query)) ||
+            (property.city && property.city.toLowerCase().includes(query)) ||
+            (property.district && property.district.toLowerCase().includes(query))
+        );
+    });
 
     const handleInterestSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -49,7 +62,7 @@ export function PublicListingPage({ onNavigate }: { onNavigate?: (page: string) 
 
     return (
         <div className="space-y-6 container mx-auto px-6 py-8">
-            <div className="flex justify-between items-center mb-8">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
                 <div>
                     {onNavigate && (
                         <Button variant="ghost" className="mb-4 pl-0 hover:pl-2 transition-all" onClick={() => onNavigate('landing')}>
@@ -59,11 +72,30 @@ export function PublicListingPage({ onNavigate }: { onNavigate?: (page: string) 
                     <h1 className="text-3xl font-bold text-gray-900">Browse Properties</h1>
                     <p className="text-gray-500 mt-2 text-lg">Discover your next dream home from our premium listings</p>
                 </div>
+
+                {/* Search Filter */}
+                <div className="w-full md:w-96 relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 size-4" />
+                    <Input
+                        placeholder="Search by street, city, or district..."
+                        className="pl-9 pr-10"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                    />
+                    {searchQuery && (
+                        <button
+                            onClick={() => setSearchQuery('')}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                        >
+                            <X className="size-4" />
+                        </button>
+                    )}
+                </div>
             </div>
 
             {/* Properties Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {properties.map((property) => (
+                {filteredProperties.map((property) => (
                     <Card key={property.id} className="overflow-hidden flex flex-col hover:shadow-lg transition-shadow duration-300">
                         {property.image ? (
                             <div className="h-64 w-full bg-gray-100 relative group cursor-pointer" onClick={() => navigate(`/property/${property.id}`)}>

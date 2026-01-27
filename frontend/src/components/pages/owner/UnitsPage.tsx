@@ -102,8 +102,10 @@ export function UnitsPage() {
       });
       setUploadFiles([]);
       setPrimaryImageIndex(0);
-    } catch (error) {
-      toast.error("Failed to save unit");
+    } catch (error: any) {
+      console.error(error);
+      const msg = error.response?.data?.error || 'Failed to save unit';
+      toast.error(msg);
     }
   };
 

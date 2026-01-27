@@ -22,6 +22,25 @@ apiClient.interceptors.request.use(
     (error) => Promise.reject(error)
 );
 
+// Add response interceptor to handle auth errors
+apiClient.interceptors.response.use(
+    (response) => response,
+    (error) => {
+        if (error.response && (error.response.status === 401 || error.response.status === 403)) {
+            // Clear token if invalid/expired to prevent infinite loops of failed requests
+            console.warn('Authentication failed, clearing token.');
+            // We don't auto-redirect here to avoid circular dependency or jarring UX, 
+            // but clearing the token will force the app to treat user as logged out on next check.
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('user');
+            // Optional: Dispatch a custom event or use window.location if necessary, 
+            // but typically the UI (AuthProvider) reacts to token absence.
+            // window.location.href = '/login'; // aggressive but ensures consistency
+        }
+        return Promise.reject(error);
+    }
+);
+
 // Maintenance API
 export const maintenanceApi = {
     createRequest: (data: any) => apiClient.post('/maintenance-requests', data),

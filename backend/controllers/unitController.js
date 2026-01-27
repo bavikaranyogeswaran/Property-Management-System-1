@@ -7,6 +7,9 @@ class UnitController {
             const newUnit = await unitModel.findById(unit);
             res.status(201).json(newUnit);
         } catch (error) {
+            if (error.code === 'ER_DUP_ENTRY' || error.message.includes('Duplicate entry')) {
+                return res.status(409).json({ error: 'Unit number already exists in this property' });
+            }
             res.status(500).json({ error: error.message });
         }
     }
