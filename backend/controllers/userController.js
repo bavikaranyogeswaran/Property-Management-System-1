@@ -1,4 +1,5 @@
 import userService from '../services/userService.js';
+import { validateEmail } from '../utils/validators.js';
 
 class UserController {
     async createTreasurer(req, res) {
@@ -12,6 +13,12 @@ class UserController {
             const { name, email, phone } = req.body;
             if (!name || !email || !phone) {
                 return res.status(400).json({ error: 'All fields are required' });
+            }
+
+            // Email validation
+            const emailValidation = validateEmail(email);
+            if (!emailValidation.isValid) {
+                return res.status(400).json({ error: emailValidation.error });
             }
 
             // Password is NOT required here as we send an invite link.
@@ -32,6 +39,14 @@ class UserController {
             const { id } = req.params;
             const { name, email, phone, status } = req.body;
 
+            // Email validation if email is being updated
+            if (email) {
+                const emailValidation = validateEmail(email);
+                if (!emailValidation.isValid) {
+                    return res.status(400).json({ error: emailValidation.error });
+                }
+            }
+
             // Explicitly DO NOT extract password from body, preventing update.
 
             const result = await userService.updateTreasurer(id, { name, email, phone, status });
@@ -46,6 +61,14 @@ class UserController {
             // Self-update only
             const id = req.user.id;
             const { name, email, phone } = req.body;
+
+            // Email validation if email is being updated
+            if (email) {
+                const emailValidation = validateEmail(email);
+                if (!emailValidation.isValid) {
+                    return res.status(400).json({ error: emailValidation.error });
+                }
+            }
 
             const result = await userService.updateUserProfile(id, { name, email, phone });
             res.json(result);

@@ -20,6 +20,7 @@ export function LeadsPage() {
   const {
     leads,
     units,
+    properties,
     leadFollowUps,
     leadStageHistory,
     addLead,
@@ -160,9 +161,13 @@ export function LeadsPage() {
 
   const LeadCard = ({ lead }: { lead: Lead }) => {
     const unit = units.find(u => u.id === lead.interestedUnit);
+    const property = properties.find(p => p.id === lead.propertyId);
     const leadFollowUpsCount = leadFollowUps.filter(f => f.leadId === lead.id).length;
     const statusBadge = getStatusBadge(lead.status);
     const history = leadStageHistory.filter(h => h.leadId === lead.id);
+
+    // Determine unit display text
+    const unitDisplay = unit?.unitNumber || (property?.name ? `${property.name} (General)` : 'N/A');
 
     return (
       <div className="p-3 bg-white rounded-lg border shadow-sm hover:shadow-md transition-shadow">
@@ -188,7 +193,7 @@ export function LeadsPage() {
 
         <div className="space-y-1 mb-3">
           <p className="text-xs text-gray-600">
-            <span className="font-medium">Unit:</span> {unit?.unitNumber || 'N/A'}
+            <span className="font-medium">Unit:</span> {unitDisplay}
           </p>
           <p className="text-xs text-gray-600">
             <span className="font-medium">Created:</span> {lead.createdAt}

@@ -2,6 +2,7 @@ import userService from '../services/userService.js';
 import leadModel from '../models/leadModel.js';
 import leadStageHistoryModel from '../models/leadStageHistoryModel.js';
 import db from '../config/db.js';
+import { validatePassword, validateEmail, validatePhoneNumber } from '../utils/validators.js';
 
 class LeadController {
     async convertLead(req, res) {
@@ -85,10 +86,25 @@ class LeadController {
                 return res.status(400).json({ error: 'Name, email, phone, password and property are required' });
             }
 
-            // Basic email validation regex
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            if (!emailRegex.test(email)) {
-                return res.status(400).json({ error: 'Invalid email format' });
+            // Email validation
+            const emailValidation = validateEmail(email);
+            if (!emailValidation.isValid) {
+                return res.status(400).json({ error: emailValidation.error });
+            }
+
+            // Phone number validation
+            const phoneValidation = validatePhoneNumber(phone);
+            if (!phoneValidation.isValid) {
+                return res.status(400).json({ error: phoneValidation.error });
+            }
+
+            // Password strength validation
+            const passwordValidation = validatePassword(password);
+            if (!passwordValidation.isValid) {
+                return res.status(400).json({
+                    error: 'Password does not meet security requirements',
+                    details: passwordValidation.errors
+                });
             }
 
             // STRICT VALIDATION: Check if unit belongs to property

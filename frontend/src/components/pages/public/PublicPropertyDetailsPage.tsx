@@ -9,9 +9,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import {
     Building2, MapPin, ArrowLeft, CheckCircle2, Shield,
-    Car, Wrench, Ruler, Home, Info, Share2, Star, Phone
+    Car, Wrench, Ruler, Home, Info, Share2, Star, Phone, AlertCircle
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { validatePassword, validateEmail, validatePhoneNumber, validateName, getPasswordStrength } from '@/utils/validators';
 
 export function PublicPropertyDetailsPage() {
     const { id } = useParams<{ id: string }>();
@@ -36,6 +37,10 @@ export function PublicPropertyDetailsPage() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isMobileInterestOpen, setIsMobileInterestOpen] = useState(false);
     const [isUnitLocked, setIsUnitLocked] = useState(false); // Validating feature request: lock unit if selected via card
+
+    // Validation state
+    const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({});
+    const [passwordStrength, setPasswordStrength] = useState<'weak' | 'medium' | 'strong' | 'very-strong' | null>(null);
 
     // Unit Gallery State
     const [selectedUnit, setSelectedUnit] = useState<Unit | null>(null);
@@ -71,8 +76,46 @@ export function PublicPropertyDetailsPage() {
         }
     }, [id, properties, units, getPropertyImages]);
 
+    const validateForm = (): boolean => {
+        const errors: { [key: string]: string } = {};
+
+        // Name validation
+        const nameValidation = validateName(interestFormData.name);
+        if (!nameValidation.isValid) {
+            errors.name = nameValidation.error || 'Invalid name';
+        }
+
+        // Email validation
+        const emailValidation = validateEmail(interestFormData.email);
+        if (!emailValidation.isValid) {
+            errors.email = emailValidation.error || 'Invalid email';
+        }
+
+        // Phone validation
+        const phoneValidation = validatePhoneNumber(interestFormData.phone);
+        if (!phoneValidation.isValid) {
+            errors.phone = phoneValidation.error || 'Invalid phone number';
+        }
+
+        // Password validation
+        const passwordValidation = validatePassword(interestFormData.password);
+        if (!passwordValidation.isValid) {
+            errors.password = passwordValidation.errors?.[0] || 'Invalid password';
+        }
+
+        setFormErrors(errors);
+        return Object.keys(errors).length === 0;
+    };
+
     const handleInterestSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        // Pre-submission validation
+        if (!validateForm()) {
+            toast.error('Please fix the form errors before submitting');
+            return;
+        }
+
         setIsSubmitting(true);
         try {
             await addLead({
@@ -81,13 +124,36 @@ export function PublicPropertyDetailsPage() {
             });
             toast.success('Account created and interest registered! We will contact you soon.');
             setInterestFormData({ name: '', email: '', phone: '', interestedUnit: '', notes: '', propertyId: id || '', password: '' });
+            setFormErrors({});
+            setPasswordStrength(null);
             setIsMobileInterestOpen(false);
         } catch (error: any) {
             console.error(error);
+            // Display backend validation errors
             const errorMessage = error.response?.data?.error || 'Failed to submit interest';
-            toast.error(errorMessage);
+            const errorDetails = error.response?.data?.details;
+
+            if (errorDetails && Array.isArray(errorDetails)) {
+                toast.error(errorMessage + ': ' + errorDetails.join(', '));
+            } else {
+                toast.error(errorMessage);
+            }
         } finally {
             setIsSubmitting(false);
+        }
+    };
+
+    const handlePasswordChange = (password: string) => {
+        setInterestFormData({ ...interestFormData, password });
+        if (password.length > 0) {
+            const strength = getPasswordStrength(password);
+            setPasswordStrength(strength.strength);
+        } else {
+            setPasswordStrength(null);
+        }
+        // Clear password error on change
+        if (formErrors.password) {
+            setFormErrors({ ...formErrors, password: '' });
         }
     };
 
@@ -529,9 +595,19 @@ export function PublicPropertyDetailsPage() {
                                 id="lead-name"
                                 placeholder="Your full name"
                                 value={interestFormData.name}
-                                onChange={(e) => setInterestFormData({ ...interestFormData, name: e.target.value })}
+                                onChange={(e) => {
+                                    setInterestFormData({ ...interestFormData, name: e.target.value });
+                                    if (formErrors.name) setFormErrors({ ...formErrors, name: '' });
+                                }}
+                                className={formErrors.name ? 'border-red-500' : ''}
                                 required
                             />
+                            {formErrors.name && (
+                                <p className="text-xs text-red-500 flex items-center gap-1">
+                                    <AlertCircle className="w-3 h-3" />
+                                    {formErrors.name}
+                                </p>
+                            )}
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
@@ -541,9 +617,19 @@ export function PublicPropertyDetailsPage() {
                                     type="email"
                                     placeholder="email@example.com"
                                     value={interestFormData.email}
-                                    onChange={(e) => setInterestFormData({ ...interestFormData, email: e.target.value })}
+                                    onChange={(e) => {
+                                        setInterestFormData({ ...interestFormData, email: e.target.value });
+                                        if (formErrors.email) setFormErrors({ ...formErrors, email: '' });
+                                    }}
+                                    className={formErrors.email ? 'border-red-500' : ''}
                                     required
                                 />
+                                {formErrors.email && (
+                                    <p className="text-xs text-red-500 flex items-center gap-1">
+                                        <AlertCircle className="w-3 h-3" />
+                                        {formErrors.email}
+                                    </p>
+                                )}
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="lead-phone">Phone</Label>
@@ -551,9 +637,19 @@ export function PublicPropertyDetailsPage() {
                                     id="lead-phone"
                                     placeholder="+94 77 123 4567"
                                     value={interestFormData.phone}
-                                    onChange={(e) => setInterestFormData({ ...interestFormData, phone: e.target.value })}
+                                    onChange={(e) => {
+                                        setInterestFormData({ ...interestFormData, phone: e.target.value });
+                                        if (formErrors.phone) setFormErrors({ ...formErrors, phone: '' });
+                                    }}
+                                    className={formErrors.phone ? 'border-red-500' : ''}
                                     required
                                 />
+                                {formErrors.phone && (
+                                    <p className="text-xs text-red-500 flex items-center gap-1">
+                                        <AlertCircle className="w-3 h-3" />
+                                        {formErrors.phone}
+                                    </p>
+                                )}
                             </div>
                         </div>
                         <div className="space-y-2">
@@ -584,10 +680,37 @@ export function PublicPropertyDetailsPage() {
                                 type="password"
                                 placeholder="Min 8 characters"
                                 value={interestFormData.password}
-                                onChange={(e) => setInterestFormData({ ...interestFormData, password: e.target.value })}
+                                onChange={(e) => handlePasswordChange(e.target.value)}
+                                className={formErrors.password ? 'border-red-500' : ''}
                                 required
                                 minLength={8}
                             />
+                            {formErrors.password && (
+                                <p className="text-xs text-red-500 flex items-center gap-1">
+                                    <AlertCircle className="w-3 h-3" />
+                                    {formErrors.password}
+                                </p>
+                            )}
+                            {passwordStrength && !formErrors.password && (
+                                <div className="space-y-1">
+                                    <div className="flex gap-1">
+                                        <div className={`h-1 flex-1 rounded ${passwordStrength === 'weak' ? 'bg-red-500' : 'bg-gray-200'}`} />
+                                        <div className={`h-1 flex-1 rounded ${passwordStrength === 'medium' || passwordStrength === 'strong' || passwordStrength === 'very-strong' ? 'bg-yellow-500' : 'bg-gray-200'}`} />
+                                        <div className={`h-1 flex-1 rounded ${passwordStrength === 'strong' || passwordStrength === 'very-strong' ? 'bg-green-500' : 'bg-gray-200'}`} />
+                                        <div className={`h-1 flex-1 rounded ${passwordStrength === 'very-strong' ? 'bg-green-600' : 'bg-gray-200'}`} />
+                                    </div>
+                                    <p className={`text-xs ${passwordStrength === 'weak' ? 'text-red-500' :
+                                            passwordStrength === 'medium' ? 'text-yellow-600' :
+                                                passwordStrength === 'strong' ? 'text-green-600' :
+                                                    'text-green-700'
+                                        }`}>
+                                        Password strength: {passwordStrength.replace('-', ' ')}
+                                    </p>
+                                    <p className="text-xs text-gray-500">
+                                        Must include: uppercase, lowercase, number, and special character
+                                    </p>
+                                </div>
+                            )}
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="lead-notes">Notes / Questions</Label>
