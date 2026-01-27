@@ -11,8 +11,8 @@ class PropertyService {
         return await propertyModel.findById(id);
     }
 
-    async getProperties() {
-        return await propertyModel.findAll();
+    async getProperties(ownerId = null) {
+        return await propertyModel.findAll(ownerId);
     }
 
     async getPropertyById(id) {

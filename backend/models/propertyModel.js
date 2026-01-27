@@ -13,8 +13,8 @@ class PropertyModel {
         return result.insertId;
     }
 
-    async findAll() {
-        const [rows] = await db.query(`
+    async findAll(ownerId = null) {
+        let query = `
             SELECT 
                 p.property_id, 
                 p.owner_id, 
@@ -31,7 +31,15 @@ class PropertyModel {
             FROM properties p
             JOIN property_types pt ON p.property_type_id = pt.type_id
             WHERE p.status = 'active'
-        `);
+        `;
+
+        const params = [];
+        if (ownerId) {
+            query += ' AND p.owner_id = ?';
+            params.push(ownerId);
+        }
+
+        const [rows] = await db.query(query, params);
 
         return rows.map(row => ({
             ...row,

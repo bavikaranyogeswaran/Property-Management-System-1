@@ -78,7 +78,30 @@ class LeadModel {
         return result.affectedRows > 0;
     }
 
-    async findAll() {
+    async findAll(ownerId = null) {
+        // If ownerId is provided, filter leads by owner through properties
+        if (ownerId) {
+            const [rows] = await db.query(`
+                SELECT 
+                    l.lead_id as id,
+                    l.property_id as propertyId,
+                    l.unit_id as interestedUnit,
+                    l.name,
+                    l.email,
+                    l.phone,
+                    l.notes,
+                    l.status,
+                    l.created_at as createdAt,
+                    l.last_contacted_at as lastContactedAt,
+                    l.tenant_id as tenantId
+                FROM leads l
+                INNER JOIN properties p ON l.property_id = p.property_id
+                WHERE p.owner_id = ?
+                ORDER BY l.created_at DESC`, [ownerId]);
+            return rows;
+        }
+
+        // Otherwise return all leads (for admin or backward compatibility)
         const [rows] = await db.query(`
             SELECT 
                 lead_id as id,

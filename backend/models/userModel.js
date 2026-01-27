@@ -23,6 +23,35 @@ class UserModel {
         return rows;
     }
 
+    async findTenantsByOwner(ownerId) {
+        // Get tenants who have leases OR were converted from leads for this owner's properties
+        const [rows] = await pool.query(`
+            SELECT DISTINCT 
+                u.user_id as id, 
+                u.name, 
+                u.email, 
+                u.phone, 
+                u.role, 
+                u.status, 
+                u.created_at as createdAt
+            FROM users u
+            -- Join path 1: via Leases
+            LEFT JOIN leases l ON u.user_id = l.tenant_id
+            LEFT JOIN units ut ON l.unit_id = ut.unit_id
+            LEFT JOIN properties p_lease ON ut.property_id = p_lease.property_id
+            
+            -- Join path 2: via Leads (converted)
+            LEFT JOIN leads ld ON u.user_id = ld.tenant_id
+            LEFT JOIN properties p_lead ON ld.property_id = p_lead.property_id
+            
+            WHERE u.role = 'tenant' 
+                AND (p_lease.owner_id = ? OR p_lead.owner_id = ?)
+                AND u.email NOT LIKE "deleted_%"
+            ORDER BY u.created_at DESC
+        `, [ownerId, ownerId]);
+        return rows;
+    }
+
     async findById(id) {
         const [rows] = await pool.query('SELECT * FROM users WHERE user_id = ?', [id]);
         return rows[0];

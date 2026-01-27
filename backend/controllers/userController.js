@@ -108,7 +108,8 @@ class UserController {
             if (req.user.role !== 'owner') {
                 return res.status(403).json({ error: 'Access denied.' });
             }
-            const result = await userService.getTenants();
+            // Filter tenants by this owner's properties
+            const result = await userService.getTenants(req.user.id);
             res.json(result);
         } catch (error) {
             res.status(500).json({ error: error.message });

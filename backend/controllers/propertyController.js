@@ -14,7 +14,7 @@ class PropertyController {
 
     async getProperties(req, res) {
         try {
-            const properties = await propertyService.getProperties();
+            const properties = await propertyService.getProperties(req.user.id);
             res.json(properties);
         } catch (error) {
             res.status(500).json({ error: error.message });

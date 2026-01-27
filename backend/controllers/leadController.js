@@ -26,7 +26,8 @@ class LeadController {
             if (req.user.role !== 'owner') {
                 return res.status(403).json({ error: 'Access denied.' });
             }
-            const leads = await leadModel.findAll();
+            // Filter leads by this owner's properties
+            const leads = await leadModel.findAll(req.user.id);
             res.json(leads);
         } catch (error) {
             res.status(500).json({ error: error.message });
@@ -180,7 +181,8 @@ class LeadController {
             if (req.user.role !== 'owner') {
                 return res.status(403).json({ error: 'Access denied.' });
             }
-            const history = await leadStageHistoryModel.findAll();
+            // Filter history by owner's leads
+            const history = await leadStageHistoryModel.findAll(req.user.id);
             res.json(history);
         } catch (error) {
             res.status(500).json({ error: error.message });

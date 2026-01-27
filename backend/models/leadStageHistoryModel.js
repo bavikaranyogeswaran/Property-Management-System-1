@@ -69,8 +69,31 @@ class LeadStageHistoryModel {
 
     /**
      * Get all stage history records
+     * @param {number|null} ownerId - Optional owner ID to filter by
      */
-    async findAll() {
+    async findAll(ownerId = null) {
+        if (ownerId) {
+            // Filter by owner through leads and properties
+            const [rows] = await db.query(
+                `SELECT 
+                    h.history_id as id,
+                    h.lead_id as leadId,
+                    h.from_status as fromStatus,
+                    h.to_status as toStatus,
+                    h.changed_at as changedAt,
+                    h.notes,
+                    h.duration_in_previous_stage as durationInPreviousStage
+                 FROM lead_stage_history h
+                 INNER JOIN leads l ON h.lead_id = l.lead_id
+                 INNER JOIN properties p ON l.property_id = p.property_id
+                 WHERE p.owner_id = ?
+                 ORDER BY h.changed_at DESC`,
+                [ownerId]
+            );
+            return rows;
+        }
+
+        // Return all history (for admin or backward compatibility)
         const [rows] = await db.query(
             `SELECT 
                 history_id as id,
