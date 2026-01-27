@@ -253,15 +253,17 @@ export function LeadsPage() {
               Convert
             </Button>
           )}
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 inline-flex items-center justify-center flex-shrink-0"
-            onClick={() => handleStatusChange(lead.id, 'dropped')}
-            title="Drop Lead"
-          >
-            <XCircle className="size-3.5" />
-          </Button>
+          {lead.status !== 'converted' && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 inline-flex items-center justify-center flex-shrink-0"
+              onClick={() => handleStatusChange(lead.id, 'dropped')}
+              title="Drop Lead"
+            >
+              <XCircle className="size-3.5" />
+            </Button>
+          )}
 
         </div>
       </div>

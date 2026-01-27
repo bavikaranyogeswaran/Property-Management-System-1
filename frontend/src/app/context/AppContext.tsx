@@ -755,8 +755,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
             setLeads(mappedLeads);
           }
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Failed to fetch leads:', error);
+        toast.error(`Failed to fetch leads: ${error.message}`);
       }
     };
     fetchLeads();

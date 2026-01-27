@@ -1,4 +1,5 @@
 import db from '../config/db.js';
+import leadStageHistoryModel from './leadStageHistoryModel.js';
 
 class LeadModel {
     async create(data) {
@@ -15,7 +16,13 @@ class LeadModel {
              VALUES (?, ?, ?, ?, ?, ?, ?)`,
             [propertyId, finalUnitId, name, phone, email, notes, status]
         );
-        return result.insertId;
+
+        const leadId = result.insertId;
+
+        // Create initial stage history record
+        await leadStageHistoryModel.create(leadId, null, status, 'Lead created');
+
+        return leadId;
     }
 
     async findById(id) {
@@ -36,6 +43,10 @@ class LeadModel {
     }
 
     async update(id, data) {
+        // Get current lead status before updating (for history tracking)
+        const currentLead = await this.findById(id);
+        if (!currentLead) return false;
+
         // Dynamic update query
         const fields = [];
         const values = [];
@@ -53,6 +64,17 @@ class LeadModel {
             `UPDATE leads SET ${fields.join(', ')} WHERE lead_id = ?`,
             values
         );
+
+        // Track status change in history if status was updated
+        if (data.status && data.status !== currentLead.status) {
+            await leadStageHistoryModel.create(
+                id,
+                currentLead.status,
+                data.status,
+                data.notes || 'Status updated'
+            );
+        }
+
         return result.affectedRows > 0;
     }
 
