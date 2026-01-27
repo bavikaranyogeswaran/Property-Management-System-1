@@ -14,7 +14,22 @@ class PropertyController {
 
     async getProperties(req, res) {
         try {
-            const properties = await propertyService.getProperties(req.user.id);
+            // Check if user is authenticated (req.user exists)
+            // If authenticated, we *could* filter by owner, but the current requirement seems to be
+            // "Show all properties" on the main page, or maybe "Show Owner's properties" in dashboard.
+            // The route is currently PUBLIC in `propertyRoutes.js`.
+            // Let's pass `null` or handle it based on role if needed.
+            // For now, to match the previous logic but safely:
+
+            const userId = req.user ? req.user.id : null;
+
+            // If the intention of this specific controller method is "Get All Properties contextually",
+            // we should probably just fetch all active ones for public view,
+            // OR fetch specific ones if filtering is requested.
+            // The previous code was `propertyService.getProperties(req.user.id)`.
+            // If we want to support public view, we pass null.
+
+            const properties = await propertyService.getProperties(userId);
             res.json(properties);
         } catch (error) {
             res.status(500).json({ error: error.message });

@@ -29,7 +29,7 @@ class PropertyModel {
                 pt.name as type_name,
                 pt.type_id as type_id
             FROM properties p
-            JOIN property_types pt ON p.property_type_id = pt.type_id
+            LEFT JOIN property_types pt ON p.property_type_id = pt.type_id
             WHERE p.status = 'active'
         `;
 

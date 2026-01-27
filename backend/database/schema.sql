@@ -170,8 +170,6 @@ CREATE TABLE leases (
 CREATE TABLE rent_invoices (
     invoice_id INT AUTO_INCREMENT PRIMARY KEY,
     lease_id INT NOT NULL,
-    tenant_id INT NOT NULL,
-    unit_id INT NOT NULL,
     year SMALLINT NOT NULL,
     month TINYINT NOT NULL,
     amount DECIMAL(10,2) NOT NULL,
@@ -179,9 +177,7 @@ CREATE TABLE rent_invoices (
     status ENUM('pending','paid','overdue') DEFAULT 'pending',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     UNIQUE (lease_id, year, month),
-    FOREIGN KEY (lease_id) REFERENCES leases(lease_id),
-    FOREIGN KEY (tenant_id) REFERENCES users(user_id),
-    FOREIGN KEY (unit_id) REFERENCES units(unit_id)
+    FOREIGN KEY (lease_id) REFERENCES leases(lease_id)
 );
 
 -- =========================
@@ -190,7 +186,6 @@ CREATE TABLE rent_invoices (
 CREATE TABLE payments (
     payment_id INT AUTO_INCREMENT PRIMARY KEY,
     invoice_id INT NOT NULL,
-    tenant_id INT NOT NULL,
     amount DECIMAL(10,2) NOT NULL,
     payment_date DATE NOT NULL,
     payment_method VARCHAR(30),
@@ -200,7 +195,6 @@ CREATE TABLE payments (
     verified_by INT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (invoice_id) REFERENCES rent_invoices(invoice_id),
-    FOREIGN KEY (tenant_id) REFERENCES users(user_id),
     FOREIGN KEY (verified_by) REFERENCES users(user_id)
 );
 
@@ -210,14 +204,10 @@ CREATE TABLE payments (
 CREATE TABLE receipts (
     receipt_id INT AUTO_INCREMENT PRIMARY KEY,
     payment_id INT UNIQUE NOT NULL,
-    invoice_id INT NOT NULL,
-    tenant_id INT NOT NULL,
     amount DECIMAL(10,2) NOT NULL,
     receipt_date DATE NOT NULL,
     receipt_number VARCHAR(50) UNIQUE NOT NULL,
-    FOREIGN KEY (payment_id) REFERENCES payments(payment_id),
-    FOREIGN KEY (invoice_id) REFERENCES rent_invoices(invoice_id),
-    FOREIGN KEY (tenant_id) REFERENCES users(user_id)
+    FOREIGN KEY (payment_id) REFERENCES payments(payment_id)
 );
 
 -- =========================
