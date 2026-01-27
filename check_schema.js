@@ -1,5 +1,5 @@
 
-import pool from './config/db.js';
+import pool from './backend/config/db.js';
 
 async function checkSchema() {
     try {
