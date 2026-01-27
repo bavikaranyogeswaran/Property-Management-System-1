@@ -38,7 +38,7 @@ class EmailService {
 
         try {
             const mailOptions = {
-                from: process.env.SMTP_USER,
+                from: `"Property Management System" <${process.env.SMTP_USER}>`,
                 to: email,
                 subject: 'Property Management System - Account Created',
                 html: `
@@ -78,7 +78,7 @@ class EmailService {
         }
         try {
             await this.transporter.sendMail({
-                from: process.env.SMTP_USER,
+                from: `"Property Management System" <${process.env.SMTP_USER}>`,
                 to: email,
                 subject: 'Welcome to Property Management System',
                 html: `<h1>Welcome ${name}!</h1><p>Thanks for your interest. We will contact you soon.</p>`
@@ -95,7 +95,7 @@ class EmailService {
         }
         try {
             await this.transporter.sendMail({
-                from: process.env.SMTP_USER,
+                from: `"Property Management System" <${process.env.SMTP_USER}>`,
                 to: email,
                 subject: 'Application Approved - Welcome Tenant',
                 html: `<h1>Congratulations ${name}!</h1><p>Your application has been approved. You are now a tenant.</p>`
@@ -118,7 +118,7 @@ class EmailService {
             const resetLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${resetToken}`;
 
             await this.transporter.sendMail({
-                from: process.env.SMTP_USER,
+                from: `"Property Management System" <${process.env.SMTP_USER}>`,
                 to: email,
                 subject: 'Password Reset Request',
                 html: `
@@ -152,7 +152,7 @@ class EmailService {
 
         try {
             await this.transporter.sendMail({
-                from: process.env.SMTP_USER,
+                from: `"Property Management System" <${process.env.SMTP_USER}>`,
                 to: email,
                 subject: 'Verify Your Email Address',
                 html: `
@@ -180,7 +180,7 @@ class EmailService {
 
         try {
             await this.transporter.sendMail({
-                from: process.env.SMTP_USER,
+                from: `"Property Management System" <${process.env.SMTP_USER}>`,
                 to: email,
                 subject: subject,
                 html: `
