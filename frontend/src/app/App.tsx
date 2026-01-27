@@ -72,6 +72,7 @@ import { MaintenanceExpensesPage } from '@/components/pages/treasurer/Maintenanc
 // Shared Pages
 import { AnalyticsPage } from '@/components/reports/AnalyticsPage';
 import { SettingsPage } from '@/components/pages/common/SettingsPage';
+import { ReceiptsPage } from '@/components/pages/common/ReceiptsPage';
 import { PublicListingPage } from '@/components/pages/public/PublicListingPage';
 import { PublicPropertyDetailsPage } from '@/components/pages/public/PublicPropertyDetailsPage';
 
@@ -149,6 +150,7 @@ function AppContent() {
           <Route path="/maintenance" element={<ProtectedRoute><OwnerMaintenancePage /></ProtectedRoute>} />
           <Route path="/reports" element={<ProtectedRoute><OwnerReportsPage /></ProtectedRoute>} />
           <Route path="/analytics" element={<ProtectedRoute><AnalyticsPage /></ProtectedRoute>} />
+          <Route path="/receipts" element={<ProtectedRoute><ReceiptsPage /></ProtectedRoute>} />
         </>
       )}
 
@@ -158,6 +160,7 @@ function AppContent() {
           <Route path="/invoices" element={<ProtectedRoute><TenantInvoicesPage /></ProtectedRoute>} />
           <Route path="/maintenance" element={<ProtectedRoute><TenantMaintenancePage /></ProtectedRoute>} />
           <Route path="/payments" element={<ProtectedRoute><TenantPaymentsPage /></ProtectedRoute>} />
+          <Route path="/receipts" element={<ProtectedRoute><ReceiptsPage /></ProtectedRoute>} />
         </>
       )}
 
@@ -167,6 +170,7 @@ function AppContent() {
           <Route path="/payments" element={<ProtectedRoute><PaymentVerificationPage /></ProtectedRoute>} />
           <Route path="/expenses" element={<ProtectedRoute><MaintenanceExpensesPage /></ProtectedRoute>} />
           <Route path="/analytics" element={<ProtectedRoute><AnalyticsPage /></ProtectedRoute>} />
+          <Route path="/receipts" element={<ProtectedRoute><ReceiptsPage /></ProtectedRoute>} />
         </>
       )}
 

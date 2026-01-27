@@ -15,7 +15,8 @@ import {
   X,
   Shield,
   Settings,
-  DollarSign
+  DollarSign,
+  Receipt
 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 
@@ -42,6 +43,7 @@ export function AppLayout({ children }: AppLayoutProps) {
     { path: '/treasurers', label: 'Treasurers', icon: Shield },
     { path: '/leases', label: 'Leases', icon: FileText },
     { path: '/invoices', label: 'Invoices', icon: CreditCard },
+    { path: '/receipts', label: 'Receipts', icon: Receipt },
     { path: '/reports', label: 'Reports', icon: BarChart3 },
     { path: '/maintenance', label: 'Maintenance', icon: Wrench },
     { path: '/analytics', label: 'Analytics', icon: BarChart3 },
@@ -50,6 +52,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   const treasurerMenu = [
     { path: '/dashboard', label: 'Dashboard', icon: Home },
     { path: '/payments', label: 'Payment Verification', icon: CreditCard },
+    { path: '/receipts', label: 'Receipts', icon: Receipt },
     { path: '/expenses', label: 'Expenses', icon: DollarSign },
     { path: '/analytics', label: 'Financial Reports', icon: BarChart3 },
   ];
@@ -58,6 +61,7 @@ export function AppLayout({ children }: AppLayoutProps) {
     { path: '/dashboard', label: 'Dashboard', icon: Home },
     { path: '/invoices', label: 'My Invoices', icon: FileText },
     { path: '/payments', label: 'My Payments', icon: CreditCard },
+    { path: '/receipts', label: 'My Receipts', icon: Receipt },
     { path: '/maintenance', label: 'Maintenance Requests', icon: Wrench },
   ];
 
