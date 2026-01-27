@@ -1,5 +1,6 @@
 import userService from '../services/userService.js';
 import leadModel from '../models/leadModel.js';
+import leadStageHistoryModel from '../models/leadStageHistoryModel.js';
 import db from '../config/db.js';
 
 class LeadController {
@@ -155,6 +156,18 @@ class LeadController {
             res.json({ message: 'Lead updated successfully' });
         } catch (error) {
             res.status(400).json({ error: error.message });
+        }
+    }
+
+    async getLeadStageHistory(req, res) {
+        try {
+            if (req.user.role !== 'owner') {
+                return res.status(403).json({ error: 'Access denied.' });
+            }
+            const history = await leadStageHistoryModel.findAll();
+            res.json(history);
+        } catch (error) {
+            res.status(500).json({ error: error.message });
         }
     }
 }

@@ -813,6 +813,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
     fetchUnitTypes();
 
+    // Fetch Lead Stage History
+    const fetchLeadStageHistory = async () => {
+      try {
+        const token = localStorage.getItem('authToken');
+        if (token) {
+          const response = await apiClient.get('/leads/stage-history');
+          if (response.status === 200) {
+            setLeadStageHistory(response.data);
+          }
+        }
+      } catch (error: any) {
+        console.error('Failed to fetch lead stage history:', error);
+      }
+    };
+    fetchLeadStageHistory();
+
   }, []);
 
 

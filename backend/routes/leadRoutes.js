@@ -13,6 +13,7 @@ router.post('/', leadController.createLead);
 router.use(authenticateToken);
 
 router.get('/', leadController.getLeads);
+router.get('/stage-history', leadController.getLeadStageHistory);
 router.get('/my-profile', leadController.getMyLead);
 router.put('/:id', leadController.updateLead);
 router.post('/:id/convert', leadController.convertLead);
