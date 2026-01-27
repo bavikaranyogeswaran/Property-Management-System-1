@@ -621,7 +621,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
             // Actually we want DB truth.
             setUnits(mappedUnits);
           }
-        } catch (e) { console.error("Failed to fetch units", e); }
+        } catch (e: any) {
+          console.error("Failed to fetch units", e);
+          toast.error(`Failed to fetch units: ${e.message}`);
+        }
 
         // Fetch Leases
         try {
