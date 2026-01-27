@@ -566,7 +566,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const stored = localStorage.getItem('pms_data');
     const version = localStorage.getItem('pms_version');
-    const CURRENT_VERSION = '2.0'; // Updated version for FR-16 implementation
+    const CURRENT_VERSION = '2.1'; // Bump version to force clear localStorage cache
 
     // If version mismatch, clear old data
     if (version !== CURRENT_VERSION) {
@@ -603,20 +603,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setLeadStageHistory(initialHistory);
       }
     } else {
-      setProperties(INITIAL_DATA.properties);
-      setUnits(INITIAL_DATA.units);
-      setLeads(INITIAL_DATA.leads);
-      setLeadFollowUps(INITIAL_DATA.leadFollowUps);
-      setLeadStageHistory(INITIAL_DATA.leadStageHistory);
-      setTenants(INITIAL_DATA.tenants);
-      setTreasurers(INITIAL_DATA.treasurers);
-      setLeases(INITIAL_DATA.leases);
-      setInvoices(INITIAL_DATA.invoices);
-      setPayments(INITIAL_DATA.payments);
-      setReceipts(INITIAL_DATA.receipts);
-      setMaintenanceRequests(INITIAL_DATA.maintenanceRequests);
-      setMaintenanceCosts(INITIAL_DATA.maintenanceCosts);
-      setNotifications(INITIAL_DATA.notifications);
+      setProperties([]);
+      setUnits([]);
+      setLeads([]);
+      setLeadFollowUps([]);
+      setLeadStageHistory([]);
+      setTenants([]);
+      setTreasurers([]);
+      setLeases([]);
+      setInvoices([]);
+      setPayments([]);
+      setReceipts([]);
+      setMaintenanceRequests([]);
+      setMaintenanceCosts([]);
+      setNotifications([]);
     }
 
     // Fetch real treasurers from backend (sync with DB)
