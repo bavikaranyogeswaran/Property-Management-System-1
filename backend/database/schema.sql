@@ -8,23 +8,64 @@ USE pms_database2;
 -- =========================
 -- USERS (AUTH + RBAC)
 -- =========================
+-- =========================
+-- USERS (AUTH + RBAC)
+-- =========================
 CREATE TABLE users (
     user_id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     email VARCHAR(100) UNIQUE NOT NULL,
-    phone VARCHAR(20),                   -- [ADDED] Phone number (Common to all roles)
+    phone VARCHAR(20),
     password_hash VARCHAR(255) NOT NULL,
     role ENUM('owner','tenant','treasurer','lead') NOT NULL,
-    status ENUM('active','inactive') DEFAULT 'active',
+    is_email_verified BOOLEAN DEFAULT FALSE,
+    email_verified_at DATETIME,
+    status ENUM('active','inactive','banned') DEFAULT 'active',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- Tenant Profile (Optional extensions - currently unused as phone is moved to users)
--- CREATE TABLE tenant_profile (
---     tenant_id INT PRIMARY KEY,
---     ... specific fields like credit_score, employer_info ...
---     CONSTRAINT fk_tenant_profile_user FOREIGN KEY (tenant_id) REFERENCES users(user_id)
--- );
+-- =========================
+-- ROLE PROFILES (SRI LANKAN CONTEXT)
+-- =========================
+
+-- TENANTS
+CREATE TABLE tenants (
+    user_id INT PRIMARY KEY,
+    nic VARCHAR(20) UNIQUE,              -- NIC (Old or New format)
+    permanent_address VARCHAR(255),      -- Legal address per NIC
+    emergency_contact_name VARCHAR(100),
+    emergency_contact_phone VARCHAR(20),
+    employer_name VARCHAR(100),
+    employment_status ENUM('employed', 'self-employed', 'student', 'unemployed'),
+    monthly_income DECIMAL(15,2),        -- LKR
+    date_of_birth DATE,
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+);
+
+-- OWNERS
+CREATE TABLE owners (
+    user_id INT PRIMARY KEY,
+    nic VARCHAR(20),
+    tin VARCHAR(50),                     -- Taxpayer Identification Number
+    bank_name VARCHAR(100),
+    branch_name VARCHAR(100),
+    account_holder_name VARCHAR(100),
+    account_number VARCHAR(50),
+    residence_address VARCHAR(255),      -- Mailing address
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+);
+
+-- STAFF (TREASURERS)
+CREATE TABLE staff (
+    user_id INT PRIMARY KEY,
+    nic VARCHAR(20),
+    employee_id VARCHAR(50) UNIQUE,
+    department VARCHAR(50),
+    job_title VARCHAR(50),
+    shift_start TIME,
+    shift_end TIME,
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+);
 
 -- =========================
 -- PROPERTIES & UNITS

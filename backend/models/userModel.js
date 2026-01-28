@@ -33,8 +33,10 @@ class UserModel {
                 u.phone, 
                 u.role, 
                 u.status, 
-                u.created_at as createdAt
+                u.created_at as createdAt,
+                t.nic, t.permanent_address, t.employer_name
             FROM users u
+            JOIN tenants t ON u.user_id = t.user_id
             -- Join path 1: via Leases
             LEFT JOIN leases l ON u.user_id = l.tenant_id
             LEFT JOIN units ut ON l.unit_id = ut.unit_id
@@ -53,15 +55,32 @@ class UserModel {
     }
 
     async findById(id) {
-        const [rows] = await pool.query('SELECT * FROM users WHERE user_id = ?', [id]);
+        // We first fetch the user to know the role, or we just LEFT JOIN everything.
+        // Joining everything is safer to fetch all data in one go.
+        const query = `
+            SELECT u.*, 
+                   t.nic as tenant_nic, t.permanent_address, t.employer_name, t.monthly_income,
+                   o.nic as owner_nic, o.tin, o.bank_name, o.account_number,
+                   s.employee_id, s.department, s.job_title
+            FROM users u
+            LEFT JOIN tenants t ON u.user_id = t.user_id
+            LEFT JOIN owners o ON u.user_id = o.user_id
+            LEFT JOIN staff s ON u.user_id = s.user_id
+            WHERE u.user_id = ?
+        `;
+        const [rows] = await pool.query(query, [id]);
         return rows[0];
     }
 
-    async create(userData) {
-        const { name, email, phone, passwordHash, role, status = 'active' } = userData;
-        const [result] = await pool.query(
-            'INSERT INTO users (name, email, phone, password_hash, role, status) VALUES (?, ?, ?, ?, ?, ?)',
-            [name, email, phone, passwordHash, role, status]
+    async create(userData, connection) {
+        const { name, email, phone, passwordHash, role, is_email_verified = false, status = 'active' } = userData;
+
+        // Use provided connection or default pool (for non-transactional calls)
+        const db = connection || pool;
+
+        const [result] = await db.query(
+            'INSERT INTO users (name, email, phone, password_hash, role, is_email_verified, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [name, email, phone, passwordHash, role, is_email_verified, status]
         );
         return result.insertId;
     }

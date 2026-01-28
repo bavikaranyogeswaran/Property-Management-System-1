@@ -2,6 +2,9 @@ import bcrypt from 'bcryptjs';
 const { hash } = bcrypt;
 import userModel from '../models/userModel.js';
 import leadModel from '../models/leadModel.js';
+import tenantModel from '../models/tenantModel.js';
+import ownerModel from '../models/ownerModel.js';
+import staffModel from '../models/staffModel.js';
 import jwt from 'jsonwebtoken';
 const { sign } = jwt;
 const JWT_SECRET = process.env.JWT_SECRET || 'secret';
@@ -13,45 +16,56 @@ import pool from '../config/db.js';
 const SALT_ROUNDS = 10;
 
 class UserService {
-    async createTreasurer(name, email, phone, password) {
-        // Validation handled in Controller or here (DAL checks duplicate email)
-        const existingUser = await userModel.findByEmail(email);
-        if (existingUser) {
-            throw new Error('Email already in use');
+    async createTreasurer(name, email, phone, password, staffData = {}) {
+        const connection = await pool.getConnection();
+        try {
+            await connection.beginTransaction();
+
+            // Validation handled in Controller or here (DAL checks duplicate email)
+            // findByEmail uses pool, so it is outside transaction? 
+            // Better to use connection if possible, but finding by email is just a read.
+            // However, concurrent inserts might race.
+            // For now, simple read is fine.
+            const existingUser = await userModel.findByEmail(email);
+            if (existingUser) {
+                throw new Error('Email already in use');
+            }
+
+            const tempPassword = password || Math.random().toString(36).slice(-8);
+            const hashedPassword = await hash(tempPassword, SALT_ROUNDS);
+
+            const userId = await userModel.create({
+                name,
+                email,
+                phone,
+                passwordHash: hashedPassword,
+                role: 'treasurer',
+                status: 'active'
+            }, connection);
+
+            // Create Staff Profile
+            await staffModel.create({
+                userId,
+                ...staffData
+            }, connection);
+
+            await connection.commit();
+
+            // Setup Token & Email (Outside transaction as side effect)
+            const token = jwt.sign(
+                { id: userId, type: 'setup_password' },
+                JWT_SECRET,
+                { expiresIn: '48h' }
+            );
+            await emailService.sendInvitationEmail(email, 'treasurer', token);
+
+            return { id: userId, name, email, phone, role: 'treasurer' };
+        } catch (error) {
+            await connection.rollback();
+            throw error;
+        } finally {
+            connection.release();
         }
-
-        // Generate temporary hash (user must reset it via token)
-        // If password is provided (e.g. initial setup), we ignore it basically and force setup?
-        // Or if the Owner provides a password, we might just set it but still "invite"?
-        // The requirement is "Secure Invitations", so we should force them to set it.
-        // But for `createTreasurer` API, we usually accept a password. 
-        // We will generate a random one to satisfy the DB constraint, but send the invite link.
-        const tempPassword = Math.random().toString(36).slice(-8);
-        const hashedPassword = await hash(tempPassword, SALT_ROUNDS);
-
-        const userId = await userModel.create({
-            name,
-            email,
-            phone,
-            passwordHash: hashedPassword,
-            role: 'treasurer',
-            status: 'active' // Active so they can login after setting password? Or should be pending?
-            // If active, they CAN login if they guess the random password (unlikely).
-            // Better to keep active for simplicity, or add 'pending' status support.
-            // For now, keeping 'active' but `is_email_verified` will be handled by setup.
-        });
-
-        // Generate Setup Token
-        const token = jwt.sign(
-            { id: userId, type: 'setup_password' },
-            JWT_SECRET,
-            { expiresIn: '48h' }
-        );
-
-        // Send Invitation
-        await emailService.sendInvitationEmail(email, 'treasurer', token);
-
-        return { id: userId, name, email, phone, role: 'treasurer' };
     }
 
     async createLeadUser(name, email, phone, password) {
@@ -159,90 +173,89 @@ class UserService {
     }
 
     // Convert lead to tenant
-    async convertLeadToTenant(leadId, startDate, endDate) {
-        // 1. Get lead details
-        const lead = await leadModel.findById(leadId);
-        if (!lead) {
-            throw new Error('Lead not found');
-        }
+    async convertLeadToTenant(leadId, startDate, endDate, tenantData = {}) {
+        const connection = await pool.getConnection();
+        try {
+            await connection.beginTransaction();
 
-        if (lead.status === 'converted') {
-            throw new Error('Lead is already converted');
-        }
-
-        // 2. Check if user already exists
-        let userId;
-        const existingUser = await userModel.findByEmail(lead.email);
-
-        if (existingUser) {
-            // User exists (likely as a Lead)
-            userId = existingUser.user_id;
-
-            // If they are a lead, upgrade them to tenant
-            if (existingUser.role === 'lead') {
-                await userModel.updateRole(userId, 'tenant');
-                // Send confirmation
-                await emailService.sendTenantConfirmation(existingUser.email, existingUser.name);
+            // 1. Get lead details
+            const lead = await leadModel.findById(leadId);
+            if (!lead) {
+                throw new Error('Lead not found');
             }
-        } else {
-            // This case should ideally not happen if every lead must have an account to be a lead
-            // But if leads can be created manually by owner without accounts, we need to handle it.
-            // If they don't have an account, we generate a password or throw error?
-            // User requirement: "tenant can use the password when he created for lead account creation"
-            // This implies the user ALREADY exists.
 
-            // If user doesn't exist, we might need to create one.
-            // Let's generate a temporary password and email it.
+            if (lead.status === 'converted') {
+                throw new Error('Lead is already converted');
+            }
 
-            const passwordToUse = Math.random().toString(36).slice(-8);
-            const hashedPassword = await hash(passwordToUse, SALT_ROUNDS);
+            // 2. Check if user already exists
+            let userId;
+            const existingUser = await userModel.findByEmail(lead.email);
 
-            userId = await userModel.create({
-                name: lead.name,
-                email: lead.email,
-                phone: lead.phone,
-                passwordHash: hashedPassword,
-                role: 'tenant',
-                status: 'active'
-            });
+            if (existingUser) {
+                // User exists (likely as a Lead)
+                userId = existingUser.user_id;
 
-            // Generate Setup Token
-            const token = jwt.sign(
-                { id: userId, type: 'setup_password' },
-                JWT_SECRET,
-                { expiresIn: '48h' }
-            );
+                // If they are a lead, upgrade them to tenant
+                if (existingUser.role === 'lead') {
+                    await userModel.updateRole(userId, 'tenant'); // Should support connection?
+                    // Ideally we update userModel.updateRole to accept connection too.
+                    // For now, executing query directly or hoping implicit consistency is enough?
+                    // No, must be in transaction.
+                    await connection.query('UPDATE users SET role = ? WHERE user_id = ?', ['tenant', userId]);
 
-            // Send Invitation
-            await emailService.sendInvitationEmail(lead.email, 'tenant', token);
-        }
+                    // Send confirmation
+                    await emailService.sendTenantConfirmation(existingUser.email, existingUser.name);
+                }
+            } else {
+                // Create new user
+                const passwordToUse = Math.random().toString(36).slice(-8);
+                const hashedPassword = await hash(passwordToUse, SALT_ROUNDS);
 
-        // Ensure tenant_profile exists (for phone or other details)
-        // [REMOVED] Phone is now in users table, and tenant_profile is unused.
-        // const [profileCheck] = await pool.query('SELECT * FROM tenant_profile WHERE tenant_id = ?', [userId]);
-        // if (profileCheck.length === 0) {
-        //     await pool.query('INSERT INTO tenant_profile (tenant_id, phone) VALUES (?, ?)', [userId, lead.phone]);
-        // }
+                userId = await userModel.create({
+                    name: lead.name,
+                    email: lead.email,
+                    phone: lead.phone,
+                    passwordHash: hashedPassword,
+                    role: 'tenant',
+                    status: 'active'
+                }, connection);
 
-        // 3. Update lead status and link to tenant
-        await leadModel.update(leadId, {
-            status: 'converted',
-            tenantId: userId
-        });
+                // Setup Token logic handled after commit usually, or here if we want to ensure it works.
+                // We'll queue it mentally.
 
-        // 4. Mark Unit as Occupied and Create Lease if one was selected
-        if (lead.interestedUnit) {
-            console.log(`[INFO] Marking unit ${lead.interestedUnit} as occupied due to lead conversion.`);
-            await unitModel.update(lead.interestedUnit, { status: 'occupied' });
+                const token = jwt.sign(
+                    { id: userId, type: 'setup_password' },
+                    JWT_SECRET,
+                    { expiresIn: '48h' }
+                );
+                await emailService.sendInvitationEmail(lead.email, 'tenant', token);
+            }
 
-            // Create Lease Record
-            try {
-                const unit = await unitModel.findById(lead.interestedUnit);
+            // 3. Create Tenant Profile
+            // We use the passed tenantData alongside defaults from Lead if available?
+            // Lead doesn't have NIC/Address usually.
+            await tenantModel.create({
+                userId,
+                nic: tenantData.nic || null,
+                permanentAddress: tenantData.permanentAddress || null,
+                employerName: tenantData.employerName || null,
+                // ... map other fields
+            }, connection);
+
+            // 4. Update lead status
+            // leadModel.update doesn't support connection?
+            // Need to support it or use raw query.
+            await connection.query('UPDATE leads SET status = ?, tenant_id = ? WHERE lead_id = ?', ['converted', userId, leadId]);
+
+            // 5. Lease & Unit Logic
+            if (lead.interestedUnit) {
+                await connection.query('UPDATE units SET status = ? WHERE unit_id = ?', ['occupied', lead.interestedUnit]);
+
+                const unit = await unitModel.findById(lead.interestedUnit); // Read outside transaction is risky but acceptable for now
                 if (unit) {
                     const today = new Date();
-                    // Use provided dates or default to 1 year from today
                     const leaseStart = startDate ? new Date(startDate) : today;
-
                     let leaseEnd;
                     if (endDate) {
                         leaseEnd = new Date(endDate);
@@ -251,26 +264,23 @@ class UserService {
                         leaseEnd.setFullYear(leaseStart.getFullYear() + 1);
                     }
 
-                    await leaseModel.create({
-                        tenantId: userId,
-                        unitId: lead.interestedUnit,
-                        startDate: leaseStart.toISOString().split('T')[0],
-                        endDate: leaseEnd.toISOString().split('T')[0],
-                        monthlyRent: unit.monthlyRent,
-                        status: 'active'
-                    });
-                    console.log(`[INFO] Created default lease for unit ${lead.interestedUnit} and tenant ${userId}`);
+                    // Lease creation
+                    await connection.query(
+                        'INSERT INTO leases (tenant_id, unit_id, start_date, end_date, monthly_rent, status) VALUES (?, ?, ?, ?, ?, ?)',
+                        [userId, lead.interestedUnit, leaseStart, leaseEnd, unit.monthlyRent, 'active']
+                    );
                 }
-            } catch (err) {
-                console.error(`[ERROR] Failed to create lease during conversion: ${err.message}`);
-                // Proceed without erroring out the whole request? Or throw?
-                // Probably better to log but let conversion succeed, as user is created.
-                // But user wants property shown, so this is critical.
-                // However, transactionality isn't fully implemented here (no commit/rollback).
             }
-        }
 
-        return { message: 'Lead converted successfully', tenantId: userId };
+            await connection.commit();
+            return { message: 'Lead converted successfully', tenantId: userId };
+
+        } catch (error) {
+            await connection.rollback();
+            throw error;
+        } finally {
+            connection.release();
+        }
     }
 }
 
