@@ -10,7 +10,7 @@ class UserController {
                 return res.status(403).json({ error: 'Access denied. Only Owners can create Treasurers.' });
             }
 
-            const { name, email, phone, nic, employeeId, department, jobTitle, shiftStart, shiftEnd } = req.body;
+            const { name, email, phone, nic, employeeId, jobTitle, shiftStart, shiftEnd } = req.body;
             if (!name || !email || !phone) {
                 return res.status(400).json({ error: 'All fields are required' });
             }
@@ -21,7 +21,7 @@ class UserController {
                 return res.status(400).json({ error: emailValidation.error });
             }
 
-            const staffData = { nic, employeeId, department, jobTitle, shiftStart, shiftEnd };
+            const staffData = { nic, employeeId, jobTitle, shiftStart, shiftEnd };
 
             // Password is NOT required here as we send an invite link.
             // We pass 'null' or empty string to service, which generates a random temp password.
@@ -110,8 +110,10 @@ class UserController {
             if (req.user.role !== 'owner') {
                 return res.status(403).json({ error: 'Access denied.' });
             }
+            console.log(`[DEBUG] getTenants called by UserID: ${req.user.id}`);
             // Filter tenants by this owner's properties
             const result = await userService.getTenants(req.user.id);
+            console.log(`[DEBUG] getTenants found ${result.length} tenants.`);
             res.json(result);
         } catch (error) {
             res.status(500).json({ error: error.message });

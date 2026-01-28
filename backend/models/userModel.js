@@ -61,7 +61,7 @@ class UserModel {
             SELECT u.*, 
                    t.nic as tenant_nic, t.permanent_address, t.employer_name, t.monthly_income,
                    o.nic as owner_nic, o.tin, o.bank_name, o.account_number,
-                   s.employee_id, s.department, s.job_title
+                   s.employee_id, s.job_title
             FROM users u
             LEFT JOIN tenants t ON u.user_id = t.user_id
             LEFT JOIN owners o ON u.user_id = o.user_id

@@ -1,9 +1,9 @@
 -- =========================
 -- PMS DATABASE (FINAL - ADJUSTED)
 -- =========================
-DROP DATABASE IF EXISTS pms_database2;
-CREATE DATABASE pms_database2;
-USE pms_database2;
+DROP DATABASE IF EXISTS pms_database;
+CREATE DATABASE pms_database;
+USE pms_database;
 
 -- =========================
 -- USERS (AUTH + RBAC)
@@ -60,7 +60,7 @@ CREATE TABLE staff (
     user_id INT PRIMARY KEY,
     nic VARCHAR(20),
     employee_id VARCHAR(50) UNIQUE,
-    department VARCHAR(50),
+
     job_title VARCHAR(50),
     shift_start TIME,
     shift_end TIME,
@@ -152,7 +152,7 @@ CREATE TABLE leads (
     lead_id INT AUTO_INCREMENT PRIMARY KEY,
     property_id INT NOT NULL,                -- [ADDED] Link to property
     unit_id INT NULL,
-    tenant_id INT,  -- set ONLY when converted
+    user_id INT,    -- Link to User account (Lead or Tenant role)
     name VARCHAR(100) NOT NULL,
     phone VARCHAR(20),
     email VARCHAR(100),
@@ -163,7 +163,7 @@ CREATE TABLE leads (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (property_id) REFERENCES properties(property_id),
     FOREIGN KEY (unit_id) REFERENCES units(unit_id),
-    FOREIGN KEY (tenant_id) REFERENCES users(user_id)
+    FOREIGN KEY (user_id) REFERENCES users(user_id)
 );
 
 CREATE TABLE lead_followups (

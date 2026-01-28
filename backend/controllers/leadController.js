@@ -29,8 +29,10 @@ class LeadController {
             if (req.user.role !== 'owner') {
                 return res.status(403).json({ error: 'Access denied.' });
             }
+            console.log(`[DEBUG] getLeads called by UserID: ${req.user.id}, Role: ${req.user.role}`);
             // Filter leads by this owner's properties
             const leads = await leadModel.findAll(req.user.id);
+            console.log(`[DEBUG] getLeads found ${leads.length} leads.`);
             res.json(leads);
         } catch (error) {
             res.status(500).json({ error: error.message });
@@ -102,14 +104,7 @@ class LeadController {
                 return res.status(400).json({ error: phoneValidation.error });
             }
 
-            // Password strength validation
-            const passwordValidation = validatePassword(password);
-            if (!passwordValidation.isValid) {
-                return res.status(400).json({
-                    error: 'Password does not meet security requirements',
-                    details: passwordValidation.errors
-                });
-            }
+
 
             // STRICT VALIDATION: Check if unit belongs to property
             let finalUnitId = unitId || interestedUnit;
@@ -156,7 +151,7 @@ class LeadController {
             // `userService` checks email.
             // Let's rely on email matching for conversion logic as implemented in `convertLeadToTenant`.
 
-            const leadId = await leadModel.create({ ...req.body, status: 'interested' });
+            const leadId = await leadModel.create({ ...req.body, userId: userId, status: 'interested' });
             res.status(201).json({ id: leadId, message: 'Account created. Please check your email to verify your account.' });
         } catch (error) {
             res.status(400).json({ error: error.message });

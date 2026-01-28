@@ -68,6 +68,8 @@ class UserService {
         }
     }
 
+
+
     async createLeadUser(name, email, phone, password) {
         // Validation handled in Controller or here (DAL checks duplicate email)
         const existingUser = await userModel.findByEmail(email);
@@ -246,7 +248,8 @@ class UserService {
             // 4. Update lead status
             // leadModel.update doesn't support connection?
             // Need to support it or use raw query.
-            await connection.query('UPDATE leads SET status = ?, tenant_id = ? WHERE lead_id = ?', ['converted', userId, leadId]);
+            // user_id is likely already set if they were created as a lead, but we ensure it's linked to the converted user.
+            await connection.query('UPDATE leads SET status = ?, user_id = ? WHERE lead_id = ?', ['converted', userId, leadId]);
 
             // 5. Lease & Unit Logic
             if (lead.interestedUnit) {

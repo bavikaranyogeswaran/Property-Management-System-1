@@ -3,7 +3,7 @@ import leadStageHistoryModel from './leadStageHistoryModel.js';
 
 class LeadModel {
     async create(data) {
-        const { propertyId, unitId, interestedUnit, name, phone, email, notes, status = 'interested' } = data;
+        const { propertyId, unitId, interestedUnit, userId, name, phone, email, notes, status = 'interested' } = data;
 
         // Handle alias and empty string
         let finalUnitId = unitId || interestedUnit;
@@ -12,9 +12,9 @@ class LeadModel {
         }
 
         const [result] = await db.query(
-            `INSERT INTO leads (property_id, unit_id, name, phone, email, notes, status) 
-             VALUES (?, ?, ?, ?, ?, ?, ?)`,
-            [propertyId, finalUnitId, name, phone, email, notes, status]
+            `INSERT INTO leads (property_id, unit_id, user_id, name, phone, email, notes, status) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [propertyId, finalUnitId, userId, name, phone, email, notes, status]
         );
 
         const leadId = result.insertId;
@@ -37,7 +37,8 @@ class LeadModel {
                 status,
                 created_at as createdAt,
                 last_contacted_at as lastContactedAt,
-                tenant_id as tenantId
+                last_contacted_at as lastContactedAt,
+                user_id as userId
             FROM leads WHERE lead_id = ?`, [id]);
         return rows[0];
     }
@@ -52,7 +53,8 @@ class LeadModel {
         const values = [];
 
         if (data.status) { fields.push('status = ?'); values.push(data.status); }
-        if (data.tenantId) { fields.push('tenant_id = ?'); values.push(data.tenantId); }
+        if (data.userId) { fields.push('user_id = ?'); values.push(data.userId); }
+        if (data.tenantId) { fields.push('user_id = ?'); values.push(data.tenantId); } // Backward compat alias
         if (data.notes) { fields.push('notes = ?'); values.push(data.notes); }
         if (data.lastContactedAt) { fields.push('last_contacted_at = ?'); values.push(data.lastContactedAt); }
 
@@ -93,7 +95,8 @@ class LeadModel {
                     l.status,
                     l.created_at as createdAt,
                     l.last_contacted_at as lastContactedAt,
-                    l.tenant_id as tenantId
+                    l.last_contacted_at as lastContactedAt,
+                    l.user_id as userId
                 FROM leads l
                 INNER JOIN properties p ON l.property_id = p.property_id
                 WHERE p.owner_id = ?
@@ -114,7 +117,8 @@ class LeadModel {
                 status,
                 created_at as createdAt,
                 last_contacted_at as lastContactedAt,
-                tenant_id as tenantId
+                last_contacted_at as lastContactedAt,
+                user_id as userId
             FROM leads ORDER BY created_at DESC`);
         return rows;
     }
