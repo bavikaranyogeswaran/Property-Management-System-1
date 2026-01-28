@@ -2,18 +2,44 @@ import pool from '../config/db.js';
 
 class MaintenanceRequestModel {
     async findAll() {
-        const [rows] = await pool.query('SELECT * FROM maintenance_requests ORDER BY created_at DESC');
+        const [rows] = await pool.query(`
+            SELECT mr.*, 
+            COALESCE(
+                (SELECT JSON_ARRAYAGG(JSON_OBJECT('id', mi.image_id, 'url', mi.image_url)) 
+                 FROM maintenance_images mi 
+                 WHERE mi.request_id = mr.request_id),
+                JSON_ARRAY()
+            ) as images
+            FROM maintenance_requests mr 
+            ORDER BY mr.created_at DESC
+        `);
         return rows;
     }
 
     async findById(id) {
-        const [rows] = await pool.query('SELECT * FROM maintenance_requests WHERE request_id = ?', [id]);
+        const [rows] = await pool.query(`
+            SELECT mr.*, 
+            COALESCE(
+                (SELECT JSON_ARRAYAGG(JSON_OBJECT('id', mi.image_id, 'url', mi.image_url)) 
+                 FROM maintenance_images mi 
+                 WHERE mi.request_id = mr.request_id),
+                JSON_ARRAY()
+            ) as images
+            FROM maintenance_requests mr 
+            WHERE mr.request_id = ?
+        `, [id]);
         return rows[0];
     }
 
     async findByPropertyId(propertyId) {
         const [rows] = await pool.query(`
-            SELECT mr.* 
+            SELECT mr.*,
+            COALESCE(
+                (SELECT JSON_ARRAYAGG(JSON_OBJECT('id', mi.image_id, 'url', mi.image_url)) 
+                 FROM maintenance_images mi 
+                 WHERE mi.request_id = mr.request_id),
+                JSON_ARRAY()
+            ) as images
             FROM maintenance_requests mr
             JOIN units u ON mr.unit_id = u.unit_id
             WHERE u.property_id = ?
@@ -23,17 +49,50 @@ class MaintenanceRequestModel {
     }
 
     async findByTenantId(tenantId) {
-        const [rows] = await pool.query('SELECT * FROM maintenance_requests WHERE tenant_id = ? ORDER BY created_at DESC', [tenantId]);
+        const [rows] = await pool.query(`
+            SELECT mr.*,
+            COALESCE(
+                (SELECT JSON_ARRAYAGG(JSON_OBJECT('id', mi.image_id, 'url', mi.image_url)) 
+                 FROM maintenance_images mi 
+                 WHERE mi.request_id = mr.request_id),
+                JSON_ARRAY()
+            ) as images
+            FROM maintenance_requests mr 
+            WHERE mr.tenant_id = ? 
+            ORDER BY mr.created_at DESC
+        `, [tenantId]);
         return rows;
     }
 
     async create(data) {
-        const { unitId, LtenantId, title, description, priority, images } = data;
-        const [result] = await pool.query(
-            'INSERT INTO maintenance_requests (unit_id, tenant_id, title, description, priority, images, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
-            [unitId, LtenantId, title, description, priority || 'medium', JSON.stringify(images || []), 'submitted']
-        );
-        return result.insertId;
+        const { unitId, tenantId, title, description, priority, images } = data;
+
+        const connection = await pool.getConnection();
+        try {
+            await connection.beginTransaction();
+
+            const [result] = await connection.query(
+                'INSERT INTO maintenance_requests (unit_id, tenant_id, title, description, priority, status) VALUES (?, ?, ?, ?, ?, ?)',
+                [unitId, tenantId, title, description, priority || 'medium', 'submitted']
+            );
+            const requestId = result.insertId;
+
+            if (images && images.length > 0) {
+                const imageValues = images.map(url => [requestId, url]);
+                await connection.query(
+                    'INSERT INTO maintenance_images (request_id, image_url) VALUES ?',
+                    [imageValues]
+                );
+            }
+
+            await connection.commit();
+            return requestId;
+        } catch (error) {
+            await connection.rollback();
+            throw error;
+        } finally {
+            connection.release();
+        }
     }
 
     async updateStatus(id, status) {

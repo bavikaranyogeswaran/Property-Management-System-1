@@ -218,11 +218,11 @@ class UserService {
         }
 
         // Ensure tenant_profile exists (for phone or other details)
-        // We do this for both existing (upgraded) and new users to ensure consistency
-        const [profileCheck] = await pool.query('SELECT * FROM tenant_profile WHERE tenant_id = ?', [userId]);
-        if (profileCheck.length === 0) {
-            await pool.query('INSERT INTO tenant_profile (tenant_id, phone) VALUES (?, ?)', [userId, lead.phone]);
-        }
+        // [REMOVED] Phone is now in users table, and tenant_profile is unused.
+        // const [profileCheck] = await pool.query('SELECT * FROM tenant_profile WHERE tenant_id = ?', [userId]);
+        // if (profileCheck.length === 0) {
+        //     await pool.query('INSERT INTO tenant_profile (tenant_id, phone) VALUES (?, ?)', [userId, lead.phone]);
+        // }
 
         // 3. Update lead status and link to tenant
         await leadModel.update(leadId, {

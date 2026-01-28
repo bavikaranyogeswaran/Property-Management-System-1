@@ -12,21 +12,19 @@ CREATE TABLE users (
     user_id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     email VARCHAR(100) UNIQUE NOT NULL,
+    phone VARCHAR(20),                   -- [ADDED] Phone number (Common to all roles)
     password_hash VARCHAR(255) NOT NULL,
     role ENUM('owner','tenant','treasurer','lead') NOT NULL,
     status ENUM('active','inactive') DEFAULT 'active',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- Tenant Profile (Optional extensions)
-CREATE TABLE tenant_profile (
-    tenant_id INT PRIMARY KEY,               -- same as users.user_id
-    phone VARCHAR(20),
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_tenant_profile_user
-        FOREIGN KEY (tenant_id) REFERENCES users(user_id)
-        ON DELETE CASCADE
-);
+-- Tenant Profile (Optional extensions - currently unused as phone is moved to users)
+-- CREATE TABLE tenant_profile (
+--     tenant_id INT PRIMARY KEY,
+--     ... specific fields like credit_score, employer_info ...
+--     CONSTRAINT fk_tenant_profile_user FOREIGN KEY (tenant_id) REFERENCES users(user_id)
+-- );
 
 -- =========================
 -- PROPERTIES & UNITS
@@ -220,11 +218,19 @@ CREATE TABLE maintenance_requests (
     title VARCHAR(150) NOT NULL,
     description TEXT NOT NULL,
     priority ENUM('low','medium','high','urgent') DEFAULT 'medium',
-    images JSON,
+    -- images JSON removed for normalization
     status ENUM('submitted','in_progress','completed') DEFAULT 'submitted',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (unit_id) REFERENCES units(unit_id),
     FOREIGN KEY (tenant_id) REFERENCES users(user_id)
+);
+
+CREATE TABLE maintenance_images (
+    image_id INT AUTO_INCREMENT PRIMARY KEY,
+    request_id INT NOT NULL,
+    image_url VARCHAR(500) NOT NULL,
+    uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (request_id) REFERENCES maintenance_requests(request_id) ON DELETE CASCADE
 );
 
 CREATE TABLE maintenance_costs (
