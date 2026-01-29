@@ -1,5 +1,6 @@
 import invoiceModel from '../models/invoiceModel.js';
 import behaviorLogModel from '../models/behaviorLogModel.js';
+import paymentModel from '../models/paymentModel.js';
 import pool from '../config/db.js';
 
 class InvoiceController {
@@ -53,6 +54,33 @@ class InvoiceController {
             if (!invoice) return res.status(404).json({ error: 'Invoice not found' });
 
             const oldStatus = invoice.status;
+
+            // SAFEGUARDS FOR OVERDUE STATUS
+            if (status === 'overdue') {
+                // Safeguard 1: Due Date Check
+                const dueDate = new Date(invoice.due_date);
+                const today = new Date();
+                // Set hours to 0 to compare dates only, avoiding time issues
+                today.setHours(0, 0, 0, 0);
+                dueDate.setHours(0, 0, 0, 0);
+
+                if (today <= dueDate) {
+                    return res.status(400).json({
+                        error: 'Cannot mark invoice as overdue before the due date.'
+                    });
+                }
+
+                // Safeguard 2: Pending Payment Check
+                const payments = await paymentModel.findByInvoiceId(id);
+                const pendingPayments = payments.filter(p => p.status === 'pending');
+
+                if (pendingPayments.length > 0) {
+                    return res.status(400).json({
+                        error: 'Cannot mark as overdue. A payment is pending verification.'
+                    });
+                }
+            }
+
             const updatedInvoice = await invoiceModel.updateStatus(id, status);
 
             // AUTOMATIC SCORING HOOK

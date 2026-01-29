@@ -27,6 +27,11 @@ class PaymentModel {
         return rows;
     }
 
+    async findByInvoiceId(invoiceId) {
+        const [rows] = await pool.query('SELECT * FROM payments WHERE invoice_id = ?', [invoiceId]);
+        return rows;
+    }
+
     async findByTenantId(tenantId) {
         const [rows] = await pool.query('SELECT * FROM payments WHERE tenant_id = ? ORDER BY payment_date DESC', [tenantId]);
         return rows;
