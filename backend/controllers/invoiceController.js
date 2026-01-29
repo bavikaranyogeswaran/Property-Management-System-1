@@ -1,4 +1,6 @@
 import invoiceModel from '../models/invoiceModel.js';
+import behaviorLogModel from '../models/behaviorLogModel.js';
+import pool from '../config/db.js';
 
 class InvoiceController {
     async getInvoices(req, res) {
@@ -33,6 +35,59 @@ class InvoiceController {
         } catch (error) {
             console.error(error);
             res.status(500).json({ error: 'Error creating invoice' });
+        }
+    }
+
+    async updateStatus(req, res) {
+        try {
+            const { id } = req.params;
+            const { status } = req.body;
+
+            // Only Owner/Treasurer can update status manually (e.g. to 'overdue' or 'cancelled')
+            // 'paid' is usually handled by payment verification, but allowing manual override.
+            if (req.user.role !== 'owner' && req.user.role !== 'treasurer') {
+                return res.status(403).json({ error: 'Access denied' });
+            }
+
+            const invoice = await invoiceModel.findById(id);
+            if (!invoice) return res.status(404).json({ error: 'Invoice not found' });
+
+            const oldStatus = invoice.status;
+            const updatedInvoice = await invoiceModel.updateStatus(id, status);
+
+            // AUTOMATIC SCORING HOOK
+            if (status === 'overdue' && oldStatus !== 'overdue') {
+                try {
+                    console.log(`Invoice ${id} marked overdue. Deducting points for tenant ${invoice.tenant_id}`);
+                    const scoreChange = -10;
+
+                    // 1. Create Log
+                    await behaviorLogModel.create({
+                        tenantId: invoice.tenant_id,
+                        type: 'negative',
+                        category: 'Payment',
+                        scoreChange: scoreChange,
+                        description: `Invoice #${id} marked as overdue.`,
+                        recordedBy: req.user.id
+                    });
+
+                    // 2. Update Tenant Score
+                    await pool.query(
+                        'UPDATE tenants SET behavior_score = behavior_score + ? WHERE user_id = ?',
+                        [scoreChange, invoice.tenant_id]
+                    );
+
+                    console.log(`Updated behavior_score for tenant ${invoice.tenant_id} by ${scoreChange}`);
+                } catch (err) {
+                    console.error('Failed to update behavior score:', err);
+                    // Don't fail the request, just log error
+                }
+            }
+
+            res.json({ message: `Invoice status updated to ${status}`, invoice: updatedInvoice });
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ error: 'Failed to update invoice status' });
         }
     }
 }

@@ -6,5 +6,6 @@ const router = Router();
 
 router.get('/', authenticateToken, invoiceController.getInvoices);
 router.post('/', authenticateToken, invoiceController.createInvoice); // Manual trigger
+router.patch('/:id/status', authenticateToken, invoiceController.updateStatus);
 
 export default router;

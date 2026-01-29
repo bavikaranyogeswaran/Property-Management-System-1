@@ -39,6 +39,7 @@ CREATE TABLE tenants (
     employment_status ENUM('employed', 'self-employed', 'student', 'unemployed'),
     monthly_income DECIMAL(15,2),        -- LKR
     date_of_birth DATE,
+    behavior_score INT DEFAULT 100,      -- [ADDED] Tenant scoring
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 );
 
@@ -60,7 +61,6 @@ CREATE TABLE staff (
     user_id INT PRIMARY KEY,
     nic VARCHAR(20),
     employee_id VARCHAR(50) UNIQUE,
-
     job_title VARCHAR(50),
     shift_start TIME,
     shift_end TIME,

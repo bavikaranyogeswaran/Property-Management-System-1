@@ -42,6 +42,7 @@ export interface Tenant {
     email: string;
     phone: string;
     moveInDate?: string;
+    behaviorScore?: number;
     createdAt?: string;
 }
 
@@ -112,4 +113,15 @@ export interface Treasurer {
     email: string;
     assignedBy: string;
     createdAt?: string;
+}
+
+export interface BehaviorLog {
+    log_id: number;
+    tenant_id: number;
+    type: 'positive' | 'negative' | 'neutral';
+    category: string;
+    score_change: number;
+    description: string;
+    recorded_by: number;
+    created_at: string;
 }

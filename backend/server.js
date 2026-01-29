@@ -31,6 +31,7 @@ import maintenanceRequestRoutes from './routes/maintenanceRequestRoutes.js';
 import maintenanceCostRoutes from './routes/maintenanceCostRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
 import invoiceRoutes from './routes/invoiceRoutes.js';
+import behaviorRoutes from './routes/behaviorRoutes.js';
 
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
@@ -44,6 +45,7 @@ app.use('/api/maintenance-requests', maintenanceRequestRoutes);
 app.use('/api/maintenance-costs', maintenanceCostRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/invoices', invoiceRoutes);
+app.use('/api/behavior', behaviorRoutes);
 app.use('/api', imageRoutes);
 
 app.get('/api/health', (req, res) => {

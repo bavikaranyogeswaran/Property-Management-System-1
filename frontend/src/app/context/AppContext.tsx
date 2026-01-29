@@ -86,6 +86,7 @@ export interface Tenant {
   leaseId?: string;
   createdAt: string;
   status?: string;
+  behaviorScore?: number;
 }
 
 export interface Treasurer {

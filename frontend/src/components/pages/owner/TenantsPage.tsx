@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Users, Mail, Phone, Home, Calendar, UserX, UserCheck } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { TenantDetailsDialog } from '@/components/tenants/TenantDetailsDialog';
 
 export function TenantsPage() {
   const { tenants, leases, units, properties } = useApp();
@@ -234,119 +234,17 @@ export function TenantsPage() {
       </Card>
 
       {/* Tenant Details Dialog */}
-      <Dialog open={!!selectedTenant} onOpenChange={(open) => !open && setSelectedTenant(null)}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Tenant Profile</DialogTitle>
-          </DialogHeader>
-          {selectedTenant && (() => {
-            const lease = getTenantLease(selectedTenant.id);
-            const unit = getTenantUnit(selectedTenant.id);
-            const property = getTenantProperty(selectedTenant.id);
-            const allTenantLeases = leases.filter(l => l.tenantId === selectedTenant.id);
+    </Card>
 
-            return (
-              <div className="space-y-6 mt-4">
-                {/* Tenant Info */}
-                <div className="flex items-start gap-4">
-                  <div className="size-16 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-semibold text-2xl">
-                    {selectedTenant.name.charAt(0).toUpperCase()}
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-xl font-semibold">{selectedTenant.name}</h3>
-                    <div className="space-y-1 mt-2">
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
-                        <Mail className="size-4" />
-                        {selectedTenant.email}
-                      </div>
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
-                        <Phone className="size-4" />
-                        {selectedTenant.phone}
-                      </div>
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
-                        <Calendar className="size-4" />
-                        Member since {new Date(selectedTenant.createdAt).toLocaleDateString()}
-                      </div>
-                    </div>
-                  </div>
-                  {lease ? (
-                    <Badge variant="secondary" className="bg-green-100 text-green-700">
-                      Active Tenant
-                    </Badge>
-                  ) : (
-                    <Badge variant="outline" className="text-gray-500">
-                      Inactive
-                    </Badge>
-                  )}
-                </div>
-
-                {/* Current Residence */}
-                <div className="border rounded-lg p-4 bg-gray-50">
-                  <h4 className="font-semibold mb-3">Current Residence</h4>
-                  {lease && unit && property ? (
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <p className="text-sm text-gray-600">Property</p>
-                        <p className="font-medium">{property.name}</p>
-                        <p className="text-sm text-gray-500">
-                          {property.propertyNo} {property.street}, {property.city} {property.district}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-600">Unit</p>
-                        <p className="font-medium">Unit {unit.unitNumber}</p>
-                        <p className="text-sm text-gray-500">{unit.type}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-600">Lease Period</p>
-                        <p className="font-medium">{lease.startDate} - {lease.endDate}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-600">Monthly Rent</p>
-                        <p className="font-medium">LKR {lease.monthlyRent}</p>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-gray-500">No active lease</p>
-                  )}
-                </div>
-
-                {/* Lease History */}
-                <div className="border rounded-lg p-4">
-                  <h4 className="font-semibold mb-3">Lease History</h4>
-                  {allTenantLeases.length > 0 ? (
-                    <div className="space-y-2">
-                      {allTenantLeases.map((lease) => {
-                        const leaseUnit = units.find(u => u.id === lease.unitId);
-                        const leaseProperty = leaseUnit ? properties.find(p => p.id === leaseUnit.propertyId) : null;
-                        return (
-                          <div key={lease.id} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                            <div className="text-sm">
-                              <span className="font-medium">{leaseProperty?.name}</span>
-                              {' - '}
-                              <span className="text-gray-600">Unit {leaseUnit?.unitNumber}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs text-gray-500">
-                                {lease.startDate} - {lease.endDate}
-                              </span>
-                              <Badge variant={lease.status === 'active' ? 'secondary' : 'outline'} className="text-xs">
-                                {lease.status}
-                              </Badge>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <p className="text-gray-500 text-sm">No lease history</p>
-                  )}
-                </div>
-              </div>
-            );
-          })()}
-        </DialogContent>
-      </Dialog>
-    </div>
+      {/* Tenant Details Dialog */ }
+  <TenantDetailsDialog
+    tenant={selectedTenant}
+    isOpen={!!selectedTenant}
+    onClose={() => setSelectedTenant(null)}
+    leases={leases}
+    units={units}
+    properties={properties}
+  />
+    </div >
   );
 }
