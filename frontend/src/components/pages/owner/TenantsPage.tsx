@@ -234,17 +234,17 @@ export function TenantsPage() {
       </Card>
 
       {/* Tenant Details Dialog */}
-    </Card>
 
-      {/* Tenant Details Dialog */ }
-  <TenantDetailsDialog
-    tenant={selectedTenant}
-    isOpen={!!selectedTenant}
-    onClose={() => setSelectedTenant(null)}
-    leases={leases}
-    units={units}
-    properties={properties}
-  />
+
+      {/* Tenant Details Dialog */}
+      <TenantDetailsDialog
+        tenant={selectedTenant}
+        isOpen={!!selectedTenant}
+        onClose={() => setSelectedTenant(null)}
+        leases={leases}
+        units={units}
+        properties={properties}
+      />
     </div >
   );
 }

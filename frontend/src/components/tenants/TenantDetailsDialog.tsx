@@ -3,12 +3,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Mail, Phone, Calendar, Plus } from 'lucide-react';
-import { Lease, Unit, Property, BehaviorLog } from '@/types/models';
-import { Tenant } from '@/app/context/AppContext';
+import { BehaviorLog } from '@/types/models';
+import { Tenant, Lease, Unit, Property } from '@/app/context/AppContext';
 import { TenantScoreCard } from './TenantScoreCard';
 import { BehaviorLogList } from './BehaviorLogList';
 import { AddBehaviorModal, BehaviorLogFormData } from './AddBehaviorModal';
-import { useApp } from '@/app/context/AppContext'; // Assuming context is available
+import { useApp } from '@/app/context/AppContext';
 
 interface TenantDetailsDialogProps {
     tenant: Tenant | null;
