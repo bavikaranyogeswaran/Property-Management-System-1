@@ -87,9 +87,11 @@ class LeadController {
         try {
             // Public endpoint - no role check needed
 
-            const { name, email, phone, propertyId, interestedUnit, unitId, password } = req.body;
-            if (!name || !email || !phone || !propertyId || !password) {
-                return res.status(400).json({ error: 'Name, email, phone, password and property are required' });
+            const { name, email, phone, propertyId, interestedUnit, unitId, notes } = req.body;
+            // Password is NO LONGER required for "I'm Interested"
+
+            if (!name || !email || !propertyId) {
+                return res.status(400).json({ error: 'Name, email, and property are required' });
             }
 
             // Email validation
@@ -98,17 +100,16 @@ class LeadController {
                 return res.status(400).json({ error: emailValidation.error });
             }
 
-            // Phone number validation
-            const phoneValidation = validatePhoneNumber(phone);
-            if (!phoneValidation.isValid) {
-                return res.status(400).json({ error: phoneValidation.error });
+            // Phone number validation (optional but good)
+            if (phone) {
+                const phoneValidation = validatePhoneNumber(phone);
+                if (!phoneValidation.isValid) {
+                    return res.status(400).json({ error: phoneValidation.error });
+                }
             }
-
-
 
             // STRICT VALIDATION: Check if unit belongs to property
             let finalUnitId = unitId || interestedUnit;
-            console.log("Creating lead for property:", propertyId, "Unit:", finalUnitId);
 
             if (finalUnitId && finalUnitId !== '' && finalUnitId !== 'null') {
                 const [unitCheck] = await db.query(
@@ -117,44 +118,60 @@ class LeadController {
                 );
 
                 if (unitCheck.length === 0) {
-                    console.error("Unit not found:", finalUnitId);
+                    // Invalid unit is not fatal, just ignore it? Or error?
+                    // Let's error to be safe.
                     return res.status(400).json({ error: 'Invalid unit selected' });
                 }
 
                 if (String(unitCheck[0].property_id) !== String(propertyId)) {
-                    console.error("Unit property mismatch:", unitCheck[0].property_id, "vs", propertyId);
                     return res.status(400).json({ error: 'Selected unit does not belong to the specified property' });
                 }
+            } else {
+                finalUnitId = null;
             }
 
-            // Create User Account (Lead Role)
-            // This will throw if email exists
-            const userId = await userService.createLeadUser(name, email, phone, password);
+            // CHECK ARBITRATION: 
+            // Instead of creating a USER account, we check if a LEAD exists.
 
-            // Create Context Lead
-            // We link the lead to the user_id immediately? The schema has `tenant_id` which references users.
-            // But conceptually "Lead" is the pre-tenant stage.
-            // `tenant_id` column in `leads` usually means "converted to this tenant".
-            // However, since we now have a user account from the start, we could store it?
-            // Re-reading schema: `tenant_id INT, -- set ONLY when converted`
-            // If we want to link the Lead record to the User account RIGHT NOW, we might need a column `user_id` or just reuse `tenant_id`?
-            // "tenant_id" name implies successfully converted.
-            // But if the requirement is "create account -> appear in leads page", the link is useful.
-            // For now, I will NOT set tenant_id yet, as the schema says "set ONLY when converted".
-            // Wait, if they have an account, how do they log in and see their status?
-            // The requirement says "create account... details in leads page... move to negotiation... converted... mail sent".
-            // I will create the user, but maybe not link it in `leads` table until conversion?
-            // OR I should use `tenant_id` to store the user_id even if not full tenant yet, but the column comment says otherwise.
-            // I'll stick to creating the user. I won't link it in `leads` yet to avoid confusion with conversion logic, 
-            // OR I should check if I need to link it to show "this lead has an account".
-            // Actually, if I don't link it, how do we know which user corresponds to this lead? Email matching?
-            // `userService` checks email.
-            // Let's rely on email matching for conversion logic as implemented in `convertLeadToTenant`.
+            // 1. Check if ANY lead exists with this email (across any property? or just this one?)
+            // Usually, a "Lead" is per-property interest in some systems, or a "Person" in others.
+            // In this DB schema, `leads` table has `property_id`. So one person can be a lead for multiple properties.
+            // However, we don't want to create duplicates if they inquire about the SAME property twice.
 
-            const leadId = await leadModel.create({ ...req.body, userId: userId, status: 'interested' });
-            res.status(201).json({ id: leadId, message: 'Account created. Please check your email to verify your account.' });
+            const [existingLeads] = await db.query(
+                `SELECT lead_id FROM leads WHERE email = ? AND property_id = ? LIMIT 1`,
+                [email, propertyId]
+            );
+
+            let leadId;
+            if (existingLeads.length > 0) {
+                // Lead exists for this property -> Update it (e.g. new notes, timestamp)
+                leadId = existingLeads[0].lead_id;
+                await leadModel.update(leadId, {
+                    lastContactedAt: new Date(),
+                    notes: notes ? `${notes} (Re-inquiry)` : undefined,
+                    // potentially update unit if they changed mind?
+                });
+                return res.status(200).json({ id: leadId, message: 'Interest updated. We will contact you soon.' });
+            } else {
+                // Create NEW Lead (No User Account yet)
+                leadId = await leadModel.create({
+                    propertyId,
+                    unitId: finalUnitId,
+                    interestedUnit: finalUnitId,
+                    name,
+                    phone,
+                    email,
+                    notes,
+                    status: 'interested',
+                    userId: null // No user account
+                });
+                return res.status(201).json({ id: leadId, message: 'Interest registered! We will contact you soon.' });
+            }
+
         } catch (error) {
-            res.status(400).json({ error: error.message });
+            console.error("Error creating lead:", error);
+            res.status(500).json({ error: error.message });
         }
     }
 
