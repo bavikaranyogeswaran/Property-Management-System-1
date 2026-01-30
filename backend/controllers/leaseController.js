@@ -1,5 +1,6 @@
 import leaseModel from '../models/leaseModel.js';
 import unitModel from '../models/unitModel.js';
+import leaseService from '../services/leaseService.js';
 
 class LeaseController {
     async getLeases(req, res) {
@@ -54,26 +55,14 @@ class LeaseController {
                 return res.status(400).json({ error: 'All fields are required' });
             }
 
-            // Check if unit is available
-            const unit = await unitModel.findById(unitId);
-            if (!unit) {
-                return res.status(404).json({ error: 'Unit not found' });
-            }
-            if (unit.status === 'occupied') {
-                return res.status(400).json({ error: 'Unit is already occupied' });
-            }
-
-            const leaseId = await leaseModel.create({
+            // Delegate to LeaseService
+            const leaseId = await leaseService.createLease({
                 tenantId,
                 unitId,
                 startDate,
                 endDate,
-                monthlyRent,
-                status: 'active'
+                monthlyRent
             });
-
-            // Mark unit as occupied
-            await unitModel.update(unitId, { status: 'occupied' });
 
             res.status(201).json({ id: leaseId, message: 'Lease created successfully' });
         } catch (error) {

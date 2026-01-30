@@ -1,9 +1,10 @@
 import db from '../config/db.js';
 
 class LeaseModel {
-    async create(data) {
+    async create(data, connection = null) {
         const { tenantId, unitId, startDate, endDate, monthlyRent, status } = data;
-        const [result] = await db.query(
+        const dbConn = connection || db;
+        const [result] = await dbConn.query(
             `INSERT INTO leases (tenant_id, unit_id, start_date, end_date, monthly_rent, status)
              VALUES (?, ?, ?, ?, ?, ?)`,
             [tenantId, unitId, startDate, endDate, monthlyRent, status || 'active']

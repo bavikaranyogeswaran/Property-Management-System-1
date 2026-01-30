@@ -53,7 +53,7 @@ class UnitModel {
         return this.mapRows(rows);
     }
 
-    async update(id, updates) {
+    async update(id, updates, connection = null) {
         const fields = [];
         const values = [];
 
@@ -66,7 +66,9 @@ class UnitModel {
         if (fields.length === 0) return false;
 
         values.push(id);
-        const [result] = await db.query(
+
+        const dbConn = connection || db;
+        const [result] = await dbConn.query(
             `UPDATE units SET ${fields.join(', ')} WHERE unit_id = ?`,
             values
         );

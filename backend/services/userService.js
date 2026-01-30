@@ -10,6 +10,7 @@ const { sign } = jwt;
 const JWT_SECRET = process.env.JWT_SECRET || 'secret';
 import unitModel from '../models/unitModel.js';
 import leaseModel from '../models/leaseModel.js';
+import leaseService from '../services/leaseService.js';
 import emailService from '../utils/emailService.js';
 import pool from '../config/db.js';
 
@@ -253,9 +254,11 @@ class UserService {
 
             // 5. Lease & Unit Logic
             if (lead.interestedUnit) {
-                await connection.query('UPDATE units SET status = ? WHERE unit_id = ?', ['occupied', lead.interestedUnit]);
+                // We rely on LeaseService to handle unit status and lease creation.
+                // However, we need to fetch the unit to get the rent first? 
+                // LeaseService expects us to pass monthlyRent.
 
-                const unit = await unitModel.findById(lead.interestedUnit); // Read outside transaction is risky but acceptable for now
+                const unit = await unitModel.findById(lead.interestedUnit);
                 if (unit) {
                     const today = new Date();
                     const leaseStart = startDate ? new Date(startDate) : today;
@@ -267,11 +270,14 @@ class UserService {
                         leaseEnd.setFullYear(leaseStart.getFullYear() + 1);
                     }
 
-                    // Lease creation
-                    await connection.query(
-                        'INSERT INTO leases (tenant_id, unit_id, start_date, end_date, monthly_rent, status) VALUES (?, ?, ?, ?, ?, ?)',
-                        [userId, lead.interestedUnit, leaseStart, leaseEnd, unit.monthlyRent, 'active']
-                    );
+                    // Use LeaseService with the existing transaction connection
+                    await leaseService.createLease({
+                        tenantId: userId,
+                        unitId: lead.interestedUnit,
+                        startDate: leaseStart,
+                        endDate: leaseEnd,
+                        monthlyRent: unit.monthlyRent
+                    }, connection);
                 }
             }
 
