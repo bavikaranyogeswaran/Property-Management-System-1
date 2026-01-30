@@ -297,6 +297,26 @@ CREATE TABLE notifications (
 );
 
 -- =========================
+-- PROPERTY VISITS
+-- =========================
+CREATE TABLE property_visits (
+    visit_id INT AUTO_INCREMENT PRIMARY KEY,
+    property_id INT NOT NULL,
+    unit_id INT NULL,
+    lead_id INT NULL,
+    visitor_name VARCHAR(100) NOT NULL,
+    visitor_email VARCHAR(100) NOT NULL,
+    visitor_phone VARCHAR(20) NOT NULL,
+    scheduled_date DATETIME NOT NULL,
+    status ENUM('pending', 'confirmed', 'cancelled', 'completed') DEFAULT 'pending',
+    notes TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (property_id) REFERENCES properties(property_id),
+    FOREIGN KEY (unit_id) REFERENCES units(unit_id),
+    FOREIGN KEY (lead_id) REFERENCES leads(lead_id) ON DELETE SET NULL
+);
+
+-- =========================
 -- INDEXES
 -- =========================
 CREATE INDEX idx_unit_status ON units(status);

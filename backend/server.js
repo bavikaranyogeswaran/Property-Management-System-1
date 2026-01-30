@@ -47,6 +47,8 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/invoices', invoiceRoutes);
 app.use('/api/behavior', behaviorRoutes);
 app.use('/api', imageRoutes);
+import visitRoutes from './routes/visitRoutes.js';
+app.use('/api/visits', visitRoutes);
 
 app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', message: 'PMS Backend is running' });

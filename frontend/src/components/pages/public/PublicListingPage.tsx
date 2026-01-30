@@ -9,6 +9,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Building2, Plus, Edit, Trash2, Eye, ArrowLeft, Search, X } from 'lucide-react';
 import { toast } from 'sonner';
 
+// ... imports
+import { ScheduleVisitDialog } from './ScheduleVisitDialog';
+
 export function PublicListingPage({ onNavigate }: { onNavigate?: (page: string) => void }) {
 
     const { properties, units, addLead } = useApp();
@@ -21,11 +24,16 @@ export function PublicListingPage({ onNavigate }: { onNavigate?: (page: string) 
         notes: '',
     });
     const [interestProperty, setInterestProperty] = useState<Property | null>(null);
+
+    // Schedule Visit State
+    const [isVisitDialogOpen, setIsVisitDialogOpen] = useState(false);
+    const [visitProperty, setVisitProperty] = useState<Property | null>(null);
+
     const [searchQuery, setSearchQuery] = useState('');
 
     const navigate = useNavigate();
 
-    // Filter properties based on search query
+    // ... (keep calculate filteredProperties)
     const filteredProperties = properties.filter(property => {
         const query = searchQuery.toLowerCase().trim();
         if (!query) return true;
@@ -58,6 +66,11 @@ export function PublicListingPage({ onNavigate }: { onNavigate?: (page: string) 
         setInterestProperty(property);
         setInterestFormData(prev => ({ ...prev, interestedUnit: '' }));
         setIsInterestDialogOpen(true);
+    };
+
+    const openVisitDialog = (property: Property) => {
+        setVisitProperty(property);
+        setIsVisitDialogOpen(true);
     };
 
     return (
@@ -148,16 +161,25 @@ export function PublicListingPage({ onNavigate }: { onNavigate?: (page: string) 
                                 </div>
                             </div>
 
-                            <div className="pt-6 mt-auto flex gap-3">
+                            <div className="pt-6 mt-auto flex flex-col gap-2">
+                                <div className="flex gap-2">
+                                    <Button
+                                        className="flex-1"
+                                        variant="outline"
+                                        onClick={() => navigate(`/property/${property.id}`)}
+                                    >
+                                        View Details
+                                    </Button>
+                                    <Button
+                                        className="flex-1"
+                                        variant="secondary"
+                                        onClick={() => openVisitDialog(property)}
+                                    >
+                                        Schedule Visit
+                                    </Button>
+                                </div>
                                 <Button
-                                    className="flex-1"
-                                    variant="outline"
-                                    onClick={() => navigate(`/property/${property.id}`)}
-                                >
-                                    View Details
-                                </Button>
-                                <Button
-                                    className="flex-1"
+                                    className="w-full"
                                     onClick={() => openInterestDialog(property)}
                                 >
                                     I'm Interested
@@ -178,7 +200,7 @@ export function PublicListingPage({ onNavigate }: { onNavigate?: (page: string) 
             )}
 
 
-            {/* Interest Dialog (Same as before) */}
+            {/* Interest Dialog */}
             <Dialog open={isInterestDialogOpen} onOpenChange={setIsInterestDialogOpen}>
                 <DialogContent>
                     <DialogHeader>
@@ -255,6 +277,12 @@ export function PublicListingPage({ onNavigate }: { onNavigate?: (page: string) 
                     </form>
                 </DialogContent>
             </Dialog>
+
+            <ScheduleVisitDialog
+                open={isVisitDialogOpen}
+                onOpenChange={setIsVisitDialogOpen}
+                property={visitProperty}
+            />
         </div>
     );
 }
