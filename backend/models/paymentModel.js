@@ -19,10 +19,11 @@ class PaymentModel {
         // For treasurer view - all payments
         // tenant_id is not in payments, need to join invoices -> leases -> tenants -> users
         const [rows] = await pool.query(`
-            SELECT p.*, u.first_name, u.last_name, ri.property_id, ri.lease_id, l.tenant_id
+            SELECT p.*, u.name, un.property_id, ri.lease_id, l.tenant_id
             FROM payments p
             JOIN rent_invoices ri ON p.invoice_id = ri.invoice_id
             JOIN leases l ON ri.lease_id = l.lease_id
+            JOIN units un ON l.unit_id = un.unit_id
             JOIN users u ON l.tenant_id = u.user_id
             ORDER BY p.payment_date DESC
         `);
