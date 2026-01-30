@@ -12,4 +12,7 @@ router.post('/', visitController.scheduleVisit);
 // Only authenticated users (owners/staff) should see the list
 router.get('/', authenticateToken, visitController.getVisits);
 
+// Update visit status
+router.patch('/:id/status', authenticateToken, visitController.updateStatus);
+
 export default router;

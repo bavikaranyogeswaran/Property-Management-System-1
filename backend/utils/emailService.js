@@ -197,6 +197,58 @@ class EmailService {
             return false;
         }
     }
+
+    async sendVisitNotification(ownerEmail, visitDetails) {
+        const { visitorName, visitorPhone, propertyName, unitNumber, scheduledDate, notes } = visitDetails;
+        const dateStr = new Date(scheduledDate).toLocaleString();
+
+        if (!this.transporter) {
+            console.log('==================================================');
+            console.log(`[EMAIL MOCK] Visit Notification to Owner: ${ownerEmail}`);
+            console.log(`Visitor: ${visitorName} (${visitorPhone})`);
+            console.log(`Property: ${propertyName} ${unitNumber ? '(Unit ' + unitNumber + ')' : ''}`);
+            console.log(`Date: ${dateStr}`);
+            console.log('==================================================');
+            return true;
+        }
+
+        try {
+            await this.transporter.sendMail({
+                from: `"Property Management System" <${process.env.SMTP_USER}>`,
+                to: ownerEmail,
+                subject: `New Visit Scheduled: ${propertyName}`,
+                html: `
+                    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 8px; padding: 20px;">
+                        <h2 style="color: #333; margin-top: 0;">New Visit Scheduled</h2>
+                        <p>A new visit has been scheduled via the public listing.</p>
+                        
+                        <div style="background-color: #f9f9f9; padding: 15px; border-radius: 5px; margin: 20px 0;">
+                            <h3 style="margin-top: 0; color: #555;">Property Details</h3>
+                            <p style="margin: 5px 0;"><strong>Property:</strong> ${propertyName}</p>
+                            ${unitNumber ? `<p style="margin: 5px 0;"><strong>Unit:</strong> ${unitNumber}</p>` : ''}
+                            <p style="margin: 5px 0;"><strong>Scheduled For:</strong> ${dateStr}</p>
+                        </div>
+
+                        <div style="background-color: #f9f9f9; padding: 15px; border-radius: 5px; margin: 20px 0;">
+                            <h3 style="margin-top: 0; color: #555;">Visitor Details</h3>
+                            <p style="margin: 5px 0;"><strong>Name:</strong> ${visitorName}</p>
+                            <p style="margin: 5px 0;"><strong>Phone:</strong> ${visitorPhone}</p>
+                            ${notes ? `<p style="margin: 5px 0;"><strong>Notes:</strong> ${notes}</p>` : ''}
+                        </div>
+
+                        <div style="text-align: center; margin-top: 30px;">
+                            <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/owner/leads" style="background-color: #0070f3; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">View in Dashboard</a>
+                        </div>
+                    </div>
+                `
+            });
+            return true;
+        } catch (error) {
+            console.error('Error sending visit notification:', error);
+            // Don't fail the request if email fails
+            return false;
+        }
+    }
 }
 
 export default new EmailService();

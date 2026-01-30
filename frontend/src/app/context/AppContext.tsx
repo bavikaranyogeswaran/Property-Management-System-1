@@ -165,6 +165,23 @@ export interface MaintenanceCost {
   recordedDate: string;
 }
 
+export interface Visit {
+  visit_id: string;
+  property_id: string;
+  unit_id: string | null;
+  lead_id: string | null;
+  visitor_name: string;
+  visitor_email: string;
+  visitor_phone: string;
+  scheduled_date: string;
+  status: 'pending' | 'confirmed' | 'cancelled' | 'completed';
+  notes: string;
+  created_at: string;
+  property_name?: string;
+  unit_number?: string;
+  lead_status?: string;
+}
+
 export interface Notification {
   id: string;
   type: 'lease_expiring' | 'lease_expired' | 'invoice_overdue' | 'maintenance_urgent';
@@ -253,12 +270,18 @@ interface AppContextType {
   updateMaintenanceRequest: (id: string, request: Partial<MaintenanceRequest>) => void;
   addMaintenanceCost: (cost: Omit<MaintenanceCost, 'id' | 'recordedDate'>) => void;
   deleteMaintenanceCost: (id: string) => void;
+
+  // Visit operations
+  visits: Visit[];
+  fetchVisits: () => Promise<void>;
+  updateVisitStatus: (id: string, status: Visit['status']) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 // Initialize with mock data
 const INITIAL_DATA = {
+  visits: [],
   properties: [
     {
       id: 'prop-1',
@@ -562,8 +585,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [maintenanceRequests, setMaintenanceRequests] = useState<MaintenanceRequest[]>([]);
   const [maintenanceCosts, setMaintenanceCosts] = useState<MaintenanceCost[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [visits, setVisits] = useState<Visit[]>([]);
 
-  // Load data from Backend
+  // Fetch initial data
   useEffect(() => {
 
     // Fetch real treasurers from backend (sync with DB)
@@ -1454,6 +1478,36 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const fetchVisits = async () => {
+    try {
+      // Only fetch if owner? Backend checks role, but handled gracefully
+      const response = await apiClient.get('/visits');
+      setVisits(response.data);
+    } catch (error) {
+      console.error('Failed to fetch visits:', error);
+    }
+  };
+
+  const updateVisitStatus = async (id: string, status: Visit['status']) => {
+    try {
+      await apiClient.patch(`/visits/${id}/status`, { status });
+      setVisits(prev => prev.map(v => v.visit_id === id ? { ...v, status } : v));
+      toast.success(`Visit ${status}`);
+    } catch (error) {
+      console.error('Failed to update visit status:', error);
+      toast.error('Failed to update visit status');
+    }
+  };
+
+  // Initial fetch for visits if owner
+  useEffect(() => {
+    const token = localStorage.getItem('authToken');
+    const userRole = localStorage.getItem('userRole'); // Assuming stored
+    if (token && userRole === 'owner') {
+      fetchVisits();
+    }
+  }, []);
+
   return (
     <AppContext.Provider value={{
       properties,
@@ -1508,6 +1562,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       deletePropertyType,
       addUnitType,
       deleteUnitType,
+      visits,
+      fetchVisits,
+      updateVisitStatus,
     }}>
       {children}
     </AppContext.Provider>

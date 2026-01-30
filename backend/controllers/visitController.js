@@ -2,6 +2,7 @@
 import visitModel from '../models/visitModel.js';
 import leadModel from '../models/leadModel.js';
 import db from '../config/db.js';
+import emailService from '../utils/emailService.js';
 
 class VisitController {
     /**
@@ -73,6 +74,52 @@ class VisitController {
                 notes
             });
 
+            // 3. Send Notification to Owner
+            try {
+                // Fetch property details (includes owner_id)
+                // We need to import propertyModel and userModel or use db query
+                // For simplicity/speed, let's just query or access via existing helpers if available.
+                // But controllers should ideally use models.
+                // Let's bring in propertyModel and userModel imports at top of file, 
+                // but since I can't easily add imports specific to this chunk without re-writing top,
+                // I'll dynamically import or assume I'll add them in a separate step?
+                // Better: Use direct db query for now or assume imports exist (I need to add them).
+                // I will add imports in a separate 'replace' call or just use db.query since `db` is imported here.
+
+                // Get Property & Owner details
+                const [propRows] = await db.query(
+                    `SELECT p.name as property_name, u.email as owner_email 
+                     FROM properties p
+                     JOIN users u ON p.owner_id = u.user_id
+                     WHERE p.property_id = ?`,
+                    [propertyId]
+                );
+
+                if (propRows.length > 0) {
+                    const { property_name, owner_email } = propRows[0];
+
+                    // Get unit number if applicable
+                    let unit_number = null;
+                    if (unitId) {
+                        const [unitRows] = await db.query('SELECT unit_number FROM units WHERE unit_id = ?', [unitId]);
+                        if (unitRows.length > 0) unit_number = unitRows[0].unit_number;
+                    }
+
+                    await emailService.sendVisitNotification(owner_email, {
+                        visitorName: name,
+                        visitorPhone: phone,
+                        propertyName: property_name,
+                        unitNumber: unit_number,
+                        scheduledDate: scheduledDate,
+                        notes: notes
+                    });
+                }
+
+            } catch (emailError) {
+                console.error("Failed to send visit notification:", emailError);
+                // Non-blocking
+            }
+
             res.status(201).json({
                 message: 'Visit scheduled successfully',
                 visitId,
@@ -98,6 +145,27 @@ class VisitController {
         } catch (error) {
             console.error('Error fetching visits:', error);
             res.status(500).json({ error: 'Failed to fetch visits' });
+        }
+    }
+
+    async updateStatus(req, res) {
+        try {
+            const { id } = req.params;
+            const { status } = req.body;
+
+            if (!['pending', 'confirmed', 'cancelled', 'completed'].includes(status)) {
+                return res.status(400).json({ error: 'Invalid status' });
+            }
+
+            const success = await visitModel.updateStatus(id, status);
+            if (!success) {
+                return res.status(404).json({ error: 'Visit not found' });
+            }
+
+            res.json({ message: 'Visit status updated' });
+        } catch (error) {
+            console.error('Error updating visit status:', error);
+            res.status(500).json({ error: 'Failed to update status' });
         }
     }
 }

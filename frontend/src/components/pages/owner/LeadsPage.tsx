@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useApp, Lead, LeadStageHistory } from '@/app/context/AppContext';
+import { useApp, Lead, LeadStageHistory, Visit } from '@/app/context/AppContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { UserPlus, Calendar, CheckCircle, ArrowRight, Clock, TrendingUp, LayoutGrid, List, XCircle, MessageSquare } from 'lucide-react';
+import { UserPlus, Calendar, CheckCircle, ArrowRight, Clock, TrendingUp, LayoutGrid, List, XCircle, MessageSquare, Check, X } from 'lucide-react';
 import { ChatInterface } from '@/components/common/ChatInterface';
 import { toast } from 'sonner';
 
@@ -21,12 +21,14 @@ export function LeadsPage() {
     leads,
     units,
     properties,
+    visits,
     leadFollowUps,
     leadStageHistory,
     addLead,
     updateLead,
     addLeadFollowUp,
     convertLeadToTenant,
+    updateVisitStatus,
   } = useApp();
 
 
@@ -69,6 +71,14 @@ export function LeadsPage() {
       toast.success(`Lead moved to ${getStatusLabel(status)}`);
     } catch (error) {
       toast.error('Failed to update status');
+    }
+  };
+
+  const handleVisitStatusChange = async (visitId: string, status: Visit['status']) => {
+    try {
+      await updateVisitStatus(visitId, status);
+    } catch (e) {
+      // Toast handled in context
     }
   };
 
@@ -128,6 +138,16 @@ export function LeadsPage() {
     return labels[status];
   };
 
+  const getVisitStatusBadge = (status: Visit['status']) => {
+    const styles = {
+      pending: 'bg-yellow-100 text-yellow-800',
+      confirmed: 'bg-blue-100 text-blue-800',
+      cancelled: 'bg-red-100 text-red-800',
+      completed: 'bg-green-100 text-green-800',
+    };
+    return <Badge variant="outline" className={styles[status]}>{status.charAt(0).toUpperCase() + status.slice(1)}</Badge>;
+  };
+
   const getStatusBadge = (status: Lead['status']) => {
     const variants: Record<Lead['status'], { variant: any, label: string, color: string }> = {
       interested: { variant: 'default', label: 'Interested', color: 'bg-blue-100 text-blue-700' },
@@ -138,6 +158,12 @@ export function LeadsPage() {
   };
 
   const stats = [
+    {
+      label: 'Scheduled Visits',
+      value: visits.filter(v => v.status === 'pending' || v.status === 'confirmed').length,
+      icon: Calendar,
+      color: 'bg-orange-50 text-orange-700',
+    },
     {
       label: 'Total Leads',
       value: leads.length,
@@ -288,6 +314,66 @@ export function LeadsPage() {
       </div>
     );
   };
+
+  const VisitTable = ({ visits: data }: { visits: Visit[] }) => (
+    <div className="overflow-x-auto">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Visitor</TableHead>
+            <TableHead>Date & Time</TableHead>
+            <TableHead>Property/Unit</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Notes</TableHead>
+            <TableHead className="text-right">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {data.map((visit) => {
+            const visitDate = new Date(visit.scheduled_date).toLocaleString();
+            return (
+              <TableRow key={visit.visit_id}>
+                <TableCell>
+                  <div className="font-medium">{visit.visitor_name}</div>
+                  <div className="text-xs text-gray-500">{visit.visitor_email}</div>
+                  <div className="text-xs text-gray-500">{visit.visitor_phone}</div>
+                </TableCell>
+                <TableCell>{visitDate}</TableCell>
+                <TableCell>
+                  <div>{visit.property_name}</div>
+                  {visit.unit_number && <div className="text-xs text-gray-500">Unit: {visit.unit_number}</div>}
+                </TableCell>
+                <TableCell>{getVisitStatusBadge(visit.status)}</TableCell>
+                <TableCell className="max-w-xs truncate" title={visit.notes}>{visit.notes}</TableCell>
+                <TableCell className="text-right">
+                  <div className="flex gap-2 justify-end">
+                    {visit.status === 'pending' && (
+                      <>
+                        <Button size="sm" variant="ghost" className="text-green-600 hover:bg-green-50" onClick={() => handleVisitStatusChange(visit.visit_id, 'confirmed')} title="Confirm Visit">
+                          <Check className="size-4" />
+                        </Button>
+                        <Button size="sm" variant="ghost" className="text-red-600 hover:bg-red-50" onClick={() => handleVisitStatusChange(visit.visit_id, 'cancelled')} title="Cancel Visit">
+                          <X className="size-4" />
+                        </Button>
+                      </>
+                    )}
+                    {visit.status === 'confirmed' && (
+                      <Button size="sm" variant="ghost" className="text-blue-600 hover:bg-blue-50" onClick={() => handleVisitStatusChange(visit.visit_id, 'completed')} title="Mark as Completed">
+                        <CheckCircle className="size-4" />
+                      </Button>
+                    )}
+                  </div>
+                </TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
+      {data.length === 0 && (
+        <div className="p-8 text-center text-gray-500">No scheduled visits.</div>
+      )}
+    </div>
+  );
 
   const LeadTable = ({ leads: leadsData }: { leads: Lead[] }) => (
     <div className="overflow-x-auto">
@@ -475,39 +561,50 @@ export function LeadsPage() {
       {/* Pipeline View */}
       {viewMode === 'pipeline' ? (
         <div className="space-y-4">
-          {/* Active Pipeline */}
           <Card>
             <CardHeader>
-              <CardTitle>Conversion Funnel</CardTitle>
+              <CardTitle>Overview</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {pipelineStages.map((stage, index) => {
-                  const stageLeads = leads.filter(l => l.status === stage.status);
-                  return (
-                    <div key={stage.status}>
-                      <div className={`border-2 ${stage.color} rounded-lg p-4 min-h-[400px]`}>
-                        <div className="flex items-center justify-between mb-4">
-                          <h3 className="font-semibold text-sm">{stage.label}</h3>
-                          <Badge variant="secondary">{stageLeads.length}</Badge>
-                        </div>
-                        <div className="space-y-2">
-                          {stageLeads.map(lead => (
-                            <LeadCard key={lead.id} lead={lead} />
-                          ))}
-                          {stageLeads.length === 0 && (
-                            <div className="text-center py-8 text-gray-400 text-sm">
-                              No leads in this stage
+              <Tabs defaultValue="funnel">
+                <TabsList>
+                  <TabsTrigger value="funnel">Funnel</TabsTrigger>
+                  <TabsTrigger value="visits">Upcoming Visits ({visits.filter(v => v.status === 'confirmed' || v.status === 'pending').length})</TabsTrigger>
+                </TabsList>
+                <TabsContent value="funnel">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+                    {pipelineStages.map((stage, index) => {
+                      const stageLeads = leads.filter(l => l.status === stage.status);
+                      return (
+                        <div key={stage.status}>
+                          <div className={`border-2 ${stage.color} rounded-lg p-4 min-h-[400px]`}>
+                            <div className="flex items-center justify-between mb-4">
+                              <h3 className="font-semibold text-sm">{stage.label}</h3>
+                              <Badge variant="secondary">{stageLeads.length}</Badge>
                             </div>
-                          )}
+                            <div className="space-y-2">
+                              {stageLeads.map(lead => (
+                                <LeadCard key={lead.id} lead={lead} />
+                              ))}
+                              {stageLeads.length === 0 && (
+                                <div className="text-center py-8 text-gray-400 text-sm">
+                                  No leads in this stage
+                                </div>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+                      );
+                    })}
+                  </div>
+                </TabsContent>
+                <TabsContent value="visits">
+                  <VisitTable visits={visits.filter(v => ['pending', 'confirmed'].includes(v.status))} />
+                </TabsContent>
+              </Tabs>
             </CardContent>
           </Card>
+
 
           {/* Dropped Leads */}
           {droppedLeads.length > 0 && (
@@ -529,9 +626,12 @@ export function LeadsPage() {
         /* List View */
         <Card>
           <CardContent className="p-0">
-            <Tabs defaultValue="active" className="w-full">
+            <Tabs defaultValue="visits" className="w-full">
               <div className="border-b px-6 pt-6">
                 <TabsList>
+                  <TabsTrigger value="visits">
+                    Scheduled Visits ({visits.length})
+                  </TabsTrigger>
                   <TabsTrigger value="active">
                     Active Leads ({activeLeads.length})
                   </TabsTrigger>
@@ -543,6 +643,9 @@ export function LeadsPage() {
                   </TabsTrigger>
                 </TabsList>
               </div>
+              <TabsContent value="visits" className="m-0">
+                <VisitTable visits={visits} />
+              </TabsContent>
               <TabsContent value="active" className="m-0">
                 <LeadTable leads={activeLeads} />
               </TabsContent>
