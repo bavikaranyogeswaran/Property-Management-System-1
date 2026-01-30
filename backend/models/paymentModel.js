@@ -2,10 +2,10 @@ import pool from '../config/db.js';
 
 class PaymentModel {
     async create(data) {
-        const { invoiceId, tenantId, amount, paymentDate, paymentMethod, referenceNumber, evidenceUrl } = data;
+        const { invoiceId, amount, paymentDate, paymentMethod, referenceNumber, evidenceUrl } = data;
         const [result] = await pool.query(
-            'INSERT INTO payments (invoice_id, tenant_id, amount, payment_date, payment_method, reference_number, evidence_url, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-            [invoiceId, tenantId, amount, paymentDate, paymentMethod, referenceNumber, evidenceUrl, 'pending']
+            'INSERT INTO payments (invoice_id, amount, payment_date, payment_method, reference_number, proof_url, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [invoiceId, amount, paymentDate, paymentMethod, referenceNumber, evidenceUrl, 'pending']
         );
         return result.insertId;
     }
@@ -17,11 +17,13 @@ class PaymentModel {
 
     async findAll() {
         // For treasurer view - all payments
+        // tenant_id is not in payments, need to join invoices -> leases -> tenants -> users
         const [rows] = await pool.query(`
-            SELECT p.*, u.first_name, u.last_name, ri.property_id
+            SELECT p.*, u.first_name, u.last_name, ri.property_id, ri.lease_id, l.tenant_id
             FROM payments p
-            JOIN users u ON p.tenant_id = u.user_id
             JOIN rent_invoices ri ON p.invoice_id = ri.invoice_id
+            JOIN leases l ON ri.lease_id = l.lease_id
+            JOIN users u ON l.tenant_id = u.user_id
             ORDER BY p.payment_date DESC
         `);
         return rows;
@@ -33,7 +35,14 @@ class PaymentModel {
     }
 
     async findByTenantId(tenantId) {
-        const [rows] = await pool.query('SELECT * FROM payments WHERE tenant_id = ? ORDER BY payment_date DESC', [tenantId]);
+        const [rows] = await pool.query(`
+            SELECT p.* 
+            FROM payments p
+            JOIN rent_invoices ri ON p.invoice_id = ri.invoice_id
+            JOIN leases l ON ri.lease_id = l.lease_id
+            WHERE l.tenant_id = ? 
+            ORDER BY p.payment_date DESC
+        `, [tenantId]);
         return rows;
     }
 

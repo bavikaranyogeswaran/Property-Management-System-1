@@ -11,7 +11,6 @@ class PaymentController {
 
             const paymentId = await paymentModel.create({
                 invoiceId,
-                tenantId,
                 amount,
                 paymentDate,
                 paymentMethod,
