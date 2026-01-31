@@ -25,6 +25,11 @@ router.get('/tenants', authenticateToken, userController.getTenants);
 // Get user by ID (Generic)
 router.get('/:id', authenticateToken, userController.getUserById);
 
+// Property Assignments
+router.post('/assign-property', authenticateToken, userController.assignProperty);
+router.delete('/:userId/assign-property/:propertyId', authenticateToken, userController.removeProperty);
+router.get('/:userId/assigned-properties', authenticateToken, userController.getAssignedProperties);
+
 
 
 export default router;

@@ -138,6 +138,51 @@ class UserController {
             res.status(500).json({ error: error.message });
         }
     }
+
+    async assignProperty(req, res) {
+        try {
+            if (req.user.role !== 'owner') {
+                return res.status(403).json({ error: 'Access denied. Only Owners can assign properties.' });
+            }
+            const { userId, propertyId } = req.body;
+            await staffModel.assignProperty(userId, propertyId);
+            res.json({ message: 'Property assigned successfully' });
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    }
+
+    async removeProperty(req, res) {
+        try {
+            if (req.user.role !== 'owner') {
+                return res.status(403).json({ error: 'Access denied. Only Owners can remove property assignments.' });
+            }
+            const { userId, propertyId } = req.params;
+            await staffModel.removePropertyAssignment(userId, propertyId);
+            res.json({ message: 'Property assignment removed' });
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    }
+
+    async getAssignedProperties(req, res) {
+        try {
+            if (req.user.role !== 'owner' && req.user.role !== 'treasurer') {
+                // Treasurers can see their own assignments? Maybe. Owner is key.
+                return res.status(403).json({ error: 'Access denied.' });
+            }
+            const { userId } = req.params;
+            // Access control: Owner can see anyone's. Treasurer can only see their own.
+            if (req.user.role === 'treasurer' && parseInt(userId) !== req.user.id) {
+                return res.status(403).json({ error: 'Access denied.' });
+            }
+
+            const properties = await staffModel.getAssignedProperties(userId);
+            res.json(properties);
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    }
 }
 
 export default new UserController();

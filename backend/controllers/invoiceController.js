@@ -10,7 +10,10 @@ class InvoiceController {
             if (req.user.role === 'tenant') {
                 const invoices = await invoiceModel.findByTenantId(req.user.id);
                 return res.json(invoices);
-            } else if (req.user.role === 'owner' || req.user.role === 'treasurer') {
+            } else if (req.user.role === 'treasurer') {
+                const invoices = await invoiceModel.findByTreasurerId(req.user.id);
+                return res.json(invoices);
+            } else if (req.user.role === 'owner') {
                 const invoices = await invoiceModel.findAll();
                 return res.json(invoices);
             } else {

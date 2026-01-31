@@ -59,7 +59,10 @@ class PaymentController {
             if (req.user.role === 'tenant') {
                 const payments = await paymentModel.findByTenantId(req.user.id);
                 return res.json(payments);
-            } else if (req.user.role === 'treasurer' || req.user.role === 'owner') {
+            } else if (req.user.role === 'treasurer') {
+                const payments = await paymentModel.findByTreasurerId(req.user.id);
+                return res.json(payments);
+            } else if (req.user.role === 'owner') {
                 const payments = await paymentModel.findAll();
                 return res.json(payments);
             } else {

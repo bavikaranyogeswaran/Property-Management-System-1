@@ -326,3 +326,16 @@ CREATE INDEX idx_lease_status ON leases(status);
 CREATE INDEX idx_invoice_status ON rent_invoices(status);
 CREATE INDEX idx_payment_status ON payments(status);
 CREATE INDEX idx_maintenance_status ON maintenance_requests(status);
+
+-- =========================
+-- STAFF ASSIGNMENTS
+-- =========================
+CREATE TABLE IF NOT EXISTS staff_property_assignments (
+    assignment_id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    property_id INT NOT NULL,
+    assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    FOREIGN KEY (property_id) REFERENCES properties(property_id) ON DELETE CASCADE,
+    UNIQUE KEY unique_assignment (user_id, property_id)
+);

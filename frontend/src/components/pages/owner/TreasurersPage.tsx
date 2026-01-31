@@ -21,8 +21,9 @@ import {
 } from '@/components/ui/table';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { UserPlus, Mail, Phone, Shield, Trash2, Edit, Eye, EyeOff } from 'lucide-react';
+import { UserPlus, Mail, Phone, Shield, Trash2, Edit, Eye, EyeOff, Building } from 'lucide-react';
 import { toast } from 'sonner';
+import { TreasurerAssignmentDialog } from './TreasurerAssignmentDialog';
 import {
   Select,
   SelectContent,
@@ -33,10 +34,16 @@ import {
 import { apiClient } from '@/services/api';
 
 export function TreasurersPage() {
-  const { treasurers, addTreasurer, updateTreasurer, deleteTreasurer } = useApp();
+  const { treasurers, properties, addTreasurer, updateTreasurer, deleteTreasurer } = useApp();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isAssignmentDialogOpen, setIsAssignmentDialogOpen] = useState(false);
   const [selectedTreasurer, setSelectedTreasurer] = useState<Treasurer | null>(null);
+
+  const handleAssignmentClick = (treasurer: Treasurer) => {
+    setSelectedTreasurer(treasurer);
+    setIsAssignmentDialogOpen(true);
+  };
 
   // Form state
   const [name, setName] = useState('');
@@ -354,6 +361,14 @@ export function TreasurersPage() {
                           <Button
                             variant="ghost"
                             size="sm"
+                            onClick={() => handleAssignmentClick(treasurer)}
+                            title="Assign Properties"
+                          >
+                            <Building className="size-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={() => handleToggleStatus(treasurer)}
                           >
                             {treasurer.status === 'active' ? 'Deactivate' : 'Activate'}
@@ -460,6 +475,13 @@ export function TreasurersPage() {
           </form>
         </DialogContent>
       </Dialog>
-    </div>
+
+      <TreasurerAssignmentDialog
+        open={isAssignmentDialogOpen}
+        onOpenChange={setIsAssignmentDialogOpen}
+        treasurer={selectedTreasurer}
+        properties={properties}
+      />
+    </div >
   );
 }
