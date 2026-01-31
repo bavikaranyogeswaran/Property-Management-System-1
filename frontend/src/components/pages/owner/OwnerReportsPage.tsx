@@ -1,62 +1,38 @@
-import React from 'react';
-import { useApp } from '@/app/context/AppContext';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import {
     BarChart3,
-    TrendingUp,
-    TrendingDown,
     Download,
     Users,
-    Building2,
-    DollarSign,
     Wrench,
     Calendar,
-    Filter
+    Filter,
+    FileText
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { reportService } from '@/services/reportService';
-import { useState } from 'react';
 
 export function OwnerReportsPage() {
-    const { properties, units, tenants, invoices, maintenanceRequests } = useApp();
-
-    // Calculate stats
-    const totalProperties = properties.length;
-    const totalUnits = units.length;
-    const occupiedUnits = units.filter(u => u.status === 'occupied').length;
-    const occupancyRate = totalUnits > 0 ? Math.round((occupiedUnits / totalUnits) * 100) : 0;
-
-    const totalIncome = invoices
-        .filter(i => i.status === 'paid')
-        .reduce((sum, i) => sum + i.amount, 0);
-
-    // Estimated Maintenance Cost (mock calculation as request doesn't have cost yet)
-    const maintenanceCost = maintenanceRequests
-        .filter(m => m.status === 'completed')
-        .length * 150; // assuming avg LKR 150 per request
-
-    const netIncome = totalIncome - maintenanceCost;
-
     const [isGenerating, setIsGenerating] = useState(false);
 
-    const handleExport = async (reportType: string) => {
+    const handleExport = async (reportType: string, action: 'view' | 'download') => {
         setIsGenerating(true);
         try {
             if (reportType === 'Monthly Summary') {
-                await reportService.downloadOccupancyReport();
+                await reportService.downloadOccupancyReport(action);
             } else if (reportType === 'Financial Report') {
-                await reportService.downloadFinancialReport();
+                await reportService.downloadFinancialReport(undefined, action);
             } else if (reportType === 'Tenant Risk Report') {
-                await reportService.downloadTenantRiskReport();
+                await reportService.downloadTenantRiskReport(action);
             } else if (reportType === 'Maintenance Report') {
-                await reportService.downloadMaintenanceReport();
+                await reportService.downloadMaintenanceReport(action);
             } else if (reportType === 'Lease Expiration Report') {
-                await reportService.downloadLeaseReport();
+                await reportService.downloadLeaseReport(action);
             } else if (reportType === 'Lead Conversion Report') {
-                await reportService.downloadLeadReport();
+                await reportService.downloadLeadReport(action);
             }
-            toast.success(`${reportType} downloaded successfully`);
+            toast.success(`${reportType} ${action === 'view' ? 'opened' : 'downloaded'} successfully`);
         } catch (error) {
             toast.error(`Failed to generate ${reportType}`);
         } finally {
@@ -64,159 +40,109 @@ export function OwnerReportsPage() {
         }
     };
 
+    const reports = [
+        {
+            title: 'Financial Report',
+            description: 'Income statement, expense breakdown, and net operating income analysis.',
+            icon: BarChart3,
+            type: 'Financial Report',
+            color: 'text-green-600',
+            bgColor: 'bg-green-50'
+        },
+        {
+            title: 'Occupancy Report',
+            description: 'Monthly summary of unit occupancy, vacancies, and tenant turnover rates.',
+            icon: Download,
+            type: 'Monthly Summary',
+            color: 'text-blue-600',
+            bgColor: 'bg-blue-50'
+        },
+        {
+            title: 'Tenant Risk Profile',
+            description: 'Analysis of tenant behavior scores, payment history, and risk assessment.',
+            icon: Users,
+            type: 'Tenant Risk Report',
+            color: 'text-purple-600',
+            bgColor: 'bg-purple-50'
+        },
+        {
+            title: 'Maintenance Analysis',
+            description: 'Breakdown of maintenance costs by category, property, and contractor.',
+            icon: Wrench,
+            type: 'Maintenance Report',
+            color: 'text-red-600',
+            bgColor: 'bg-red-50'
+        },
+        {
+            title: 'Lease Expirations',
+            description: 'Forecast of upcoming lease expirations for the next 90 days.',
+            icon: Calendar,
+            type: 'Lease Expiration Report',
+            color: 'text-orange-600',
+            bgColor: 'bg-orange-50'
+        },
+        {
+            title: 'Lead Conversion Funnel',
+            description: 'Tracking of lead pipeline performance from interest to signed lease.',
+            icon: Filter,
+            type: 'Lead Conversion Report',
+            color: 'text-indigo-600',
+            bgColor: 'bg-indigo-50'
+        }
+    ];
+
     return (
-        <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <div>
-                    <h2 className="text-2xl font-semibold text-gray-900">Reports & Analytics</h2>
-                    <p className="text-sm text-gray-500 mt-1">Financial overview and property performance</p>
-                </div>
-                <div className="flex gap-2">
-                    <Button variant="outline" onClick={() => handleExport('Monthly Summary')} disabled={isGenerating}>
-                        <Download className="size-4 mr-2" />
-                        {isGenerating ? 'Generating...' : 'Occupancy Report'}
-                    </Button>
-                    <Button onClick={() => handleExport('Financial Report')} disabled={isGenerating}>
-                        <BarChart3 className="size-4 mr-2" />
-                        {isGenerating ? 'Generating...' : 'Financial Report'}
-                    </Button>
-                    <Button variant="secondary" onClick={() => handleExport('Tenant Risk Report')} disabled={isGenerating}>
-                        <Users className="size-4 mr-2" />
-                        {isGenerating ? 'Generating...' : 'Tenant Risk Report'}
-                    </Button>
-                </div>
+        <div className="space-y-8">
+            <div>
+                <h2 className="text-3xl font-bold tracking-tight text-gray-900">Reports Hub</h2>
+                <p className="text-muted-foreground mt-2">
+                    Generate and download comprehensive PDF reports for your properties.
+                </p>
             </div>
 
-            <div className="flex flex-wrap gap-2 justify-end">
-                <Button variant="outline" onClick={() => handleExport('Maintenance Report')} disabled={isGenerating}>
-                    <Wrench className="size-4 mr-2" />
-                    Maintenance Analysis
-                </Button>
-                <Button variant="outline" onClick={() => handleExport('Lease Expiration Report')} disabled={isGenerating}>
-                    <Calendar className="size-4 mr-2" />
-                    Lease Expirations
-                </Button>
-                <Button variant="outline" onClick={() => handleExport('Lead Conversion Report')} disabled={isGenerating}>
-                    <Filter className="size-4 mr-2" />
-                    Lead Funnel
-                </Button>
-            </div>
-
-            {/* Financial Overview Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <Card>
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium text-gray-500">Total Income (YTD)</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="flex items-center">
-                            <DollarSign className="size-5 text-green-500 mr-2" />
-                            <span className="text-2xl font-bold">LKR {totalIncome.toLocaleString()}</span>
-                        </div>
-                        <p className="text-xs text-green-600 mt-1 flex items-center">
-                            <TrendingUp className="size-3 mr-1" /> +12% from last year
-                        </p>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium text-gray-500">Maintenance Expenses</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="flex items-center">
-                            <DollarSign className="size-5 text-red-500 mr-2" />
-                            <span className="text-2xl font-bold">LKR {maintenanceCost.toLocaleString()}</span>
-                        </div>
-                        <p className="text-xs text-gray-500 mt-1">
-                            Estimated based on completed requests
-                        </p>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium text-gray-500">Net Operating Income</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="flex items-center">
-                            <DollarSign className="size-5 text-blue-500 mr-2" />
-                            <span className="text-2xl font-bold">LKR {netIncome.toLocaleString()}</span>
-                        </div>
-                        <p className="text-xs text-blue-600 mt-1 font-medium">
-                            {totalIncome > 0 ? Math.round((netIncome / totalIncome) * 100) : 0}% Margin
-                        </p>
-                    </CardContent>
-                </Card>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Occupancy Stats */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Occupancy Overview</CardTitle>
-                        <CardDescription>Current unit status distribution</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="space-y-4">
-                            <div className="flex justify-between items-center">
-                                <span className="text-sm font-medium text-gray-600">Occupancy Rate</span>
-                                <span className="text-2xl font-bold">{occupancyRate}%</span>
-                            </div>
-                            <div className="w-full bg-gray-100 rounded-full h-2.5">
-                                <div className="bg-blue-600 h-2.5 rounded-full" style={{ width: `${occupancyRate}%` }}></div>
-                            </div>
-                            <div className="grid grid-cols-3 gap-4 pt-4">
-                                <div className="text-center p-3 bg-green-50 rounded-lg">
-                                    <p className="text-xs text-green-600 font-medium">Occupied</p>
-                                    <p className="text-xl font-bold text-green-700">{occupiedUnits}</p>
-                                </div>
-                                <div className="text-center p-3 bg-orange-50 rounded-lg">
-                                    <p className="text-xs text-orange-600 font-medium">Available</p>
-                                    <p className="text-xl font-bold text-orange-700">{totalUnits - occupiedUnits}</p>
-                                </div>
-                                <div className="text-center p-3 bg-blue-50 rounded-lg">
-                                    <p className="text-xs text-blue-600 font-medium">Total Units</p>
-                                    <p className="text-xl font-bold text-blue-700">{totalUnits}</p>
-                                </div>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                {/* Property Performance */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Property Performance</CardTitle>
-                        <CardDescription>Revenue by property</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="space-y-4">
-                            {properties.slice(0, 4).map(property => {
-                                const propUnits = units.filter(u => u.propertyId === property.id);
-                                const propIncome = invoices
-                                    .filter(i => propUnits.some(u => u.id === i.unitId) && i.status === 'paid')
-                                    .reduce((sum, i) => sum + i.amount, 0);
-
-                                // Mock progress relative to max possible
-                                const maxIncome = 10000;
-                                const percentage = Math.min((propIncome / maxIncome) * 100, 100);
-
-                                return (
-                                    <div key={property.id} className="space-y-1">
-                                        <div className="flex justify-between text-sm">
-                                            <span className="font-medium">{property.name}</span>
-                                            <span className="text-gray-600">LKR {propIncome.toLocaleString()}</span>
-                                        </div>
-                                        <div className="w-full bg-gray-100 rounded-full h-2">
-                                            <div className="bg-green-500 h-2 rounded-full" style={{ width: `${percentage}%` }}></div>
-                                        </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {reports.map((report, index) => {
+                    const Icon = report.icon;
+                    return (
+                        <Card key={index} className="flex flex-col hover:shadow-lg transition-shadow duration-200">
+                            <CardHeader>
+                                <div className="flex items-center gap-4">
+                                    <div className={`p-3 rounded-lg ${report.bgColor}`}>
+                                        <Icon className={`w-6 h-6 ${report.color}`} />
                                     </div>
-                                );
-                            })}
-                            {properties.length === 0 && <p className="text-sm text-gray-500">No properties data available.</p>}
-                        </div>
-                    </CardContent>
-                </Card>
+                                    <CardTitle className="text-xl">{report.title}</CardTitle>
+                                </div>
+                            </CardHeader>
+                            <CardContent className="flex-grow">
+                                <CardDescription className="text-base">
+                                    {report.description}
+                                </CardDescription>
+                            </CardContent>
+                            <CardFooter className="flex gap-2">
+                                <Button
+                                    className="flex-1"
+                                    variant="outline"
+                                    onClick={() => handleExport(report.type, 'view')}
+                                    disabled={isGenerating}
+                                >
+                                    <FileText className="w-4 h-4 mr-2" />
+                                    View
+                                </Button>
+                                <Button
+                                    className="flex-1"
+                                    variant="outline"
+                                    onClick={() => handleExport(report.type, 'download')}
+                                    disabled={isGenerating}
+                                >
+                                    <Download className="w-4 h-4 mr-2" />
+                                    Download
+                                </Button>
+                            </CardFooter>
+                        </Card>
+                    );
+                })}
             </div>
         </div>
     );
 }
+

@@ -44,7 +44,7 @@ class ReportController {
             const doc = new PDFDocument({ margin: 50 });
 
             res.setHeader('Content-Type', 'application/pdf');
-            res.setHeader('Content-Disposition', `attachment; filename=financial_report_${year}.pdf`);
+            res.setHeader('Content-Disposition', `inline; filename=financial_report_${year}.pdf`);
 
             doc.pipe(res);
 
@@ -141,7 +141,7 @@ class ReportController {
 
             const doc = new PDFDocument({ margin: 50 });
             res.setHeader('Content-Type', 'application/pdf');
-            res.setHeader('Content-Disposition', `attachment; filename=occupancy_report.pdf`);
+            res.setHeader('Content-Disposition', `inline; filename=occupancy_report.pdf`);
             doc.pipe(res);
 
             doc.fontSize(20).text(`Occupancy Report`, { align: 'center' });
@@ -215,7 +215,7 @@ class ReportController {
 
             const doc = new PDFDocument({ margin: 50 });
             res.setHeader('Content-Type', 'application/pdf');
-            res.setHeader('Content-Disposition', `attachment; filename=tenant_risk_report.pdf`);
+            res.setHeader('Content-Disposition', `inline; filename=tenant_risk_report.pdf`);
             doc.pipe(res);
 
             doc.fontSize(20).text(`Tenant Risk Profile`, { align: 'center' });
@@ -312,7 +312,7 @@ class ReportController {
 
             const doc = new PDFDocument({ margin: 50 });
             res.setHeader('Content-Type', 'application/pdf');
-            res.setHeader('Content-Disposition', `attachment; filename=maintenance_category_report.pdf`);
+            res.setHeader('Content-Disposition', `inline; filename=maintenance_category_report.pdf`);
             doc.pipe(res);
 
             doc.fontSize(20).text(`Maintenance Cost Analysis`, { align: 'center' });
@@ -378,7 +378,7 @@ class ReportController {
 
             const doc = new PDFDocument({ margin: 50 });
             res.setHeader('Content-Type', 'application/pdf');
-            res.setHeader('Content-Disposition', `attachment; filename=lease_expiration_forecast.pdf`);
+            res.setHeader('Content-Disposition', `inline; filename=lease_expiration_forecast.pdf`);
             doc.pipe(res);
 
             doc.fontSize(20).text(`Lease Expiration Forecast (90 Days)`, { align: 'center' });
@@ -445,7 +445,7 @@ class ReportController {
 
             const doc = new PDFDocument({ margin: 50 });
             res.setHeader('Content-Type', 'application/pdf');
-            res.setHeader('Content-Disposition', `attachment; filename=lead_conversion_report.pdf`);
+            res.setHeader('Content-Disposition', `inline; filename=lead_conversion_report.pdf`);
             doc.pipe(res);
 
             doc.fontSize(20).text(`Lead Conversion Analytics`, { align: 'center' });

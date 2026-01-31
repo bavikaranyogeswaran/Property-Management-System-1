@@ -17,87 +17,100 @@ const downloadFile = (response: any, filename: string) => {
     link.remove();
 };
 
+const openInNewTab = (response: any) => {
+    const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+    window.open(url, '_blank');
+};
+
+const handleResponse = (response: any, filename: string, action: 'view' | 'download') => {
+    if (action === 'view') {
+        openInNewTab(response);
+    } else {
+        downloadFile(response, filename);
+    }
+};
+
 export const reportService = {
-    downloadFinancialReport: async (year: number = new Date().getFullYear()) => {
+    downloadFinancialReport: async (year: number = new Date().getFullYear(), action: 'view' | 'download' = 'view') => {
         try {
             const response = await axios.get(`${API_URL}/financial?year=${year}`, {
                 headers: getAuthHeader(),
                 responseType: 'blob'
             });
-            downloadFile(response, `financial_report_${year}.pdf`);
+            handleResponse(response, `financial_report_${year}.pdf`, action);
             return true;
         } catch (error) {
-            console.error('Download failed', error);
+            console.error('Action failed', error);
             throw error;
         }
     },
 
-    downloadOccupancyReport: async () => {
+    downloadOccupancyReport: async (action: 'view' | 'download' = 'view') => {
         try {
             const response = await axios.get(`${API_URL}/occupancy`, {
                 headers: getAuthHeader(),
                 responseType: 'blob'
             });
-            downloadFile(response, `occupancy_report.pdf`);
+            handleResponse(response, `occupancy_report.pdf`, action);
             return true;
         } catch (error) {
-            console.error('Download failed', error);
+            console.error('Action failed', error);
             throw error;
         }
     },
 
-    downloadTenantRiskReport: async () => {
+    downloadTenantRiskReport: async (action: 'view' | 'download' = 'view') => {
         try {
             const response = await axios.get(`${API_URL}/tenant-risk`, {
                 headers: getAuthHeader(),
                 responseType: 'blob'
             });
-            downloadFile(response, `tenant_risk_report.pdf`);
+            handleResponse(response, `tenant_risk_report.pdf`, action);
             return true;
         } catch (error) {
-            console.error('Download failed', error);
+            console.error('Action failed', error);
             throw error;
         }
     },
 
-    downloadMaintenanceReport: async () => {
+    downloadMaintenanceReport: async (action: 'view' | 'download' = 'view') => {
         try {
             const response = await axios.get(`${API_URL}/maintenance`, {
                 headers: getAuthHeader(),
                 responseType: 'blob'
             });
-            downloadFile(response, `maintenance_category_report.pdf`);
+            handleResponse(response, `maintenance_category_report.pdf`, action);
             return true;
         } catch (error) {
-            console.error('Download failed', error);
+            console.error('Action failed', error);
             throw error;
         }
     },
 
-    downloadLeaseReport: async () => {
+    downloadLeaseReport: async (action: 'view' | 'download' = 'view') => {
         try {
             const response = await axios.get(`${API_URL}/leases`, {
                 headers: getAuthHeader(),
                 responseType: 'blob'
             });
-            downloadFile(response, `lease_expiration_forecast.pdf`);
+            handleResponse(response, `lease_expiration_forecast.pdf`, action);
             return true;
         } catch (error) {
-            console.error('Download failed', error);
+            console.error('Action failed', error);
             throw error;
         }
     },
 
-    downloadLeadReport: async () => {
+    downloadLeadReport: async (action: 'view' | 'download' = 'view') => {
         try {
             const response = await axios.get(`${API_URL}/leads`, {
                 headers: getAuthHeader(),
                 responseType: 'blob'
             });
-            downloadFile(response, `lead_conversion_report.pdf`);
+            handleResponse(response, `lead_conversion_report.pdf`, action);
             return true;
         } catch (error) {
-            console.error('Download failed', error);
+            console.error('Action failed', error);
             throw error;
         }
     }
