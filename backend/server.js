@@ -55,6 +55,8 @@ import visitRoutes from './routes/visitRoutes.js';
 app.use('/api/visits', visitRoutes);
 import notificationRoutes from './routes/notificationRoutes.js';
 app.use('/api/notifications', notificationRoutes);
+import reportRoutes from './routes/reportRoutes.js';
+app.use('/api/reports', reportRoutes);
 
 app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', message: 'PMS Backend is running' });

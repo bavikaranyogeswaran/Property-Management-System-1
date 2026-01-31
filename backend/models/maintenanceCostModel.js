@@ -45,6 +45,17 @@ class MaintenanceCostModel {
         const [result] = await pool.query('DELETE FROM maintenance_costs WHERE cost_id = ?', [id]);
         return result.affectedRows > 0;
     }
+    async findAllWithDetails() {
+        const [rows] = await pool.query(`
+            SELECT mc.*, p.name as property_name, p.property_id
+            FROM maintenance_costs mc
+            JOIN maintenance_requests mr ON mc.request_id = mr.request_id
+            JOIN units u ON mr.unit_id = u.unit_id
+            JOIN properties p ON u.property_id = p.property_id
+            ORDER BY mc.recorded_date DESC
+        `);
+        return rows;
+    }
 }
 
 export default new MaintenanceCostModel();

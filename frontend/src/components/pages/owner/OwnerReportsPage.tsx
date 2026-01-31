@@ -12,6 +12,8 @@ import {
     DollarSign
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { reportService } from '@/services/reportService';
+import { useState } from 'react';
 
 export function OwnerReportsPage() {
     const { properties, units, tenants, invoices, maintenanceRequests } = useApp();
@@ -33,16 +35,22 @@ export function OwnerReportsPage() {
 
     const netIncome = totalIncome - maintenanceCost;
 
-    const handleExport = (reportType: string) => {
-        // Simulate export
-        toast.promise(
-            new Promise((resolve) => setTimeout(resolve, 1500)),
-            {
-                loading: `Generating ${reportType}...`,
-                success: `${reportType} downloaded successfully`,
-                error: 'Failed to generate report',
+    const [isGenerating, setIsGenerating] = useState(false);
+
+    const handleExport = async (reportType: string) => {
+        setIsGenerating(true);
+        try {
+            if (reportType === 'Monthly Summary') {
+                await reportService.downloadOccupancyReport();
+            } else if (reportType === 'Financial Report') {
+                await reportService.downloadFinancialReport();
             }
-        );
+            toast.success(`${reportType} downloaded successfully`);
+        } catch (error) {
+            toast.error(`Failed to generate ${reportType}`);
+        } finally {
+            setIsGenerating(false);
+        }
     };
 
     return (
@@ -53,13 +61,13 @@ export function OwnerReportsPage() {
                     <p className="text-sm text-gray-500 mt-1">Financial overview and property performance</p>
                 </div>
                 <div className="flex gap-2">
-                    <Button variant="outline" onClick={() => handleExport('Monthly Summary')}>
+                    <Button variant="outline" onClick={() => handleExport('Monthly Summary')} disabled={isGenerating}>
                         <Download className="size-4 mr-2" />
-                        Monthly Summary
+                        {isGenerating ? 'Generating...' : 'Occupancy Report'}
                     </Button>
-                    <Button onClick={() => handleExport('Financial Report')}>
+                    <Button onClick={() => handleExport('Financial Report')} disabled={isGenerating}>
                         <BarChart3 className="size-4 mr-2" />
-                        Export Financials
+                        {isGenerating ? 'Generating...' : 'Financial Report'}
                     </Button>
                 </div>
             </div>
