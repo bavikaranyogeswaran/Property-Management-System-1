@@ -58,6 +58,22 @@ class InvoiceController {
             let skippedCount = 0;
 
             for (const lease of activeLeases) {
+                // Check Lease Start Date
+                // Lease must start ON or BEFORE the 1st of the invoice month to get an auto-invoice for that month
+                // (e.g. Generating for Feb: Lease starts Feb 15 -> Skip. Lease starts Feb 1 -> Include. Lease starts Jan 15 -> Include.)
+                const leaseStart = new Date(lease.startDate);
+                // Reset time to midnight for accurate comparison
+                leaseStart.setHours(0, 0, 0, 0);
+
+                const targetMonthStart = new Date(year, month - 1, 1);
+                targetMonthStart.setHours(0, 0, 0, 0);
+
+                if (leaseStart > targetMonthStart) {
+                    console.log(`Skipping lease ${lease.id} (Starts ${lease.startDate} after target month start)`);
+                    skippedCount++;
+                    continue;
+                }
+
                 // Check if invoice already exists
                 const exists = await invoiceModel.exists(lease.id, year, month);
                 if (exists) {
