@@ -44,6 +44,8 @@ export function OwnerReportsPage() {
                 await reportService.downloadOccupancyReport();
             } else if (reportType === 'Financial Report') {
                 await reportService.downloadFinancialReport();
+            } else if (reportType === 'Tenant Risk Report') {
+                await reportService.downloadTenantRiskReport();
             }
             toast.success(`${reportType} downloaded successfully`);
         } catch (error) {
@@ -68,6 +70,10 @@ export function OwnerReportsPage() {
                     <Button onClick={() => handleExport('Financial Report')} disabled={isGenerating}>
                         <BarChart3 className="size-4 mr-2" />
                         {isGenerating ? 'Generating...' : 'Financial Report'}
+                    </Button>
+                    <Button variant="secondary" onClick={() => handleExport('Tenant Risk Report')} disabled={isGenerating}>
+                        <Users className="size-4 mr-2" />
+                        {isGenerating ? 'Generating...' : 'Tenant Risk Report'}
                     </Button>
                 </div>
             </div>

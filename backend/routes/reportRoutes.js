@@ -8,5 +8,6 @@ const router = express.Router();
 // Or mainly Owner. Let's allow Owner and Treasurer.
 router.get('/financial', authenticateToken, authorizeRoles('owner', 'treasurer'), reportController.generateFinancialReport);
 router.get('/occupancy', authenticateToken, authorizeRoles('owner', 'treasurer'), reportController.generateOccupancyReport);
+router.get('/tenant-risk', authenticateToken, authorizeRoles('owner', 'treasurer'), reportController.generateTenantRiskReport);
 
 export default router;

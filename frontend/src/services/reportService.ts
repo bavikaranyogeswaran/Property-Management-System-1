@@ -44,5 +44,19 @@ export const reportService = {
             console.error('Download failed', error);
             throw error;
         }
+    },
+
+    downloadTenantRiskReport: async () => {
+        try {
+            const response = await axios.get(`${API_URL}/tenant-risk`, {
+                headers: getAuthHeader(),
+                responseType: 'blob'
+            });
+            downloadFile(response, `tenant_risk_report.pdf`);
+            return true;
+        } catch (error) {
+            console.error('Download failed', error);
+            throw error;
+        }
     }
 };

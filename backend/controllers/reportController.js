@@ -181,6 +181,109 @@ class ReportController {
             res.status(500).json({ error: 'Failed to generate occupancy report' });
         }
     }
+
+    async generateTenantRiskReport(req, res) {
+        try {
+            // Fetch Tenants with profile data
+            // We need: name, behavior_score, and payment history (late fees or overdue invoices)
+            // userModel.findAllTenants() might be needed or we use invoiceModel/behaviorModel
+
+            // Let's rely on invoiceModel.findAll() which joins users, and we can aggregate.
+            // But we also need behavior scores which are on the user table (tenant role).
+
+            // Quickest way: Fetch all invoices to check payment history + Fetch all tenants for scores.
+
+            // 1. Fetch Tenants (users with role 'tenant')
+            // We assume userModel has a way to find by role or we use raw query here for speed/custom join
+            // Let's perform a custom query to get everything we need for the report.
+
+            const [tenants] = await invoiceModel.pool.query(`
+                SELECT u.user_id, u.name, u.email, t.behavior_score,
+                       (SELECT COUNT(*) FROM rent_invoices ri 
+                        JOIN leases l ON ri.lease_id = l.lease_id 
+                        WHERE l.tenant_id = u.user_id AND ri.status = 'overdue') as overdue_count,
+                       (SELECT COUNT(*) FROM rent_invoices ri 
+                        JOIN leases l ON ri.lease_id = l.lease_id 
+                        WHERE l.tenant_id = u.user_id AND ri.status = 'paid') as paid_count
+                FROM users u
+                JOIN tenants t ON u.user_id = t.user_id
+                WHERE u.role = 'tenant'
+                ORDER BY t.behavior_score ASC
+            `);
+
+            const doc = new PDFDocument({ margin: 50 });
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader('Content-Disposition', `attachment; filename=tenant_risk_report.pdf`);
+            doc.pipe(res);
+
+            doc.fontSize(20).text(`Tenant Risk Profile`, { align: 'center' });
+            doc.fontSize(12).text(`Generated on: ${new Date().toLocaleDateString()}`, { align: 'center' });
+            doc.moveDown();
+
+            // Table Header
+            const tableTop = 150;
+            const nameX = 50;
+            const scoreX = 200;
+            const historyX = 300;
+            const riskX = 450;
+
+            doc.fontSize(12).font('Helvetica-Bold');
+            doc.text('Tenant', nameX, tableTop);
+            doc.text('Behavior Score', scoreX, tableTop);
+            doc.text('Overdue / Paid', historyX, tableTop);
+            doc.text('Risk Level', riskX, tableTop);
+
+            doc.moveTo(nameX, tableTop + 15).lineTo(550, tableTop + 15).stroke();
+
+            let y = tableTop + 25;
+
+            doc.font('Helvetica');
+            for (const tenant of tenants) {
+                // Risk Calculation Logic
+                // Start with score (Base 100). < 80 is watching, < 50 is bad.
+                // Overdue invoices add significant risk.
+
+                let riskLevel = 'Low';
+                let color = 'green';
+
+                if (tenant.behavior_score < 70 || tenant.overdue_count > 1) {
+                    riskLevel = 'Medium';
+                    color = 'orange';
+                }
+                if (tenant.behavior_score < 50 || tenant.overdue_count > 3) {
+                    riskLevel = 'High';
+                    color = 'red';
+                }
+
+                doc.fillColor('black').text(tenant.name, nameX, y);
+                doc.text(tenant.behavior_score.toString(), scoreX, y);
+                doc.text(`${tenant.overdue_count} / ${tenant.paid_count}`, historyX, y);
+
+                doc.fillColor(color).font('Helvetica-Bold').text(riskLevel, riskX, y);
+
+                y += 20;
+
+                if (y > 700) {
+                    doc.addPage();
+                    y = 50;
+                    // Redraw header
+                    doc.fillColor('black').fontSize(12).font('Helvetica-Bold');
+                    doc.text('Tenant', nameX, y);
+                    doc.text('Behavior Score', scoreX, y);
+                    doc.text('Overdue / Paid', historyX, y);
+                    doc.text('Risk Level', riskX, y);
+                    doc.moveTo(nameX, y + 15).lineTo(550, y + 15).stroke();
+                    y += 25;
+                    doc.font('Helvetica');
+                }
+            }
+            doc.end();
+
+        } catch (error) {
+            console.error('Error generating tenant risk report:', error);
+            res.status(500).json({ error: 'Failed to generate tenant risk report' });
+        }
+    }
 }
 
 export default new ReportController();
