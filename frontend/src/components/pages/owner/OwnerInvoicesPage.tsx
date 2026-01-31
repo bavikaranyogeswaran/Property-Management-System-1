@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useAuth } from '@/app/context/AuthContext';
 import { useApp, Receipt as ReceiptType } from '@/app/context/AppContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,6 +12,7 @@ import { toast } from 'sonner';
 import { ReceiptViewer } from '@/components/common/ReceiptViewer';
 
 export function OwnerInvoicesPage() {
+  const { user } = useAuth();
   const { invoices, tenants, units, properties, leases, receipts, payments, generateMonthlyInvoices } = useApp();
   const [selectedReceipt, setSelectedReceipt] = useState<{
     receipt: ReceiptType;
@@ -157,30 +159,34 @@ export function OwnerInvoicesPage() {
           <h2 className="text-2xl font-semibold text-gray-900">Invoices</h2>
           <p className="text-sm text-gray-500 mt-1">Manage rent invoices and payments</p>
         </div>
-        <Button onClick={handleGenerateInvoices}>
-          <Plus className="size-4 mr-2" />
-          Generate Monthly Invoices
-        </Button>
+        {user?.role === 'treasurer' && (
+          <Button onClick={handleGenerateInvoices}>
+            <Plus className="size-4 mr-2" />
+            Generate Monthly Invoices
+          </Button>
+        )}
       </div>
 
       {/* Info Card */}
-      <Card className="border-blue-200 bg-blue-50">
-        <CardContent className="p-4">
-          <div className="flex items-start gap-3">
-            <DollarSign className="size-5 text-blue-600 mt-0.5" />
-            <div>
-              <p className="font-medium text-blue-900">Auto-Generate Invoices</p>
-              <p className="text-sm text-blue-800 mt-1">
-                Click "Generate Monthly Invoices" to automatically create invoices for all active leases.
-                Invoices are generated for the current month with a due date of the 5th.
-              </p>
-              <p className="text-sm text-blue-700 mt-2">
-                Active leases: <strong>{activeLeases.length}</strong>
-              </p>
+      {user?.role === 'treasurer' && (
+        <Card className="border-blue-200 bg-blue-50">
+          <CardContent className="p-4">
+            <div className="flex items-start gap-3">
+              <DollarSign className="size-5 text-blue-600 mt-0.5" />
+              <div>
+                <p className="font-medium text-blue-900">Auto-Generate Invoices</p>
+                <p className="text-sm text-blue-800 mt-1">
+                  Click "Generate Monthly Invoices" to automatically create invoices for all active leases.
+                  Invoices are generated for the current month with a due date of the 5th.
+                </p>
+                <p className="text-sm text-blue-700 mt-2">
+                  Active leases: <strong>{activeLeases.length}</strong>
+                </p>
+              </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

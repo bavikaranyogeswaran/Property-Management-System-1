@@ -167,6 +167,7 @@ function AppContent() {
       {/* Treasurer Routes */}
       {user?.role === 'treasurer' && (
         <>
+          <Route path="/invoices" element={<ProtectedRoute><OwnerInvoicesPage /></ProtectedRoute>} />
           <Route path="/payments" element={<ProtectedRoute><PaymentVerificationPage /></ProtectedRoute>} />
           <Route path="/expenses" element={<ProtectedRoute><MaintenanceExpensesPage /></ProtectedRoute>} />
           <Route path="/analytics" element={<ProtectedRoute><AnalyticsPage /></ProtectedRoute>} />

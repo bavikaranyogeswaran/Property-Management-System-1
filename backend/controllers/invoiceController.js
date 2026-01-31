@@ -27,7 +27,8 @@ class InvoiceController {
     // Let's add a manual create for Owner to seed data.
     async createInvoice(req, res) {
         try {
-            if (req.user.role !== 'owner') return res.status(403).json({ error: 'Denied' });
+            // Strictly Treasurer only
+            if (req.user.role !== 'treasurer') return res.status(403).json({ error: 'Denied. Only Treasurers can create invoices.' });
 
             const { leaseId, tenantId, propertyId, amount, dueDate, description } = req.body;
             const id = await invoiceModel.create({
@@ -42,8 +43,8 @@ class InvoiceController {
 
     async generateMonthlyInvoices(req, res) {
         try {
-            if (req.user.role !== 'owner' && req.user.role !== 'treasurer') {
-                return res.status(403).json({ error: 'Access denied' });
+            if (req.user.role !== 'treasurer') {
+                return res.status(403).json({ error: 'Access denied. Only Treasurers can generate invoices.' });
             }
 
             // Default to current year/month if not provided
@@ -116,10 +117,11 @@ class InvoiceController {
             const { id } = req.params;
             const { status } = req.body;
 
-            // Only Owner/Treasurer can update status manually (e.g. to 'overdue' or 'cancelled')
+            // Only Treasurer can update status manually (e.g. to 'overdue' or 'cancelled')
             // 'paid' is usually handled by payment verification, but allowing manual override.
-            if (req.user.role !== 'owner' && req.user.role !== 'treasurer') {
-                return res.status(403).json({ error: 'Access denied' });
+            // Owner is VIEW ONLY.
+            if (req.user.role !== 'treasurer') {
+                return res.status(403).json({ error: 'Access denied. Only Treasurers can update invoice status.' });
             }
 
             const invoice = await invoiceModel.findById(id);

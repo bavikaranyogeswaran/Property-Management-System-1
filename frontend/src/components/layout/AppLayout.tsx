@@ -51,6 +51,7 @@ export function AppLayout({ children }: AppLayoutProps) {
 
   const treasurerMenu = [
     { path: '/dashboard', label: 'Dashboard', icon: Home },
+    { path: '/invoices', label: 'Invoices', icon: FileText },
     { path: '/payments', label: 'Payment Verification', icon: CreditCard },
     { path: '/receipts', label: 'Receipts', icon: Receipt },
     { path: '/expenses', label: 'Expenses', icon: DollarSign },
