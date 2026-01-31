@@ -178,12 +178,8 @@ export function PublicListingPage({ onNavigate }: { onNavigate?: (page: string) 
                                         Schedule Visit
                                     </Button>
                                 </div>
-                                <Button
-                                    className="w-full"
-                                    onClick={() => openInterestDialog(property)}
-                                >
-                                    I'm Interested
-                                </Button>
+
+
                             </div>
                         </CardContent>
                     </Card>

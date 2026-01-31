@@ -128,6 +128,18 @@ class LeadController {
                 }
             } else {
                 finalUnitId = null;
+
+                // NEW CHECK: If "Whole Property" interest (no specific unit), check if any units are OCCUPIED.
+                const [occupiedCheck] = await db.query(
+                    "SELECT COUNT(*) as count FROM units WHERE property_id = ? AND status IN ('occupied', 'maintenance')",
+                    [propertyId]
+                );
+
+                if (occupiedCheck[0].count > 0) {
+                    return res.status(400).json({
+                        error: 'Cannot express interest in the whole property because some units are currently occupied. Please select a specific unit.'
+                    });
+                }
             }
 
             // CHECK ARBITRATION: 

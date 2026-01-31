@@ -662,7 +662,14 @@ export function PublicPropertyDetailsPage() {
                                     onChange={(e) => setInterestFormData({ ...interestFormData, interestedUnit: e.target.value })}
                                     disabled={isUnitLocked}
                                 >
-                                    <option value="">Whole Property / Any Available Unit</option>
+                                    {propertyUnits.some(u => u.status !== 'available') ? (
+                                        null
+                                    ) : (
+                                        <option value="">Whole Property / Any Available Unit</option>
+                                    )}
+                                    {propertyUnits.some(u => u.status !== 'available') && (
+                                        <option value="" disabled>Select a specific unit (Whole property unavailable due to occupancy)</option>
+                                    )}
                                     {propertyUnits
                                         .filter(u => u.status === 'available')
                                         .map(u => (
@@ -700,9 +707,9 @@ export function PublicPropertyDetailsPage() {
                                         <div className={`h-1 flex-1 rounded ${passwordStrength === 'very-strong' ? 'bg-green-600' : 'bg-gray-200'}`} />
                                     </div>
                                     <p className={`text-xs ${passwordStrength === 'weak' ? 'text-red-500' :
-                                            passwordStrength === 'medium' ? 'text-yellow-600' :
-                                                passwordStrength === 'strong' ? 'text-green-600' :
-                                                    'text-green-700'
+                                        passwordStrength === 'medium' ? 'text-yellow-600' :
+                                            passwordStrength === 'strong' ? 'text-green-600' :
+                                                'text-green-700'
                                         }`}>
                                         Password strength: {passwordStrength.replace('-', ' ')}
                                     </p>
