@@ -29,9 +29,8 @@ class MaintenanceCostController {
             const { requestId } = req.query;
 
             if (req.user.role === 'tenant') {
-                // Tenants generally don't see internal costs, but maybe transparency?
-                // Let's restrict for now.
-                return res.status(403).json({ error: 'Access denied' });
+                const costs = await maintenanceCostModel.findByTenantId(req.user.id);
+                return res.json(costs);
             }
 
             // If no requestId provided, return all costs for Owner/Treasurer

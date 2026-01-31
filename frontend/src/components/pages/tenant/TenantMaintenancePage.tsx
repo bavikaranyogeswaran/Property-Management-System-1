@@ -14,7 +14,7 @@ import { toast } from 'sonner';
 
 export function TenantMaintenancePage() {
   const { user } = useAuth();
-  const { maintenanceRequests, leases, units, addMaintenanceRequest } = useApp();
+  const { maintenanceRequests, leases, units, addMaintenanceRequest, maintenanceCosts } = useApp();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
@@ -298,6 +298,15 @@ export function TenantMaintenancePage() {
                         <span>•</span>
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${getPriorityBadge(request.priority)}`}>
                           {request.priority.charAt(0).toUpperCase() + request.priority.slice(1)} Priority
+                        </span>
+                        <span>•</span>
+                        <span className="font-medium text-gray-700">
+                          {(() => {
+                            const totalCost = maintenanceCosts
+                              .filter(c => c.requestId === request.id)
+                              .reduce((sum, c) => sum + c.amount, 0);
+                            return totalCost > 0 ? `Cost: LKR ${totalCost.toLocaleString()}` : 'Cost: -';
+                          })()}
                         </span>
                         <span>•</span>
                         <span>Submitted: {request.submittedDate}</span>

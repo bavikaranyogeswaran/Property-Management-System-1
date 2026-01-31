@@ -6,6 +6,17 @@ class MaintenanceCostModel {
         return rows;
     }
 
+    async findByTenantId(tenantId) {
+        const [rows] = await pool.query(`
+            SELECT mc.* 
+            FROM maintenance_costs mc 
+            JOIN maintenance_requests mr ON mc.request_id = mr.request_id 
+            WHERE mr.tenant_id = ? 
+            ORDER BY mc.recorded_date DESC
+        `, [tenantId]);
+        return rows;
+    }
+
     async create(data) {
         const { requestId, description, amount, recordedDate } = data;
         const [result] = await pool.query(
