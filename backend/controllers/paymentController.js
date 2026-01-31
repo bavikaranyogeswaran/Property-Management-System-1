@@ -26,6 +26,37 @@ class PaymentController {
         }
     }
 
+    async recordCashPayment(req, res) {
+        try {
+            if (req.user.role !== 'treasurer') {
+                return res.status(403).json({ error: 'Access denied. Only Treasurers can record cash payments.' });
+            }
+
+            const { invoiceId, amount, paymentDate, referenceNumber } = req.body;
+
+            // Create Verified Payment directly
+            const paymentId = await paymentModel.create({
+                invoiceId,
+                amount,
+                paymentDate,
+                paymentMethod: 'cash',
+                referenceNumber: referenceNumber || `CASH-${Date.now()}`,
+                evidenceUrl: null // No proof for cash
+            });
+
+            // Auto-verify
+            await paymentModel.updateStatus(paymentId, 'verified');
+
+            // Mark Invoice as Paid
+            await invoiceModel.updateStatus(invoiceId, 'paid');
+
+            res.status(201).json({ message: 'Cash payment recorded and verified', paymentId });
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ error: 'Failed to record cash payment' });
+        }
+    }
+
     async verifyPayment(req, res) {
         try {
             const { id } = req.params;

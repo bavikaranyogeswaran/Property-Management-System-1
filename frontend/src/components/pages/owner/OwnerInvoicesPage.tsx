@@ -5,11 +5,65 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FileText, Plus, DollarSign, AlertCircle, CheckCircle, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import { ReceiptViewer } from '@/components/common/ReceiptViewer';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+
+// Helper Form Component
+function RecordCashPaymentForm({ invoice, tenantName }: { invoice: any, tenantName?: string }) {
+  const { recordCashPayment } = useApp();
+  const [amount, setAmount] = useState(invoice.amount.toString());
+  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await recordCashPayment(invoice.id, parseFloat(amount), date);
+      // Close dialog? Ideally parent handles logic, but simple form submission here.
+      // We rely on toast from context.
+      // To close dialog, we might need a prop or use DialogClose. 
+      // For now, let it submit.
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <Label>Tenant</Label>
+        <div className="p-2 bg-gray-50 rounded border">{tenantName || 'Unknown'}</div>
+      </div>
+      <div>
+        <Label>Amount (LKR)</Label>
+        <Input
+          type="number"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          required
+        />
+      </div>
+      <div>
+        <Label>Payment Date</Label>
+        <Input
+          type="date"
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
+          required
+        />
+      </div>
+      <Button type="submit" disabled={loading} className="w-full">
+        {loading ? 'Recording...' : 'Confirm Cash Payment'}
+      </Button>
+    </form>
+  );
+}
 
 export function OwnerInvoicesPage() {
   const { user } = useAuth();
@@ -109,7 +163,25 @@ export function OwnerInvoicesPage() {
                     {isOverdue ? 'Overdue' : invoice.status}
                   </Badge>
                 </TableCell>
-                <TableCell className="text-right">
+                <TableCell className="text-right flex items-center justify-end gap-2">
+                  {/* Cash Payment Button for Treasurer */}
+                  {user?.role === 'treasurer' && invoice.status !== 'paid' && (
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button size="sm" variant="outline" className="text-green-600 border-green-200 hover:bg-green-50">
+                          <DollarSign className="size-3 mr-1" />
+                          Cash Pay
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Record Cash Payment</DialogTitle>
+                        </DialogHeader>
+                        <RecordCashPaymentForm invoice={invoice} tenantName={tenant?.name} />
+                      </DialogContent>
+                    </Dialog>
+                  )}
+
                   {invoice.status === 'paid' && receipt && (() => {
                     const receiptPayment = payments.find(p => p.id === receipt.paymentId);
                     if (!receiptPayment || !tenant || !unit || !property) return null;
@@ -141,13 +213,15 @@ export function OwnerInvoicesPage() {
           })}
         </TableBody>
       </Table>
-      {invoicesList.length === 0 && (
-        <div className="py-12 text-center">
-          <FileText className="size-12 text-gray-400 mx-auto mb-4" />
-          <p className="text-gray-600">No invoices found</p>
-        </div>
-      )}
-    </div>
+      {
+        invoicesList.length === 0 && (
+          <div className="py-12 text-center">
+            <FileText className="size-12 text-gray-400 mx-auto mb-4" />
+            <p className="text-gray-600">No invoices found</p>
+          </div>
+        )
+      }
+    </div >
   );
 
   const activeLeases = leases.filter(l => l.status === 'active');

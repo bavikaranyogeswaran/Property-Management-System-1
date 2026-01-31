@@ -5,6 +5,7 @@ import authenticateToken from '../middleware/authMiddleware.js';
 const router = Router();
 
 router.post('/', authenticateToken, paymentController.submitPayment);
+router.post('/cash', authenticateToken, paymentController.recordCashPayment);
 router.get('/', authenticateToken, paymentController.getPayments);
 router.put('/:id/verify', authenticateToken, paymentController.verifyPayment);
 

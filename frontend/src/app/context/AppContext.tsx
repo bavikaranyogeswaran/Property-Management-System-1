@@ -264,6 +264,7 @@ interface AppContextType {
   // Payment operations
   submitPayment: (payment: Omit<Payment, 'id' | 'submittedAt'>) => void;
   verifyPayment: (id: string, approved: boolean) => void;
+  recordCashPayment: (invoiceId: string, amount: number, paymentDate: string, referenceNumber?: string) => Promise<void>;
 
   // Maintenance operations
   addMaintenanceRequest: (request: Omit<MaintenanceRequest, 'id' | 'submittedDate'>) => void;
@@ -1423,6 +1424,44 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const recordCashPayment = async (invoiceId: string, amount: number, paymentDate: string, referenceNumber?: string) => {
+    try {
+      await paymentApi.recordCashPayment(invoiceId, amount, paymentDate, referenceNumber);
+      toast.success("Cash payment recorded");
+      // Refresh payments and invoices
+      const payRes = await paymentApi.getPayments();
+      if (payRes.data) {
+        const mappedPayments = payRes.data.map((p: any) => ({
+          id: p.payment_id.toString(),
+          invoiceId: p.invoice_id.toString(),
+          tenantId: p.tenant_id.toString(),
+          amount: parseFloat(p.amount),
+          paymentDate: p.payment_date ? p.payment_date.split('T')[0] : '',
+          paymentMethod: p.payment_method,
+          referenceNumber: p.reference_number,
+          status: p.status,
+          submittedAt: p.created_at || '',
+          proofUrl: p.evidence_url
+        }));
+        setPayments(mappedPayments);
+      }
+      const invRes = await invoiceApi.getInvoices();
+      setInvoices(invRes.data.map((i: any) => ({
+        id: i.invoice_id.toString(),
+        leaseId: i.lease_id,
+        tenantId: i.tenant_id,
+        unitId: i.unit_id ? i.unit_id.toString() : '',
+        amount: parseFloat(i.amount),
+        dueDate: i.due_date ? i.due_date.split('T')[0] : '',
+        status: i.status,
+        generatedDate: i.created_at ? i.created_at.split('T')[0] : ''
+      })));
+    } catch (e: any) {
+      console.error("Failed to record cash payment", e);
+      toast.error(e.response?.data?.error || "Failed to record cash payment");
+    }
+  };
+
   const addMaintenanceCost = async (cost: Omit<MaintenanceCost, 'id' | 'recordedDate'>) => {
     try {
       const res = await maintenanceApi.addCost(cost);
@@ -1574,6 +1613,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       generateMonthlyInvoices,
       submitPayment,
       verifyPayment,
+      recordCashPayment,
       addMaintenanceRequest,
       updateMaintenanceRequest,
       addMaintenanceCost,
