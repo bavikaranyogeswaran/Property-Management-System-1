@@ -55,10 +55,12 @@ export function TenantInvoicesPage() {
     if (!invoice) return;
 
     // Simulate file upload by creating a local URL
-    let proofUrl = undefined;
-    if (selectedFile) {
-      proofUrl = URL.createObjectURL(selectedFile);
+    if (!selectedFile) {
+      toast.error('Please upload payment proof to proceed.');
+      return;
     }
+
+    let proofUrl = URL.createObjectURL(selectedFile);
 
     submitPayment({
       invoiceId: selectedInvoice,
@@ -343,13 +345,14 @@ export function TenantInvoicesPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="proof">Payment Proof (Optional)</Label>
+              <Label htmlFor="proof">Payment Proof (Required)</Label>
               <Input
                 id="proof"
                 type="file"
                 accept="image/*,.pdf"
                 onChange={handleFileChange}
                 className="cursor-pointer"
+                required
               />
               <p className="text-xs text-gray-500">
                 Upload a screenshot or photo of your payment receipt

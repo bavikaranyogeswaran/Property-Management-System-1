@@ -1,5 +1,6 @@
 import paymentModel from '../models/paymentModel.js';
 import invoiceModel from '../models/invoiceModel.js';
+import receiptModel from '../models/receiptModel.js';
 
 class PaymentController {
     async submitPayment(req, res) {

@@ -31,6 +31,10 @@ import maintenanceRequestRoutes from './routes/maintenanceRequestRoutes.js';
 import maintenanceCostRoutes from './routes/maintenanceCostRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
 import invoiceRoutes from './routes/invoiceRoutes.js';
+import receiptRoutes from './routes/receiptRoutes.js';
+
+// ...
+app.use('/api/receipts', receiptRoutes);
 import behaviorRoutes from './routes/behaviorRoutes.js';
 
 app.use('/api/auth', authRoutes);
