@@ -1,5 +1,8 @@
 import maintenanceRequestModel from '../models/maintenanceRequestModel.js';
 import propertyModel from '../models/propertyModel.js';
+import notificationModel from '../models/notificationModel.js';
+// Assuming userModel exists or we use raw query. Checking userModel first...
+import userModel from '../models/userModel.js';
 
 class MaintenanceRequestController {
     async createRequest(req, res) {
@@ -59,6 +62,26 @@ class MaintenanceRequestController {
             }
 
             const updated = await maintenanceRequestModel.updateStatus(id, status);
+
+            // Notification Logic: If status is completed, notify Treasurers
+            if (status === 'completed') {
+                // Find all treasurers
+                const treasurers = await userModel.findByRole('treasurer');
+
+                // Get request details for the message
+                const request = await maintenanceRequestModel.findById(id);
+                // Also get unit/property info if possible, but let's keep message simple for now or fetch unit details.
+                // request object has details.
+
+                for (const treasurer of treasurers) {
+                    await notificationModel.create({
+                        userId: treasurer.user_id,
+                        message: `Maintenance Request '${request.title}' has been completed. Please record final costs.`,
+                        type: 'maintenance'
+                    });
+                }
+            }
+
             res.json(updated);
         } catch (error) {
             console.error(error);

@@ -1,6 +1,9 @@
 import React, { ReactNode, useState } from 'react';
 import { useAuth } from '@/app/context/AuthContext';
+import { useApp } from '@/app/context/AppContext';
 import { Button } from '@/components/ui/button';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Building2,
   Home,
@@ -16,7 +19,8 @@ import {
   Shield,
   Settings,
   DollarSign,
-  Receipt
+  Receipt,
+  Bell
 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 
@@ -26,8 +30,11 @@ interface AppLayoutProps {
 
 export function AppLayout({ children }: AppLayoutProps) {
   const { user, logout } = useAuth();
+  const { notifications, markNotificationAsRead } = useApp();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const location = useLocation();
+
+  const unreadCount = notifications.filter(n => !n.read).length;
 
   const isActive = (path: string) => {
     if (path === '/dashboard' && location.pathname === '/') return true;
@@ -102,6 +109,41 @@ export function AppLayout({ children }: AppLayoutProps) {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="ghost" size="icon" className="relative">
+                  <Bell className="size-5 text-gray-600" />
+                  {unreadCount > 0 && (
+                    <span className="absolute top-2 right-2 size-2 bg-red-600 rounded-full" />
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-80 p-0" align="end">
+                <div className="p-4 border-b font-semibold">Notifications</div>
+                <ScrollArea className="h-[300px]">
+                  {notifications.length === 0 ? (
+                    <div className="p-4 text-center text-sm text-gray-500">No notifications</div>
+                  ) : (
+                    <div className="divide-y">
+                      {notifications.map((notification) => (
+                        <div
+                          key={notification.id}
+                          className={`p-4 hover:bg-gray-50 cursor-pointer ${!notification.read ? 'bg-blue-50/50' : ''}`}
+                          onClick={() => markNotificationAsRead(notification.id)}
+                        >
+                          <div className="text-sm font-medium mb-1">{notification.title}</div>
+                          <div className="text-xs text-gray-600 mb-1">{notification.message}</div>
+                          <div className="text-xs text-gray-400">
+                            {new Date(notification.createdAt).toLocaleDateString()}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </ScrollArea>
+              </PopoverContent>
+            </Popover>
+
             <div className="text-right hidden sm:block">
               <p className="text-sm font-medium text-gray-900">{user?.name}</p>
               <p className="text-xs text-gray-500">{user?.email}</p>

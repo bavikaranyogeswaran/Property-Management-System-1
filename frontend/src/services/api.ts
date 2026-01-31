@@ -57,6 +57,14 @@ export const paymentApi = {
     submitPayment: (data: any) => apiClient.post('/payments', data),
     getPayments: () => apiClient.get('/payments'),
     verifyPayment: (id: string, status: string) => apiClient.put(`/payments/${id}/verify`, { status }),
+    recordCashPayment: (invoiceId: string, amount: number, paymentDate: string, referenceNumber?: string) =>
+        apiClient.post('/payments/cash', { invoiceId, amount, paymentDate, referenceNumber }),
+};
+
+// Notification API
+export const notificationApi = {
+    getNotifications: () => apiClient.get('/notifications'),
+    markAsRead: (id: string) => apiClient.put(`/notifications/${id}/read`),
 };
 
 // Invoice API

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import apiClient, { maintenanceApi, paymentApi, invoiceApi } from '../../services/api';
+import apiClient, { maintenanceApi, paymentApi, invoiceApi, notificationApi } from '../../services/api';
 import { toast } from 'sonner';
 
 // Type definitions
@@ -215,6 +215,7 @@ interface AppContextType {
   maintenanceRequests: MaintenanceRequest[];
   maintenanceCosts: MaintenanceCost[];
   notifications: Notification[];
+  markNotificationAsRead: (id: string) => Promise<void>;
 
   // Property operations
   addProperty: (property: Omit<Property, 'id' | 'createdAt'>) => Promise<Property | undefined>;
@@ -1558,6 +1559,46 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const markNotificationAsRead = async (id: string) => {
+    try {
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+      if (!id.startsWith('notif-')) {
+        await notificationApi.markAsRead(id);
+      }
+    } catch (e) {
+      console.error("Failed to mark notification as read", e);
+    }
+  };
+
+  // Fetch Notifications from Backend
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      try {
+        const res = await notificationApi.getNotifications();
+        if (res.data) {
+          const backendNotifs = res.data.map((n: any) => ({
+            id: n.notification_id.toString(),
+            type: n.type,
+            title: n.type === 'maintenance' ? 'Maintenance Update' : 'Notification',
+            message: n.message,
+            targetRole: 'treasurer',
+            severity: 'info',
+            createdAt: n.created_at,
+            read: Boolean(n.is_read)
+          }));
+          setNotifications(prev => {
+            // Keep existing local notifications (those starting with 'notif-')
+            const local = prev.filter(n => n.id.startsWith('notif-'));
+            return [...local, ...backendNotifs];
+          });
+        }
+      } catch (e) {
+        console.error("Failed to fetch notifications", e);
+      }
+    };
+    fetchNotifications();
+  }, []);
+
   // Initial fetch for visits if owner
   useEffect(() => {
     const token = localStorage.getItem('authToken');
@@ -1625,6 +1666,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       visits,
       fetchVisits,
       updateVisitStatus,
+      markNotificationAsRead,
     }}>
       {children}
     </AppContext.Provider>
