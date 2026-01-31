@@ -43,6 +43,19 @@ CREATE TABLE tenants (
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 );
 
+CREATE TABLE tenant_behavior_logs (
+    log_id INT AUTO_INCREMENT PRIMARY KEY,
+    tenant_id INT NOT NULL,
+    type ENUM('positive','negative','neutral') NOT NULL,
+    category VARCHAR(50) NOT NULL,
+    score_change INT NOT NULL,
+    description TEXT,
+    recorded_by INT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (tenant_id) REFERENCES tenants(user_id) ON DELETE CASCADE,
+    FOREIGN KEY (recorded_by) REFERENCES users(user_id)
+);
+
 -- OWNERS
 CREATE TABLE owners (
     user_id INT PRIMARY KEY,
