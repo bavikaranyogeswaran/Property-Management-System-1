@@ -9,7 +9,10 @@ import {
     Download,
     Users,
     Building2,
-    DollarSign
+    DollarSign,
+    Wrench,
+    Calendar,
+    Filter
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { reportService } from '@/services/reportService';
@@ -46,6 +49,12 @@ export function OwnerReportsPage() {
                 await reportService.downloadFinancialReport();
             } else if (reportType === 'Tenant Risk Report') {
                 await reportService.downloadTenantRiskReport();
+            } else if (reportType === 'Maintenance Report') {
+                await reportService.downloadMaintenanceReport();
+            } else if (reportType === 'Lease Expiration Report') {
+                await reportService.downloadLeaseReport();
+            } else if (reportType === 'Lead Conversion Report') {
+                await reportService.downloadLeadReport();
             }
             toast.success(`${reportType} downloaded successfully`);
         } catch (error) {
@@ -76,6 +85,21 @@ export function OwnerReportsPage() {
                         {isGenerating ? 'Generating...' : 'Tenant Risk Report'}
                     </Button>
                 </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2 justify-end">
+                <Button variant="outline" onClick={() => handleExport('Maintenance Report')} disabled={isGenerating}>
+                    <Wrench className="size-4 mr-2" />
+                    Maintenance Analysis
+                </Button>
+                <Button variant="outline" onClick={() => handleExport('Lease Expiration Report')} disabled={isGenerating}>
+                    <Calendar className="size-4 mr-2" />
+                    Lease Expirations
+                </Button>
+                <Button variant="outline" onClick={() => handleExport('Lead Conversion Report')} disabled={isGenerating}>
+                    <Filter className="size-4 mr-2" />
+                    Lead Funnel
+                </Button>
             </div>
 
             {/* Financial Overview Cards */}

@@ -58,5 +58,47 @@ export const reportService = {
             console.error('Download failed', error);
             throw error;
         }
+    },
+
+    downloadMaintenanceReport: async () => {
+        try {
+            const response = await axios.get(`${API_URL}/maintenance`, {
+                headers: getAuthHeader(),
+                responseType: 'blob'
+            });
+            downloadFile(response, `maintenance_category_report.pdf`);
+            return true;
+        } catch (error) {
+            console.error('Download failed', error);
+            throw error;
+        }
+    },
+
+    downloadLeaseReport: async () => {
+        try {
+            const response = await axios.get(`${API_URL}/leases`, {
+                headers: getAuthHeader(),
+                responseType: 'blob'
+            });
+            downloadFile(response, `lease_expiration_forecast.pdf`);
+            return true;
+        } catch (error) {
+            console.error('Download failed', error);
+            throw error;
+        }
+    },
+
+    downloadLeadReport: async () => {
+        try {
+            const response = await axios.get(`${API_URL}/leads`, {
+                headers: getAuthHeader(),
+                responseType: 'blob'
+            });
+            downloadFile(response, `lead_conversion_report.pdf`);
+            return true;
+        } catch (error) {
+            console.error('Download failed', error);
+            throw error;
+        }
     }
 };

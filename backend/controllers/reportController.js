@@ -3,6 +3,8 @@ import invoiceModel from '../models/invoiceModel.js';
 import maintenanceCostModel from '../models/maintenanceCostModel.js';
 import unitModel from '../models/unitModel.js';
 import propertyModel from '../models/propertyModel.js';
+import leaseModel from '../models/leaseModel.js';
+import leadModel from '../models/leadModel.js';
 
 class ReportController {
     async generateFinancialReport(req, res) {
@@ -284,6 +286,205 @@ class ReportController {
             res.status(500).json({ error: 'Failed to generate tenant risk report' });
         }
     }
-}
+    async generateMaintenanceCategoryReport(req, res) {
+        try {
+            const costs = await maintenanceCostModel.findAllWithDetails();
 
-export default new ReportController();
+            // Group by Category (inferred from title/description)
+            const categories = {};
+            let totalCost = 0;
+
+            costs.forEach(cost => {
+                const text = (cost.description + ' ' + (cost.title || '')).toLowerCase();
+                let category = 'General';
+
+                if (text.includes('water') || text.includes('leak') || text.includes('plumb') || text.includes('pipe')) category = 'Plumbing';
+                else if (text.includes('electric') || text.includes('light') || text.includes('power') || text.includes('wire')) category = 'Electrical';
+                else if (text.includes('ac') || text.includes('air') || text.includes('heat') || text.includes('cool') || text.includes('hvac')) category = 'HVAC';
+                else if (text.includes('paint') || text.includes('wall')) category = 'Painting';
+                else if (text.includes('clean') || text.includes('trash')) category = 'Cleaning';
+                else if (text.includes('door') || text.includes('lock') || text.includes('key')) category = 'Security';
+
+                if (!categories[category]) categories[category] = 0;
+                categories[category] += Number(cost.amount);
+                totalCost += Number(cost.amount);
+            });
+
+            const doc = new PDFDocument({ margin: 50 });
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader('Content-Disposition', `attachment; filename=maintenance_category_report.pdf`);
+            doc.pipe(res);
+
+            doc.fontSize(20).text(`Maintenance Cost Analysis`, { align: 'center' });
+            doc.fontSize(12).text(`Generated on: ${new Date().toLocaleDateString()}`, { align: 'center' });
+            doc.moveDown();
+
+            const tableTop = 150;
+            const catX = 50;
+            const amountX = 250;
+            const percentX = 400;
+
+            doc.fontSize(12).font('Helvetica-Bold');
+            doc.text('Category', catX, tableTop);
+            doc.text('Total Cost', amountX, tableTop);
+            doc.text('% of Total', percentX, tableTop);
+
+            doc.moveTo(catX, tableTop + 15).lineTo(550, tableTop + 15).stroke();
+
+            let y = tableTop + 25;
+            doc.font('Helvetica');
+
+            // Sort by cost desc
+            const sorted = Object.entries(categories).sort((a, b) => b[1] - a[1]);
+
+            for (const [cat, amount] of sorted) {
+                const percent = ((amount / totalCost) * 100).toFixed(1);
+
+                doc.text(cat, catX, y);
+                doc.text(amount.toLocaleString(), amountX, y);
+                doc.text(`${percent}%`, percentX, y);
+
+                // Simple bar chart
+                doc.rect(percentX + 60, y, Number(percent) * 2, 10).fill('blue');
+                doc.fillColor('black');
+
+                y += 20;
+            }
+
+            doc.moveDown();
+            doc.font('Helvetica-Bold').text(`Total Maintenance Spend: ${totalCost.toLocaleString()}`, catX, y + 20);
+
+            doc.end();
+
+        } catch (error) {
+            console.error('Error generating maintenance report:', error);
+            res.status(500).json({ error: 'Failed to generate report' });
+        }
+    }
+
+    async generateLeaseExpirationReport(req, res) {
+        try {
+            const activeLeases = await leaseModel.findActive();
+            // Assuming tenant name and property name are joined in findActive()
+
+            const now = new Date();
+            const ninetyDaysFromNow = new Date();
+            ninetyDaysFromNow.setDate(now.getDate() + 90);
+
+            const expiringLeases = activeLeases.filter(lease => {
+                const endDate = new Date(lease.endDate); // leaseModel formats this
+                return endDate >= now && endDate <= ninetyDaysFromNow;
+            });
+
+            const doc = new PDFDocument({ margin: 50 });
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader('Content-Disposition', `attachment; filename=lease_expiration_forecast.pdf`);
+            doc.pipe(res);
+
+            doc.fontSize(20).text(`Lease Expiration Forecast (90 Days)`, { align: 'center' });
+            doc.fontSize(12).text(`Generated on: ${new Date().toLocaleDateString()}`, { align: 'center' });
+            doc.moveDown();
+
+            if (expiringLeases.length === 0) {
+                doc.text('No leases expiring in the next 90 days.');
+            } else {
+                const tableTop = 150;
+                doc.fontSize(10).font('Helvetica-Bold');
+                doc.text('Property', 50, tableTop);
+                doc.text('Unit', 200, tableTop);
+                doc.text('Expiration Date', 300, tableTop);
+                doc.text('Days Remaining', 450, tableTop);
+
+                doc.moveTo(50, tableTop + 15).lineTo(550, tableTop + 15).stroke();
+
+                let y = tableTop + 25;
+                doc.font('Helvetica');
+
+                expiringLeases.forEach(lease => {
+                    const endDate = new Date(lease.endDate);
+                    const diffTime = Math.abs(endDate - now);
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+                    doc.text(lease.propertyName || 'N/A', 50, y);
+                    doc.text(lease.unitNumber || 'N/A', 200, y);
+                    doc.text(lease.endDate, 300, y);
+                    doc.text(`${diffDays} days`, 450, y);
+
+                    y += 20;
+                });
+            }
+            doc.end();
+
+        } catch (error) {
+            console.error('Error generating lease report:', error);
+            res.status(500).json({ error: 'Failed to generate report' });
+        }
+    }
+
+    async generateLeadConversionReport(req, res) {
+        try {
+            const leads = await leadModel.findAll();
+
+            const stats = {
+                Total: leads.length,
+                Interested: 0,
+                Scheduled: 0,
+                visited: 0, // Assuming status update
+                Application: 0,
+                Leased: 0
+            };
+
+            // Map status to funnel step
+            leads.forEach(lead => {
+                const status = lead.status.toLowerCase();
+                if (status === 'interested' || status === 'new') stats.Interested++;
+                if (status.includes('schedule') || status.includes('visit')) stats.Scheduled++;
+                if (status.includes('application') || status === 'applied') stats.Application++;
+                if (status === 'converted' || status === 'leased' || status === 'tenant') stats.Leased++;
+            });
+
+            const doc = new PDFDocument({ margin: 50 });
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader('Content-Disposition', `attachment; filename=lead_conversion_report.pdf`);
+            doc.pipe(res);
+
+            doc.fontSize(20).text(`Lead Conversion Analytics`, { align: 'center' });
+            doc.fontSize(12).text(`Generated on: ${new Date().toLocaleDateString()}`, { align: 'center' });
+            doc.moveDown();
+
+            // Funnel Visualization
+            let y = 150;
+            const steps = [
+                { label: 'Total Leads', count: stats.Total, color: '#e0e0e0' },
+                { label: 'Visits Scheduled', count: stats.Scheduled, color: '#b3e5fc' },
+                { label: 'Applications', count: stats.Application, color: '#81c784' },
+                { label: 'Signed Leases', count: stats.Leased, color: '#4caf50' }
+            ];
+
+            doc.font('Helvetica-Bold');
+            steps.forEach((step, index) => {
+                const width = 300 - (index * 40); // Funnel shape
+                const x = (600 - width) / 2;
+
+                doc.rect(x, y, width, 40).fillAndStroke(step.color, 'black');
+                doc.fillColor('black').text(`${step.label}: ${step.count}`, x, y + 15, { width: width, align: 'center' });
+
+                // Conversion Rate
+                if (index > 0) {
+                    const prev = steps[index - 1];
+                    const rate = prev.count > 0 ? ((step.count / prev.count) * 100).toFixed(1) : 0;
+                    doc.fontSize(10).text(`${rate}% conversion`, x + width + 10, y + 15);
+                    doc.fontSize(12);
+                }
+
+                y += 60;
+            });
+
+            doc.end();
+
+        } catch (error) {
+            console.error('Error generating lead report:', error);
+            res.status(500).json({ error: 'Failed to generate report' });
+        }
+    }
+}
