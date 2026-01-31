@@ -51,7 +51,22 @@ class PaymentController {
             // Mark Invoice as Paid
             await invoiceModel.updateStatus(invoiceId, 'paid');
 
-            res.status(201).json({ message: 'Cash payment recorded and verified', paymentId });
+            // Find invoice to get tenant details for Receipt
+            const invoice = await invoiceModel.findById(invoiceId);
+
+            // Generate Receipt
+            if (invoice) {
+                await receiptModel.create({
+                    paymentId,
+                    invoiceId,
+                    tenantId: invoice.tenant_id,
+                    amount,
+                    generatedDate: new Date().toISOString(),
+                    receiptNumber: `REC-CASH-${Date.now()}`
+                });
+            }
+
+            res.status(201).json({ message: 'Cash payment recorded and verified, receipt generated', paymentId });
         } catch (error) {
             console.error(error);
             res.status(500).json({ error: 'Failed to record cash payment' });
@@ -71,11 +86,22 @@ class PaymentController {
 
             if (status === 'verified') {
                 // Update invoice status to 'paid'
-                // In a real app, perform this in a transaction or check if partial payment
                 const payment = await paymentModel.findById(id);
                 if (payment) {
                     await invoiceModel.updateStatus(payment.invoice_id, 'paid');
-                    // Also generate Receipt? (Future)
+
+                    // Generate Receipt
+                    const invoice = await invoiceModel.findById(payment.invoice_id);
+                    if (invoice) {
+                        await receiptModel.create({
+                            paymentId: id,
+                            invoiceId: payment.invoice_id,
+                            tenantId: invoice.tenant_id,
+                            amount: payment.amount,
+                            generatedDate: new Date().toISOString(),
+                            receiptNumber: `REC-${Date.now()}`
+                        });
+                    }
                 }
             }
 
