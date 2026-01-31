@@ -63,6 +63,7 @@ export const paymentApi = {
 export const invoiceApi = {
     getInvoices: () => apiClient.get('/invoices'),
     createInvoice: (data: any) => apiClient.post('/invoices', data),
+    generateInvoices: (year?: number, month?: number) => apiClient.post('/invoices/generate', { year, month }),
 };
 
 export default apiClient;

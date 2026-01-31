@@ -52,6 +52,19 @@ class LeaseModel {
         return this.mapRows(rows);
     }
 
+    async findActive() {
+        const [rows] = await db.query(`
+            SELECT l.*, 
+                   u.unit_number,
+                   p.name as property_name
+            FROM leases l
+            JOIN units u ON l.unit_id = u.unit_id
+            JOIN properties p ON u.property_id = p.property_id
+            WHERE l.status = 'active'
+        `);
+        return this.mapRows(rows);
+    }
+
     mapRows(rows) {
         return rows.map(row => ({
             id: row.lease_id.toString(),

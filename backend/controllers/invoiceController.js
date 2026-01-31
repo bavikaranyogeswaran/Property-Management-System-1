@@ -1,4 +1,5 @@
 import invoiceModel from '../models/invoiceModel.js';
+import leaseModel from '../models/leaseModel.js';
 import behaviorLogModel from '../models/behaviorLogModel.js';
 import paymentModel from '../models/paymentModel.js';
 import pool from '../config/db.js';
@@ -36,6 +37,61 @@ class InvoiceController {
         } catch (error) {
             console.error(error);
             res.status(500).json({ error: 'Error creating invoice' });
+        }
+    }
+
+    async generateMonthlyInvoices(req, res) {
+        try {
+            if (req.user.role !== 'owner' && req.user.role !== 'treasurer') {
+                return res.status(403).json({ error: 'Access denied' });
+            }
+
+            // Default to current year/month if not provided
+            const now = new Date();
+            const year = req.body.year || now.getFullYear();
+            const month = req.body.month || (now.getMonth() + 1);
+
+            console.log(`Generating invoices for ${year}-${month}`);
+
+            const activeLeases = await leaseModel.findActive();
+            let generatedCount = 0;
+            let skippedCount = 0;
+
+            for (const lease of activeLeases) {
+                // Check if invoice already exists
+                const exists = await invoiceModel.exists(lease.id, year, month);
+                if (exists) {
+                    skippedCount++;
+                    continue;
+                }
+
+                // Create Invoice
+                // Due date defaults to 5th of the month
+                // Note: new Date(year, monthIndex, day) -> monthIndex is 0-11
+                const dueDate = new Date(year, month - 1, 5);
+
+                // Adjust to YYYY-MM-DD string
+                // We'll trust the model/DB to handle the date object or string, model uses native Date object logic effectively
+                const dueDateStr = dueDate.toISOString().split('T')[0];
+
+                await invoiceModel.create({
+                    leaseId: lease.id,
+                    amount: lease.monthlyRent,
+                    dueDate: dueDateStr,
+                    description: `Rent for ${year}-${month}`
+                });
+                generatedCount++;
+            }
+
+            res.json({
+                message: 'Invoice generation complete',
+                generated: generatedCount,
+                skipped: skippedCount
+            });
+
+        } catch (error) {
+            console.error('Error generating invoices:', error);
+            res.status(500).json({ error: 'Failed to generate invoices' });
         }
     }
 

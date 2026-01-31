@@ -1327,15 +1327,35 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // Invoice operations
   const generateMonthlyInvoices = async () => {
-    // Currently backend doesn't have a bulk generate endpoint exposed in api.ts yet (I didn't add it).
-    // We can iterate active leases and call createInvoice or just skip for now and rely on backend cron.
-    // Or let's implement a loop here for now to bridge the gap if user clicks "Generate".
-    // But better to just refresh invoices if backend generates them.
-    // Let's just fetch invoices to refresh.
     try {
+      // Call backend to generate invoices
+      await invoiceApi.generateInvoices();
+
+      // Refresh list
       const res = await invoiceApi.getInvoices();
-      if (res.data) setInvoices(res.data);
-    } catch (e) { toast.error("Failed to refresh invoices"); }
+      if (res.data) {
+        // Map data again as in initial fetch? 
+        // Or just trust the same structure if consistent. 
+        // Using same mapping logic for safety
+        const mappedInvoices = res.data.map((i: any) => ({
+          id: i.invoice_id.toString(),
+          leaseId: i.lease_id.toString(),
+          tenantId: i.tenant_id.toString(),
+          unitId: i.unit_id ? i.unit_id.toString() : '',
+          amount: parseFloat(i.amount),
+          dueDate: i.due_date ? i.due_date.split('T')[0] : '',
+          status: i.status,
+          generatedDate: i.created_at ? i.created_at.split('T')[0] : ''
+        }));
+        setInvoices(mappedInvoices);
+        // toast handled by caller? or here? Caller usually does it but we can do it here too or let caller do it for custom msg.
+        // Caller (OwnerInvoicesPage) does toast.success.
+      }
+    } catch (e: any) {
+      console.error("Failed to generate invoices", e);
+      // @ts-ignore
+      toast.error(e.response?.data?.error || "Failed to generate invoices");
+    }
   };
 
   // Payment operations

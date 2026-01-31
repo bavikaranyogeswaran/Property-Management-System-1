@@ -15,6 +15,14 @@ class InvoiceModel {
         return result.insertId;
     }
 
+    async exists(leaseId, year, month) {
+        const [rows] = await pool.query(
+            'SELECT invoice_id FROM rent_invoices WHERE lease_id = ? AND year = ? AND month = ?',
+            [leaseId, year, month]
+        );
+        return rows.length > 0;
+    }
+
     async findById(id) {
         // Join with leases to get tenant_id for scoring hooks
         const [rows] = await pool.query(`
