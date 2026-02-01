@@ -144,18 +144,32 @@ export function PublicListingPage({ onNavigate }: { onNavigate?: (page: string) 
                                     <p className="text-sm">{property.city} {property.district}</p>
                                 </div>
 
-                                <div className="pt-4 border-t grid grid-cols-2 gap-4">
-                                    <div>
-                                        <p className="text-xs text-gray-500 uppercase tracking-wide">Available Units</p>
-                                        <p className="text-2xl font-bold text-green-600">
-                                            {units.filter(u => u.propertyId === property.id && u.status === 'available').length}
-                                        </p>
-                                    </div>
-                                    <div className="text-right">
+                                <div className="pt-4 border-t flex justify-between items-end">
+                                    {(() => {
+                                        const propertyUnits = units.filter(u => u.propertyId === property.id);
+                                        const totalCount = propertyUnits.length;
+                                        const availableCount = propertyUnits.filter(u => u.status === 'available').length;
+
+                                        // Show block if there are ANY units (even if 0 available)
+                                        // Hide only if property has NO units created (Total = 0)
+                                        return totalCount > 0 ? (
+                                            <div>
+                                                <p className="text-xs text-gray-500 uppercase tracking-wide">Available Units</p>
+                                                <p className={`text-2xl font-bold ${availableCount > 0 ? 'text-green-600' : 'text-gray-400'}`}>
+                                                    {availableCount}
+                                                </p>
+                                            </div>
+                                        ) : null;
+                                    })()}
+                                    <div className={`text-right ${units.filter(u => u.propertyId === property.id).length === 0 ? 'w-full text-left' : ''}`}>
                                         <p className="text-xs text-gray-500 uppercase tracking-wide">Starting From</p>
                                         <p className="text-lg font-semibold text-gray-900">
-                                            {/* Calculate min rent logic or just show placeholder */}
-                                            LKR {Math.min(...units.filter(u => u.propertyId === property.id).map(u => u.monthlyRent), 0) || 'N/A'}
+                                            {/* Calculate min rent logic */}
+                                            LKR {(() => {
+                                                const rents = units.filter(u => u.propertyId === property.id).map(u => u.monthlyRent);
+                                                const minRent = rents.length > 0 ? Math.min(...rents) : 0;
+                                                return minRent > 0 ? minRent.toLocaleString() : 'N/A';
+                                            })()}
                                         </p>
                                     </div>
                                 </div>
