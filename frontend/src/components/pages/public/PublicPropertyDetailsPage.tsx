@@ -275,7 +275,7 @@ export function PublicPropertyDetailsPage() {
                     <div className="col-span-12 space-y-12">
 
                         {/* Stats Grid */}
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 py-8 border-y border-gray-100">
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-6 py-8 border-y border-gray-100">
                             <div className="space-y-1">
                                 <p className="text-sm text-gray-500 font-medium uppercase tracking-wider">Starting Price</p>
                                 <p className="text-2xl font-bold text-gray-900">
@@ -297,28 +297,27 @@ export function PublicPropertyDetailsPage() {
                                     {propertyUnits.length} Units
                                 </div>
                             </div>
-                            <div className="space-y-1">
-                                <p className="text-sm text-gray-500 font-medium uppercase tracking-wider">Rating</p>
-                                <div className="flex items-center gap-2 text-gray-900 font-semibold">
-                                    <Star className="w-5 h-5 text-yellow-400 fill-yellow-400" />
-                                    4.9 <span className="text-gray-400 font-normal">(12 reviews)</span>
-                                </div>
-                            </div>
                         </div>
 
                         {/* About Section */}
                         <section>
                             <h2 className="text-2xl font-bold text-gray-900 mb-6">About the Property</h2>
                             <div className="prose prose-lg text-gray-600 max-w-none leading-relaxed">
-                                <p>
-                                    Welcome to {property.name}, where modern living meets exceptional convenience.
-                                    Located in a prime neighborhood, this property offers thoughtfully designed spaces
-                                    perfect for your lifestyle.
-                                </p>
-                                <p>
-                                    Experience the perfect blend of comfort and style. Our dedicated management team
-                                    ensures a hassle-free living experience, allowing you to focus on what matters most.
-                                </p>
+                                {property.description ? (
+                                    <p className="whitespace-pre-wrap">{property.description}</p>
+                                ) : (
+                                    <>
+                                        <p>
+                                            Welcome to {property.name}, where modern living meets exceptional convenience.
+                                            Located in a prime neighborhood, this property offers thoughtfully designed spaces
+                                            perfect for your lifestyle.
+                                        </p>
+                                        <p>
+                                            Experience the perfect blend of comfort and style. Our dedicated management team
+                                            ensures a hassle-free living experience, allowing you to focus on what matters most.
+                                        </p>
+                                    </>
+                                )}
                             </div>
                         </section>
 
@@ -349,30 +348,43 @@ export function PublicPropertyDetailsPage() {
                         <section>
                             <h2 className="text-2xl font-bold text-gray-900 mb-6">Features & Amenities</h2>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <div className="flex items-center p-4 rounded-xl bg-gray-50 hover:bg-blue-50/50 transition-colors border border-transparent hover:border-blue-100">
-                                    <div className="p-2 bg-white rounded-lg shadow-sm mr-4">
-                                        <Shield className="w-6 h-6 text-blue-600" />
-                                    </div>
-                                    <span className="font-medium text-gray-700">24/7 Security Surveillance</span>
-                                </div>
-                                <div className="flex items-center p-4 rounded-xl bg-gray-50 hover:bg-blue-50/50 transition-colors border border-transparent hover:border-blue-100">
-                                    <div className="p-2 bg-white rounded-lg shadow-sm mr-4">
-                                        <Car className="w-6 h-6 text-blue-600" />
-                                    </div>
-                                    <span className="font-medium text-gray-700">Dedicated Parking</span>
-                                </div>
-                                <div className="flex items-center p-4 rounded-xl bg-gray-50 hover:bg-blue-50/50 transition-colors border border-transparent hover:border-blue-100">
-                                    <div className="p-2 bg-white rounded-lg shadow-sm mr-4">
-                                        <Wrench className="w-6 h-6 text-blue-600" />
-                                    </div>
-                                    <span className="font-medium text-gray-700">On-site Maintenance</span>
-                                </div>
-                                <div className="flex items-center p-4 rounded-xl bg-gray-50 hover:bg-blue-50/50 transition-colors border border-transparent hover:border-blue-100">
-                                    <div className="p-2 bg-white rounded-lg shadow-sm mr-4">
-                                        <CheckCircle2 className="w-6 h-6 text-blue-600" />
-                                    </div>
-                                    <span className="font-medium text-gray-700">Modern Interiors</span>
-                                </div>
+                                {property.features && property.features.length > 0 ? (
+                                    property.features.map((feature, idx) => (
+                                        <div key={idx} className="flex items-center p-4 rounded-xl bg-gray-50 hover:bg-blue-50/50 transition-colors border border-transparent hover:border-blue-100">
+                                            <div className="p-2 bg-white rounded-lg shadow-sm mr-4">
+                                                <CheckCircle2 className="w-6 h-6 text-blue-600" />
+                                            </div>
+                                            <span className="font-medium text-gray-700">{feature}</span>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <>
+                                        <div className="flex items-center p-4 rounded-xl bg-gray-50 hover:bg-blue-50/50 transition-colors border border-transparent hover:border-blue-100">
+                                            <div className="p-2 bg-white rounded-lg shadow-sm mr-4">
+                                                <Shield className="w-6 h-6 text-blue-600" />
+                                            </div>
+                                            <span className="font-medium text-gray-700">24/7 Security Surveillance</span>
+                                        </div>
+                                        <div className="flex items-center p-4 rounded-xl bg-gray-50 hover:bg-blue-50/50 transition-colors border border-transparent hover:border-blue-100">
+                                            <div className="p-2 bg-white rounded-lg shadow-sm mr-4">
+                                                <Car className="w-6 h-6 text-blue-600" />
+                                            </div>
+                                            <span className="font-medium text-gray-700">Dedicated Parking</span>
+                                        </div>
+                                        <div className="flex items-center p-4 rounded-xl bg-gray-50 hover:bg-blue-50/50 transition-colors border border-transparent hover:border-blue-100">
+                                            <div className="p-2 bg-white rounded-lg shadow-sm mr-4">
+                                                <Wrench className="w-6 h-6 text-blue-600" />
+                                            </div>
+                                            <span className="font-medium text-gray-700">On-site Maintenance</span>
+                                        </div>
+                                        <div className="flex items-center p-4 rounded-xl bg-gray-50 hover:bg-blue-50/50 transition-colors border border-transparent hover:border-blue-100">
+                                            <div className="p-2 bg-white rounded-lg shadow-sm mr-4">
+                                                <CheckCircle2 className="w-6 h-6 text-blue-600" />
+                                            </div>
+                                            <span className="font-medium text-gray-700">Modern Interiors</span>
+                                        </div>
+                                    </>
+                                )}
                             </div>
                         </section>
 

@@ -2,13 +2,16 @@ import db from '../config/db.js';
 
 class PropertyModel {
     async create(propertyData) {
-        const { ownerId, name, propertyTypeId, propertyNo, street, city, district, imageUrl } = propertyData;
+        const { ownerId, name, propertyTypeId, propertyNo, street, city, district, imageUrl, description, features } = propertyData;
+
+        // Ensure features is a JSON string if it's an array/object, or null if empty
+        const featuresJson = features ? JSON.stringify(features) : null;
 
         const [result] = await db.query(
             `INSERT INTO properties 
-            (owner_id, name, property_type_id, property_no, street, city, district, image_url) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-            [ownerId, name, propertyTypeId, propertyNo, street, city, district, imageUrl]
+            (owner_id, name, property_type_id, property_no, street, city, district, image_url, description, features) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [ownerId, name, propertyTypeId, propertyNo, street, city, district, imageUrl, description, featuresJson]
         );
         return result.insertId;
     }
@@ -24,6 +27,8 @@ class PropertyModel {
                 p.city,
                 p.district,
                 p.image_url, 
+                p.description,
+                p.features,
                 p.status, 
                 p.created_at,
                 pt.name as type_name,
@@ -46,7 +51,8 @@ class PropertyModel {
             propertyNo: row.property_no,
             street: row.street,
             city: row.city,
-            district: row.district
+            district: row.district,
+            features: row.features ? JSON.parse(row.features) : []
         }));
     }
 
@@ -61,6 +67,8 @@ class PropertyModel {
                 p.city,
                 p.district,
                 p.image_url, 
+                p.description,
+                p.features,
                 p.status, 
                 p.created_at,
                 pt.name as type_name,
@@ -77,7 +85,8 @@ class PropertyModel {
             propertyNo: rows[0].property_no,
             street: rows[0].street,
             city: rows[0].city,
-            district: rows[0].district
+            district: rows[0].district,
+            features: rows[0].features ? JSON.parse(rows[0].features) : []
         };
     }
 
@@ -119,6 +128,15 @@ class PropertyModel {
         if (updates.status) {
             fields.push('status = ?');
             values.push(updates.status);
+        }
+
+        if (updates.description !== undefined) {
+            fields.push('description = ?');
+            values.push(updates.description);
+        }
+        if (updates.features !== undefined) {
+            fields.push('features = ?');
+            values.push(JSON.stringify(updates.features));
         }
 
         if (fields.length === 0) return false;

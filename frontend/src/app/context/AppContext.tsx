@@ -14,6 +14,8 @@ export interface Property {
   district: string;
   createdAt: string;
   image?: string;
+  description?: string;
+  features?: string[];
 }
 
 // ... (skipping unchanged interfaces)
@@ -751,7 +753,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
               city: p.city,
               district: p.district,
               image: p.image_url,
-              createdAt: p.created_at
+              createdAt: p.created_at,
+              description: p.description,
+              features: p.features
             }));
             setProperties(mappedProps);
           }

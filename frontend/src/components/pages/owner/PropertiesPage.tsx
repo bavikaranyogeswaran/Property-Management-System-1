@@ -49,7 +49,10 @@ export function PropertiesPage() {
     city: '',
     district: '',
     propertyTypeId: 0,
+    description: '',
+    features: [] as string[],
   });
+  const [currentFeature, setCurrentFeature] = useState('');
   const [uploadFiles, setUploadFiles] = useState<File[]>([]);
   const [primaryImageIndex, setPrimaryImageIndex] = useState(0);
   const [viewProperty, setViewProperty] = useState<Property | null>(null);
@@ -106,8 +109,9 @@ export function PropertiesPage() {
         setIsAddDialogOpen(false);
       }
 
-      setFormData({ name: '', propertyNo: '', street: '', city: '', district: '', propertyTypeId: 0 });
+      setFormData({ name: '', propertyNo: '', street: '', city: '', district: '', propertyTypeId: 0, description: '', features: [] });
       setUploadFiles([]);
+      setCurrentFeature('');
       setPrimaryImageIndex(0);
     } catch (error: any) {
       console.error(error);
@@ -125,10 +129,13 @@ export function PropertiesPage() {
       city: property.city || '',
       district: property.district || '',
       propertyTypeId: property.propertyTypeId,
+      description: property.description || '',
+      features: (property.features && Array.isArray(property.features)) ? property.features : [],
     });
     setUploadFiles([]);
     setPrimaryImageIndex(0);
     setExistingImages([]);
+    setCurrentFeature('');
 
     try {
       const images = await getPropertyImages(property.id);
@@ -329,6 +336,67 @@ export function PropertiesPage() {
                     ))}
                   </select>
                 </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="description">About the Property</Label>
+                  <textarea
+                    id="description"
+                    className="flex min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    placeholder="Describe your property..."
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Features & Amenities</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="e.g. 24/7 Security"
+                      value={currentFeature}
+                      onChange={(e) => setCurrentFeature(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          if (currentFeature.trim()) {
+                            setFormData({ ...formData, features: [...formData.features, currentFeature.trim()] });
+                            setCurrentFeature('');
+                          }
+                        }
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={() => {
+                        if (currentFeature.trim()) {
+                          setFormData({ ...formData, features: [...formData.features, currentFeature.trim()] });
+                          setCurrentFeature('');
+                        }
+                      }}
+                    >
+                      Add
+                    </Button>
+                  </div>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {formData.features.map((feature, idx) => (
+                      <div key={idx} className="bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-sm flex items-center gap-2">
+                        {feature}
+                        <button
+                          type="button"
+                          className="hover:text-red-500"
+                          onClick={() => {
+                            const newFeatures = [...formData.features];
+                            newFeatures.splice(idx, 1);
+                            setFormData({ ...formData, features: newFeatures });
+                          }}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
                 <MultiImageUpload
                   maxImages={10}
                   onImagesChange={handleImagesChange}
@@ -339,9 +407,10 @@ export function PropertiesPage() {
                 <div className="flex gap-2 justify-end">
                   <Button type="button" variant="outline" onClick={() => {
                     setIsAddDialogOpen(false);
-                    setFormData({ name: '', propertyNo: '', street: '', city: '', district: '', propertyTypeId: 0 });
+                    setFormData({ name: '', propertyNo: '', street: '', city: '', district: '', propertyTypeId: 0, description: '', features: [] });
                     setUploadFiles([]);
                     setPrimaryImageIndex(0);
+                    setCurrentFeature('');
                   }}>
                     Cancel
                   </Button>
@@ -429,9 +498,10 @@ export function PropertiesPage() {
                       <Dialog open={editingProperty?.id === property.id} onOpenChange={(open) => {
                         if (!open) {
                           setEditingProperty(null);
-                          setFormData({ name: '', propertyNo: '', street: '', city: '', district: '', propertyTypeId: 0 });
+                          setFormData({ name: '', propertyNo: '', street: '', city: '', district: '', propertyTypeId: 0, description: '', features: [] });
                           setUploadFiles([]);
                           setPrimaryImageIndex(0);
+                          setCurrentFeature('');
                         }
                       }}>
                         <DialogTrigger asChild>
@@ -515,6 +585,67 @@ export function PropertiesPage() {
                                 ))}
                               </select>
                             </div>
+
+                            <div className="space-y-2">
+                              <Label htmlFor="edit-description">About the Property</Label>
+                              <textarea
+                                id="edit-description"
+                                className="flex min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                placeholder="Describe your property..."
+                                value={formData.description}
+                                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                              />
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label>Features & Amenities</Label>
+                              <div className="flex gap-2">
+                                <Input
+                                  placeholder="e.g. 24/7 Security"
+                                  value={currentFeature}
+                                  onChange={(e) => setCurrentFeature(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      e.preventDefault();
+                                      if (currentFeature.trim()) {
+                                        setFormData({ ...formData, features: [...formData.features, currentFeature.trim()] });
+                                        setCurrentFeature('');
+                                      }
+                                    }
+                                  }}
+                                />
+                                <Button
+                                  type="button"
+                                  variant="secondary"
+                                  onClick={() => {
+                                    if (currentFeature.trim()) {
+                                      setFormData({ ...formData, features: [...formData.features, currentFeature.trim()] });
+                                      setCurrentFeature('');
+                                    }
+                                  }}
+                                >
+                                  Add
+                                </Button>
+                              </div>
+                              <div className="flex flex-wrap gap-2 mt-2">
+                                {formData.features.map((feature, idx) => (
+                                  <div key={idx} className="bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-sm flex items-center gap-2">
+                                    {feature}
+                                    <button
+                                      type="button"
+                                      className="hover:text-red-500"
+                                      onClick={() => {
+                                        const newFeatures = [...formData.features];
+                                        newFeatures.splice(idx, 1);
+                                        setFormData({ ...formData, features: newFeatures });
+                                      }}
+                                    >
+                                      ×
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
                             <MultiImageUpload
                               maxImages={10}
                               onImagesChange={handleImagesChange}
@@ -525,9 +656,10 @@ export function PropertiesPage() {
                             <div className="flex gap-2 justify-end">
                               <Button type="button" variant="outline" onClick={() => {
                                 setEditingProperty(null);
-                                setFormData({ name: '', propertyNo: '', street: '', city: '', district: '', propertyTypeId: 0 });
+                                setFormData({ name: '', propertyNo: '', street: '', city: '', district: '', propertyTypeId: 0, description: '', features: [] });
                                 setUploadFiles([]);
                                 setPrimaryImageIndex(0);
+                                setCurrentFeature('');
                               }}>
                                 Cancel
                               </Button>
