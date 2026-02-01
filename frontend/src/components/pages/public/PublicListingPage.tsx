@@ -259,14 +259,36 @@ export function PublicListingPage({ onNavigate }: { onNavigate?: (page: string) 
                                     className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                     value={interestFormData.interestedUnit}
                                     onChange={(e) => setInterestFormData({ ...interestFormData, interestedUnit: e.target.value })}
+                                    required
                                 >
-                                    <option value="">Whole Property / Any Available Unit</option>
-                                    {interestProperty && units
-                                        .filter(u => u.propertyId === interestProperty.id && u.status === 'available')
-                                        .map(u => (
-                                            <option key={u.id} value={u.id}>Unit {u.unitNumber} - {u.type} (LKR {u.monthlyRent}/mo)</option>
-                                        ))
-                                    }
+                                    {(() => {
+                                        if (!interestProperty) return <option value="">Whole Property</option>;
+
+                                        const pUnits = units.filter(u => u.propertyId === interestProperty.id);
+                                        const avail = pUnits.filter(u => u.status === 'available');
+                                        const hasUnits = pUnits.length > 0;
+                                        const hasAvailable = avail.length > 0;
+
+                                        if (!hasUnits) {
+                                            // Unitless: Only Whole Property
+                                            return <option value="">Whole Property</option>;
+                                        }
+
+                                        if (hasAvailable) {
+                                            // Has units: Force selection
+                                            return (
+                                                <>
+                                                    <option value="" disabled>Select a Unit...</option>
+                                                    {avail.map(u => (
+                                                        <option key={u.id} value={u.id}>Unit {u.unitNumber} - {u.type} (LKR {u.monthlyRent}/mo)</option>
+                                                    ))}
+                                                </>
+                                            );
+                                        }
+
+                                        // Full: Waitlist
+                                        return <option value="">Join Waitlist / General Inquiry</option>;
+                                    })()}
                                 </select>
                             </div>
                         </div>
