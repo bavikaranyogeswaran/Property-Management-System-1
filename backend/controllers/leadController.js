@@ -2,6 +2,7 @@ import userService from '../services/userService.js';
 import leadModel from '../models/leadModel.js';
 import leadStageHistoryModel from '../models/leadStageHistoryModel.js';
 import db from '../config/db.js';
+import emailService from '../utils/emailService.js';
 import { validatePassword, validateEmail, validatePhoneNumber } from '../utils/validators.js';
 
 class LeadController {
@@ -164,6 +165,16 @@ class LeadController {
                     notes: notes ? `${notes} (Re-inquiry)` : undefined,
                     // potentially update unit if they changed mind?
                 });
+
+                // Send Confirmation Email for re-inquiry
+                try {
+                    const [propRows] = await db.query('SELECT name FROM properties WHERE property_id = ?', [propertyId]);
+                    const propertyName = propRows.length > 0 ? propRows[0].name : 'our property';
+                    await emailService.sendWelcomeLead(email, name, propertyName); // name from request might differ from DB, but we use current request name
+                } catch (emailErr) {
+                    console.error("Failed to send re-inquiry confirmation email", emailErr);
+                }
+
                 return res.status(200).json({ id: leadId, message: 'Interest updated. We will contact you soon.' });
             } else {
                 // Create NEW Lead (No User Account yet)
@@ -178,6 +189,17 @@ class LeadController {
                     status: 'interested',
                     userId: null // No user account
                 });
+
+                // Send Confirmation Email
+                try {
+                    // Fetch property Name for the email
+                    const [propRows] = await db.query('SELECT name FROM properties WHERE property_id = ?', [propertyId]);
+                    const propertyName = propRows.length > 0 ? propRows[0].name : 'our property';
+                    await emailService.sendWelcomeLead(email, name, propertyName);
+                } catch (emailErr) {
+                    console.error("Failed to send interest confirmation email", emailErr);
+                }
+
                 return res.status(201).json({ id: leadId, message: 'Interest registered! We will contact you soon.' });
             }
 

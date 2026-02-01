@@ -24,67 +24,38 @@ class EmailService {
         }
     }
 
-    async sendCredentials(email, role, password) {
-        // Fallback to console log if no transporter (dev mode or missing creds)
+
+
+    async sendWelcomeLead(email, name, propertyName = 'our property') {
         if (!this.transporter) {
             console.log('==================================================');
-            console.log(`[EMAIL MOCK] Sending credentials to ${email}`);
-            console.log(`Role: ${role}`);
-            console.log(`Password: ${password}`);
+            console.log(`[EMAIL MOCK] Welcome/Interest Confirmation: ${email}`);
+            console.log(`Name: ${name}`);
+            console.log(`Property: ${propertyName}`);
             console.log('==================================================');
-            console.warn('NOTE: Real email not sent. Configure SMTP_USER and SMTP_PASS in .env to enable.');
-            return true;
-        }
-
-        try {
-            const mailOptions = {
-                from: `"Property Management System" <${process.env.SMTP_USER}>`,
-                to: email,
-                subject: 'Property Management System - Account Created',
-                html: `
-                    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                        <h2 style="color: #333;">Welcome to Property Management System</h2>
-                        <p>Your account has been successfully created.</p>
-                        <div style="background-color: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
-                            <p style="margin: 5px 0;"><strong>Role:</strong> ${role}</p>
-                            <p style="margin: 5px 0;"><strong>Username:</strong> ${email}</p>
-                            <p style="margin: 5px 0;"><strong>Password:</strong> ${password}</p>
-                        </div>
-                        <div style="text-align: center; margin: 30px 0;">
-                            <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/login" style="background-color: #0070f3; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold;">Login to Dashboard</a>
-                        </div>
-                        <p>Please login and change your password immediately.</p>
-                        <p style="color: #666; font-size: 12px; margin-top: 30px;">This is an automated message, please do not reply.</p>
-                    </div>
-                `
-            };
-
-            const info = await this.transporter.sendMail(mailOptions);
-            console.log(`Email sent: ${info.messageId}`);
-            return true;
-        } catch (error) {
-            console.error('Error sending email:', error);
-            // Log credentials to console as backup mechanism if email fails
-            console.log('--- BACKUP CREDENTIAL LOG ---');
-            console.log(`User: ${email}, Pass: ${password}`);
-            return false;
-        }
-    }
-
-    async sendWelcomeLead(email, name) {
-        if (!this.transporter) {
-            console.log(`[EMAIL MOCK] Welcome Lead: ${email}`);
             return true;
         }
         try {
             await this.transporter.sendMail({
                 from: `"Property Management System" <${process.env.SMTP_USER}>`,
                 to: email,
-                subject: 'Welcome to Property Management System',
-                html: `<h1>Welcome ${name}!</h1><p>Thanks for your interest. We will contact you soon.</p>`
+                subject: 'Interest Received - Property Management System',
+                html: this._getTemplate('Thanks for your interest!', `
+                    <p>Hi ${name},</p>
+                    <p>We have received your interest in <strong>${propertyName}</strong>.</p>
+                    <p>One of our property managers will review your inquiry and get back to you shortly to schedule a viewing or answer any questions you may have.</p>
+                    
+                    <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; margin: 24px 0; border: 1px solid #e2e8f0;">
+                        <p style="margin: 0; color: #1e293b; font-weight: 600;">Next Steps:</p>
+                        <ul style="margin-top: 12px; color: #475569; padding-left: 20px;">
+                            <li style="margin-bottom: 8px;">Wait for our call or email (usually within 24 hours)</li>
+                            <li>Prepare any questions you might have about the property</li>
+                        </ul>
+                    </div>
+                `)
             });
         } catch (e) {
-            console.error(e);
+            console.error('Error sending welcome lead email:', e);
         }
     }
 
@@ -98,7 +69,14 @@ class EmailService {
                 from: `"Property Management System" <${process.env.SMTP_USER}>`,
                 to: email,
                 subject: 'Application Approved - Welcome Tenant',
-                html: `<h1>Congratulations ${name}!</h1><p>Your application has been approved. You are now a tenant.</p>`
+                html: this._getTemplate('Welcome Home!', `
+                    <p>Dear ${name},</p>
+                    <p>Congratulations! Your tenant application has been approved.</p>
+                    <p>We are thrilled to welcome you to your new home. You can now log in to your dashboard to view your lease details and manage your payments.</p>
+                    <div style="text-align: center; margin: 32px 0;">
+                        <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/login" style="background-color: #2563eb; color: white; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px; display: inline-block;">Access Dashboard</a>
+                    </div>
+                `)
             });
         } catch (e) {
             console.error(e);
@@ -121,17 +99,14 @@ class EmailService {
                 from: `"Property Management System" <${process.env.SMTP_USER}>`,
                 to: email,
                 subject: 'Password Reset Request',
-                html: `
-                    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                        <h2 style="color: #333;">Password Reset Request</h2>
-                        <p>You requested a password reset. Click the button below to reset your password.</p>
-                        <div style="text-align: center; margin: 30px 0;">
-                            <a href="${resetLink}" style="background-color: #0070f3; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold;">Reset Password</a>
-                        </div>
-                        <p style="color: #666; font-size: 14px;">If you didn't request this, you can safely ignore this email.</p>
-                        <p style="color: #666; font-size: 12px; margin-top: 30px;">Link expires in 1 hour.</p>
+                html: this._getTemplate('Password Reset Request', `
+                    <p>We received a request to reset your password. If you didn't make this request, you can safely ignore this email.</p>
+                    <p>To reset your password, click the button below:</p>
+                    <div style="text-align: center; margin: 32px 0;">
+                        <a href="${resetLink}" style="background-color: #2563eb; color: white; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px; display: inline-block;">Reset Password</a>
                     </div>
-                `
+                    <p style="color: #94a3b8; font-size: 14px;">This link will expire in 1 hour.</p>
+                `)
             });
             return true;
         } catch (error) {
@@ -139,7 +114,6 @@ class EmailService {
             return false;
         }
     }
-
 
     async sendVerificationEmail(email, token) {
         const link = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/verify-email?token=${token}`;
@@ -155,11 +129,12 @@ class EmailService {
                 from: `"Property Management System" <${process.env.SMTP_USER}>`,
                 to: email,
                 subject: 'Verify Your Email Address',
-                html: `
-                    <h2>Verify Your Email</h2>
-                    <p>Click the link below to verify your email address:</p>
-                    <a href="${link}">Verify Email</a>
-                `
+                html: this._getTemplate('Verify Your Email', `
+                    <p>Thank you for signing up. Please verify your email address to continue.</p>
+                    <div style="text-align: center; margin: 32px 0;">
+                        <a href="${link}" style="background-color: #2563eb; color: white; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px; display: inline-block;">Verify Email</a>
+                    </div>
+                `)
             });
             return true;
         } catch (error) {
@@ -171,6 +146,7 @@ class EmailService {
     async sendInvitationEmail(email, role, token) {
         const link = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/setup-password?token=${token}`;
         const subject = role === 'treasurer' ? 'Treasurer Invitation' : 'Tenant Access Invitation';
+        const roleDisplay = role.charAt(0).toUpperCase() + role.slice(1);
 
         if (!this.transporter) {
             console.log(`[EMAIL MOCK] Invitation Email for ${email} (${role})`);
@@ -183,13 +159,14 @@ class EmailService {
                 from: `"Property Management System" <${process.env.SMTP_USER}>`,
                 to: email,
                 subject: subject,
-                html: `
-                    <h2>You have been invited!</h2>
-                    <p>You have been invited to join as a ${role}.</p>
-                    <p>Click the link below to set up your password and access your account:</p>
-                    <a href="${link}">Set Up Account</a>
-                    <p>This link expires in 24 hours.</p>
-                `
+                html: this._getTemplate('You have been invited!', `
+                    <p>You have been invited to join the Property Management System as a <strong>${roleDisplay}</strong>.</p>
+                    <p>To get started, please click the button below to set up your account and password:</p>
+                    <div style="text-align: center; margin: 32px 0;">
+                        <a href="${link}" style="background-color: #2563eb; color: white; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px; display: inline-block;">Set Up Account</a>
+                    </div>
+                    <p style="color: #94a3b8; font-size: 14px;">This link will expire in 24 hours.</p>
+                `)
             });
             return true;
         } catch (error) {
@@ -217,30 +194,27 @@ class EmailService {
                 from: `"Property Management System" <${process.env.SMTP_USER}>`,
                 to: ownerEmail,
                 subject: `New Visit Scheduled: ${propertyName}`,
-                html: `
-                    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 8px; padding: 20px;">
-                        <h2 style="color: #333; margin-top: 0;">New Visit Scheduled</h2>
-                        <p>A new visit has been scheduled via the public listing.</p>
-                        
-                        <div style="background-color: #f9f9f9; padding: 15px; border-radius: 5px; margin: 20px 0;">
-                            <h3 style="margin-top: 0; color: #555;">Property Details</h3>
-                            <p style="margin: 5px 0;"><strong>Property:</strong> ${propertyName}</p>
-                            ${unitNumber ? `<p style="margin: 5px 0;"><strong>Unit:</strong> ${unitNumber}</p>` : ''}
-                            <p style="margin: 5px 0;"><strong>Scheduled For:</strong> ${dateStr}</p>
-                        </div>
-
-                        <div style="background-color: #f9f9f9; padding: 15px; border-radius: 5px; margin: 20px 0;">
-                            <h3 style="margin-top: 0; color: #555;">Visitor Details</h3>
-                            <p style="margin: 5px 0;"><strong>Name:</strong> ${visitorName}</p>
-                            <p style="margin: 5px 0;"><strong>Phone:</strong> ${visitorPhone}</p>
-                            ${notes ? `<p style="margin: 5px 0;"><strong>Notes:</strong> ${notes}</p>` : ''}
-                        </div>
-
-                        <div style="text-align: center; margin-top: 30px;">
-                            <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/owner/leads" style="background-color: #0070f3; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">View in Dashboard</a>
-                        </div>
+                html: this._getTemplate('New Visit Scheduled', `
+                    <p>A new visit has been scheduled via the public listing.</p>
+                    
+                    <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; margin: 24px 0; border: 1px solid #e2e8f0;">
+                        <h3 style="margin-top: 0; color: #1e293b; font-size: 16px; margin-bottom: 12px;">Property Details</h3>
+                        <p style="margin: 4px 0; color: #475569;"><strong>Property:</strong> ${propertyName}</p>
+                        ${unitNumber ? `<p style="margin: 4px 0; color: #475569;"><strong>Unit:</strong> ${unitNumber}</p>` : ''}
+                        <p style="margin: 4px 0; color: #475569;"><strong>Scheduled For:</strong> ${dateStr}</p>
                     </div>
-                `
+
+                    <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; margin: 24px 0; border: 1px solid #e2e8f0;">
+                        <h3 style="margin-top: 0; color: #1e293b; font-size: 16px; margin-bottom: 12px;">Visitor Details</h3>
+                        <p style="margin: 4px 0; color: #475569;"><strong>Name:</strong> ${visitorName}</p>
+                        <p style="margin: 4px 0; color: #475569;"><strong>Phone:</strong> ${visitorPhone}</p>
+                        ${notes ? `<p style="margin: 4px 0; color: #475569;"><strong>Notes:</strong> ${notes}</p>` : ''}
+                    </div>
+
+                    <div style="text-align: center; margin-top: 32px;">
+                        <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/owner/leads" style="background-color: #2563eb; color: white; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px; display: inline-block;">View in Dashboard</a>
+                    </div>
+                `)
             });
             return true;
         } catch (error) {
