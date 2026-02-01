@@ -353,9 +353,8 @@ CREATE INDEX idx_invoice_status ON rent_invoices(status);
 CREATE INDEX idx_payment_status ON payments(status);
 CREATE INDEX idx_maintenance_status ON maintenance_requests(status);
 CREATE INDEX idx_properties_city_district ON properties(city, district);
-CREATE INDEX idx_units_status ON units(status);
 CREATE INDEX idx_units_rent ON units(monthly_rent);
 CREATE INDEX idx_leases_status_end_date ON leases(status, end_date);
 CREATE INDEX idx_invoices_status_due_date ON rent_invoices(status, due_date);
-CREATE INDEX idx_maintenance_status ON maintenance_requests(status);
+
 
