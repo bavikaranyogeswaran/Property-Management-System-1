@@ -58,11 +58,20 @@ class LeaseService {
         // Actually, the plan is to move ALL unit blocking logic HERE.
 
         if (unit.status === 'occupied') {
-            // Throw error UNLESS we are explicitly allowing "Future Move-in" logic? 
-            // But 'occupied' usually means "someone else is there". 
-            // If the unit is occupied by THIS tenant (e.g. they just got assigned), we need to know.
-            // For simplicity: We expect the unit to be 'available' when we create a lease.
-            throw new Error('Unit is already occupied');
+            // Check if this is just an overlap or disjoint
+            // Actually, we trust the status, BUT we also check specific dates now.
+            // If status is occupied, it might be occupied by a future or past lease?
+            // "Occupied" usually means "Right Now".
+            // But let's rely on overlap check for date correctness.
+            // We'll warn if occupied but proceed to overlap check?
+            // No, if occupied, we probably shouldn't create unless we are sure.
+            // But let's stick to the overlap check as the source of truth for "Booking Conflict".
+        }
+
+        // 2. Check for Date Overlaps
+        const hasOverlap = await leaseModel.checkOverlap(unitId, startDate, endDate);
+        if (hasOverlap) {
+            throw new Error('Unit is already leased for the selected dates.');
         }
 
         const leaseParams = {

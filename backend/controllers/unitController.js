@@ -46,6 +46,16 @@ class UnitController {
 
     async deleteUnit(req, res) {
         try {
+            // Safeguard: Check if occupied
+            const unit = await unitModel.findById(req.params.id);
+            if (!unit) {
+                return res.status(404).json({ error: 'Unit not found' });
+            }
+
+            if (unit.status === 'occupied') {
+                return res.status(400).json({ error: 'Cannot delete an occupied unit.' });
+            }
+
             const success = await unitModel.delete(req.params.id);
             if (!success) return res.status(404).json({ error: 'Unit not found' });
             res.json({ message: 'Unit deleted' });

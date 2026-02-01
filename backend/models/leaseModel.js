@@ -65,6 +65,17 @@ class LeaseModel {
         return this.mapRows(rows);
     }
 
+    async checkOverlap(unitId, startDate, endDate) {
+        const [rows] = await db.query(`
+            SELECT lease_id FROM leases 
+            WHERE unit_id = ? 
+            AND status IN ('active', 'pending')
+            AND start_date <= ? 
+            AND end_date >= ?
+        `, [unitId, endDate, startDate]);
+        return rows.length > 0;
+    }
+
     mapRows(rows) {
         return rows.map(row => ({
             id: row.lease_id.toString(),
