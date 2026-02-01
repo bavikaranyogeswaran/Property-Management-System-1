@@ -12,22 +12,29 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FileText, Plus, Eye, Calendar, DollarSign, Home, User, XCircle, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { leaseSchema, type LeaseFormValues } from '@/schemas/ownerSchemas';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+
 export function LeasesPage() {
   const { tenants, leases, units, properties, addLease, endLease } = useApp();
   const [isAddLeaseDialogOpen, setIsAddLeaseDialogOpen] = useState(false);
   const [selectedLease, setSelectedLease] = useState<Lease | null>(null);
-  const [leaseFormData, setLeaseFormData] = useState({
-    tenantId: '',
-    unitId: '',
-    startDate: '',
-    endDate: '',
-    monthlyRent: '',
+
+  const leaseForm = useForm<LeaseFormValues>({
+    resolver: zodResolver(leaseSchema),
+    defaultValues: {
+      tenantId: '',
+      unitId: '',
+      startDate: '',
+      endDate: '',
+      monthlyRent: 0,
+    },
   });
 
-  const handleLeaseSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    const unit = units.find(u => u.id === leaseFormData.unitId);
+  const onSubmit = async (values: LeaseFormValues) => {
+    const unit = units.find(u => u.id === values.unitId);
     if (unit?.status === 'occupied') {
       toast.error('This unit is already occupied');
       return;
@@ -35,35 +42,23 @@ export function LeasesPage() {
 
     try {
       await addLease({
-        ...leaseFormData,
-        monthlyRent: parseFloat(leaseFormData.monthlyRent),
+        ...values,
+        monthlyRent: values.monthlyRent,
         status: 'active',
       });
 
       toast.success('Lease created successfully');
       setIsAddLeaseDialogOpen(false);
-      setLeaseFormData({
-        tenantId: '',
-        unitId: '',
-        startDate: '',
-        endDate: '',
-        monthlyRent: '',
-      });
+      leaseForm.reset();
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to create lease');
     }
   };
 
-  const handleEndLease = (leaseId: string) => {
-    if (confirm('Are you sure you want to end this lease? This action will mark the lease as ended and free up the unit.')) {
-      endLease(leaseId);
-      toast.success('Lease ended successfully');
-      setSelectedLease(null);
-    }
-  };
-
   const activeLeases = leases.filter(l => l.status === 'active');
   const endedLeases = leases.filter(l => l.status !== 'active');
+
+  // ... (keep existing calculations)
 
   // Calculate expiring soon (within 30 days)
   const today = new Date();
@@ -101,6 +96,7 @@ export function LeasesPage() {
   ];
 
   const LeaseRow = ({ lease }: { lease: Lease }) => {
+    // ... (keep existing LeaseRow component logic)
     const tenant = tenants.find(t => t.id === lease.tenantId);
     const unit = units.find(u => u.id === lease.unitId);
     const property = unit ? properties.find(p => p.id === unit.propertyId) : null;
@@ -188,6 +184,15 @@ export function LeasesPage() {
     );
   };
 
+  // Helper for End Lease (keep outside or inside, reusing existing)
+  const handleEndLease = (leaseId: string) => {
+    if (confirm('Are you sure you want to end this lease? This action will mark the lease as ended and free up the unit.')) {
+      endLease(leaseId);
+      toast.success('Lease ended successfully');
+      setSelectedLease(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -197,117 +202,142 @@ export function LeasesPage() {
         </div>
         <Dialog open={isAddLeaseDialogOpen} onOpenChange={setIsAddLeaseDialogOpen}>
           <DialogTrigger asChild>
-            <Button>
+            <Button onClick={() => leaseForm.reset()}>
               <Plus className="size-4 mr-2" />
               Create Lease
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Create New Lease</DialogTitle>
             </DialogHeader>
-            <form onSubmit={handleLeaseSubmit} className="space-y-4 mt-4">
-              <div className="space-y-2">
-                <Label htmlFor="tenantId">Tenant</Label>
-                <Select
-                  value={leaseFormData.tenantId}
-                  onValueChange={(value) => setLeaseFormData({ ...leaseFormData, tenantId: value })}
-                  required
-                >
-                  <SelectTrigger id="tenantId">
-                    <SelectValue placeholder="Select tenant" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {tenants.map((tenant) => (
-                      <SelectItem key={tenant.id} value={tenant.id}>
-                        {tenant.name} - {tenant.email}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="unitId">Unit</Label>
-                <Select
-                  value={leaseFormData.unitId}
-                  onValueChange={(value) => {
-                    const unit = units.find(u => u.id === value);
-                    setLeaseFormData({
-                      ...leaseFormData,
-                      unitId: value,
-                      monthlyRent: unit ? unit.monthlyRent.toString() : '',
-                    });
-                  }}
-                  required
-                >
-                  <SelectTrigger id="unitId">
-                    <SelectValue placeholder="Select unit" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {units.filter(u => u.status === 'available').map((unit) => {
-                      const property = properties.find(p => p.id === unit.propertyId);
-                      return (
-                        <SelectItem key={unit.id} value={unit.id}>
-                          {property?.name} - {unit.unitNumber} (LKR {unit.monthlyRent}/mo)
-                        </SelectItem>
-                      );
-                    })}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="startDate">Start Date</Label>
-                  <Input
-                    id="startDate"
-                    type="date"
-                    value={leaseFormData.startDate}
-                    onChange={(e) => setLeaseFormData({ ...leaseFormData, startDate: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="endDate">End Date</Label>
-                  <Input
-                    id="endDate"
-                    type="date"
-                    value={leaseFormData.endDate}
-                    onChange={(e) => setLeaseFormData({ ...leaseFormData, endDate: e.target.value })}
-                    required
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="monthlyRent">Monthly Rent (LKR)</Label>
-                <Input
-                  id="monthlyRent"
-                  type="number"
-                  step="0.01"
-                  value={leaseFormData.monthlyRent}
-                  onChange={(e) => setLeaseFormData({ ...leaseFormData, monthlyRent: e.target.value })}
-                  required
+            <Form {...leaseForm}>
+              <form onSubmit={leaseForm.handleSubmit(onSubmit)} className="space-y-4 mt-4">
+
+                <FormField
+                  control={leaseForm.control}
+                  name="tenantId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Tenant</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select tenant" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {tenants.map((tenant) => (
+                            <SelectItem key={tenant.id} value={tenant.id}>
+                              {tenant.name} - {tenant.email}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
-              </div>
-              <div className="flex gap-2 justify-end">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setIsAddLeaseDialogOpen(false);
-                    setLeaseFormData({
-                      tenantId: '',
-                      unitId: '',
-                      startDate: '',
-                      endDate: '',
-                      monthlyRent: '',
-                    });
-                  }}
-                >
-                  Cancel
-                </Button>
-                <Button type="submit">Create Lease</Button>
-              </div>
-            </form>
+
+                <FormField
+                  control={leaseForm.control}
+                  name="unitId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Unit</FormLabel>
+                      <Select
+                        onValueChange={(val) => {
+                          field.onChange(val);
+                          // Auto-fill rent
+                          const unit = units.find(u => u.id === val);
+                          if (unit) {
+                            leaseForm.setValue('monthlyRent', unit.monthlyRent);
+                          }
+                        }}
+                        defaultValue={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select unit" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {units.filter(u => u.status === 'available').map((unit) => {
+                            const property = properties.find(p => p.id === unit.propertyId);
+                            return (
+                              <SelectItem key={unit.id} value={unit.id}>
+                                {property?.name} - {unit.unitNumber} (LKR {unit.monthlyRent}/mo)
+                              </SelectItem>
+                            );
+                          })}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={leaseForm.control}
+                    name="startDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Start Date</FormLabel>
+                        <FormControl>
+                          <Input type="date" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={leaseForm.control}
+                    name="endDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>End Date</FormLabel>
+                        <FormControl>
+                          <Input type="date" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <FormField
+                  control={leaseForm.control}
+                  name="monthlyRent"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Monthly Rent (LKR)</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          {...field}
+                          onChange={e => field.onChange(parseFloat(e.target.value))}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="flex gap-2 justify-end">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setIsAddLeaseDialogOpen(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button type="submit">Create Lease</Button>
+                </div>
+              </form>
+            </Form>
           </DialogContent>
         </Dialog>
       </div>

@@ -11,6 +11,10 @@ import { Badge } from '@/components/ui/badge';
 import { Home, Plus, Edit, Trash2, Filter, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 import { MultiImageUpload } from '@/components/ui/multi-image-upload';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { unitSchema, type UnitFormValues } from '@/schemas/ownerSchemas';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 
 export function UnitsPage() {
   const { units, properties, unitTypes, leases, addUnit, updateUnit, deleteUnit, uploadUnitImages, getUnitImages, deleteUnitImage, setUnitPrimaryImage } = useApp();
@@ -18,14 +22,18 @@ export function UnitsPage() {
   const [editingUnit, setEditingUnit] = useState<Unit | null>(null);
   const [filterProperty, setFilterProperty] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
-  const [formData, setFormData] = useState({
-    propertyId: '',
-    unitNumber: '',
-    unitTypeId: 0,
-    type: '',
-    monthlyRent: '',
-    status: 'available' as Unit['status'],
+
+  const unitForm = useForm<UnitFormValues>({
+    resolver: zodResolver(unitSchema),
+    defaultValues: {
+      propertyId: '',
+      unitNumber: '',
+      unitTypeId: 0,
+      monthlyRent: 0,
+      status: 'available',
+    },
   });
+
   const [uploadFiles, setUploadFiles] = useState<File[]>([]);
   const [primaryImageIndex, setPrimaryImageIndex] = useState(0);
   const [viewUnit, setViewUnit] = useState<Unit | null>(null);
@@ -49,42 +57,38 @@ export function UnitsPage() {
     setPrimaryImageIndex(primaryIndex >= 0 ? primaryIndex : 0);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
+  const onSubmit = async (values: UnitFormValues) => {
     try {
+      // Derive type name from ID
+      const unitType = unitTypes.find(t => t.type_id === values.unitTypeId);
+      const typeName = unitType?.name || '';
+
       if (editingUnit) {
         // Update unit text fields
         await updateUnit(editingUnit.id, {
-          ...formData,
-          monthlyRent: parseFloat(formData.monthlyRent),
-          image: editingUnit.image // Keep existing image if no new ones, or placeholder logic handled in upload
+          ...values,
+          type: typeName,
+          monthlyRent: values.monthlyRent,
+          image: editingUnit.image
         });
 
         // Upload new images if any
         if (uploadFiles.length > 0) {
           await uploadUnitImages(editingUnit.id, uploadFiles);
-          // Actually call uploadUnitImages from context
-          // But I destructured it? No, need to add it to destructuring.
         }
 
         toast.success('Unit updated successfully');
         setEditingUnit(null);
+        setIsAddDialogOpen(false); // Close shared dialog
       } else {
         const newUnit = await addUnit({
-          ...formData,
-          monthlyRent: parseFloat(formData.monthlyRent),
-          image: undefined // let backend handle or upload logic
+          ...values,
+          type: typeName,
+          monthlyRent: values.monthlyRent,
+          image: undefined
         });
 
         if (newUnit && uploadFiles.length > 0) {
-          // We need to access uploadUnitImages. 
-          // Since I can't easily change destructuring in this single replacement block without accessing line 16, 
-          // I will assume I update line 16 separately OR use `useApp().uploadUnitImages` here if React allows (it doesn't in callback).
-          // Wait, I can't use hook in callback.
-          // I must update Line 16 to destructure `uploadUnitImages`.
-          // For this block, I'll assume `uploadUnitImages` is available in scope. 
-          // I will make sure to update line 16 in a separate call.
           await uploadUnitImages(newUnit.id, uploadFiles);
         }
 
@@ -92,16 +96,10 @@ export function UnitsPage() {
         setIsAddDialogOpen(false);
       }
 
-      setFormData({
-        propertyId: '',
-        unitNumber: '',
-        unitTypeId: 0,
-        type: '',
-        monthlyRent: '',
-        status: 'available',
-      });
+      unitForm.reset();
       setUploadFiles([]);
       setPrimaryImageIndex(0);
+      setExistingImages([]);
     } catch (error: any) {
       console.error('Failed to save unit:', error);
       let msg = 'Failed to save unit';
@@ -157,19 +155,34 @@ export function UnitsPage() {
     }
   };
 
-  const handleEdit = async (unit: Unit) => {
+  const handleAddClick = () => {
+    setEditingUnit(null);
+    unitForm.reset({
+      propertyId: '',
+      unitNumber: '',
+      unitTypeId: 0,
+      monthlyRent: 0,
+      status: 'available',
+    });
+    setExistingImages([]);
+    setUploadFiles([]);
+    setIsAddDialogOpen(true);
+  };
+
+  const handleEditClick = async (unit: Unit) => {
     setEditingUnit(unit);
-    setFormData({
+    unitForm.reset({
       propertyId: unit.propertyId,
       unitNumber: unit.unitNumber,
       unitTypeId: unit.unitTypeId,
-      type: unit.type,
-      monthlyRent: unit.monthlyRent.toString(),
-      status: unit.status,
+      monthlyRent: Number(unit.monthlyRent),
+      status: unit.status as any,
     });
     setUploadFiles([]);
     setPrimaryImageIndex(0);
     setExistingImages([]);
+
+    setIsAddDialogOpen(true); // Reuse Add Dialog logic
 
     try {
       const images = await getUnitImages(unit.id);
@@ -244,125 +257,157 @@ export function UnitsPage() {
           <h2 className="text-2xl font-semibold text-gray-900">Units</h2>
           <p className="text-sm text-gray-500 mt-1">Manage your rental units</p>
         </div>
-        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="size-4 mr-2" />
-              Add Unit
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Add New Unit</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4 mt-4">
-              <div className="space-y-2">
-                <Label htmlFor="propertyId">Property</Label>
-                <Select
-                  value={formData.propertyId}
-                  onValueChange={(value) => setFormData({ ...formData, propertyId: value })}
-                  required
-                >
-                  <SelectTrigger id="propertyId">
-                    <SelectValue placeholder="Select property" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {properties.map((prop) => (
-                      <SelectItem key={prop.id} value={prop.id}>
-                        {prop.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="unitNumber">Unit Number</Label>
-                <Input
-                  id="unitNumber"
-                  placeholder="e.g., A101"
-                  value={formData.unitNumber}
-                  onChange={(e) => setFormData({ ...formData, unitNumber: e.target.value })}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="type">Unit Type</Label>
-                <Select
-                  value={formData.unitTypeId.toString()}
-                  onValueChange={(value) => {
-                    const typeId = parseInt(value);
-                    const typeName = unitTypes.find(t => t.type_id === typeId)?.name || '';
-                    setFormData({ ...formData, unitTypeId: typeId, type: typeName });
-                  }}
-                  required
-                >
-                  <SelectTrigger id="type">
-                    <SelectValue placeholder="Select unit type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {unitTypes.map((type) => (
-                      <SelectItem key={type.type_id} value={type.type_id.toString()}>
-                        {type.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="monthlyRent">Monthly Rent (LKR)</Label>
-                <Input
-                  id="monthlyRent"
-                  type="number"
-                  step="0.01"
-                  placeholder="e.g., 1200"
-                  value={formData.monthlyRent}
-                  onChange={(e) => setFormData({ ...formData, monthlyRent: e.target.value })}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="status">Status</Label>
-                <Select
-                  value={formData.status}
-                  onValueChange={(value: Unit['status']) => setFormData({ ...formData, status: value })}
-                >
-                  <SelectTrigger id="status">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="available">Available</SelectItem>
-                    <SelectItem value="occupied">Occupied</SelectItem>
-                    <SelectItem value="maintenance">Maintenance</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <MultiImageUpload
-                  maxImages={10}
-                  onImagesChange={handleImagesChange}
-                />
-              </div>
-              <div className="flex gap-2 justify-end">
-                <Button type="button" variant="outline" onClick={() => {
-                  setIsAddDialogOpen(false);
-                  setFormData({
-                    propertyId: '',
-                    unitNumber: '',
-                    unitTypeId: 0,
-                    type: '',
-                    monthlyRent: '',
-                    status: 'available',
-                  });
-                  setUploadFiles([]);
-                  setPrimaryImageIndex(0);
-                }}>
-                  Cancel
-                </Button>
-                <Button type="submit">Add Unit</Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
+
+        {/* Add/Edit Shared Dialog */}
+        <>
+          <Button onClick={handleAddClick}>
+            <Plus className="size-4 mr-2" />
+            Add Unit
+          </Button>
+          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+            <DialogContent className="max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>{editingUnit ? 'Edit Unit' : 'Add New Unit'}</DialogTitle>
+              </DialogHeader>
+              <Form {...unitForm}>
+                <form onSubmit={unitForm.handleSubmit(onSubmit)} className="space-y-4 mt-4">
+
+                  <FormField
+                    control={unitForm.control}
+                    name="propertyId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Property</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select property" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {properties.map((prop) => (
+                              <SelectItem key={prop.id} value={prop.id}>
+                                {prop.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={unitForm.control}
+                    name="unitNumber"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Unit Number</FormLabel>
+                        <FormControl>
+                          <Input placeholder="e.g., A101" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={unitForm.control}
+                    name="unitTypeId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Unit Type</FormLabel>
+                        <Select
+                          onValueChange={(val) => {
+                            field.onChange(parseInt(val));
+                            // We don't need to manually set 'type' name string here, backend or context likely handles it, 
+                            // or we just need the ID. Schema only asks for unitTypeId.
+                            // Wait, schema has strict validation.
+                          }}
+                          value={field.value?.toString()}
+                          defaultValue={field.value?.toString()}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select unit type" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {unitTypes.map((type) => (
+                              <SelectItem key={type.type_id} value={type.type_id.toString()}>
+                                {type.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={unitForm.control}
+                    name="monthlyRent"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Monthly Rent (LKR)</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            placeholder="e.g., 1200"
+                            {...field}
+                            onChange={e => field.onChange(e.target.valueAsNumber)}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={unitForm.control}
+                    name="status"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Status</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select status" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="available">Available</SelectItem>
+                            <SelectItem value="occupied">Occupied</SelectItem>
+                            <SelectItem value="maintenance">Maintenance</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <div className="space-y-2">
+                    <MultiImageUpload
+                      maxImages={10}
+                      onImagesChange={handleImagesChange}
+                      existingImages={existingImages}
+                      onRemoveExisting={handleRemoveExistingImage}
+                      onSetPrimaryExisting={handleSetPrimaryExistingImage}
+                    />
+                  </div>
+
+                  <div className="flex gap-2 justify-end">
+                    <Button type="button" variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button type="submit">{editingUnit ? 'Save Changes' : 'Add Unit'}</Button>
+                  </div>
+                </form>
+              </Form>
+            </DialogContent>
+          </Dialog>
+        </>
       </div>
 
       {/* Stats */}
@@ -476,143 +521,13 @@ export function UnitsPage() {
                           >
                             <Eye className="size-4" />
                           </Button>
-                          <Dialog open={editingUnit?.id === unit.id} onOpenChange={(open) => {
-                            if (!open) {
-                              setEditingUnit(null);
-                              setFormData({
-                                propertyId: '',
-                                unitNumber: '',
-                                unitTypeId: 0,
-                                type: '',
-                                monthlyRent: '',
-                                status: 'available',
-                              });
-                              setUploadFiles([]);
-                              setPrimaryImageIndex(0);
-                              setExistingImages([]);
-                            }
-                          }}>
-                            <DialogTrigger asChild>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => handleEdit(unit)}
-                              >
-                                <Edit className="size-4" />
-                              </Button>
-                            </DialogTrigger>
-                            <DialogContent className="max-h-[90vh] overflow-y-auto">
-                              <DialogHeader>
-                                <DialogTitle>Edit Unit</DialogTitle>
-                              </DialogHeader>
-                              <form onSubmit={handleSubmit} className="space-y-4 mt-4">
-                                <div className="space-y-2">
-                                  <Label htmlFor="edit-propertyId">Property</Label>
-                                  <Select
-                                    value={formData.propertyId}
-                                    onValueChange={(value) => setFormData({ ...formData, propertyId: value })}
-                                  >
-                                    <SelectTrigger id="edit-propertyId">
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {properties.map((prop) => (
-                                        <SelectItem key={prop.id} value={prop.id}>
-                                          {prop.name}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-                                <div className="space-y-2">
-                                  <Label htmlFor="edit-unitNumber">Unit Number</Label>
-                                  <Input
-                                    id="edit-unitNumber"
-                                    value={formData.unitNumber}
-                                    onChange={(e) => setFormData({ ...formData, unitNumber: e.target.value })}
-                                    required
-                                  />
-                                </div>
-                                <div className="space-y-2">
-                                  <Label htmlFor="edit-type">Unit Type</Label>
-                                  <Select
-                                    value={formData.unitTypeId.toString()}
-                                    onValueChange={(value) => {
-                                      const typeId = parseInt(value);
-                                      const typeName = unitTypes.find(t => t.type_id === typeId)?.name || '';
-                                      setFormData({ ...formData, unitTypeId: typeId, type: typeName });
-                                    }}
-                                  >
-                                    <SelectTrigger id="edit-type">
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {unitTypes.map((type) => (
-                                        <SelectItem key={type.type_id} value={type.type_id.toString()}>
-                                          {type.name}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-                                <div className="space-y-2">
-                                  <Label htmlFor="edit-monthlyRent">Monthly Rent (LKR)</Label>
-                                  <Input
-                                    id="edit-monthlyRent"
-                                    type="number"
-                                    step="0.01"
-                                    value={formData.monthlyRent}
-                                    onChange={(e) => setFormData({ ...formData, monthlyRent: e.target.value })}
-                                    required
-                                  />
-                                </div>
-                                <div className="space-y-2">
-                                  <Label htmlFor="edit-status">Status</Label>
-                                  <Select
-                                    value={formData.status}
-                                    onValueChange={(value: Unit['status']) => setFormData({ ...formData, status: value })}
-                                  >
-                                    <SelectTrigger id="edit-status">
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="available">Available</SelectItem>
-                                      <SelectItem value="occupied">Occupied</SelectItem>
-                                      <SelectItem value="maintenance">Maintenance</SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-                                <div className="space-y-2">
-                                  <MultiImageUpload
-                                    maxImages={10}
-                                    onImagesChange={handleImagesChange}
-                                    existingImages={existingImages}
-                                    onRemoveExisting={handleRemoveExistingImage}
-                                    onSetPrimaryExisting={handleSetPrimaryExistingImage}
-                                  />
-                                </div>
-                                <div className="flex gap-2 justify-end">
-                                  <Button type="button" variant="outline" onClick={() => {
-                                    setEditingUnit(null);
-                                    setFormData({
-                                      propertyId: '',
-                                      unitNumber: '',
-                                      unitTypeId: 0,
-                                      type: '',
-                                      monthlyRent: '',
-                                      status: 'available',
-                                    });
-                                    setUploadFiles([]);
-                                    setPrimaryImageIndex(0);
-                                    setExistingImages([]);
-                                  }}>
-                                    Cancel
-                                  </Button>
-                                  <Button type="submit">Save Changes</Button>
-                                </div>
-                              </form>
-                            </DialogContent>
-                          </Dialog>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleEditClick(unit)}
+                          >
+                            <Edit className="size-4" />
+                          </Button>
                           <Button
                             size="sm"
                             variant="ghost"
@@ -707,8 +622,10 @@ export function UnitsPage() {
               <div className="flex justify-end gap-2 pt-4 border-t">
                 <Button variant="outline" onClick={() => setViewUnit(null)}>Close</Button>
                 <Button onClick={() => {
-                  handleEdit(viewUnit);
-                  setViewUnit(null);
+                  if (viewUnit) {
+                    handleEditClick(viewUnit);
+                    setViewUnit(null);
+                  }
                 }}>
                   <Edit className="size-4 mr-2" />
                   Edit Unit

@@ -10,6 +10,10 @@ import { toast } from 'sonner';
 import { MultiImageUpload } from '@/components/ui/multi-image-upload';
 
 import { useAuth } from '@/app/context/AuthContext';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { propertySchema, leadSchema, type PropertyFormValues, type LeadFormValues } from '@/schemas/ownerSchemas';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 
 export function PropertiesPage() {
   const { user } = useAuth();
@@ -29,29 +33,40 @@ export function PropertiesPage() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingProperty, setEditingProperty] = useState<Property | null>(null);
   const [isInterestDialogOpen, setIsInterestDialogOpen] = useState(false);
-  const [interestFormData, setInterestFormData] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    interestedUnit: '',
-    notes: '',
-  });
+
   const [interestProperty, setInterestProperty] = useState<Property | null>(null);
   const [existingImages, setExistingImages] = useState<any[]>([]);
   const [viewGalleryOpen, setViewGalleryOpen] = useState(false);
   const [galleryImages, setGalleryImages] = useState<any[]>([]);
   const [viewPropertyTitle, setViewPropertyTitle] = useState('');
 
-  const [formData, setFormData] = useState({
-    name: '',
-    propertyNo: '',
-    street: '',
-    city: '',
-    district: '',
-    propertyTypeId: 0,
-    description: '',
-    features: [] as string[],
+  // Property Form
+  const propertyForm = useForm<PropertyFormValues>({
+    resolver: zodResolver(propertySchema),
+    defaultValues: {
+      name: '',
+      propertyNo: '',
+      street: '',
+      city: '',
+      district: '',
+      propertyTypeId: 0,
+      description: '',
+      features: [],
+    },
   });
+
+  // Interest Form
+  const interestForm = useForm<LeadFormValues>({
+    resolver: zodResolver(leadSchema),
+    defaultValues: {
+      name: '',
+      email: '',
+      phone: '',
+      interestedUnit: '',
+      notes: '',
+    },
+  });
+
   const [currentFeature, setCurrentFeature] = useState('');
   const [uploadFiles, setUploadFiles] = useState<File[]>([]);
   const [primaryImageIndex, setPrimaryImageIndex] = useState(0);
@@ -66,37 +81,32 @@ export function PropertiesPage() {
 
   // ... (keep existing handler functions unchanged) ...
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (formData.propertyTypeId === 0) {
-      toast.error('Please select a property type');
-      return;
-    }
-
+  const onSubmitProperty = async (values: PropertyFormValues) => {
     try {
       if (editingProperty) {
-        await updateProperty(editingProperty.id, formData);
+        // Update existing property
+        await updateProperty(editingProperty.id, values); // values aligns with Property interface mostly? 
+        // Note: Property interface features is string[], values.features is string[]. all good.
 
+        // Handle images if any
         if (uploadFiles.length > 0) {
-          const response = await uploadPropertyImages(editingProperty.id, uploadFiles);
-
-          if (primaryImageIndex > 0 && response.images && response.images.length > primaryImageIndex) {
-            const targetImage = response.images[primaryImageIndex];
-            if (targetImage) {
-              await setPropertyPrimaryImage(editingProperty.id, targetImage.image_id || targetImage.id);
-            }
-          }
+          await uploadPropertyImages(editingProperty.id, uploadFiles);
         }
 
-        toast.success('Property updated successfully');
-        setEditingProperty(null);
+        toast.success("Property updated successfully");
       } else {
-        const newProperty = await addProperty({ ...formData });
+        // Add new property
+        const propertyData = {
+          ...values,
+          propertyNo: values.propertyNo || '',
+          // Property interface expects these. Form values provide them.
+          // We might need to handle 'image' if we want to show it immediately? 
+          // The context handles fetching images. 
+        };
+        const newProperty = await addProperty(propertyData);
 
         if (newProperty && uploadFiles.length > 0) {
           const response = await uploadPropertyImages(newProperty.id, uploadFiles);
-
           if (primaryImageIndex > 0 && response.images && response.images.length > primaryImageIndex) {
             const targetImage = response.images[primaryImageIndex];
             if (targetImage) {
@@ -104,52 +114,120 @@ export function PropertiesPage() {
             }
           }
         }
-
-        toast.success('Property added successfully');
-        setIsAddDialogOpen(false);
+        toast.success("Property added successfully");
       }
-
-      setFormData({ name: '', propertyNo: '', street: '', city: '', district: '', propertyTypeId: 0, description: '', features: [] });
+      setIsAddDialogOpen(false);
+      setEditingProperty(null);
+      propertyForm.reset();
       setUploadFiles([]);
-      setCurrentFeature('');
-      setPrimaryImageIndex(0);
-    } catch (error: any) {
-      console.error(error);
-      const msg = error.response?.data?.error || 'Failed to save property';
-      toast.error(msg);
+      setExistingImages([]);
+    } catch (error) {
+      console.error('Failed to save property:', error);
+      toast.error("Failed to save property");
     }
   };
 
-  const handleEdit = async (property: Property) => {
+  const handleSetPrimaryExisting = async (image: any) => {
+    if (!editingProperty) return;
+    try {
+      await setPropertyPrimaryImage(editingProperty.id, image.id);
+      // Refresh
+      const images = await getPropertyImages(editingProperty.id);
+      setExistingImages(images.map((img: any) => ({
+        id: img.image_id?.toString() || img.id?.toString(),
+        url: img.image_url || img.url,
+        isPrimary: Boolean(img.is_primary)
+      })));
+      toast.success('Primary image updated');
+    } catch (e) {
+      toast.error('Failed to set primary image');
+    }
+  };
+
+  const handleEditClick = (property: Property) => {
     setEditingProperty(property);
-    setFormData({
+    propertyForm.reset({
       name: property.name,
-      propertyNo: property.propertyNo || '',
-      street: property.street || '',
-      city: property.city || '',
-      district: property.district || '',
+      propertyNo: property.propertyNo,
+      street: property.street,
+      city: property.city,
+      district: property.district,
       propertyTypeId: property.propertyTypeId,
       description: property.description || '',
-      features: (property.features && Array.isArray(property.features)) ? property.features : [],
+      features: property.features || [],
     });
-    setUploadFiles([]);
-    setPrimaryImageIndex(0);
+    setExistingImages(property.image ? [{ id: '1', url: property.image }] : []); // Simplified for now as we don't have full image objects in Property interface here
+    setIsAddDialogOpen(true);
+  };
+
+  const handleAddClick = () => {
+    setEditingProperty(null);
+    propertyForm.reset({
+      name: '',
+      propertyNo: '',
+      street: '',
+      city: '',
+      district: '',
+      propertyTypeId: 0,
+      description: '',
+      features: [],
+    });
     setExistingImages([]);
-    setCurrentFeature('');
+    setUploadFiles([]);
+    setIsAddDialogOpen(true);
+  };
+
+  const handleDeleteClick = async (id: string) => {
+    if (confirm('Are you sure you want to delete this property?')) {
+      await deleteProperty(id);
+      toast.success("Property deleted successfully");
+    }
+  };
+
+  const onSubmitInterest = async (values: LeadFormValues) => {
+    if (!interestProperty) return;
 
     try {
-      const images = await getPropertyImages(property.id);
-      if (images) {
-        setExistingImages(images.map((img: any) => ({
-          id: img.image_id?.toString() || img.id?.toString(),
-          url: img.image_url || img.url, // Handle backend naming
-          isPrimary: Boolean(img.is_primary)
-        })));
-      }
-    } catch (e) {
-      console.error("Failed to load images", e);
-      toast.error("Failed to load property images");
+      await addLead({
+        name: values.name,
+        email: values.email,
+        phone: values.phone,
+        interestedUnit: values.interestedUnit || '',
+        propertyId: interestProperty.id,
+        status: 'interested',
+        notes: values.notes || 'Interested from public page',
+      });
+      toast.success("Interest submitted successfully");
+      setIsInterestDialogOpen(false);
+      interestForm.reset();
+    } catch (error) {
+      console.error('Failed to submit interest:', error);
+      toast.error("Failed to submit interest");
     }
+  };
+
+  const handleInterestClick = (property: Property) => {
+    setInterestProperty(property);
+    interestForm.reset({
+      name: user?.name || '',
+      email: user?.email || '',
+      phone: user?.phone || '',
+      interestedUnit: '',
+      notes: '',
+    });
+    setIsInterestDialogOpen(true);
+  };
+
+  const addFeature = () => {
+    if (!currentFeature.trim()) return;
+    const currentFeatures = propertyForm.getValues('features') || [];
+    propertyForm.setValue('features', [...currentFeatures, currentFeature.trim()]);
+    setCurrentFeature('');
+  };
+
+  const removeFeature = (index: number) => {
+    const currentFeatures = propertyForm.getValues('features') || [];
+    propertyForm.setValue('features', currentFeatures.filter((_, i) => i !== index));
   };
 
   const handleRemoveExistingImage = async (image: any) => {
@@ -161,7 +239,7 @@ export function PropertiesPage() {
         const images = await getPropertyImages(editingProperty.id);
         setExistingImages(images.map((img: any) => ({
           id: img.image_id?.toString() || img.id?.toString(),
-          url: img.image_url,
+          url: img.image_url || img.url, // Handle backend naming
           isPrimary: Boolean(img.is_primary)
         })));
         toast.success('Image deleted');
@@ -213,37 +291,7 @@ export function PropertiesPage() {
     }
   };
 
-  const handleInterestSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      // Find a default available unit if none selected, or strict it?
-      // Logic: Lead is interested in the *property*, but backend expects `interestedUnit`.
-      // If user selected a unit in form, use it. If triggered from property card, maybe force select?
-      // For now, let's auto-select the first available unit or leave empty if backend allows.
-      // Backend `leadModel` inserts `unit_id`.
-      // Let's modify the form to allow unit selection or pre-fill.
 
-      await addLead({
-        ...interestFormData,
-        propertyId: interestProperty?.id || '',
-        status: 'interested',
-      });
-      toast.success('Interest registered! We will contact you soon.');
-      setIsInterestDialogOpen(false);
-      setInterestFormData({ name: '', email: '', phone: '', interestedUnit: '', notes: '' });
-      setInterestProperty(null);
-    } catch (error) {
-      toast.error('Failed to submit interest');
-    }
-  };
-
-  const openInterestDialog = (property: Property) => {
-    setInterestProperty(property);
-    // Find first available unit for this property to pre-select
-    const availableUnit = units.find(u => u.propertyId === property.id && u.status === 'available');
-    setInterestFormData(prev => ({ ...prev, interestedUnit: availableUnit?.id || '' }));
-    setIsInterestDialogOpen(true);
-  };
 
   const getUnitCount = (propertyId: string) => {
     return units.filter(u => u.propertyId === propertyId).length;
@@ -257,168 +305,205 @@ export function PropertiesPage() {
           <p className="text-sm text-gray-500 mt-1">Manage your properties</p>
         </div>
         {user?.role === 'owner' && (
-          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="size-4 mr-2" />
-                Add Property
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>Add New Property</DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleSubmit} className="space-y-4 mt-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Property Name</Label>
-                  <Input
-                    id="name"
-                    placeholder="e.g., Sunset Apartments"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="space-y-4">
-                  <div className="grid grid-cols-4 gap-2">
-                    <div className="col-span-1 space-y-2">
-                      <Label>No.</Label>
-                      <Input
-                        placeholder="10/A"
-                        value={formData.propertyNo}
-                        onChange={(e) => setFormData({ ...formData, propertyNo: e.target.value })}
-                        required
-                      />
-                    </div>
-                    <div className="col-span-3 space-y-2">
-                      <Label>Street</Label>
-                      <Input
-                        placeholder="Main Street"
-                        value={formData.street}
-                        onChange={(e) => setFormData({ ...formData, street: e.target.value })}
-                        required
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>City</Label>
-                      <Input
-                        placeholder="Colombo"
-                        value={formData.city}
-                        onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                        required
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>District</Label>
-                      <Input
-                        placeholder="Western"
-                        value={formData.district}
-                        onChange={(e) => setFormData({ ...formData, district: e.target.value })}
-                        required
-                      />
-                    </div>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="type">Property Type</Label>
-                  <select
-                    id="type"
-                    className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                    value={formData.propertyTypeId}
-                    onChange={(e) => setFormData({ ...formData, propertyTypeId: parseInt(e.target.value) })}
-                    required
-                  >
-                    <option value={0}>Select Type</option>
-                    {propertyTypes.map((t) => (
-                      <option key={t.type_id} value={t.type_id}>{t.name}</option>
-                    ))}
-                  </select>
-                </div>
+          <>
+            <Button onClick={handleAddClick}>
+              <Plus className="size-4 mr-2" />
+              Add Property
+            </Button>
+            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>{editingProperty ? 'Edit Property' : 'Add New Property'}</DialogTitle>
+                </DialogHeader>
 
-                <div className="space-y-2">
-                  <Label htmlFor="description">About the Property</Label>
-                  <textarea
-                    id="description"
-                    className="flex min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                    placeholder="Describe your property..."
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  />
-                </div>
+                <Form {...propertyForm}>
+                  <form onSubmit={propertyForm.handleSubmit(onSubmitProperty)} className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* Basic Information */}
+                      <div className="space-y-4">
+                        <h3 className="text-lg font-medium">Basic Information</h3>
 
-                <div className="space-y-2">
-                  <Label>Features & Amenities</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="e.g. 24/7 Security"
-                      value={currentFeature}
-                      onChange={(e) => setCurrentFeature(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          if (currentFeature.trim()) {
-                            setFormData({ ...formData, features: [...formData.features, currentFeature.trim()] });
-                            setCurrentFeature('');
-                          }
-                        }
-                      }}
-                    />
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      onClick={() => {
-                        if (currentFeature.trim()) {
-                          setFormData({ ...formData, features: [...formData.features, currentFeature.trim()] });
-                          setCurrentFeature('');
-                        }
-                      }}
-                    >
-                      Add
-                    </Button>
-                  </div>
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {formData.features.map((feature, idx) => (
-                      <div key={idx} className="bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-sm flex items-center gap-2">
-                        {feature}
-                        <button
-                          type="button"
-                          className="hover:text-red-500"
-                          onClick={() => {
-                            const newFeatures = [...formData.features];
-                            newFeatures.splice(idx, 1);
-                            setFormData({ ...formData, features: newFeatures });
-                          }}
-                        >
-                          ×
-                        </button>
+                        <FormField
+                          control={propertyForm.control}
+                          name="name"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Property Name</FormLabel>
+                              <FormControl>
+                                <Input placeholder="e.g. Sunset Apartments" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={propertyForm.control}
+                          name="propertyTypeId"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Property Type</FormLabel>
+                              <FormControl>
+                                <select
+                                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                  {...field}
+                                  onChange={(e) => field.onChange(parseInt(e.target.value))}
+                                  value={field.value}
+                                >
+                                  <option value={0}>Select Type</option>
+                                  {propertyTypes.map((type) => (
+                                    <option key={type.type_id} value={type.type_id}>
+                                      {type.name}
+                                    </option>
+                                  ))}
+                                </select>
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={propertyForm.control}
+                          name="description"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Description</FormLabel>
+                              <FormControl>
+                                <textarea
+                                  className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                  placeholder="Describe the property..."
+                                  {...field}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
                       </div>
-                    ))}
-                  </div>
-                </div>
-                <MultiImageUpload
-                  maxImages={10}
-                  onImagesChange={handleImagesChange}
-                  existingImages={existingImages}
-                  onRemoveExisting={handleRemoveExistingImage}
-                  onSetPrimaryExisting={handleSetPrimaryExistingImage}
-                />
-                <div className="flex gap-2 justify-end">
-                  <Button type="button" variant="outline" onClick={() => {
-                    setIsAddDialogOpen(false);
-                    setFormData({ name: '', propertyNo: '', street: '', city: '', district: '', propertyTypeId: 0, description: '', features: [] });
-                    setUploadFiles([]);
-                    setPrimaryImageIndex(0);
-                    setCurrentFeature('');
-                  }}>
-                    Cancel
-                  </Button>
-                  <Button type="submit">Add Property</Button>
-                </div>
-              </form>
-            </DialogContent>
-          </Dialog>
+
+                      {/* Location */}
+                      <div className="space-y-4">
+                        <h3 className="text-lg font-medium">Location</h3>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <FormField
+                            control={propertyForm.control}
+                            name="propertyNo"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Property No</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="e.g. 12/A" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={propertyForm.control}
+                            name="street"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Street</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="e.g. Main Street" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <FormField
+                            control={propertyForm.control}
+                            name="city"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>City</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="e.g. Colombo" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={propertyForm.control}
+                            name="district"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>District</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="e.g. Western" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Features & Images */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                      <div className="space-y-4">
+                        <h3 className="text-lg font-medium">Features</h3>
+                        <div className="flex gap-2">
+                          <Input
+                            value={currentFeature}
+                            onChange={(e) => setCurrentFeature(e.target.value)}
+                            placeholder="Add a feature (e.g. Pool, Gym)"
+                            onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addFeature())}
+                          />
+                          <Button type="button" onClick={addFeature} variant="outline" size="icon">
+                            <Plus className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {propertyForm.watch('features')?.map((feature, idx) => (
+                            <div key={idx} className="bg-secondary text-secondary-foreground px-3 py-1 rounded-full text-sm flex items-center gap-2">
+                              {feature}
+                              <button
+                                type="button"
+                                onClick={() => removeFeature(idx)}
+                                className="hover:text-destructive"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        <h3 className="text-lg font-medium">Images</h3>
+                        <MultiImageUpload
+                          maxImages={10}
+                          onImagesChange={handleImagesChange}
+                          existingImages={existingImages}
+                          onRemoveExisting={handleRemoveExistingImage}
+                          onSetPrimaryExisting={handleSetPrimaryExisting}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-4 border-t">
+                      <Button type="button" variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+                        Cancel
+                      </Button>
+                      <Button type="submit">
+                        {editingProperty ? 'Save Changes' : 'Add Property'}
+                      </Button>
+                    </div>
+                  </form>
+                </Form>
+              </DialogContent>
+            </Dialog>
+          </>
         )}
       </div>
 
@@ -448,7 +533,7 @@ export function PropertiesPage() {
                   )}
                   <div>
                     <CardTitle className="text-lg">{property.name}</CardTitle>
-                    {!property.image && <p className="text-xs text-gray-500 mt-1">{property.typeName}</p>}
+                    !property.image && <p className="text-xs text-gray-500 mt-1">{property.typeName}</p>
                   </div>
                 </div>
               </div>
@@ -480,7 +565,7 @@ export function PropertiesPage() {
                   <Button
                     className="flex-1"
                     variant={user?.role === 'owner' ? 'secondary' : 'default'}
-                    onClick={() => user?.role === 'owner' ? handleViewGallery(property) : openInterestDialog(property)}
+                    onClick={() => user?.role === 'owner' ? handleViewGallery(property) : handleInterestClick(property)}
                   >
                     {user?.role === 'owner' ? (
                       <>
@@ -495,179 +580,13 @@ export function PropertiesPage() {
 
                   {user?.role === 'owner' && (
                     <>
-                      <Dialog open={editingProperty?.id === property.id} onOpenChange={(open) => {
-                        if (!open) {
-                          setEditingProperty(null);
-                          setFormData({ name: '', propertyNo: '', street: '', city: '', district: '', propertyTypeId: 0, description: '', features: [] });
-                          setUploadFiles([]);
-                          setPrimaryImageIndex(0);
-                          setCurrentFeature('');
-                        }
-                      }}>
-                        <DialogTrigger asChild>
-                          <Button
-                            size="icon"
-                            variant="outline"
-                            onClick={() => handleEdit(property)}
-                          >
-                            <Edit className="size-4" />
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="max-h-[90vh] overflow-y-auto">
-                          <DialogHeader>
-                            <DialogTitle>Edit Property</DialogTitle>
-                          </DialogHeader>
-                          <form onSubmit={handleSubmit} className="space-y-4 mt-4">
-                            <div className="space-y-2">
-                              <Label htmlFor="edit-name">Property Name</Label>
-                              <Input
-                                id="edit-name"
-                                value={formData.name}
-                                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                required
-                              />
-                            </div>
-                            <div className="space-y-4">
-                              <div className="space-y-4">
-                                <div className="grid grid-cols-4 gap-2">
-                                  <div className="col-span-1 space-y-2">
-                                    <Label>No.</Label>
-                                    <Input
-                                      placeholder="10/A"
-                                      value={formData.propertyNo}
-                                      onChange={(e) => setFormData({ ...formData, propertyNo: e.target.value })}
-                                    />
-                                  </div>
-                                  <div className="col-span-3 space-y-2">
-                                    <Label>Street</Label>
-                                    <Input
-                                      placeholder="Main Street"
-                                      value={formData.street}
-                                      onChange={(e) => setFormData({ ...formData, street: e.target.value })}
-                                      required
-                                    />
-                                  </div>
-                                </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                  <div className="space-y-2">
-                                    <Label>City</Label>
-                                    <Input
-                                      placeholder="Colombo"
-                                      value={formData.city}
-                                      onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                                      required
-                                    />
-                                  </div>
-                                  <div className="space-y-2">
-                                    <Label>District</Label>
-                                    <Input
-                                      placeholder="Western"
-                                      value={formData.district}
-                                      onChange={(e) => setFormData({ ...formData, district: e.target.value })}
-                                      required
-                                    />
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="edit-type">Property Type</Label>
-                              <select
-                                id="edit-type"
-                                className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                value={formData.propertyTypeId}
-                                onChange={(e) => setFormData({ ...formData, propertyTypeId: parseInt(e.target.value) })}
-                                required
-                              >
-                                <option value={0}>Select Type</option>
-                                {propertyTypes.map((t) => (
-                                  <option key={t.type_id} value={t.type_id}>{t.name}</option>
-                                ))}
-                              </select>
-                            </div>
-
-                            <div className="space-y-2">
-                              <Label htmlFor="edit-description">About the Property</Label>
-                              <textarea
-                                id="edit-description"
-                                className="flex min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                placeholder="Describe your property..."
-                                value={formData.description}
-                                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                              />
-                            </div>
-
-                            <div className="space-y-2">
-                              <Label>Features & Amenities</Label>
-                              <div className="flex gap-2">
-                                <Input
-                                  placeholder="e.g. 24/7 Security"
-                                  value={currentFeature}
-                                  onChange={(e) => setCurrentFeature(e.target.value)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                      e.preventDefault();
-                                      if (currentFeature.trim()) {
-                                        setFormData({ ...formData, features: [...formData.features, currentFeature.trim()] });
-                                        setCurrentFeature('');
-                                      }
-                                    }
-                                  }}
-                                />
-                                <Button
-                                  type="button"
-                                  variant="secondary"
-                                  onClick={() => {
-                                    if (currentFeature.trim()) {
-                                      setFormData({ ...formData, features: [...formData.features, currentFeature.trim()] });
-                                      setCurrentFeature('');
-                                    }
-                                  }}
-                                >
-                                  Add
-                                </Button>
-                              </div>
-                              <div className="flex flex-wrap gap-2 mt-2">
-                                {formData.features.map((feature, idx) => (
-                                  <div key={idx} className="bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-sm flex items-center gap-2">
-                                    {feature}
-                                    <button
-                                      type="button"
-                                      className="hover:text-red-500"
-                                      onClick={() => {
-                                        const newFeatures = [...formData.features];
-                                        newFeatures.splice(idx, 1);
-                                        setFormData({ ...formData, features: newFeatures });
-                                      }}
-                                    >
-                                      ×
-                                    </button>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                            <MultiImageUpload
-                              maxImages={10}
-                              onImagesChange={handleImagesChange}
-                              existingImages={existingImages}
-                              onRemoveExisting={handleRemoveExistingImage}
-                              onSetPrimaryExisting={handleSetPrimaryExistingImage}
-                            />
-                            <div className="flex gap-2 justify-end">
-                              <Button type="button" variant="outline" onClick={() => {
-                                setEditingProperty(null);
-                                setFormData({ name: '', propertyNo: '', street: '', city: '', district: '', propertyTypeId: 0, description: '', features: [] });
-                                setUploadFiles([]);
-                                setPrimaryImageIndex(0);
-                                setCurrentFeature('');
-                              }}>
-                                Cancel
-                              </Button>
-                              <Button type="submit">Save Changes</Button>
-                            </div>
-                          </form>
-                        </DialogContent>
-                      </Dialog>
+                      <Button
+                        size="icon"
+                        variant="outline"
+                        onClick={() => handleEditClick(property)}
+                      >
+                        <Edit className="size-4" />
+                      </Button>
                       <Button
                         size="icon"
                         variant="ghost"
@@ -751,7 +670,7 @@ export function PropertiesPage() {
                 <Button variant="outline" onClick={() => setViewProperty(null)}>Close</Button>
                 {user?.role === 'owner' && (
                   <Button onClick={() => {
-                    handleEdit(viewProperty);
+                    handleEditClick(viewProperty);
                     setViewProperty(null);
                   }}>
                     <Edit className="size-4 mr-2" />
@@ -763,80 +682,84 @@ export function PropertiesPage() {
           )}
         </DialogContent>
       </Dialog>
+
       <Dialog open={isInterestDialogOpen} onOpenChange={setIsInterestDialogOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>I'm Interested in {interestProperty?.name}</DialogTitle>
             <p className="text-sm text-gray-500">Leave your details and we'll get back to you.</p>
           </DialogHeader>
-          <form onSubmit={handleInterestSubmit} className="space-y-4 mt-4">
-            <div className="space-y-2">
-              <Label htmlFor="lead-name">Name</Label>
-              <Input
-                id="lead-name"
-                placeholder="Your full name"
-                value={interestFormData.name}
-                onChange={(e) => setInterestFormData({ ...interestFormData, name: e.target.value })}
-                required
+
+          <Form {...interestForm}>
+            <form onSubmit={interestForm.handleSubmit(onSubmitInterest)} className="space-y-4 mt-4">
+              <FormField
+                control={interestForm.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Your Name" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="lead-email">Email</Label>
-                <Input
-                  id="lead-email"
-                  type="email"
-                  placeholder="email@example.com"
-                  value={interestFormData.email}
-                  onChange={(e) => setInterestFormData({ ...interestFormData, email: e.target.value })}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="lead-phone">Phone</Label>
-                <Input
-                  id="lead-phone"
-                  placeholder="+94 77 123 4567"
-                  value={interestFormData.phone}
-                  onChange={(e) => setInterestFormData({ ...interestFormData, phone: e.target.value })}
-                  required
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="lead-unit">Interested Unit (Optional)</Label>
-              <div className="relative">
-                <select
-                  id="lead-unit"
-                  className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  value={interestFormData.interestedUnit}
-                  onChange={(e) => setInterestFormData({ ...interestFormData, interestedUnit: e.target.value })}
-                >
-                  <option value="">Any available unit</option>
-                  {interestProperty && units
-                    .filter(u => u.propertyId === interestProperty.id && u.status === 'available')
-                    .map(u => (
-                      <option key={u.id} value={u.id}>Unit {u.unitNumber} - {u.type} (LKR {u.monthlyRent}/mo)</option>
-                    ))
-                  }
-                </select>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="lead-notes">Notes / Questions</Label>
-              <textarea
-                id="lead-notes"
-                className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                placeholder="I'm interested in viewing this property..."
-                value={interestFormData.notes}
-                onChange={(e) => setInterestFormData({ ...interestFormData, notes: e.target.value })}
+
+              <FormField
+                control={interestForm.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email</FormLabel>
+                    <FormControl>
+                      <Input type="email" placeholder="your@email.com" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-            <div className="flex gap-2 justify-end pt-2">
-              <Button type="button" variant="outline" onClick={() => setIsInterestDialogOpen(false)}>Cancel</Button>
-              <Button type="submit">Submit Interest</Button>
-            </div>
-          </form>
+
+              <FormField
+                control={interestForm.control}
+                name="phone"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Phone (Sri Lanka)</FormLabel>
+                    <FormControl>
+                      <Input placeholder="0771234567" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={interestForm.control}
+                name="notes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Message (Optional)</FormLabel>
+                    <FormControl>
+                      <textarea
+                        className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        placeholder="I'm interested in this property..."
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="flex justify-end gap-2 pt-2">
+                <Button type="button" variant="outline" onClick={() => setIsInterestDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit">Submit Interest</Button>
+              </div>
+            </form>
+          </Form>
         </DialogContent>
       </Dialog>
       <Dialog open={viewGalleryOpen} onOpenChange={setViewGalleryOpen}>
