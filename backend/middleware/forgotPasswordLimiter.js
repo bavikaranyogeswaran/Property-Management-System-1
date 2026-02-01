@@ -1,4 +1,4 @@
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 
 const forgotPasswordLimiter = rateLimit({
     windowMs: 24 * 60 * 60 * 1000, // 24 hours
@@ -10,7 +10,7 @@ const forgotPasswordLimiter = rateLimit({
     legacyHeaders: false, // Disable the `X-RateLimit-*` headers
     keyGenerator: (req, res) => {
         // Limit by email if available, otherwise by IP
-        return req.body.email || req.ip;
+        return req.body.email || ipKeyGenerator(req.ip);
     }
 });
 

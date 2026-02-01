@@ -65,7 +65,6 @@ CREATE TABLE owners (
     branch_name VARCHAR(100),
     account_holder_name VARCHAR(100),
     account_number VARCHAR(50),
-    residence_address VARCHAR(255),      -- Mailing address
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 );
 
