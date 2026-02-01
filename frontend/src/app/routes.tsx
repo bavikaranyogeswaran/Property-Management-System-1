@@ -11,7 +11,7 @@ import { TreasurersPage } from '@/components/pages/owner/TreasurersPage';
 import { LeasesPage } from '@/components/pages/owner/LeasesPage';
 import { OwnerInvoicesPage } from '@/components/pages/owner/OwnerInvoicesPage';
 import { TenantInvoicesPage } from '@/components/pages/tenant/TenantInvoicesPage';
-import { TenantPaymentsPage } from '@/app/components/pages/TenantPaymentsPage';
+import { TenantPaymentsPage } from '@/components/pages/tenant/TenantPaymentsPage';
 import { PaymentVerificationPage } from '@/components/pages/treasurer/PaymentVerificationPage';
 import { MaintenanceExpensesPage } from '@/components/pages/treasurer/MaintenanceExpensesPage';
 import { TenantMaintenancePage } from '@/components/pages/tenant/TenantMaintenancePage';

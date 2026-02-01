@@ -1,5 +1,6 @@
 import leaseModel from '../models/leaseModel.js';
 import unitModel from '../models/unitModel.js';
+import tenantModel from '../models/tenantModel.js';
 import pool from '../config/db.js';
 
 class LeaseService {
@@ -13,8 +14,26 @@ class LeaseService {
         const { tenantId, unitId, startDate, endDate, monthlyRent } = leaseData;
 
         // Validation
-        if (!tenantId || !unitId || !startDate || !endDate || !monthlyRent) {
+        // Validation: Check required fields (allow 0 for rent here, caught later)
+        if (!tenantId || !unitId || !startDate || !endDate || monthlyRent === undefined || monthlyRent === null) {
             throw new Error('All fields are required for lease creation.');
+        }
+
+        if (new Date(startDate) >= new Date(endDate)) {
+            throw new Error('End date must be after start date');
+        }
+
+        if (isNaN(new Date(startDate).getTime()) || isNaN(new Date(endDate).getTime())) {
+            throw new Error('Invalid date format');
+        }
+
+        if (monthlyRent <= 0) {
+            throw new Error('Monthly rent must be greater than 0');
+        }
+
+        const tenant = await tenantModel.findByUserId(tenantId);
+        if (!tenant) {
+            throw new Error('Tenant not found');
         }
 
         // Use provided connection or get a new one (for read operations checking availability)

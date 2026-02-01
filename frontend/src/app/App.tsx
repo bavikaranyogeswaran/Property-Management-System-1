@@ -62,7 +62,7 @@ import { OwnerReportsPage } from '@/components/pages/owner/OwnerReportsPage';
 import { TenantDashboard } from '@/components/pages/tenant/TenantDashboard';
 import { TenantInvoicesPage } from '@/components/pages/tenant/TenantInvoicesPage';
 import { TenantMaintenancePage } from '@/components/pages/tenant/TenantMaintenancePage';
-import { TenantPaymentsPage } from '@/app/components/pages/TenantPaymentsPage';
+import { TenantPaymentsPage } from '@/components/pages/tenant/TenantPaymentsPage';
 
 // Treasurer Pages
 import { TreasurerDashboard } from '@/components/pages/treasurer/TreasurerDashboard';

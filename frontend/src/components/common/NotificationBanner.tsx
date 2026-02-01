@@ -1,8 +1,8 @@
 import React from 'react';
 import { Notification } from '@/app/context/AppContext';
 import { AlertCircle, Bell, Clock, AlertTriangle } from 'lucide-react';
-import { Card, CardContent } from '@/app/components/ui/card';
-import { Badge } from '@/app/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 
 interface NotificationBannerProps {
   notifications: Notification[];
@@ -35,20 +35,20 @@ export function NotificationBanner({ notifications, userRole, tenantId }: Notifi
     <div className="space-y-3 mb-6">
       {sortedNotifications.map((notification) => {
         const Icon = notification.severity === 'urgent' ? AlertTriangle :
-                     notification.severity === 'warning' ? AlertCircle :
-                     Bell;
-        
+          notification.severity === 'warning' ? AlertCircle :
+            Bell;
+
         const bgColor = notification.severity === 'urgent' ? 'bg-red-50 border-red-200' :
-                       notification.severity === 'warning' ? 'bg-orange-50 border-orange-200' :
-                       'bg-blue-50 border-blue-200';
-        
+          notification.severity === 'warning' ? 'bg-orange-50 border-orange-200' :
+            'bg-blue-50 border-blue-200';
+
         const textColor = notification.severity === 'urgent' ? 'text-red-900' :
-                         notification.severity === 'warning' ? 'text-orange-900' :
-                         'text-blue-900';
-        
+          notification.severity === 'warning' ? 'text-orange-900' :
+            'text-blue-900';
+
         const iconColor = notification.severity === 'urgent' ? 'text-red-600' :
-                         notification.severity === 'warning' ? 'text-orange-600' :
-                         'text-blue-600';
+          notification.severity === 'warning' ? 'text-orange-600' :
+            'text-blue-600';
 
         return (
           <Card key={notification.id} className={`${bgColor} border`}>
@@ -61,12 +61,12 @@ export function NotificationBanner({ notifications, userRole, tenantId }: Notifi
                       {notification.title}
                     </h4>
                     {notification.daysUntilExpiry !== undefined && (
-                      <Badge 
-                        variant="outline" 
+                      <Badge
+                        variant="outline"
                         className={
                           notification.severity === 'urgent' ? 'border-red-400 text-red-700 bg-red-100' :
-                          notification.severity === 'warning' ? 'border-orange-400 text-orange-700 bg-orange-100' :
-                          'border-blue-400 text-blue-700 bg-blue-100'
+                            notification.severity === 'warning' ? 'border-orange-400 text-orange-700 bg-orange-100' :
+                              'border-blue-400 text-blue-700 bg-blue-100'
                         }
                       >
                         <Clock className="size-3 mr-1" />
