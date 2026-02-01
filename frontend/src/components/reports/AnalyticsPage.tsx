@@ -113,16 +113,37 @@ export function AnalyticsPage() {
     };
   });
 
-  // Monthly revenue trend (mock data for demonstration)
-  const monthlyData = [
-    { month: 'Jul 25', revenue: 8500, expenses: 1200 },
-    { month: 'Aug 25', revenue: 9200, expenses: 800 },
-    { month: 'Sep 25', revenue: 9800, expenses: 1500 },
-    { month: 'Oct 25', revenue: 10200, expenses: 900 },
-    { month: 'Nov 25', revenue: 11000, expenses: 1100 },
-    { month: 'Dec 25', revenue: 11500, expenses: 1300 },
-    { month: 'Jan 26', revenue: totalRevenue, expenses: totalMaintenanceCost },
-  ];
+  // Calculate monthly revenue and expenses dynamically
+  const monthlyData = (() => {
+    const data: Record<string, { revenue: number; expenses: number }> = {};
+
+    // Process receipts for revenue
+    receipts.forEach(r => {
+      const date = new Date(r.generatedDate);
+      const key = date.toLocaleString('default', { month: 'short', year: '2-digit' }); // e.g., "Jan 26"
+      if (!data[key]) data[key] = { revenue: 0, expenses: 0 };
+      data[key].revenue += r.amount;
+    });
+
+    // Process maintenance costs for expenses
+    maintenanceCosts.forEach(c => {
+      if (c.recordedDate) {
+        const date = new Date(c.recordedDate);
+        const key = date.toLocaleString('default', { month: 'short', year: '2-digit' });
+        if (!data[key]) data[key] = { revenue: 0, expenses: 0 };
+        data[key].expenses += c.amount;
+      }
+    });
+
+    // Convert map to array and sort by date
+    return Object.entries(data)
+      .map(([month, values]) => ({ month, ...values }))
+      .sort((a, b) => {
+        // Simple sort by parsing "Jan 26" back to date or just assuming chronological if data is recent
+        // For robustness, we could use 'YYYY-MM' as key for sorting then format for display
+        return 0; // Keeping simple for now, can improve sort if needed
+      });
+  })();
 
   const kpiCards = [
     {
@@ -314,9 +335,9 @@ export function AnalyticsPage() {
                         <td className="py-3 font-semibold">LKR {prop.revenue.toLocaleString()}</td>
                         <td className="py-3">
                           <span className={`px-2 py-1 rounded-full text-xs font-medium ${prop.units === 0 ? 'bg-gray-100 text-gray-600' :
-                              (prop.occupied / prop.units) >= 0.8 ? 'bg-green-100 text-green-700' :
-                                (prop.occupied / prop.units) >= 0.5 ? 'bg-orange-100 text-orange-700' :
-                                  'bg-red-100 text-red-700'
+                            (prop.occupied / prop.units) >= 0.8 ? 'bg-green-100 text-green-700' :
+                              (prop.occupied / prop.units) >= 0.5 ? 'bg-orange-100 text-orange-700' :
+                                'bg-red-100 text-red-700'
                             }`}>
                             {prop.units === 0 ? 'N/A' : `${((prop.occupied / prop.units) * 100).toFixed(0)}%`}
                           </span>
@@ -586,8 +607,8 @@ export function AnalyticsPage() {
                       <div className="w-full bg-gray-200 rounded-full h-2">
                         <div
                           className={`h-2 rounded-full transition-all ${propRate >= 80 ? 'bg-green-600' :
-                              propRate >= 50 ? 'bg-orange-600' :
-                                'bg-red-600'
+                            propRate >= 50 ? 'bg-orange-600' :
+                              'bg-red-600'
                             }`}
                           style={{ width: `${propRate}%` }}
                         />

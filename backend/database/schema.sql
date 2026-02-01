@@ -330,17 +330,6 @@ CREATE TABLE property_visits (
 );
 
 -- =========================
--- INDEXES
--- =========================
-CREATE INDEX idx_unit_status ON units(status);
-CREATE INDEX idx_lead_status ON leads(status);
-CREATE INDEX idx_lead_last_contacted ON leads(last_contacted_at);
-CREATE INDEX idx_lease_status ON leases(status);
-CREATE INDEX idx_invoice_status ON rent_invoices(status);
-CREATE INDEX idx_payment_status ON payments(status);
-CREATE INDEX idx_maintenance_status ON maintenance_requests(status);
-
--- =========================
 -- STAFF ASSIGNMENTS
 -- =========================
 CREATE TABLE IF NOT EXISTS staff_property_assignments (
@@ -352,3 +341,21 @@ CREATE TABLE IF NOT EXISTS staff_property_assignments (
     FOREIGN KEY (property_id) REFERENCES properties(property_id) ON DELETE CASCADE,
     UNIQUE KEY unique_assignment (user_id, property_id)
 );
+
+-- =========================
+-- INDEXES
+-- =========================
+CREATE INDEX idx_unit_status ON units(status);
+CREATE INDEX idx_lead_status ON leads(status);
+CREATE INDEX idx_lead_last_contacted ON leads(last_contacted_at);
+CREATE INDEX idx_lease_status ON leases(status);
+CREATE INDEX idx_invoice_status ON rent_invoices(status);
+CREATE INDEX idx_payment_status ON payments(status);
+CREATE INDEX idx_maintenance_status ON maintenance_requests(status);
+CREATE INDEX idx_properties_city_district ON properties(city, district);
+CREATE INDEX idx_units_status ON units(status);
+CREATE INDEX idx_units_rent ON units(monthly_rent);
+CREATE INDEX idx_leases_status_end_date ON leases(status, end_date);
+CREATE INDEX idx_invoices_status_due_date ON rent_invoices(status, due_date);
+CREATE INDEX idx_maintenance_status ON maintenance_requests(status);
+

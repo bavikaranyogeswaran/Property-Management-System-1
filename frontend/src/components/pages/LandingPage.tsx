@@ -120,7 +120,7 @@ export function LandingPage({ onNavigate }: { onNavigate: (page: string) => void
                         </div>
                     </div>
                     <div className="text-center text-gray-500 text-sm">
-                        © 2024 Property Management System. All rights reserved.
+                        © 2026 Property Management System. All rights reserved.
                     </div>
                 </div>
             </footer>
