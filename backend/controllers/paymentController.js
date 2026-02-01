@@ -9,7 +9,6 @@ class PaymentController {
             const { invoiceId, amount, paymentDate, paymentMethod, referenceNumber, evidenceUrl } = req.body;
             const tenantId = req.user.id;
 
-            // TODO: Validate invoice belongs to tenant?
 
             const paymentId = await paymentModel.create({
                 invoiceId,

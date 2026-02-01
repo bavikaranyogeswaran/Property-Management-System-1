@@ -1,5 +1,7 @@
 import express, { json } from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit'; // Added rate limiting
 import 'dotenv/config';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -12,7 +14,17 @@ const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(cors());
+app.use(helmet()); // Added Helmet for security headers
 app.use(json());
+
+// Rate Limiting for Auth
+const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100, // Limit each IP to 100 requests per windowMs
+    message: 'Too many login attempts from this IP, please try again after 15 minutes'
+});
+app.use('/api/auth', authLimiter);
+
 
 // Serve uploaded files
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
