@@ -1585,7 +1585,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             type: n.type,
             title: n.type === 'maintenance' ? 'Maintenance Update' : 'Notification',
             message: n.message,
-            targetRole: 'treasurer',
+            targetRole: 'both', // Backend already filtered by user, so 'both' ensures visibility
             severity: 'info',
             createdAt: n.created_at,
             read: Boolean(n.is_read)

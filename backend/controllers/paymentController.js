@@ -1,6 +1,7 @@
 import paymentModel from '../models/paymentModel.js';
 import invoiceModel from '../models/invoiceModel.js';
 import receiptModel from '../models/receiptModel.js';
+import notificationModel from '../models/notificationModel.js';
 
 class PaymentController {
     async submitPayment(req, res) {
@@ -101,7 +102,25 @@ class PaymentController {
                             generatedDate: new Date().toISOString(),
                             receiptNumber: `REC-${Date.now()}`
                         });
+
+                        // Notify Tenant
+                        await notificationModel.create({
+                            userId: invoice.tenant_id,
+                            message: `Payment of ${payment.amount} for Invoice #${payment.invoice_id} has been verified.`,
+                            type: 'payment'
+                        });
                     }
+                }
+            } else if (status === 'rejected') {
+                const payment = await paymentModel.findById(id);
+                if (payment) {
+                    // Notify Tenant
+                    await notificationModel.create({
+                        userId: payment.tenant_id,
+                        message: `Payment of ${payment.amount} for Invoice #${payment.invoice_id} was rejected. Please contact support.`,
+                        type: 'payment',
+                        severity: 'urgent' // Optional field if model supports it, otherwise ignored
+                    });
                 }
             }
 

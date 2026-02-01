@@ -73,10 +73,20 @@ class MaintenanceRequestController {
                 // Also get unit/property info if possible, but let's keep message simple for now or fetch unit details.
                 // request object has details.
 
+                // Notify Treasurers
                 for (const treasurer of treasurers) {
                     await notificationModel.create({
                         userId: treasurer.user_id,
                         message: `Maintenance Request '${request.title}' has been completed. Please record final costs.`,
+                        type: 'maintenance'
+                    });
+                }
+
+                // Notify Tenant
+                if (request.tenant_id) {
+                    await notificationModel.create({
+                        userId: request.tenant_id,
+                        message: `Maintenance Request '${request.title}' has been marked as completed.`,
                         type: 'maintenance'
                     });
                 }
