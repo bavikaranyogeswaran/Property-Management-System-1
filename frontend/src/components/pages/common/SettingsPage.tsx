@@ -11,6 +11,11 @@ import { Switch } from '@/components/ui/switch';
 import { User, Lock, Shield, Trash } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useForm } from 'react-hook-form';
+import { passwordUpdateSchema, type PasswordUpdateFormValues } from '@/schemas/authSchemas';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+
 export function SettingsPage() {
     const { user, updateProfile, changePassword } = useAuth();
     const [profileData, setProfileData] = useState({
@@ -30,11 +35,29 @@ export function SettingsPage() {
         }
     }, [user]);
 
-    const [passwords, setPasswords] = useState({
-        current: '',
-        new: '',
-        confirm: '',
+    // React Hook Form for Password Update
+    const passwordForm = useForm<PasswordUpdateFormValues>({
+        resolver: zodResolver(passwordUpdateSchema),
+        defaultValues: {
+            current: '',
+            new: '',
+            confirm: '',
+        }
     });
+
+    const onPasswordSubmit = async (data: PasswordUpdateFormValues) => {
+        try {
+            await changePassword({
+                currentPassword: data.current,
+                newPassword: data.new
+            });
+            toast.success('Password updated successfully');
+            passwordForm.reset();
+        } catch (error: any) {
+            console.error(error);
+            toast.error(error.response?.data?.error || 'Failed to update password');
+        }
+    };
 
     const handleProfileUpdate = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -46,26 +69,6 @@ export function SettingsPage() {
         } catch (error: any) {
             console.error(error);
             toast.error(error.response?.data?.error || 'Failed to update profile');
-        }
-    };
-
-    const handlePasswordUpdate = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (passwords.new !== passwords.confirm) {
-            toast.error('New passwords do not match');
-            return;
-        }
-
-        try {
-            await changePassword({
-                currentPassword: passwords.current,
-                newPassword: passwords.new
-            });
-            toast.success('Password updated successfully');
-            setPasswords({ current: '', new: '', confirm: '' });
-        } catch (error: any) {
-            console.error(error);
-            toast.error(error.response?.data?.error || 'Failed to update password');
         }
     };
 
@@ -156,43 +159,54 @@ export function SettingsPage() {
                             <CardDescription>Manage your password and security questions</CardDescription>
                         </CardHeader>
                         <CardContent>
-                            <form onSubmit={handlePasswordUpdate} className="space-y-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="current">Current Password</Label>
-                                    <Input
-                                        id="current"
-                                        type="password"
-                                        value={passwords.current}
-                                        onChange={(e) => setPasswords({ ...passwords, current: e.target.value })}
-                                        required
+                            <Form {...passwordForm}>
+                                <form onSubmit={passwordForm.handleSubmit(onPasswordSubmit)} className="space-y-4">
+                                    <FormField
+                                        control={passwordForm.control}
+                                        name="current"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Current Password</FormLabel>
+                                                <FormControl>
+                                                    <Input type="password" {...field} />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
                                     />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="new">New Password</Label>
-                                    <Input
-                                        id="new"
-                                        type="password"
-                                        value={passwords.new}
-                                        onChange={(e) => setPasswords({ ...passwords, new: e.target.value })}
-                                        required
-                                        minLength={8}
+                                    <FormField
+                                        control={passwordForm.control}
+                                        name="new"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>New Password</FormLabel>
+                                                <FormControl>
+                                                    <Input type="password" {...field} />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
                                     />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="confirm">Confirm New Password</Label>
-                                    <Input
-                                        id="confirm"
-                                        type="password"
-                                        value={passwords.confirm}
-                                        onChange={(e) => setPasswords({ ...passwords, confirm: e.target.value })}
-                                        required
-                                        minLength={8}
+                                    <FormField
+                                        control={passwordForm.control}
+                                        name="confirm"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Confirm New Password</FormLabel>
+                                                <FormControl>
+                                                    <Input type="password" {...field} />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
                                     />
-                                </div>
-                                <div className="flex justify-end pt-4">
-                                    <Button type="submit">Update Password</Button>
-                                </div>
-                            </form>
+                                    <div className="flex justify-end pt-4">
+                                        <Button type="submit" disabled={passwordForm.formState.isSubmitting}>
+                                            {passwordForm.formState.isSubmitting ? 'Updating...' : 'Update Password'}
+                                        </Button>
+                                    </div>
+                                </form>
+                            </Form>
                         </CardContent>
                     </Card>
                 </TabsContent>

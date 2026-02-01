@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { resetPasswordSchema, type ResetPasswordFormValues } from '@/schemas/authSchemas';
 import authService from '@/services/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,46 +9,34 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Building2, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 
 export function ResetPasswordPage() {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const token = searchParams.get('token');
 
-    const [password, setPassword] = useState('');
-    const [confirmPassword, setConfirmPassword] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
+    const form = useForm<ResetPasswordFormValues>({
+        resolver: zodResolver(resetPasswordSchema),
+        defaultValues: {
+            password: '',
+            confirmPassword: '',
+        },
+    });
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-
-        if (password !== confirmPassword) {
-            toast.error('Passwords do not match');
-            return;
-        }
-
-        if (password.length < 6) {
-            toast.error('Password must be at least 6 characters');
-            return;
-        }
-
+    const onSubmit = async (data: ResetPasswordFormValues) => {
         if (!token) {
             toast.error('Invalid or missing reset token');
             return;
         }
 
-        setIsLoading(true);
-
         try {
-            await authService.resetPassword(token, password);
+            await authService.resetPassword(token, data.password);
             toast.success('Password has been reset successfully!');
             navigate('/login');
         } catch (error) {
             console.error('Reset password error:', error);
-            // Default error message from backend or generic one
             toast.error('Failed to reset password. The link may have expired.');
-        } finally {
-            setIsLoading(false);
         }
     };
 
@@ -89,44 +79,59 @@ export function ResetPasswordPage() {
                     <CardDescription>Enter your new password below</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <form onSubmit={handleSubmit} className="space-y-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="password">New Password</Label>
-                            <Input
-                                id="password"
-                                type="password"
-                                placeholder="Enter updated password"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                required
+                    <Form {...form}>
+                        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                            <FormField
+                                control={form.control}
+                                name="password"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>New Password</FormLabel>
+                                        <FormControl>
+                                            <Input
+                                                placeholder="Enter updated password"
+                                                type="password"
+                                                {...field}
+                                            />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
                             />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="confirmPassword">Confirm Password</Label>
-                            <Input
-                                id="confirmPassword"
-                                type="password"
-                                placeholder="Confirm updated password"
-                                value={confirmPassword}
-                                onChange={(e) => setConfirmPassword(e.target.value)}
-                                required
+
+                            <FormField
+                                control={form.control}
+                                name="confirmPassword"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Confirm Password</FormLabel>
+                                        <FormControl>
+                                            <Input
+                                                placeholder="Confirm updated password"
+                                                type="password"
+                                                {...field}
+                                            />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
                             />
-                        </div>
 
-                        <Button type="submit" className="w-full" disabled={isLoading}>
-                            {isLoading ? 'Resetting...' : 'Reset Password'}
-                        </Button>
+                            <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
+                                {form.formState.isSubmitting ? 'Resetting...' : 'Reset Password'}
+                            </Button>
 
-                        <div className="text-center">
-                            <Link
-                                to="/login"
-                                className="text-sm text-muted-foreground hover:text-primary flex items-center justify-center gap-2 w-full"
-                            >
-                                <ArrowLeft className="size-4" />
-                                Back to Sign In
-                            </Link>
-                        </div>
-                    </form>
+                            <div className="text-center">
+                                <Link
+                                    to="/login"
+                                    className="text-sm text-muted-foreground hover:text-primary flex items-center justify-center gap-2 w-full"
+                                >
+                                    <ArrowLeft className="size-4" />
+                                    Back to Sign In
+                                </Link>
+                            </div>
+                        </form>
+                    </Form>
                 </CardContent>
             </Card>
         </div>
