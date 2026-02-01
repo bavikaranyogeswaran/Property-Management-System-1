@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
-import { User, Lock, Bell, Shield } from 'lucide-react';
+import { User, Lock, Shield, Trash } from 'lucide-react';
 import { toast } from 'sonner';
 
 export function SettingsPage() {
@@ -34,12 +34,6 @@ export function SettingsPage() {
         current: '',
         new: '',
         confirm: '',
-    });
-
-    const [notifications, setNotifications] = useState({
-        email: true,
-        push: false,
-        marketing: false,
     });
 
     const handleProfileUpdate = async (e: React.FormEvent) => {
@@ -91,10 +85,6 @@ export function SettingsPage() {
                     <TabsTrigger value="security">
                         <Lock className="size-4 mr-2" />
                         Security
-                    </TabsTrigger>
-                    <TabsTrigger value="notifications">
-                        <Bell className="size-4 mr-2" />
-                        Notifications
                     </TabsTrigger>
                     {user?.role === 'owner' && (
                         <TabsTrigger value="types">
@@ -207,46 +197,6 @@ export function SettingsPage() {
                     </Card>
                 </TabsContent>
 
-                <TabsContent value="notifications">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Notification Preferences</CardTitle>
-                            <CardDescription>Choose how you want to be notified</CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-6">
-                            <div className="flex items-center justify-between">
-                                <div className="space-y-0.5">
-                                    <Label>Email Notifications</Label>
-                                    <p className="text-sm text-gray-500">Receive emails about account activity</p>
-                                </div>
-                                <Switch
-                                    checked={notifications.email}
-                                    onCheckedChange={(c) => setNotifications({ ...notifications, email: c })}
-                                />
-                            </div>
-                            <div className="flex items-center justify-between">
-                                <div className="space-y-0.5">
-                                    <Label>Push Notifications</Label>
-                                    <p className="text-sm text-gray-500">Receive push notifications on your device</p>
-                                </div>
-                                <Switch
-                                    checked={notifications.push}
-                                    onCheckedChange={(c) => setNotifications({ ...notifications, push: c })}
-                                />
-                            </div>
-                            <div className="flex items-center justify-between">
-                                <div className="space-y-0.5">
-                                    <Label>Marketing Emails</Label>
-                                    <p className="text-sm text-gray-500">Receive news and updates</p>
-                                </div>
-                                <Switch
-                                    checked={notifications.marketing}
-                                    onCheckedChange={(c) => setNotifications({ ...notifications, marketing: c })}
-                                />
-                            </div>
-                        </CardContent>
-                    </Card>
-                </TabsContent>
                 {user?.role === 'owner' && (
                     <TabsContent value="types">
                         <Card>
@@ -309,7 +259,7 @@ function TypeManager() {
                                 className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
                                 onClick={() => deletePropertyType(type.type_id)}
                             >
-                                <Lock className="size-3" /> {/* Using Lock icon as placeholder for protected/delete if allowed */}
+                                <Trash className="size-3" />
                                 <span className="sr-only">Delete</span>
                             </Button>
                         </div>
@@ -341,7 +291,7 @@ function TypeManager() {
                                 className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
                                 onClick={() => deleteUnitType(type.type_id)}
                             >
-                                <Lock className="size-3" />
+                                <Trash className="size-3" />
                             </Button>
                         </div>
                     ))}
