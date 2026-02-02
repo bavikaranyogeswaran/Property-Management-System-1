@@ -139,10 +139,11 @@ export function OwnerInvoicesPage() {
             const unit = units.find(u => u.id === invoice.unitId);
             const property = unit ? properties.find(p => p.id === unit.propertyId) : null;
             const isOverdue = invoice.status === 'pending' && new Date(invoice.dueDate) < new Date();
+            const isLateFee = invoice.description?.includes('Late Fee');
             const receipt = receipts.find(r => r.invoiceId === invoice.id);
 
             return (
-              <TableRow key={invoice.id}>
+              <TableRow key={invoice.id} className={isLateFee ? 'bg-red-50' : ''}>
                 <TableCell className="font-mono text-sm">{invoice.id}</TableCell>
                 <TableCell className="font-medium">{tenant?.name}</TableCell>
                 <TableCell>{property?.name}</TableCell>
@@ -156,12 +157,15 @@ export function OwnerInvoicesPage() {
                 </TableCell>
                 <TableCell>{invoice.generatedDate}</TableCell>
                 <TableCell>
-                  <Badge variant={
-                    invoice.status === 'paid' ? 'default' :
-                      isOverdue ? 'destructive' : 'secondary'
-                  }>
-                    {isOverdue ? 'Overdue' : invoice.status}
-                  </Badge>
+                  <div className="flex gap-2">
+                    <Badge variant={
+                      invoice.status === 'paid' ? 'default' :
+                        isOverdue ? 'destructive' : 'secondary'
+                    }>
+                      {isOverdue ? 'Overdue' : invoice.status}
+                    </Badge>
+                    {isLateFee && <Badge variant="destructive" className="bg-red-100 text-red-700 border-red-200">Late Fee</Badge>}
+                  </div>
                 </TableCell>
                 <TableCell className="text-right flex items-center justify-end gap-2">
                   {/* Cash Payment Button for Treasurer */}

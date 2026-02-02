@@ -109,6 +109,9 @@ export interface Lease {
   endDate: string;
   monthlyRent: number;
   status: 'active' | 'ended' | 'terminated';
+  securityDeposit?: number;
+  depositStatus?: 'pending' | 'paid' | 'partially_refunded' | 'refunded';
+  refundedAmount?: number;
   createdAt: string;
 }
 
@@ -120,6 +123,7 @@ export interface RentInvoice {
   amount: number;
   dueDate: string;
   status: 'pending' | 'paid' | 'overdue';
+  description?: string;
   generatedDate: string;
 }
 
@@ -260,6 +264,8 @@ interface AppContextType {
   // Lease operations
   addLease: (lease: Omit<Lease, 'id' | 'createdAt'>) => Promise<void>;
   endLease: (id: string) => void;
+  renewLease: (id: string, newEndDate: string, newMonthlyRent?: number) => Promise<void>;
+  refundDeposit: (id: string, amount: number) => Promise<void>;
 
   // Invoice operations
   generateMonthlyInvoices: () => void;
@@ -442,7 +448,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
               // Assuming basic mapping for now.
               amount: parseFloat(i.amount),
               dueDate: i.due_date ? i.due_date.split('T')[0] : '',
+
               status: i.status,
+              description: i.description,
               generatedDate: i.created_at ? i.created_at.split('T')[0] : '' // created_at exists? default?
             }));
             setInvoices(mappedInvoices);
@@ -1053,11 +1061,52 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const endLease = (id: string) => {
-    const lease = leases.find(l => l.id === id);
-    if (lease) {
-      setLeases(leases.map(l => l.id === id ? { ...l, status: 'ended' } : l));
-      updateUnit(lease.unitId, { status: 'available' });
+  const endLease = async (id: string) => {
+    try {
+      await apiClient.put(`/leases/${id}/end`);
+      setLeases(prev => prev.map(l => l.id === id ? { ...l, status: 'ended' } : l));
+      // Update unit status to available
+      const lease = leases.find(l => l.id === id);
+      if (lease) {
+        updateUnit(lease.unitId, { status: 'available' });
+      }
+      toast.success('Lease ended successfully');
+    } catch (e) {
+      console.error("Failed to end lease", e);
+      toast.error("Failed to end lease");
+    }
+  };
+
+  const renewLease = async (id: string, newEndDate: string, newMonthlyRent?: number) => {
+    try {
+      await apiClient.put(`/leases/${id}/renew`, { newEndDate, newMonthlyRent });
+      // Update local state
+      setLeases(prev => prev.map(l => l.id === id ? {
+        ...l,
+        endDate: newEndDate,
+        monthlyRent: newMonthlyRent || l.monthlyRent
+      } : l));
+      toast.success('Lease renewed successfully');
+    } catch (e: any) {
+      console.error("Failed to renew lease", e);
+      const msg = e.response?.data?.error || 'Failed to renew lease';
+      toast.error(msg);
+      throw new Error(msg);
+    }
+  };
+
+  const refundDeposit = async (id: string, amount: number) => {
+    try {
+      await apiClient.post(`/leases/${id}/refund`, { amount });
+      // Refetch leases to get updated status
+      const lRes = await apiClient.get('/leases');
+      setLeases(lRes.data);
+      toast.success('Deposit refunded successfully');
+    } catch (e: any) {
+      console.error("Failed to refund deposit", e);
+      const msg = e.response?.data?.error || 'Failed to refund deposit';
+      toast.error(msg);
+      throw new Error(msg);
     }
   };
 
@@ -1081,6 +1130,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           amount: parseFloat(i.amount),
           dueDate: i.due_date ? i.due_date.split('T')[0] : '',
           status: i.status,
+          description: i.description,
           generatedDate: i.created_at ? i.created_at.split('T')[0] : ''
         }));
         setInvoices(mappedInvoices);
@@ -1385,6 +1435,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       deleteTreasurer,
       addLease,
       endLease,
+      renewLease,
+      refundDeposit,
       generateMonthlyInvoices,
       submitPayment,
       verifyPayment,

@@ -194,9 +194,19 @@ CREATE TABLE lead_stage_history (
     changed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     notes TEXT,
     duration_in_previous_stage INT,
-    CONSTRAINT fk_stage_history_lead
         FOREIGN KEY (lead_id) REFERENCES leads(lead_id)
         ON DELETE CASCADE
+);
+
+CREATE TABLE messages (
+    message_id INT AUTO_INCREMENT PRIMARY KEY,
+    lead_id INT NOT NULL,
+    sender_id INT NOT NULL,
+    content TEXT NOT NULL,
+    is_read BOOLEAN DEFAULT FALSE,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (lead_id) REFERENCES leads(lead_id) ON DELETE CASCADE,
+    FOREIGN KEY (sender_id) REFERENCES users(user_id) ON DELETE CASCADE
 );
 
 -- =========================
@@ -212,6 +222,7 @@ CREATE TABLE leases (
     status ENUM('active','ended') DEFAULT 'active',
     security_deposit DECIMAL(10, 2) DEFAULT 0.00,
     deposit_status ENUM('pending', 'paid', 'partially_refunded', 'refunded') DEFAULT 'pending',
+    refunded_amount DECIMAL(10, 2) DEFAULT 0.00,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (tenant_id) REFERENCES users(user_id),
     FOREIGN KEY (unit_id) REFERENCES units(unit_id)
