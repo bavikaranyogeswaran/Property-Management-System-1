@@ -129,6 +129,47 @@ export const checkLeaseExpiration = async () => {
     }
 };
 
+// Expiry Warning (Daily at 0:30 AM)
+export const sendLeaseExpiryWarnings = async () => {
+    console.log('Running lease expiry warning check...');
+    // Warn 30 days before?
+    const today = new Date();
+    const warningDate = new Date();
+    warningDate.setDate(today.getDate() + 30);
+    const dateStr = warningDate.toISOString().split('T')[0];
+
+    try {
+        // Find leases expiring exactly in 30 days logic? 
+        // Or "Between now and 30 days" that havent been warned?
+        // Simpler: Find leases with end_date = dateStr (Exact 30 days out)
+        const [expiringLeases] = await db.query(`
+            SELECT l.*, u.email FROM leases l
+            JOIN users u ON l.tenant_id = u.user_id
+            WHERE l.status = 'active'
+            AND l.end_date = ?
+        `, [dateStr]);
+
+        if (expiringLeases.length > 0) {
+            console.log(`Found ${expiringLeases.length} leases expiring on ${dateStr}. Sending warnings...`);
+            for (const lease of expiringLeases) {
+                // Send Notification
+                await notificationModel.create({
+                    userId: lease.tenant_id,
+                    message: `Your lease is expiring in 30 days (on ${lease.end_date}). Please contact us if you wish to renew.`,
+                    type: 'system',
+                    severity: 'warning'
+                });
+
+                // Send Email? (Optional but good)
+                // Assuming emailService has generic send?
+                // emailService.sendExpiryWarning(lease.email, lease); 
+            }
+        }
+    } catch (error) {
+        console.error('Error sending expiry warnings:', error);
+    }
+};
+
 // Late Fee Automation (Daily at 2:00 AM)
 export const applyLateFees = async () => {
     console.log('Running late fee automation...');

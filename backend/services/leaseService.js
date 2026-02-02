@@ -106,22 +106,34 @@ class LeaseService {
             });
         }
 
-        // B. First Month Rent (If starts in current month/future, we assume we want it billed now/soon)
-        // Cron job handles subsequent months. This handles "Day 1" payment.
+        // B. First Month Rent (Logic Check: PRORATION)
+        // If lease starts on 1st, full rent. If mid-month, prorate.
+        // Formula: (MonthlyRent / DaysInMonth) * DaysRemaining
         const start = new Date(startDate);
-        const today = new Date();
-        // If start date is within this month (or close future), generate invoice.
-        // Actually, let's generate it for the 'start' month regardless.
-        // invoiceModel.create logic takes (leaseId, amount, dueDate, description).
-        // It calculates year/month from dueDate.
+        const year = start.getFullYear();
+        const month = start.getMonth() + 1; // 1-12
+        const daysInMonth = new Date(year, month, 0).getDate();
+        const startDay = start.getDate();
+
+        let initialRentAmount = monthlyRent;
+        let invoiceDescription = `Rent for ${year}-${month}`;
+
+        if (startDay > 1) {
+            const daysRemaining = daysInMonth - startDay + 1;
+            // Round to 2 decimals
+            initialRentAmount = Math.round((monthlyRent / daysInMonth) * daysRemaining * 100) / 100;
+            invoiceDescription += ` (Prorated: ${daysRemaining}/${daysInMonth} days)`;
+            console.log(`Prorating Rent: ${daysRemaining} days. Amount: ${initialRentAmount}`);
+        }
+
         const invoice = await import('../models/invoiceModel.js');
-        const exists = await invoice.default.exists(leaseId, start.getFullYear(), start.getMonth() + 1);
+        const exists = await invoice.default.exists(leaseId, year, month);
         if (!exists) {
             await invoice.default.create({
                 leaseId,
-                amount: monthlyRent,
+                amount: initialRentAmount,
                 dueDate: startDate,
-                description: `Rent for ${start.getFullYear()}-${start.getMonth() + 1}`
+                description: invoiceDescription
             });
         }
 
