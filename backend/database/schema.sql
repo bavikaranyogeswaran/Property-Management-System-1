@@ -210,6 +210,8 @@ CREATE TABLE leases (
     end_date DATE,
     monthly_rent DECIMAL(10,2) NOT NULL,
     status ENUM('active','ended') DEFAULT 'active',
+    security_deposit DECIMAL(10, 2) DEFAULT 0.00,
+    deposit_status ENUM('pending', 'paid', 'partially_refunded', 'refunded') DEFAULT 'pending',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (tenant_id) REFERENCES users(user_id),
     FOREIGN KEY (unit_id) REFERENCES units(unit_id)
