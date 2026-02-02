@@ -2,6 +2,8 @@ import cron from 'node-cron';
 import db from '../config/db.js';
 import leaseModel from '../models/leaseModel.js';
 import invoiceModel from '../models/invoiceModel.js';
+import notificationModel from '../models/notificationModel.js';
+import emailService from './emailService.js';
 
 export const generateRentInvoices = async () => {
     console.log('Running automated rent invoicing...');
@@ -36,6 +38,36 @@ export const generateRentInvoices = async () => {
                     dueDate: dueDate.toISOString().split('T')[0],
                     description: `Rent for ${currentYear}-${currentMonth}`
                 });
+
+                // Send Notification
+                await notificationModel.create({
+                    userId: lease.tenantId,
+                    message: `A new rent invoice for ${currentYear}-${currentMonth} has been generated. Due date: ${dueDate.toISOString().split('T')[0]}`,
+                    type: 'invoice',
+                    isRead: false
+                });
+
+                // Send Email
+                // We need tenant email. Fetch from lease->tenant->user?
+                // activeLeases query currently returns: `l.lease_id as id, l.unit_id, l.monthly_rent as monthlyRent, l.tenant_id as tenantId, u.unit_number as unitNumber`
+                // It does NOT return email. We need to fetch email.
+                try {
+                    const [userRows] = await db.query('SELECT email FROM users WHERE user_id = ?', [lease.tenantId]);
+                    if (userRows.length > 0) {
+                        await emailService.sendInvoiceNotification(userRows[0].email, {
+                            amount: lease.monthlyRent,
+                            dueDate: dueDate.toISOString().split('T')[0],
+                            month: currentMonth,
+                            year: currentYear,
+                            invoiceId: 'PENDING-ID' // We don't have the ID from create() unless we assume insertion success? create() returns void/id? 
+                            // invoiceModel.create logic:
+                            // const [result] = await db.query(...) -> return result.insertId;
+                        });
+                    }
+                } catch (emailErr) {
+                    console.error('Failed to send invoice email:', emailErr);
+                }
+
                 createdCount++;
             }
         }

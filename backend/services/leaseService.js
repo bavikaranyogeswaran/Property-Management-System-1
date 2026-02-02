@@ -94,6 +94,60 @@ class LeaseService {
 
         return leaseId;
     }
+    async renewLease(leaseId, newEndDate, newMonthlyRent = null) {
+        const lease = await leaseModel.findById(leaseId);
+        if (!lease) {
+            throw new Error('Lease not found');
+        }
+
+        if (lease.status !== 'active' && lease.status !== 'expiring') {
+            throw new Error('Only active leases can be renewed');
+        }
+
+        const currentEndDate = new Date(lease.endDate);
+        const nextEndDate = new Date(newEndDate);
+
+        if (nextEndDate <= currentEndDate) {
+            throw new Error('New end date must be after current end date');
+        }
+
+        // Check for overlaps in the extension period? 
+        // Logic: checkOverlap(unitId, currentEndDate + 1 day, nextEndDate)
+        // Ensure no OTHER lease starts in the extension period.
+        const extensionStartDate = new Date(currentEndDate);
+        extensionStartDate.setDate(extensionStartDate.getDate() + 1);
+
+        const hasOverlap = await leaseModel.checkOverlap(
+            lease.unitId,
+            extensionStartDate.toISOString().split('T')[0],
+            nextEndDate.toISOString().split('T')[0]
+        );
+
+        if (hasOverlap) {
+            // Note: checkOverlap checks if ANY lease exists in range. 
+            // We need to exclude the CURRENT lease from that check if it overlaps itself?
+            // But checkOverlap logic usually queries `WHERE start_date <= ? AND end_date >= ?`.
+            // Calling it for the *future extension* range should be fine, unless there is a future lease already booked.
+            throw new Error('Unit is already booked for the requested renewal period.');
+        }
+
+        // Prepare update data
+        const updateData = {
+            end_date: newEndDate
+        };
+        if (newMonthlyRent) {
+            updateData.monthly_rent = newMonthlyRent;
+        }
+
+        // Update DB
+        // We need a specific Update method in Model, or generic?
+        // leaseModel currently doesn't have specific `update` method shown in previous view? 
+        // Let's check model again or assume we need to add it.
+        // I will add a raw query here or delegate to model.Delegate is better.
+        await leaseModel.update(leaseId, updateData);
+
+        return true;
+    }
 }
 
 export default new LeaseService();

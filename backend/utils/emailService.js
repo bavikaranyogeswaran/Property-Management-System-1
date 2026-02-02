@@ -223,6 +223,76 @@ class EmailService {
             return false;
         }
     }
+    async sendInvoiceNotification(email, invoiceDetails) {
+        const { amount, dueDate, month, year, invoiceId } = invoiceDetails;
+        const formattedAmount = new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR' }).format(amount);
+
+        if (!this.transporter) {
+            console.log('==================================================');
+            console.log(`[EMAIL MOCK] Invoice Notification to: ${email}`);
+            console.log(`Amount: ${formattedAmount}`);
+            console.log(`Due Date: ${dueDate}`);
+            console.log('==================================================');
+            return true;
+        }
+
+        try {
+            await this.transporter.sendMail({
+                from: `"Property Management System" <${process.env.SMTP_USER}>`,
+                to: email,
+                subject: `New Rent Invoice Received: ${month}/${year}`,
+                html: this._getTemplate('New Invoice Available', `
+                    <p>A new invoice has been generated for your rent.</p>
+                    <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; margin: 24px 0; border: 1px solid #e2e8f0;">
+                         <p style="margin: 4px 0; color: #475569;"><strong>Invoice ID:</strong> #${invoiceId}</p>
+                         <p style="margin: 4px 0; color: #475569;"><strong>Amount:</strong> ${formattedAmount}</p>
+                         <p style="margin: 4px 0; color: #475569;"><strong>Due Date:</strong> ${dueDate}</p>
+                    </div>
+                     <div style="text-align: center; margin-top: 32px;">
+                        <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/tenant/payments" style="background-color: #2563eb; color: white; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px; display: inline-block;">View & Pay</a>
+                    </div>
+                `)
+            });
+            return true;
+        } catch (error) {
+            console.error('Error sending invoice email:', error);
+            return false;
+        }
+    }
+
+
+    _getTemplate(title, content) {
+        return `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="utf-8">
+                <style>
+                    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #334155; margin: 0; padding: 0; }
+                    .container { max-width: 600px; margin: 0 auto; padding: 40px 20px; }
+                    .header { text-align: center; margin-bottom: 40px; }
+                    .logo { font-size: 24px; font-weight: 700; color: #2563eb; text-decoration: none; }
+                    .content { background: white; border-radius: 12px; padding: 32px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); border: 1px solid #e2e8f0; }
+                    .footer { text-align: center; margin-top: 32px; color: #94a3b8; font-size: 14px; }
+                </style>
+            </head>
+            <body style="background-color: #f1f5f9;">
+                <div class="container">
+                    <div class="header">
+                        <a href="#" class="logo">PMS</a>
+                    </div>
+                    <div class="content">
+                        <h1 style="margin-top: 0; color: #1e293b; font-size: 24px; margin-bottom: 24px;">${title}</h1>
+                        ${content}
+                    </div>
+                    <div class="footer">
+                        <p>© ${new Date().getFullYear()} Property Management System. All rights reserved.</p>
+                    </div>
+                </div>
+            </body>
+            </html>
+        `;
+    }
 }
 
 export default new EmailService();

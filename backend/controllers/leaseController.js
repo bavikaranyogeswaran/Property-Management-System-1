@@ -71,6 +71,27 @@ class LeaseController {
             res.status(500).json({ error: error.message });
         }
     }
+
+    async renewLease(req, res) {
+        try {
+            if (req.user.role !== 'owner' && req.user.role !== 'treasurer') {
+                return res.status(403).json({ error: 'Access denied.' });
+            }
+
+            const { id } = req.params;
+            const { newEndDate, newMonthlyRent } = req.body;
+
+            if (!newEndDate) {
+                return res.status(400).json({ error: 'New end date is required' });
+            }
+
+            await leaseService.renewLease(id, newEndDate, newMonthlyRent);
+
+            res.json({ message: 'Lease renewed successfully' });
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    }
 }
 
 export default new LeaseController();

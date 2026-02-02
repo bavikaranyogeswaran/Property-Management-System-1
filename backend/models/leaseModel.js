@@ -11,6 +11,25 @@ class LeaseModel {
         );
         return result.insertId;
     }
+    async update(id, data, connection = null) {
+        const dbConn = connection || db;
+        // Build dynamic query
+        const fields = [];
+        const values = [];
+        Object.keys(data).forEach(key => {
+            fields.push(`${key} = ?`);
+            values.push(data[key]);
+        });
+        values.push(id);
+
+        if (fields.length === 0) return false;
+
+        const [result] = await dbConn.query(
+            `UPDATE leases SET ${fields.join(', ')} WHERE lease_id = ?`,
+            values
+        );
+        return result.affectedRows > 0;
+    }
 
     async findAll() {
         const [rows] = await db.query(`
@@ -96,7 +115,11 @@ class LeaseModel {
 
     formatDate(date) {
         if (!date) return null;
-        return new Date(date).toISOString().split('T')[0];
+        // Adjust for timezone offset to ensure we get the local YYYY-MM-DD
+        const d = new Date(date);
+        const offset = d.getTimezoneOffset() * 60000;
+        const localDate = new Date(d.getTime() - offset);
+        return localDate.toISOString().split('T')[0];
     }
 }
 
