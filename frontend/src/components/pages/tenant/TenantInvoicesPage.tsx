@@ -187,6 +187,7 @@ export function TenantInvoicesPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Invoice Date</TableHead>
+                  <TableHead>Description</TableHead>
                   <TableHead>Property</TableHead>
                   <TableHead>Unit</TableHead>
                   <TableHead>Amount</TableHead>
@@ -200,12 +201,17 @@ export function TenantInvoicesPage() {
                   const unit = units.find(u => u.id === invoice.unitId);
                   const property = unit ? properties.find(p => p.id === unit.propertyId) : null;
                   const isOverdue = invoice.status === 'pending' && new Date(invoice.dueDate) < new Date();
+                  const isLateFee = invoice.description?.includes('Late Fee');
                   const payment = getInvoicePayment(invoice.id);
                   const receipt = getInvoiceReceipt(invoice.id);
 
                   return (
-                    <TableRow key={invoice.id}>
+                    <TableRow key={invoice.id} className={isLateFee ? 'bg-red-50' : ''}>
                       <TableCell>{invoice.generatedDate}</TableCell>
+                      <TableCell className="font-medium">
+                        {invoice.description || 'Rent Invoice'}
+                        {isLateFee && <Badge variant="destructive" className="ml-2 bg-red-100 text-red-700 border-red-200">Late Fee</Badge>}
+                      </TableCell>
                       <TableCell>{property?.name || 'N/A'}</TableCell>
                       <TableCell>{unit?.unitNumber || 'N/A'}</TableCell>
                       <TableCell className="font-semibold">LKR {invoice.amount}</TableCell>
