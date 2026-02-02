@@ -201,7 +201,7 @@ export function TenantDashboard() {
                           <AlertCircle className={`size-4 ${isOverdue ? 'text-red-600' : 'text-orange-600'}`} />
                         )}
                         <div>
-                          <p className="text-sm font-medium">Unit {unit?.unitNumber}</p>
+                          <p className="text-sm font-medium">{invoice.description || `Unit ${unit?.unitNumber}`}</p>
                           <p className="text-xs text-gray-500">Due: {invoice.dueDate}</p>
                         </div>
                       </div>

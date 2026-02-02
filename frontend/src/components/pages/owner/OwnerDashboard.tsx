@@ -263,7 +263,7 @@ export function OwnerDashboard() {
                       <div>
                         <p className="text-sm font-medium">{tenant?.name}</p>
                         <p className="text-xs text-gray-500">
-                          Unit {unit?.unitNumber} - Due {invoice.dueDate}
+                          {invoice.description ? <span className={invoice.description.includes('Late') ? 'text-red-500 font-medium' : ''}>{invoice.description}</span> : `Unit ${unit?.unitNumber}`} • Due {invoice.dueDate}
                         </p>
                       </div>
                       <div className="text-right">
