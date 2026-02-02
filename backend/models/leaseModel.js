@@ -106,6 +106,7 @@ class LeaseModel {
             status: row.status,
             securityDeposit: parseFloat(row.security_deposit || 0),
             depositStatus: row.deposit_status,
+            refundedAmount: parseFloat(row.refunded_amount || 0),
             createdAt: row.created_at,
             // Extra info useful for frontend listing
             unitNumber: row.unit_number,

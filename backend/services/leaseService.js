@@ -148,6 +148,28 @@ class LeaseService {
 
         return true;
     }
+
+    async refundDeposit(leaseId, amount) {
+        const lease = await leaseModel.findById(leaseId);
+        if (!lease) throw new Error('Lease not found');
+
+        if (lease.securityDeposit <= 0) {
+            throw new Error('No security deposit to refund');
+        }
+
+        if (amount > lease.securityDeposit) {
+            throw new Error('Refund amount cannot exceed security deposit');
+        }
+
+        const status = amount >= lease.securityDeposit ? 'refunded' : 'partially_refunded';
+
+        await leaseModel.update(leaseId, {
+            refunded_amount: amount,
+            deposit_status: status
+        });
+
+        return { status, refundedAmount: amount };
+    }
 }
 
 export default new LeaseService();

@@ -120,12 +120,72 @@ export const checkLeaseExpiration = async () => {
     }
 };
 
+// Late Fee Automation (Daily at 2:00 AM)
+export const applyLateFees = async () => {
+    console.log('Running late fee automation...');
+    try {
+        const GRACE_PERIOD_DAYS = 5;
+        const LATE_FEE_PERCENTAGE = 0.05;
+
+        const overdueInvoices = await invoiceModel.findOverdue(GRACE_PERIOD_DAYS);
+        console.log(`Found ${overdueInvoices.length} overdue invoices eligible for late fees.`);
+
+        let appliedCount = 0;
+        for (const inv of overdueInvoices) {
+            const lateFeeAmount = inv.monthly_rent * LATE_FEE_PERCENTAGE;
+
+            // Create Late Fee Invoice
+            await invoiceModel.createLateFeeInvoice({
+                leaseId: inv.lease_id,
+                amount: lateFeeAmount,
+                dueDate: new Date(), // Due immediately
+                description: `Late Fee for Invoice #${inv.invoice_id} (${inv.year}-${inv.month})`
+            });
+
+            // Notify Tenant
+            await notificationModel.create({
+                userId: inv.tenant_id,
+                message: `A late fee of LKR ${lateFeeAmount} has been applied to your account for overdue invoice #${inv.invoice_id}.`,
+                type: 'invoice',
+                isRead: false
+            });
+
+            // Send Email
+            try {
+                const [userRows] = await db.query('SELECT email FROM users WHERE user_id = ?', [inv.tenant_id]);
+                if (userRows.length > 0) {
+                    // We reuse sendInvoiceNotification or create a generic one?
+                    // sendInvoiceNotification expects { amount, dueDate, month, year, invoiceId }
+                    await emailService.sendInvoiceNotification(userRows[0].email, {
+                        amount: lateFeeAmount,
+                        dueDate: new Date().toISOString().split('T')[0],
+                        month: inv.month,
+                        year: inv.year,
+                        invoiceId: 'LATE-FEE'
+                    });
+                }
+            } catch (emailErr) {
+                console.error('Failed to send late fee email:', emailErr);
+            }
+
+            appliedCount++;
+        }
+        console.log(`Applied late fees to ${appliedCount} invoices.`);
+
+    } catch (error) {
+        console.error('Error in late fee automation:', error);
+    }
+};
+
 const initCronJobs = () => {
     // Run every day at midnight (Lease Expiry)
     cron.schedule('0 0 * * *', checkLeaseExpiration);
 
     // Run every day at 1:00 AM (Invoicing)
     cron.schedule('0 1 * * *', generateRentInvoices);
+
+    // Run every day at 2:00 AM (Late Fees)
+    cron.schedule('0 2 * * *', applyLateFees);
 };
 
 export default initCronJobs;

@@ -92,6 +92,26 @@ class LeaseController {
             res.status(500).json({ error: error.message });
         }
     }
+
+    async refundDeposit(req, res) {
+        try {
+            if (req.user.role !== 'owner' && req.user.role !== 'treasurer') {
+                return res.status(403).json({ error: 'Access denied.' });
+            }
+            const { id } = req.params;
+            const { amount } = req.body; // Refund Amount
+
+            if (!amount || amount <= 0) {
+                return res.status(400).json({ error: 'Valid refund amount is required' });
+            }
+
+            const result = await leaseService.refundDeposit(id, amount);
+            res.json({ message: 'Deposit refunded successfully', ...result });
+
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    }
 }
 
 export default new LeaseController();

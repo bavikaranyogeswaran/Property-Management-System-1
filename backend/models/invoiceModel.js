@@ -78,6 +78,43 @@ class InvoiceModel {
         return this.findById(id);
     }
 
+    async createLateFeeInvoice(data) {
+        const { leaseId, amount, dueDate, description } = data;
+        const date = new Date();
+        const year = date.getFullYear();
+        const month = date.getMonth() + 1;
+
+        // Ensure we don't double charge for same month/year? 
+        // Or should we link it to the original invoice? 
+        // For now, standalone 'Late Fee' invoice.
+        const [result] = await pool.query(
+            'INSERT INTO rent_invoices (lease_id, year, month, amount, due_date, status, description) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [leaseId, year, month, amount, dueDate, 'pending', description]
+        );
+        return result.insertId;
+    }
+
+    async findOverdue(gracePeriodDays = 5) {
+        // Find Pending invoices where due_date < (today - gracePeriodDays)
+        // AND description NOT LIKE 'Late Fee%' (to avoid compounding late fees on late fees?)
+        const [rows] = await pool.query(`
+            SELECT ri.*, l.monthly_rent, l.tenant_id
+            FROM rent_invoices ri
+            JOIN leases l ON ri.lease_id = l.lease_id
+            WHERE ri.status = 'pending' 
+            AND ri.due_date < DATE_SUB(CURDATE(), INTERVAL ? DAY)
+            AND ri.description NOT LIKE 'Late Fee%'
+            AND NOT EXISTS (
+                SELECT 1 FROM rent_invoices ri2 
+                WHERE ri2.lease_id = ri.lease_id 
+                AND ri2.description LIKE 'Late Fee%' 
+                AND ri2.year = ri.year 
+                AND ri2.month = ri.month
+            )
+        `, [gracePeriodDays]);
+        return rows;
+    }
+
     // Check for existing invoice for valid period to prevent duplicates?
     // Leaving simple for now.
 }
