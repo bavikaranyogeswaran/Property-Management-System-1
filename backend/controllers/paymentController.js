@@ -96,10 +96,27 @@ class PaymentController {
                 // Update invoice status to 'paid'
                 const payment = await paymentModel.findById(id);
                 if (payment) {
-                    await invoiceModel.updateStatus(payment.invoice_id, 'paid');
+                    // Logic Check: Partial Payments
+                    // Calculate total verified amount for this invoice
+                    const allPayments = await paymentModel.findByInvoiceId(payment.invoice_id);
+                    const totalVerified = allPayments
+                        .filter(p => p.status === 'verified')
+                        .reduce((sum, p) => sum + Number(p.amount), 0);
 
-                    // Generate Receipt
+                    // We also need the pending amount of the CURRENT payment being verified? 
+                    // No, 'updateStatus' above already set it to 'verified'.
+                    // So totalVerified includes the current one.
+
                     const invoice = await invoiceModel.findById(payment.invoice_id);
+
+                    if (invoice && totalVerified >= invoice.amount) {
+                        await invoiceModel.updateStatus(payment.invoice_id, 'paid');
+                        console.log(`Invoice ${payment.invoice_id} fully paid.`);
+                    } else {
+                        console.log(`Invoice ${payment.invoice_id} partially paid. Total: ${totalVerified}/${invoice.amount}`);
+                    }
+
+                    // Generate Receipt (Always generate receipt for the *payment*)
                     if (invoice) {
                         await receiptModel.create({
                             paymentId: id,
@@ -109,6 +126,18 @@ class PaymentController {
                             generatedDate: new Date().toISOString(),
                             receiptNumber: `REC-${Date.now()}`
                         });
+
+                        // Logic Check: Update Lease Deposit Status if this was a Deposit Invoice
+                        if (invoice.description === 'Security Deposit') {
+                            const leaseModel = await import('../models/leaseModel.js'); // Dynamic import to avoid cycles? Or simple import at top
+                            // leaseModel import is not at top. Let's assume we can add it or use dynamic.
+                            // Better: Add import at top, but for now dynamic is safer for hotfix.
+                            await leaseModel.default.update(invoice.lease_id, {
+                                deposit_status: 'paid',
+                                security_deposit: payment.amount // Ensure amount matches if varying? Or just trust lease setup.
+                            });
+                            console.log(`Updated Lease ${invoice.lease_id} deposit status to PAID.`);
+                        }
 
                         // Notify Tenant
                         await notificationModel.create({

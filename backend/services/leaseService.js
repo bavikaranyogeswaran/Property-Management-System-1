@@ -85,12 +85,45 @@ class LeaseService {
         };
 
         // 2. Create Lease
-        // leaseModel.create needs to support connection!
         const leaseId = await leaseModel.create(leaseParams, connection);
 
         // 3. Update Unit Status
-        // unitModel.update needs to support connection!
         await unitModel.update(unitId, { status: 'occupied' }, connection);
+
+        // 4. Generate Initial Invoices (Logic Check: Missed Item)
+        // A. Security Deposit Invoice
+        if (securityDeposit > 0) {
+            // We need to import invoiceModel. Circular dependency risk? 
+            // leaseService imports leaseModel, unitModel, tenantModel. 
+            // We should import invoiceModel at top or dynamically.
+            // Let's assume top-level import (added in separate step or assumes availability).
+            const invoice = await import('../models/invoiceModel.js');
+            await invoice.default.create({
+                leaseId,
+                amount: securityDeposit,
+                dueDate: startDate, // Due on start date?
+                description: 'Security Deposit'
+            });
+        }
+
+        // B. First Month Rent (If starts in current month/future, we assume we want it billed now/soon)
+        // Cron job handles subsequent months. This handles "Day 1" payment.
+        const start = new Date(startDate);
+        const today = new Date();
+        // If start date is within this month (or close future), generate invoice.
+        // Actually, let's generate it for the 'start' month regardless.
+        // invoiceModel.create logic takes (leaseId, amount, dueDate, description).
+        // It calculates year/month from dueDate.
+        const invoice = await import('../models/invoiceModel.js');
+        const exists = await invoice.default.exists(leaseId, start.getFullYear(), start.getMonth() + 1);
+        if (!exists) {
+            await invoice.default.create({
+                leaseId,
+                amount: monthlyRent,
+                dueDate: startDate,
+                description: `Rent for ${start.getFullYear()}-${start.getMonth() + 1}`
+            });
+        }
 
         return leaseId;
     }
@@ -169,6 +202,26 @@ class LeaseService {
         });
 
         return { status, refundedAmount: amount };
+    }
+
+    async terminateLease(leaseId, terminationDate) {
+        const lease = await leaseModel.findById(leaseId);
+        if (!lease) throw new Error('Lease not found');
+
+        if (lease.status !== 'active') {
+            throw new Error('Only active leases can be terminated');
+        }
+
+        // 1. Update Lease Status & End Date
+        await leaseModel.update(leaseId, {
+            status: 'ended',
+            end_date: terminationDate
+        });
+
+        // 2. Free up the Unit immediately
+        await unitModel.update(lease.unitId, { status: 'available' });
+
+        return { status: 'ended', terminationDate };
     }
 }
 

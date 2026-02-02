@@ -97,8 +97,10 @@ class InvoiceModel {
     async findOverdue(gracePeriodDays = 5) {
         // Find Pending invoices where due_date < (today - gracePeriodDays)
         // AND description NOT LIKE 'Late Fee%' (to avoid compounding late fees on late fees?)
+        // Fix 1: Use Invoice Amount, not Lease Rent (Handles rent changes correctly)
+        // const [rows] = await pool.query(`SELECT ri.*, l.monthly_rent...`) -> ri.amount is what we want.
         const [rows] = await pool.query(`
-            SELECT ri.*, l.monthly_rent, l.tenant_id
+            SELECT ri.*, l.tenant_id
             FROM rent_invoices ri
             JOIN leases l ON ri.lease_id = l.lease_id
             WHERE ri.status = 'pending' 
@@ -107,9 +109,7 @@ class InvoiceModel {
             AND NOT EXISTS (
                 SELECT 1 FROM rent_invoices ri2 
                 WHERE ri2.lease_id = ri.lease_id 
-                AND ri2.description LIKE 'Late Fee%' 
-                AND ri2.year = ri.year 
-                AND ri2.month = ri.month
+                AND ri2.description LIKE CONCAT('%Invoice #', ri.invoice_id, '%')
             )
         `, [gracePeriodDays]);
         return rows;

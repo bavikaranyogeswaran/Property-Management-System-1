@@ -226,10 +226,20 @@ class EmailService {
     async sendInvoiceNotification(email, invoiceDetails) {
         const { amount, dueDate, month, year, invoiceId } = invoiceDetails;
         const formattedAmount = new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR' }).format(amount);
+        const isLateFee = invoiceId === 'LATE-FEE' || (invoiceDetails.description && invoiceDetails.description.includes('Late Fee'));
+
+        const subject = isLateFee
+            ? `Late Fee Applied: ${month}/${year}`
+            : `New Rent Invoice Received: ${month}/${year}`;
+
+        const title = isLateFee ? 'Late Fee Notification' : 'New Invoice Available';
+        const message = isLateFee
+            ? 'A late fee has been applied to your account due to overdue payment.'
+            : 'A new invoice has been generated for your rent.';
 
         if (!this.transporter) {
             console.log('==================================================');
-            console.log(`[EMAIL MOCK] Invoice Notification to: ${email}`);
+            console.log(`[EMAIL MOCK] ${title} to: ${email}`);
             console.log(`Amount: ${formattedAmount}`);
             console.log(`Due Date: ${dueDate}`);
             console.log('==================================================');
@@ -240,9 +250,9 @@ class EmailService {
             await this.transporter.sendMail({
                 from: `"Property Management System" <${process.env.SMTP_USER}>`,
                 to: email,
-                subject: `New Rent Invoice Received: ${month}/${year}`,
-                html: this._getTemplate('New Invoice Available', `
-                    <p>A new invoice has been generated for your rent.</p>
+                subject: subject,
+                html: this._getTemplate(title, `
+                    <p>${message}</p>
                     <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; margin: 24px 0; border: 1px solid #e2e8f0;">
                          <p style="margin: 4px 0; color: #475569;"><strong>Invoice ID:</strong> #${invoiceId}</p>
                          <p style="margin: 4px 0; color: #475569;"><strong>Amount:</strong> ${formattedAmount}</p>

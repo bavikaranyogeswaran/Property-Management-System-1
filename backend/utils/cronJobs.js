@@ -28,6 +28,15 @@ export const generateRentInvoices = async () => {
 
         let createdCount = 0;
         for (const lease of activeLeases) {
+            // Logic Check: Prevent Premature Billing
+            // If the lease starts in the future, do not invoice yet.
+            // This handles cases where a lease is signed and 'active' but the move-in date hasn't arrived.
+            const leaseStart = new Date(lease.startDate);
+            if (leaseStart > today) {
+                // console.log(`Skipping Lease ${lease.id} (Future Start: ${lease.startDate})`);
+                continue;
+            }
+
             // Check if invoice exists for this month
             const exists = await invoiceModel.exists(lease.id, currentYear, currentMonth);
             if (!exists) {
@@ -132,7 +141,8 @@ export const applyLateFees = async () => {
 
         let appliedCount = 0;
         for (const inv of overdueInvoices) {
-            const lateFeeAmount = inv.monthly_rent * LATE_FEE_PERCENTAGE;
+            // Fix 2: Calculate based on the Historical Invoice Amount, not current lease rent.
+            const lateFeeAmount = inv.amount * LATE_FEE_PERCENTAGE;
 
             // Create Late Fee Invoice
             await invoiceModel.createLateFeeInvoice({
@@ -149,6 +159,10 @@ export const applyLateFees = async () => {
                 type: 'invoice',
                 isRead: false
             });
+
+            // Logic Check: Mark Original Invoice as 'Overdue'
+            // Previously, it remained 'pending'. Now explicitly set to 'overdue'.
+            await invoiceModel.updateStatus(inv.invoice_id, 'overdue');
 
             // Send Email
             try {

@@ -126,14 +126,14 @@ export function TreasurerDashboard() {
                       <div>
                         <p className="text-sm font-medium">{payment.paymentMethod}</p>
                         <p className="text-xs text-gray-500">
-                          Ref: {payment.referenceNumber} - {payment.paymentDate}
+                          {invoice?.description} • Ref: {payment.referenceNumber}
                         </p>
                       </div>
                       <div className="text-right">
                         <p className="text-sm font-semibold">LKR {payment.amount}</p>
                         <span className={`text-xs px-2 py-1 rounded-full ${payment.status === 'verified' ? 'bg-green-100 text-green-800' :
-                            payment.status === 'pending' ? 'bg-orange-100 text-orange-800' :
-                              'bg-red-100 text-red-800'
+                          payment.status === 'pending' ? 'bg-orange-100 text-orange-800' :
+                            'bg-red-100 text-red-800'
                           }`}>
                           {payment.status}
                         </span>

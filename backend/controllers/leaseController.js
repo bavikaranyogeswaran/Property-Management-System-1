@@ -112,6 +112,30 @@ class LeaseController {
             res.status(500).json({ error: error.message });
         }
     }
+
+    async terminateLease(req, res) {
+        try {
+            if (req.user.role !== 'owner' && req.user.role !== 'treasurer') {
+                return res.status(403).json({ error: 'Access denied.' });
+            }
+            const { id } = req.params;
+            const { terminationDate } = req.body;
+
+            if (!terminationDate) {
+                return res.status(400).json({ error: 'Termination date is required' });
+            }
+
+            // Logic: Update Lease End Date, Set Status to Ended, Free up Unit
+            // We can reuse logic or call service.
+            // leaseService.terminateLease is not defined yet, let's implement inline or add to service.
+            // Better to add to service for atomicity.
+            const result = await leaseService.terminateLease(id, terminationDate);
+            res.json({ message: 'Lease terminated successfully', ...result });
+
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    }
 }
 
 export default new LeaseController();
