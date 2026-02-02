@@ -2,12 +2,12 @@ import db from '../config/db.js';
 
 class LeaseModel {
     async create(data, connection = null) {
-        const { tenantId, unitId, startDate, endDate, monthlyRent, status } = data;
+        const { tenantId, unitId, startDate, endDate, monthlyRent, status, securityDeposit, depositStatus } = data;
         const dbConn = connection || db;
         const [result] = await dbConn.query(
-            `INSERT INTO leases (tenant_id, unit_id, start_date, end_date, monthly_rent, status)
-             VALUES (?, ?, ?, ?, ?, ?)`,
-            [tenantId, unitId, startDate, endDate, monthlyRent, status || 'active']
+            `INSERT INTO leases (tenant_id, unit_id, start_date, end_date, monthly_rent, status, security_deposit, deposit_status)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [tenantId, unitId, startDate, endDate, monthlyRent, status || 'active', securityDeposit || 0.00, depositStatus || 'pending']
         );
         return result.insertId;
     }
@@ -85,6 +85,8 @@ class LeaseModel {
             endDate: this.formatDate(row.end_date),
             monthlyRent: parseFloat(row.monthly_rent),
             status: row.status,
+            securityDeposit: parseFloat(row.security_deposit || 0),
+            depositStatus: row.deposit_status,
             createdAt: row.created_at,
             // Extra info useful for frontend listing
             unitNumber: row.unit_number,

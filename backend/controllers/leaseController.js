@@ -49,7 +49,7 @@ class LeaseController {
                 return res.status(403).json({ error: 'Access denied.' });
             }
 
-            const { tenantId, unitId, startDate, endDate, monthlyRent } = req.body;
+            const { tenantId, unitId, startDate, endDate, monthlyRent, securityDeposit } = req.body;
 
             if (!tenantId || !unitId || !startDate || !endDate || !monthlyRent) {
                 return res.status(400).json({ error: 'All fields are required' });
@@ -61,7 +61,8 @@ class LeaseController {
                 unitId,
                 startDate,
                 endDate,
-                monthlyRent
+                monthlyRent,
+                securityDeposit
             });
 
             res.status(201).json({ id: leaseId, message: 'Lease created successfully' });

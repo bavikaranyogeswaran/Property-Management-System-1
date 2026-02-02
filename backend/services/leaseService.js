@@ -6,12 +6,12 @@ import pool from '../config/db.js';
 class LeaseService {
     /**
      * Creates a new lease.
-     * @param {Object} leaseData - { tenantId, unitId, startDate, endDate, monthlyRent }
+     * @param {Object} data - { tenantId, unitId, startDate, endDate, monthlyRent, securityDeposit }
      * @param {Object} [connection] - Optional database connection for transactions
      * @returns {Promise<number>} - The ID of the created lease
      */
-    async createLease(leaseData, connection = null) {
-        const { tenantId, unitId, startDate, endDate, monthlyRent } = leaseData;
+    async createLease(data, connection = null) {
+        const { tenantId, unitId, startDate, endDate, monthlyRent, securityDeposit } = data;
 
         // Validation
         // Validation: Check required fields (allow 0 for rent here, caught later)
@@ -80,6 +80,7 @@ class LeaseService {
             startDate,
             endDate,
             monthlyRent,
+            securityDeposit,
             status: 'active'
         };
 
