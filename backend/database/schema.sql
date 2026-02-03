@@ -321,6 +321,21 @@ CREATE TABLE notifications (
 );
 
 -- =========================
+-- OWNER PAYOUTS
+-- =========================
+CREATE TABLE owner_payouts (
+    payout_id INT AUTO_INCREMENT PRIMARY KEY,
+    owner_id INT NOT NULL,
+    amount DECIMAL(15,2) NOT NULL, -- Net Amount
+    period_start DATE NOT NULL,
+    period_end DATE NOT NULL,
+    status ENUM('pending', 'processed') DEFAULT 'pending',
+    generated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    processed_at DATETIME,
+    FOREIGN KEY (owner_id) REFERENCES users(user_id)
+);
+
+-- =========================
 -- SYSTEM AUDIT LOGS
 -- =========================
 CREATE TABLE system_audit_logs (
