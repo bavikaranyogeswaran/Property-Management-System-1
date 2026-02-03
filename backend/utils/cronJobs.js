@@ -232,6 +232,43 @@ export const applyLateFees = async () => {
     }
 };
 
+// Unit Status Sync (Daily at 3:00 AM)
+// Fixes the "Gap Period" bug: Ensure units with Active leases are marked Occupied.
+export const syncUnitStatuses = async () => {
+    console.log('Running unit status synchronization...');
+    try {
+        const today = new Date().toISOString().split('T')[0];
+
+        // 1. Find Units marked 'available' that actually have an Active Lease covering Today
+        // This handles the case where Lease A ended (Unit->Available) > Gap > Lease B starts (Unit stays Available?? No, we fix it here).
+        const [incorrectAvailable] = await db.query(`
+            SELECT u.unit_id 
+            FROM units u
+            JOIN leases l ON u.unit_id = l.unit_id
+            WHERE u.status = 'available'
+            AND l.status = 'active'
+            AND l.start_date <= ?
+            AND l.end_date >= ?
+        `, [today, today]);
+
+        if (incorrectAvailable.length > 0) {
+            console.log(`Found ${incorrectAvailable.length} units falsely marked 'available'. Correcting to 'occupied'...`);
+            const ids = incorrectAvailable.map(u => u.unit_id);
+            await db.query(`UPDATE units SET status = 'occupied' WHERE unit_id IN (?)`, [ids]);
+        }
+
+        // 2. Find Units marked 'occupied' that satisfy NO active lease condition?
+        // (Optional: verifying cleanup)
+        // Only if NO active/pending lease exists.
+        // This is complex if 'maintenance' uses occupied status. 
+        // We'll skip auto-cleaning 'occupied' to be safe (unless we're sure).
+        // But preventing 'False Available' is critical for avoiding double-booking.
+
+    } catch (error) {
+        console.error('Error syncing unit statuses:', error);
+    }
+};
+
 const initCronJobs = () => {
     // Run every day at 0:30 AM (Expiry Warnings)
     cron.schedule('30 0 * * *', sendLeaseExpiryWarnings);
@@ -244,6 +281,9 @@ const initCronJobs = () => {
 
     // Run every day at 2:00 AM (Late Fees)
     cron.schedule('0 2 * * *', applyLateFees);
+
+    // Run every day at 3:00 AM (Unit Status Sync)
+    cron.schedule('0 3 * * *', syncUnitStatuses);
 };
 
 export default initCronJobs;
