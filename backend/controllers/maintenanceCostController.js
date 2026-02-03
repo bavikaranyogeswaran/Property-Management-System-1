@@ -74,19 +74,16 @@ class MaintenanceCostController {
                 return res.json(costs);
             }
 
-            // If no requestId provided, return all costs for Owner/Treasurer
+            // If no requestId provided, return all costs for Owner/Treasurer (scoped)
             if (!requestId) {
-                if (req.user.role === 'owner' || req.user.role === 'treasurer') {
-                    // We need a findAll method in model. Let's assume it exists or use raw query here for speed?
-                    // Better to add to model. checking model...
-                    // Actually, let's just use a raw query from model helper I'll create or just assume findAll exists.
-                    // I'll add findAll to model in next step or use a direct query here if I must.
-                    // But I can't edit model in this same tool call easily if I didn't plan it.
-                    // Let's modify this to calls `maintenanceCostModel.findAll()`.
-                    const costs = await maintenanceCostModel.findAll();
+                if (req.user.role === 'owner') {
+                    const costs = await maintenanceCostModel.findAllWithDetails();
+                    return res.json(costs);
+                } else if (req.user.role === 'treasurer') {
+                    const costs = await maintenanceCostModel.findByTreasurerId(req.user.id);
                     return res.json(costs);
                 }
-                return res.status(400).json({ error: 'Request ID required' });
+                return res.status(403).json({ error: 'Access denied' });
             }
 
             const costs = await maintenanceCostModel.findByRequestId(requestId);
@@ -104,6 +101,19 @@ class MaintenanceCostController {
             // RBAC: Owner and Treasurer can delete costs
             if (req.user.role !== 'owner' && req.user.role !== 'treasurer') {
                 return res.status(403).json({ error: 'Access denied' });
+            }
+
+            if (req.user.role === 'treasurer') {
+                const cost = await maintenanceCostModel.findByIdWithDetails(id);
+                if (!cost) return res.status(404).json({ error: 'Cost not found' });
+
+                const staffModel = (await import('../models/staffModel.js')).default;
+                const assignments = await staffModel.getAssignedProperties(req.user.id);
+                const isAssigned = assignments.some(p => p.property_id === cost.property_id);
+
+                if (!isAssigned) {
+                    return res.status(403).json({ error: 'Access denied. You are not assigned to this property.' });
+                }
             }
 
             const deleted = await maintenanceCostModel.delete(id);

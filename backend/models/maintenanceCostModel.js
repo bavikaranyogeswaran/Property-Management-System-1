@@ -56,6 +56,31 @@ class MaintenanceCostModel {
         `);
         return rows;
     }
+
+    async findByTreasurerId(userId) {
+        const [rows] = await pool.query(`
+            SELECT mc.*, p.name as property_name
+            FROM maintenance_costs mc 
+            JOIN maintenance_requests mr ON mc.request_id = mr.request_id 
+            JOIN units u ON mr.unit_id = u.unit_id
+            JOIN properties p ON u.property_id = p.property_id
+            JOIN staff_property_assignments spa ON p.property_id = spa.property_id
+            WHERE spa.user_id = ?
+            ORDER BY mc.recorded_date DESC
+        `, [userId]);
+        return rows;
+    }
+
+    async findByIdWithDetails(costId) {
+        const [rows] = await pool.query(`
+            SELECT mc.*, u.property_id
+            FROM maintenance_costs mc
+            JOIN maintenance_requests mr ON mc.request_id = mr.request_id
+            JOIN units u ON mr.unit_id = u.unit_id
+            WHERE mc.cost_id = ?
+        `, [costId]);
+        return rows[0];
+    }
 }
 
 export default new MaintenanceCostModel();
