@@ -150,12 +150,60 @@ class PaymentController {
             } else if (status === 'rejected') {
                 const payment = await paymentModel.findById(id);
                 if (payment) {
+                    // Logic Fix: Revert Invoice Status if Payment is Rejected
+                    // 1. Check if invoice allows reverting (i.e., was it 'paid'?)
+                    // Even if not fully paid, removing a 'verified' payment reduces the balance. I should re-evaluate status.
+
+                    const invoice = await invoiceModel.findById(payment.invoice_id);
+                    if (invoice) {
+                        const allPayments = await paymentModel.findByInvoiceId(payment.invoice_id);
+                        // Filter out THIS payment (which is now rejected) and other non-verified
+                        // Note: findById might return the OLD status if transaction not committed? 
+                        // But here we just updated it above? 
+                        // Wait, 'updateStatus' was called line 93. So 'payment' has new status 'rejected'.
+                        // So 'allPayments' (fetched from DB) will have this payment as 'rejected'.
+                        // So a simple sum of 'verified' is sufficient.
+
+                        const totalVerified = allPayments
+                            .filter(p => p.status === 'verified')
+                            .reduce((sum, p) => sum + Number(p.amount), 0);
+
+                        if (totalVerified < invoice.amount) {
+                            // Revert to 'pending' or 'overdue' based on date
+                            const isOverdue = new Date() > new Date(invoice.due_date);
+                            const newStatus = isOverdue ? 'overdue' : 'pending';
+                            await invoiceModel.updateStatus(invoice.invoice_id, newStatus);
+                            console.log(`Reverted Invoice ${invoice.invoice_id} to ${newStatus}`);
+                        }
+
+                        // Logic Fix: Revert Deposit Status if applicable
+                        if (invoice.description === 'Security Deposit') {
+                            const leaseModel = await import('../models/leaseModel.js');
+                            await leaseModel.default.update(invoice.lease_id, {
+                                deposit_status: 'pending',
+                                // We don't clear security_deposit amount (it's the asked amount)
+                                // But if we tracked 'paid_amount', we would reduce it.
+                                // Model only has 'security_deposit' (target) and 'deposit_status'.
+                                // So 'pending' is correct.
+                            });
+                            console.log(`Reverted Lease ${invoice.lease_id} deposit status to PENDING.`);
+                        }
+                    }
+
                     // Notify Tenant
                     await notificationModel.create({
-                        userId: payment.tenant_id,
+                        userId: payment.tenant_id, // payment model join doesn't usually return tenant_id unless findById joins?
+                        // paymentModel.findById returns raw row?
+                        // Checked model: `SELECT * FROM payments WHERE payment_id = ?`
+                        // tenant_id is NOT in payments table. It's in leases->invoices.
+                        // But I fetched 'invoice' above. Invoice has tenant_id (if properly joined or stored).
+                        // invoiceModel.findById Join?
+                        // `SELECT ri.*, l.monthly_rent, l.tenant_id FROM rent_invoices...`
+                        // Yes, invoice object has tenant_id.
+                        userId: invoice ? invoice.tenant_id : null, // Use invoice.tenant_id
                         message: `Payment of ${payment.amount} for Invoice #${payment.invoice_id} was rejected. Please contact support.`,
                         type: 'payment',
-                        severity: 'urgent' // Optional field if model supports it, otherwise ignored
+                        severity: 'urgent'
                     });
                 }
             }
