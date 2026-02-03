@@ -32,14 +32,12 @@ CREATE TABLE users (
 CREATE TABLE tenants (
     user_id INT PRIMARY KEY,
     nic VARCHAR(20) UNIQUE,              -- NIC (Old or New format)
-    permanent_address VARCHAR(255),      -- Legal address per NIC
     emergency_contact_name VARCHAR(100),
     emergency_contact_phone VARCHAR(20),
-    employer_name VARCHAR(100),
     employment_status ENUM('employed', 'self-employed', 'student', 'unemployed'),
     monthly_income DECIMAL(15,2),        -- LKR
-    date_of_birth DATE,
     behavior_score INT DEFAULT 100,      -- [ADDED] Tenant scoring
+    credit_balance DECIMAL(10, 2) DEFAULT 0.00, -- [ADDED] Overpayment balance
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 );
 
@@ -318,6 +316,20 @@ CREATE TABLE notifications (
     message TEXT NOT NULL,
     type ENUM('invoice','lease','maintenance') NOT NULL,
     is_read BOOLEAN DEFAULT FALSE,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(user_id)
+);
+
+-- =========================
+-- SYSTEM AUDIT LOGS
+-- =========================
+CREATE TABLE system_audit_logs (
+    log_id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT, -- Who performed the action (nullable for system)
+    action_type VARCHAR(50) NOT NULL, -- e.g., 'LEASE_TERMINATION', 'PAYMENT_REJECTION'
+    entity_id INT, -- ID of the affected entity (lease_id, invoice_id, etc.)
+    details TEXT, -- JSON or text description of changes
+    ip_address VARCHAR(45),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(user_id)
 );

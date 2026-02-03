@@ -47,6 +47,14 @@ class TenantModel {
         // For MVP, we might not implementation full profile update yet.
         return true;
     }
+
+    async addCredit(userId, amount) {
+        await pool.query(
+            'UPDATE tenants SET credit_balance = credit_balance + ? WHERE user_id = ?',
+            [amount, userId]
+        );
+    }
 }
+
 
 export default new TenantModel();
