@@ -4,19 +4,19 @@ class StaffModel {
     async create(staffData, connection) {
         const {
             userId, nic, employeeId,
-            department, jobTitle, shiftStart, shiftEnd
+            jobTitle, shiftStart, shiftEnd
         } = staffData;
 
         // Uses the provided connection for transaction support
         const query = `
             INSERT INTO staff 
-            (user_id, nic, employee_id, department, job_title, shift_start, shift_end) 
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            (user_id, nic, employee_id, job_title, shift_start, shift_end) 
+            VALUES (?, ?, ?, ?, ?, ?)
         `;
 
         await connection.query(query, [
             userId, nic, employeeId,
-            department, jobTitle, shiftStart, shiftEnd
+            jobTitle, shiftStart, shiftEnd
         ]);
 
         return userId;
@@ -24,7 +24,16 @@ class StaffModel {
 
     async findByUserId(userId) {
         const [rows] = await pool.query('SELECT * FROM staff WHERE user_id = ?', [userId]);
-        return rows[0];
+        const row = rows[0];
+        if (!row) return null;
+        return {
+            userId: row.user_id,
+            nic: row.nic,
+            employeeId: row.employee_id,
+            jobTitle: row.job_title,
+            shiftStart: row.shift_start,
+            shiftEnd: row.shift_end
+        };
     }
 
     async assignProperty(userId, propertyId) {

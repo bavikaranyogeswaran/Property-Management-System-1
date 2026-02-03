@@ -13,7 +13,17 @@ class MaintenanceRequestModel {
             FROM maintenance_requests mr 
             ORDER BY mr.created_at DESC
         `);
-        return rows;
+        return rows.map(row => ({
+            id: row.request_id.toString(),
+            unitId: row.unit_id.toString(),
+            tenantId: row.tenant_id.toString(),
+            title: row.title,
+            description: row.description,
+            priority: row.priority,
+            status: row.status,
+            createdAt: row.created_at,
+            images: row.images // Already JSON
+        }));
     }
 
     async findById(id) {
@@ -28,7 +38,21 @@ class MaintenanceRequestModel {
             FROM maintenance_requests mr 
             WHERE mr.request_id = ?
         `, [id]);
-        return rows[0];
+
+        const row = rows[0];
+        if (!row) return null;
+
+        return {
+            id: row.request_id.toString(),
+            unitId: row.unit_id.toString(),
+            tenantId: row.tenant_id.toString(),
+            title: row.title,
+            description: row.description,
+            priority: row.priority,
+            status: row.status,
+            createdAt: row.created_at,
+            images: row.images // Already JSON
+        };
     }
 
     async findByPropertyId(propertyId) {
@@ -38,13 +62,13 @@ class MaintenanceRequestModel {
                 (SELECT JSON_ARRAYAGG(JSON_OBJECT('id', mi.image_id, 'url', mi.image_url)) 
                  FROM maintenance_images mi 
                  WHERE mi.request_id = mr.request_id),
-                JSON_ARRAY()
+            JSON_ARRAY()
             ) as images
             FROM maintenance_requests mr
             JOIN units u ON mr.unit_id = u.unit_id
             WHERE u.property_id = ?
             ORDER BY mr.created_at DESC
-        `, [propertyId]);
+                `, [propertyId]);
         return rows;
     }
 
@@ -55,12 +79,12 @@ class MaintenanceRequestModel {
                 (SELECT JSON_ARRAYAGG(JSON_OBJECT('id', mi.image_id, 'url', mi.image_url)) 
                  FROM maintenance_images mi 
                  WHERE mi.request_id = mr.request_id),
-                JSON_ARRAY()
+            JSON_ARRAY()
             ) as images
             FROM maintenance_requests mr 
-            WHERE mr.tenant_id = ? 
+            WHERE mr.tenant_id = ?
             ORDER BY mr.created_at DESC
-        `, [tenantId]);
+                `, [tenantId]);
         return rows;
     }
 

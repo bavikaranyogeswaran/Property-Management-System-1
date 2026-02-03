@@ -37,7 +37,6 @@ class LeadModel {
                 status,
                 created_at as createdAt,
                 last_contacted_at as lastContactedAt,
-                last_contacted_at as lastContactedAt,
                 user_id as userId
             FROM leads WHERE lead_id = ?`, [id]);
         return rows[0];

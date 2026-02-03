@@ -43,7 +43,23 @@ class VisitModel {
         query += ` ORDER BY v.scheduled_date ASC`;
 
         const [rows] = await db.query(query, params);
-        return rows;
+        return rows.map(row => ({
+            id: row.visit_id.toString(),
+            propertyId: row.property_id.toString(),
+            unitId: row.unit_id ? row.unit_id.toString() : null,
+            leadId: row.lead_id ? row.lead_id.toString() : null,
+            visitorName: row.visitor_name,
+            visitorEmail: row.visitor_email,
+            visitorPhone: row.visitor_phone,
+            scheduledDate: row.scheduled_date,
+            status: row.status,
+            notes: row.notes,
+            createdAt: row.created_at,
+            // Joined fields
+            propertyName: row.property_name,
+            unitNumber: row.unit_number,
+            leadStatus: row.lead_status
+        }));
     }
 
     async updateStatus(visitId, status) {

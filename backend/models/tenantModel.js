@@ -27,7 +27,21 @@ class TenantModel {
 
     async findByUserId(userId) {
         const [rows] = await pool.query('SELECT * FROM tenants WHERE user_id = ?', [userId]);
-        return rows[0];
+        const row = rows[0];
+        if (!row) return null;
+        return {
+            userId: row.user_id,
+            nic: row.nic,
+            permanentAddress: row.permanent_address,
+            emergencyContactName: row.emergency_contact_name,
+            emergencyContactPhone: row.emergency_contact_phone,
+            employerName: row.employer_name,
+            employmentStatus: row.employment_status,
+            monthlyIncome: parseFloat(row.monthly_income),
+            dateOfBirth: row.date_of_birth,
+            creditBalance: parseFloat(row.credit_balance || 0),
+            behaviorScore: row.behavior_score
+        };
     }
 
     async update(userId, data) {

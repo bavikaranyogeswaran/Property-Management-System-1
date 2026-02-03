@@ -47,12 +47,21 @@ class PropertyModel {
         const [rows] = await db.query(query, params);
 
         return rows.map(row => ({
-            ...row,
+            id: row.property_id.toString(),
+            ownerId: row.owner_id.toString(),
+            name: row.name,
             propertyNo: row.property_no,
             street: row.street,
             city: row.city,
             district: row.district,
-            features: row.features ? JSON.parse(row.features) : []
+            propertyTypeId: row.property_type_id,
+            typeName: row.type_name, // Alias from SQL
+            image: row.image_url,
+            description: row.description,
+            features: row.features ? JSON.parse(row.features) : [],
+            uniqueId: row.unique_id, // If it exists
+            status: row.status,
+            createdAt: row.created_at
         }));
     }
 
@@ -81,12 +90,21 @@ class PropertyModel {
         if (!rows[0]) return null;
 
         return {
-            ...rows[0],
+            id: rows[0].property_id.toString(),
+            ownerId: rows[0].owner_id.toString(),
+            name: rows[0].name,
             propertyNo: rows[0].property_no,
             street: rows[0].street,
             city: rows[0].city,
             district: rows[0].district,
-            features: rows[0].features ? JSON.parse(rows[0].features) : []
+            propertyTypeId: rows[0].property_type_id,
+            typeName: rows[0].type_name,
+            image: rows[0].image_url,
+            description: rows[0].description,
+            features: rows[0].features ? JSON.parse(rows[0].features) : [],
+            uniqueId: rows[0].unique_id,
+            status: rows[0].status,
+            createdAt: rows[0].created_at
         };
     }
 

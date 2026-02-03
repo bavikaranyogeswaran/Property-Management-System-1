@@ -15,7 +15,14 @@ class NotificationModel {
             'SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC',
             [userId]
         );
-        return rows;
+        return rows.map(row => ({
+            id: row.notification_id.toString(),
+            userId: row.user_id.toString(),
+            message: row.message,
+            type: row.type,
+            isRead: row.is_read,
+            createdAt: row.created_at
+        }));
     }
 
     async markAsRead(notificationId) {

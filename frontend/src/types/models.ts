@@ -37,10 +37,14 @@ export interface Unit {
 
 export interface Tenant {
     id: string;
-    userId: string;
+    userId?: string; // Optional as it might be redundant with id in some views
     name: string;
     email: string;
     phone: string;
+    nic?: string;
+    permanentAddress?: string;
+    employerName?: string;
+    monthlyIncome?: number;
     moveInDate?: string;
     behaviorScore?: number;
     createdAt?: string;

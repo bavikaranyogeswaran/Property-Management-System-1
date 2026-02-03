@@ -34,7 +34,10 @@ class UserModel {
                 u.role, 
                 u.status, 
                 u.created_at as createdAt,
-                t.nic, t.permanent_address, t.employer_name,
+                t.nic, 
+                t.permanent_address as permanentAddress, 
+                t.employer_name as employerName,
+                t.monthly_income as monthlyIncome,
                 t.behavior_score as behaviorScore
             FROM users u
             JOIN tenants t ON u.user_id = t.user_id
