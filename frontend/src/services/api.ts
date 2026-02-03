@@ -23,8 +23,10 @@ apiClient.interceptors.request.use(
 );
 
 // Add response interceptor to handle auth errors
-(response) => response,
-    (error) => {
+
+apiClient.interceptors.response.use(
+    (response) => response,
+    (error: any) => {
         if (error.response && error.response.status === 401) {
             // Clear token if invalid/expired to prevent infinite loops of failed requests
             console.warn('Authentication failed (401), clearing token.');
