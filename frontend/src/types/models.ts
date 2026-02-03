@@ -129,3 +129,25 @@ export interface BehaviorLog {
     recorded_by: number;
     created_at: string;
 }
+
+export interface OwnerPayout {
+    payout_id: number;
+    owner_id: number;
+    amount: number;
+    period_start: string;
+    period_end: string;
+    status: 'pending' | 'processed';
+    generated_at: string;
+    processed_at?: string;
+}
+
+export interface AuditLog {
+    log_id: number;
+    user_id: number | null;
+    action_type: string;
+    entity_id: number | null;
+    details: string; // JSON string
+    ip_address: string;
+    created_at: string;
+    user_name?: string;
+}

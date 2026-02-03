@@ -18,6 +18,8 @@ import { TenantMaintenancePage } from '@/components/pages/tenant/TenantMaintenan
 import { OwnerMaintenancePage } from '@/components/pages/owner/OwnerMaintenancePage';
 import { AnalyticsPage } from '@/components/reports/AnalyticsPage';
 import { SettingsPage } from '@/components/pages/common/SettingsPage';
+import OwnerPayoutsPage from '@/components/pages/OwnerPayoutsPage';
+import AuditLogsPage from '@/components/pages/AuditLogsPage';
 
 interface User {
     role: 'owner' | 'tenant' | 'treasurer';
@@ -54,6 +56,8 @@ export const renderPage = (activePage: string, user: User | null) => {
         if (activePage === 'invoices') return <OwnerInvoicesPage />;
         if (activePage === 'maintenance') return <OwnerMaintenancePage />;
         if (activePage === 'analytics') return <AnalyticsPage />;
+        if (activePage === 'payouts') return <OwnerPayoutsPage />;
+        if (activePage === 'audit') return <AuditLogsPage />;
     }
 
     // Tenant pages

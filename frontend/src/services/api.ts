@@ -23,19 +23,15 @@ apiClient.interceptors.request.use(
 );
 
 // Add response interceptor to handle auth errors
-apiClient.interceptors.response.use(
-    (response) => response,
+(response) => response,
     (error) => {
-        if (error.response && (error.response.status === 401 || error.response.status === 403)) {
+        if (error.response && error.response.status === 401) {
             // Clear token if invalid/expired to prevent infinite loops of failed requests
-            console.warn('Authentication failed, clearing token.');
-            // We don't auto-redirect here to avoid circular dependency or jarring UX, 
-            // but clearing the token will force the app to treat user as logged out on next check.
+            console.warn('Authentication failed (401), clearing token.');
             localStorage.removeItem('authToken');
             localStorage.removeItem('user');
-            // Optional: Dispatch a custom event or use window.location if necessary, 
-            // but typically the UI (AuthProvider) reacts to token absence.
-            // window.location.href = '/login'; // aggressive but ensures consistency
+            // Optional: Redirect to login
+            window.location.href = '/login';
         }
         return Promise.reject(error);
     }
@@ -72,6 +68,16 @@ export const invoiceApi = {
     getInvoices: () => apiClient.get('/invoices'),
     createInvoice: (data: any) => apiClient.post('/invoices', data),
     generateInvoices: (year?: number, month?: number) => apiClient.post('/invoices/generate', { year, month }),
+};
+
+export const payoutApi = {
+    preview: (startDate: string, endDate: string) => apiClient.get(`/payouts/preview?startDate=${startDate}&endDate=${endDate}`),
+    create: (data: { startDate: string; endDate: string }) => apiClient.post('/payouts/create', data),
+    getHistory: () => apiClient.get('/payouts/history'),
+};
+
+export const auditApi = {
+    getLogs: (limit = 50) => apiClient.get(`/audit-logs?limit=${limit}`),
 };
 
 export default apiClient;
