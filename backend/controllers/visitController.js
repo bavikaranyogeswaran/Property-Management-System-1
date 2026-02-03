@@ -162,6 +162,18 @@ class VisitController {
                 return res.status(404).json({ error: 'Visit not found' });
             }
 
+            // Audit Log
+            const auditLogger = (await import('../utils/auditLogger.js')).default;
+            // req.user might not be present if public route? But updateStatus should be protected.
+            // Assuming protected route (Owner/Staff).
+            const userId = req.user ? req.user.id : null;
+            await auditLogger.log({
+                userId,
+                actionType: 'VISIT_STATUS_UPDATED',
+                entityId: id,
+                details: { newStatus: status }
+            }, req);
+
             res.json({ message: 'Visit status updated' });
         } catch (error) {
             console.error('Error updating visit status:', error);

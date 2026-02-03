@@ -137,6 +137,15 @@ class LeaseService {
             });
         }
 
+        // Audit Log
+        const auditLogger = (await import('../utils/auditLogger.js')).default;
+        await auditLogger.log({
+            userId: null, // Usually triggered by owner/admin, typically we'd pass userId but service signature doesn't have it yet.
+            actionType: 'LEASE_CREATED',
+            entityId: leaseId,
+            details: { tenantId, unitId, startDate, endDate, monthlyRent }
+        });
+
         return leaseId;
     }
     async renewLease(leaseId, newEndDate, newMonthlyRent = null) {
@@ -276,6 +285,15 @@ class LeaseService {
         await leaseModel.update(leaseId, {
             refunded_amount: amount,
             deposit_status: status
+        });
+
+        // Audit Log
+        const auditLogger = (await import('../utils/auditLogger.js')).default;
+        await auditLogger.log({
+            userId: null, // System action or triggered by admin (userId not passed here currently)
+            actionType: 'DEPOSIT_REFUNDED',
+            entityId: leaseId,
+            details: { refundedAmount: amount, status }
         });
 
         return { status, refundedAmount: amount };

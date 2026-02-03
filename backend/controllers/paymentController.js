@@ -72,6 +72,15 @@ class PaymentController {
                     generatedDate: new Date().toISOString(),
                     receiptNumber: `REC-CASH-${Date.now()}`
                 });
+
+                // Audit Log (Cash Payment)
+                const auditLogger = (await import('../utils/auditLogger.js')).default;
+                await auditLogger.log({
+                    userId: req.user.id, // Treasurer ID
+                    actionType: 'PAYMENT_RECEIVED_CASH',
+                    entityId: paymentId,
+                    details: { invoiceId, amount, receiptGenerated: true }
+                }, req);
             }
 
             res.status(201).json({ message: 'Cash payment recorded and verified, receipt generated', paymentId });
