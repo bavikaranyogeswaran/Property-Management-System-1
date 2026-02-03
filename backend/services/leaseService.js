@@ -240,6 +240,39 @@ class LeaseService {
             throw new Error('Only active leases can be terminated');
         }
 
+        const today = new Date();
+        const start = new Date(lease.startDate);
+
+        // Logic Check: Pre-Move-In Cancellation
+        // If the lease is terminated BEFORE the start date, it is a cancellation.
+        // We should void all pending invoices and mark lease as 'cancelled'.
+        if (today < start) {
+            console.log(`Lease ${leaseId} cancelled before start date. Voiding invoices...`);
+
+            // 1. Update Lease Status to 'cancelled'
+            await leaseModel.update(leaseId, {
+                status: 'cancelled',
+                end_date: terminationDate // or today? Keep term date provided.
+            });
+
+            // 2. Void all PENDING invoices for this lease
+            // We need a method or raw query. Assuming raw for speed or import invoiceModel.
+            const invoice = await import('../models/invoiceModel.js');
+            // We need a voidByLeaseId method or similar. Let's iterate or use raw update in model.
+            // invoiceModel usually has updateStatus.
+            // Let's assume we fetch pending and update.
+            // Or better, add `voidPendingByLeaseId` to invoiceModel?
+            // I'll stick to logic here:
+            // "UPDATE rent_invoices SET status='void' WHERE lease_id=? AND status='pending'"
+            await pool.query("UPDATE rent_invoices SET status='void' WHERE lease_id = ? AND status='pending'", [leaseId]);
+
+            // 3. Free up unit
+            await unitModel.update(lease.unitId, { status: 'available' });
+
+            return { status: 'cancelled', terminationDate };
+        }
+
+        // Standard Termination (Post-Move-In)
         // 1. Update Lease Status & End Date
         await leaseModel.update(leaseId, {
             status: 'ended',
