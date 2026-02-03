@@ -208,6 +208,22 @@ class LeaseService {
 
         const status = amount >= lease.securityDeposit ? 'refunded' : 'partially_refunded';
 
+        // Logic Check: Deduction Invoice
+        // If refund is less than deposit, the difference is withheld.
+        // We should generate a PAID invoice for "Security Deposit Deduction" to track this income/expense.
+        if (amount < lease.securityDeposit) {
+            const deduction = lease.securityDeposit - amount;
+            const invoice = await import('../models/invoiceModel.js');
+            const invId = await invoice.default.create({
+                leaseId,
+                amount: deduction,
+                dueDate: new Date(), // Immediate
+                description: 'Security Deposit Deductions (Damages/Cleaning)'
+            });
+            await invoice.default.updateStatus(invId, 'paid'); // Paid via deposit
+            console.log(`Created Deduction Invoice ${invId} for ${deduction}`);
+        }
+
         await leaseModel.update(leaseId, {
             refunded_amount: amount,
             deposit_status: status

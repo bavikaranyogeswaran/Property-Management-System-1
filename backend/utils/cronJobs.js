@@ -233,6 +233,9 @@ export const applyLateFees = async () => {
 };
 
 const initCronJobs = () => {
+    // Run every day at 0:30 AM (Expiry Warnings)
+    cron.schedule('30 0 * * *', sendLeaseExpiryWarnings);
+
     // Run every day at midnight (Lease Expiry)
     cron.schedule('0 0 * * *', checkLeaseExpiration);
 
