@@ -45,27 +45,18 @@ class LeaseService {
         // CRITICAL: If 'unitModel.findById' doesn't support connection, we might read stale data or miss locks.
         // Let's assume standard behavior for now: optimistic check.
 
-        // 1. Check if unit is available
-        // Note: In a transaction, we should select for update ideally.
-        const unit = await unitModel.findById(unitId);
+        // 1. Check if unit is available (and LOCK it)
+        const unit = await unitModel.findByIdForUpdate(unitId, connection); // Uses SELECT ... FOR UPDATE
         if (!unit) {
             throw new Error('Unit not found');
         }
 
-        // If we are in a transaction that JUST set this unit to occupied (e.g. Lead Conversion), 
-        // reading it back might show 'occupied' if using same connection, or 'available' if different.
-        // However, standard Lead Conversion flow locks unit status UPDATE *before* calling this lease creation?
-        // Actually, the plan is to move ALL unit blocking logic HERE.
-
+        // Now strict check status within the lock
         if (unit.status === 'occupied') {
-            // Check if this is just an overlap or disjoint
-            // Actually, we trust the status, BUT we also check specific dates now.
-            // If status is occupied, it might be occupied by a future or past lease?
-            // "Occupied" usually means "Right Now".
-            // But let's rely on overlap check for date correctness.
-            // We'll warn if occupied but proceed to overlap check?
-            // No, if occupied, we probably shouldn't create unless we are sure.
-            // But let's stick to the overlap check as the source of truth for "Booking Conflict".
+            // Strict check: If occupied, we only proceed if we are booking a FUTURE date range that relies on overlap check.
+            // But if start date is today, and it's occupied, we block?
+            // Actually, existing logic relied on overlap check.
+            // We will keep relying on overlap check, but the Lock ensures no one else changes status or leases in parallel.
         }
 
         // 2. Check for Date Overlaps
@@ -88,7 +79,11 @@ class LeaseService {
         const leaseId = await leaseModel.create(leaseParams, connection);
 
         // 3. Update Unit Status
-        await unitModel.update(unitId, { status: 'occupied' }, connection);
+        // Only set to occupied if the lease is CURRENT (starts today or past)
+        const today = new Date().toISOString().split('T')[0];
+        if (startDate <= today) {
+            await unitModel.update(unitId, { status: 'occupied' }, connection);
+        }
 
         // 4. Generate Initial Invoices (Logic Check: Missed Item)
         // A. Security Deposit Invoice

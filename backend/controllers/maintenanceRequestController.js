@@ -63,15 +63,11 @@ class MaintenanceRequestController {
 
             const updated = await maintenanceRequestModel.updateStatus(id, status);
 
-            // Notification Logic: If status is completed, notify Treasurers
+            // Notification Logic
             if (status === 'completed') {
                 // Find all treasurers
                 const treasurers = await userModel.findByRole('treasurer');
-
-                // Get request details for the message
                 const request = await maintenanceRequestModel.findById(id);
-                // Also get unit/property info if possible, but let's keep message simple for now or fetch unit details.
-                // request object has details.
 
                 // Notify Treasurers
                 for (const treasurer of treasurers) {
@@ -87,6 +83,15 @@ class MaintenanceRequestController {
                     await notificationModel.create({
                         userId: request.tenant_id,
                         message: `Maintenance Request '${request.title}' has been marked as completed.`,
+                        type: 'maintenance'
+                    });
+                }
+            } else if (status === 'in_progress') {
+                const request = await maintenanceRequestModel.findById(id);
+                if (request && request.tenant_id) {
+                    await notificationModel.create({
+                        userId: request.tenant_id,
+                        message: `Maintenance Request '${request.title}' is now In Progress. Technician assigned.`,
                         type: 'maintenance'
                     });
                 }
