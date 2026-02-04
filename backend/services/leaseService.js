@@ -83,6 +83,22 @@ class LeaseService {
         const today = new Date().toISOString().split('T')[0];
         if (startDate <= today) {
             await unitModel.update(unitId, { status: 'occupied' }, connection);
+
+            // CLEANUP: Cancel conflicting future/current visits
+            await connection.query(
+                `UPDATE property_visits 
+             SET status = 'cancelled', notes = CONCAT(COALESCE(notes, ''), ' [System: Unit Leased]') 
+             WHERE unit_id = ? AND status = 'scheduled' AND scheduled_date >= ?`,
+                [unitId, today]
+            );
+
+            // CLEANUP: Mark specific-unit leads as dropped
+            await connection.query(
+                `UPDATE leads 
+             SET status = 'dropped', notes = CONCAT(COALESCE(notes, ''), ' [System: Unit Leased]') 
+             WHERE unit_id = ? AND status = 'interested'`,
+                [unitId]
+            );
         }
 
         // 4. Generate Initial Invoices (Logic Check: Missed Item)

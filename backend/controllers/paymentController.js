@@ -1,5 +1,7 @@
 import paymentModel from '../models/paymentModel.js';
 import invoiceModel from '../models/invoiceModel.js';
+import notificationModel from '../models/notificationModel.js';
+import userModel from '../models/userModel.js';
 import receiptModel from '../models/receiptModel.js';
 import notificationModel from '../models/notificationModel.js';
 
@@ -26,6 +28,21 @@ class PaymentController {
                 referenceNumber,
                 evidenceUrl
             });
+
+            // Notify Treasurers
+            try {
+                const treasurers = await userModel.findByRole('treasurer');
+                // Optimally we'd filter by property assignment here, but broadcast is safe for now.
+                for (const t of treasurers) {
+                    await notificationModel.create({
+                        userId: t.user_id,
+                        message: `New Payment submitted for Invoice #${invoiceId} (Amount: ${amount}).`,
+                        type: 'payment'
+                    });
+                }
+            } catch (noteErr) {
+                console.error('Failed to notify treasurers', noteErr);
+            }
 
             // Status remains 'pending' until treasurer verifies
             res.status(201).json({ message: 'Payment submitted for verification', paymentId });
