@@ -14,7 +14,7 @@ class ReceiptController {
 
             const receipts = await receiptModel.findAll();
             if (req.user.role === 'tenant') {
-                return res.json(receipts.filter(r => r.tenant_id === req.user.id));
+                return res.json(receipts.filter(r => r.tenantId === req.user.id.toString()));
             }
             return res.json(receipts);
 
