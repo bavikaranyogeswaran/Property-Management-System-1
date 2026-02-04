@@ -5,7 +5,15 @@ import { Building2, Home, Users, DollarSign, AlertCircle, Wrench, TrendingUp } f
 import { NotificationBanner } from '@/components/common/NotificationBanner';
 
 export function OwnerDashboard() {
-  const { properties, units, tenants, leases, invoices, maintenanceRequests, leads, notifications } = useApp();
+  const { properties, units, tenants, leases, invoices, payments, maintenanceRequests, leads, notifications } = useApp();
+
+  // Logic Fix: Calculate Balance for each invoice to support Partial Payments (Context: "is there any logics i have missed?")
+  const getInvoiceBalance = (invoiceId: string, totalAmount: number) => {
+    const verifiedPayments = payments
+      .filter(p => p.invoiceId === invoiceId && p.status === 'verified')
+      .reduce((sum, p) => sum + Number(p.amount), 0);
+    return Math.max(0, totalAmount - verifiedPayments);
+  };
 
   const totalProperties = properties.length;
   const totalUnits = units.length;
@@ -14,19 +22,31 @@ export function OwnerDashboard() {
   const activeLeases = leases.filter(l => l.status === 'active').length;
   const totalTenants = tenants.length;
 
-  const pendingInvoices = invoices.filter(i => i.status === 'pending');
+  const pendingInvoices = invoices.filter(i => {
+    // Include 'partially_paid' and 'overdue' in the pending bucket if they have balance
+    if (i.status === 'paid') return false;
+    const balance = getInvoiceBalance(i.id, i.amount);
+    return balance > 0;
+  });
+
   const overdueInvoices = invoices.filter(i => {
-    if (i.status === 'pending' && new Date(i.dueDate) < new Date()) {
+    // Dynamic Overdue Check
+    const balance = getInvoiceBalance(i.id, i.amount);
+    if (balance > 0 && new Date(i.dueDate) < new Date()) {
       return true;
     }
+    // Also include explicit 'overdue' status even if date might be weird (cron job truth)
+    if (i.status === 'overdue' && balance > 0) return true;
     return false;
   });
+
+  // Calculate actual pending money (not just full invoice amounts)
+  const pendingPayments = pendingInvoices.reduce((sum, inv) => sum + getInvoiceBalance(inv.id, inv.amount), 0);
+  const overdueAmount = overdueInvoices.reduce((sum, inv) => sum + getInvoiceBalance(inv.id, inv.amount), 0);
 
   const monthlyRevenue = leases
     .filter(l => l.status === 'active')
     .reduce((sum, l) => sum + l.monthlyRent, 0);
-
-  const pendingPayments = pendingInvoices.reduce((sum, inv) => sum + inv.amount, 0);
 
   const openMaintenanceRequests = maintenanceRequests.filter(
     r => r.status === 'submitted' || r.status === 'in_progress'
@@ -72,7 +92,7 @@ export function OwnerDashboard() {
     {
       title: 'Overdue Payments',
       count: overdueInvoices.length,
-      amount: overdueInvoices.reduce((sum, inv) => sum + inv.amount, 0),
+      amount: overdueAmount,
       icon: AlertCircle,
       color: 'text-red-600',
       bgColor: 'bg-red-50',
@@ -258,6 +278,9 @@ export function OwnerDashboard() {
                   const tenant = tenants.find(t => t.id === invoice.tenantId);
                   const unit = units.find(u => u.id === invoice.unitId);
                   const isOverdue = new Date(invoice.dueDate) < new Date();
+                  const balance = getInvoiceBalance(invoice.id, invoice.amount);
+                  const isPartial = balance < invoice.amount;
+
                   return (
                     <div key={invoice.id} className="flex justify-between items-start py-2 border-b last:border-0">
                       <div>
@@ -267,7 +290,8 @@ export function OwnerDashboard() {
                         </p>
                       </div>
                       <div className="text-right">
-                        <p className="text-sm font-semibold">LKR {invoice.amount}</p>
+                        <p className="text-sm font-semibold">LKR {balance.toLocaleString()}</p>
+                        {isPartial && <p className="text-[10px] text-gray-500">of LKR {invoice.amount.toLocaleString()}</p>}
                         {isOverdue && (
                           <span className="text-xs text-red-600">Overdue</span>
                         )}
