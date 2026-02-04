@@ -295,6 +295,10 @@ class LeaseService {
             throw new Error('Deposit has already been refunded.');
         }
 
+        if (lease.deposit_status !== 'paid') {
+            throw new Error('Cannot refund deposit that has not been fully paid.');
+        }
+
         // Logic Check: Unpaid Debt
         const invoiceModel = (await import('../models/invoiceModel.js')).default;
         const pendingDebt = await invoiceModel.getPendingTotal(leaseId);
@@ -416,6 +420,13 @@ class LeaseService {
             status: 'ended',
             end_date: terminationDate
         });
+
+        // 2b. Void Future Pending Invoices
+        // Ensure we don't leave ghost debt for months after termination
+        await pool.query(
+            "UPDATE rent_invoices SET status='void' WHERE lease_id = ? AND status='pending' AND due_date > ?",
+            [leaseId, terminationDate]
+        );
 
         // 3. Free up the Unit (Set to 'maintenance' for turnover buffer)
         // Was 'available', but we should allow cleaning.
