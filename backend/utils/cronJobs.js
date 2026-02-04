@@ -38,14 +38,16 @@ export const generateRentInvoices = async () => {
             }
 
             // Check if invoice exists for this month
-            const exists = await invoiceModel.exists(lease.id, currentYear, currentMonth);
+            // FIXED: usage of 'rent' type to avoid skipping if maintenance invoice exists
+            const exists = await invoiceModel.exists(lease.id, currentYear, currentMonth, 'rent');
             if (!exists) {
                 console.log(`Creating invoice for Lease ${lease.id} (Unit ${lease.unitNumber})...`);
                 await invoiceModel.create({
                     leaseId: lease.id,
                     amount: lease.monthlyRent,
                     dueDate: dueDate.toISOString().split('T')[0],
-                    description: `Rent for ${currentYear}-${currentMonth}`
+                    description: `Rent for ${currentYear}-${currentMonth}`,
+                    type: 'rent'
                 });
 
                 // Send Notification

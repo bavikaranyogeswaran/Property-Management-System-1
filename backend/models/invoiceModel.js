@@ -46,11 +46,16 @@ class InvoiceModel {
         return invoiceId;
     }
 
-    async exists(leaseId, year, month) {
-        const [rows] = await pool.query(
-            'SELECT invoice_id FROM rent_invoices WHERE lease_id = ? AND year = ? AND month = ?',
-            [leaseId, year, month]
-        );
+    async exists(leaseId, year, month, type = null) {
+        let query = 'SELECT invoice_id FROM rent_invoices WHERE lease_id = ? AND year = ? AND month = ?';
+        const params = [leaseId, year, month];
+
+        if (type) {
+            query += ' AND invoice_type = ?';
+            params.push(type);
+        }
+
+        const [rows] = await pool.query(query, params);
         return rows.length > 0;
     }
 
