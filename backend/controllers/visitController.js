@@ -2,6 +2,7 @@
 import visitModel from '../models/visitModel.js';
 import leadModel from '../models/leadModel.js';
 import db from '../config/db.js';
+import notificationModel from '../models/notificationModel.js';
 import emailService from '../utils/emailService.js';
 
 class VisitController {
@@ -29,19 +30,7 @@ class VisitController {
             // Combine date and time
             const scheduledDate = new Date(`${date}T${time}`);
 
-            // 1. Check if lead exists (logic typically resides in leadModel or we query lead table)
-            // For now, we'll try to find a lead with this email or phone
-            // Since leadModel.findAll returns all, we might need a specific findByEmail method
-            // Or we just insert a new one if we don't have a perfect match system.
-            // Let's create a new lead for every unique email, or find existing.
-
-            // To be robust, let's just create a new lead or find one.
-            // Simplified: Just use LeadModel.create which is what the user approved (Auto-create lead)
-            // Ideally we check existence first to avoid duplicates, but LeadModel.create doesn't seem to enforce unique email in the provided code snippet (checked earlier).
-            // However, typical systems should. Let's try to query first.
-
             // 1. Check if lead exists FOR THIS PROPERTY specifically
-            // This prevents linking a visit for Property B to a Lead profile for Property A (Privacy/RBAC)
             const [existingLeads] = await db.query(
                 `SELECT lead_id FROM leads WHERE email = ? AND property_id = ? LIMIT 1`,
                 [email, propertyId]
@@ -76,21 +65,11 @@ class VisitController {
                 notes
             });
 
-            // 3. Send Notification to Owner
+            // 3. Send Notifications (Email & In-App)
             try {
-                // Fetch property details (includes owner_id)
-                // We need to import propertyModel and userModel or use db query
-                // For simplicity/speed, let's just query or access via existing helpers if available.
-                // But controllers should ideally use models.
-                // Let's bring in propertyModel and userModel imports at top of file, 
-                // but since I can't easily add imports specific to this chunk without re-writing top,
-                // I'll dynamically import or assume I'll add them in a separate step?
-                // Better: Use direct db query for now or assume imports exist (I need to add them).
-                // I will add imports in a separate 'replace' call or just use db.query since `db` is imported here.
-
                 // Get Property & Owner details
                 const [propRows] = await db.query(
-                    `SELECT p.name as property_name, u.email as owner_email 
+                    `SELECT p.name as property_name, u.email as owner_email, u.user_id as owner_id 
                      FROM properties p
                      JOIN users u ON p.owner_id = u.user_id
                      WHERE p.property_id = ?`,
@@ -98,7 +77,7 @@ class VisitController {
                 );
 
                 if (propRows.length > 0) {
-                    const { property_name, owner_email } = propRows[0];
+                    const { property_name, owner_email, owner_id } = propRows[0];
 
                     // Get unit number if applicable
                     let unit_number = null;
@@ -107,6 +86,7 @@ class VisitController {
                         if (unitRows.length > 0) unit_number = unitRows[0].unit_number;
                     }
 
+                    // A. Send Email
                     await emailService.sendVisitNotification(owner_email, {
                         visitorName: name,
                         visitorPhone: phone,
@@ -115,11 +95,26 @@ class VisitController {
                         scheduledDate: scheduledDate,
                         notes: notes
                     });
+
+                    // B. Send In-App Notification (Logic Fix)
+                    if (owner_id) {
+                        await notificationModel.create({
+                            userId: owner_id,
+                            message: `New Visit Scheduled: ${name} for ${property_name} on ${scheduledDate.toLocaleDateString()}`,
+                            type: 'visit',
+                            severity: 'info'
+                        });
+                    }
                 }
 
-            } catch (emailError) {
-                console.error("Failed to send visit notification:", emailError);
+            } catch (notifyError) {
+                console.error("Failed to send visit notifications:", notifyError);
                 // Non-blocking
+            }
+
+            // 4. Update Lead Timestamp (Logic Fix)
+            if (leadId) {
+                await leadModel.update(leadId, { lastContactedAt: new Date() });
             }
 
             res.status(201).json({
@@ -139,9 +134,6 @@ class VisitController {
             // Assuming auth middleware puts user in req.user
             // If owner, show their property visits
             const ownerId = req.user?.id;
-            // NOTE: Need to ensure req.user.id is the OWNER's ID. 
-            // If RBAC is strict, make sure we filter correctly.
-
             const visits = await visitModel.findAll({ ownerId });
             res.json(visits);
         } catch (error) {
@@ -164,10 +156,16 @@ class VisitController {
                 return res.status(404).json({ error: 'Visit not found' });
             }
 
+            // Logic Fix: Update Lead Timestamp on Completion
+            if (status === 'completed' || status === 'confirmed') {
+                const visit = await visitModel.findById(id);
+                if (visit && visit.leadId) {
+                    await leadModel.update(visit.leadId, { lastContactedAt: new Date() });
+                }
+            }
+
             // Audit Log
             const auditLogger = (await import('../utils/auditLogger.js')).default;
-            // req.user might not be present if public route? But updateStatus should be protected.
-            // Assuming protected route (Owner/Staff).
             const userId = req.user ? req.user.id : null;
             await auditLogger.log({
                 userId,
