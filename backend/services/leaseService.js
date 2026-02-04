@@ -356,6 +356,17 @@ class LeaseService {
                     }
 
                     console.log(`Offset Pending Invoice ${inv.invoice_id} with ${toPay} from Deposit.`);
+
+                    // 1a. Generate Receipt for Offset
+                    const receiptModel = (await import('../models/receiptModel.js')).default;
+                    await receiptModel.create({
+                        paymentId: payId,
+                        invoiceId: inv.invoice_id,
+                        tenantId: lease.tenantId,
+                        amount: toPay,
+                        generatedDate: new Date().toISOString(),
+                        receiptNumber: `REC-OFFSET-${Date.now()}`
+                    });
                     withheldAmount -= toPay;
                 }
             }
@@ -383,6 +394,17 @@ class LeaseService {
             });
             await paymentModel.updateStatus(payId, 'verified');
             await invoiceModel.updateStatus(invId, 'paid');
+
+            // 2a. Generate Receipt for Deduction
+            const receiptModel = (await import('../models/receiptModel.js')).default;
+            await receiptModel.create({
+                paymentId: payId,
+                invoiceId: invId,
+                tenantId: lease.tenantId,
+                amount: withheldAmount,
+                generatedDate: new Date().toISOString(),
+                receiptNumber: `REC-DEDUCT-${Date.now()}`
+            });
             console.log(`Created Deduction Invoice ${invId} for Remaining Withheld: ${withheldAmount}`);
         }
 

@@ -164,8 +164,11 @@ export const checkLeaseExpiration = async () => {
 
         // 1. Find active leases past end date
         const [expiredLeases] = await connection.query(`
-            SELECT lease_id, unit_id FROM leases 
-            WHERE status = 'active' AND end_date < ?
+            SELECT l.lease_id, l.unit_id, p.owner_id 
+            FROM leases l
+            JOIN units u ON l.unit_id = u.unit_id
+            JOIN properties p ON u.property_id = p.property_id
+            WHERE l.status = 'active' AND l.end_date < ?
         `, [today]);
 
         if (expiredLeases.length > 0) {
@@ -186,6 +189,27 @@ export const checkLeaseExpiration = async () => {
                 );
 
                 console.log(`Lease ${lease.lease_id} ended. Unit ${lease.unit_id} set to Maintenance (Turnover).`);
+
+                // Notify Owner
+                if (lease.owner_id) {
+                    await notificationModel.create({
+                        userId: lease.owner_id,
+                        message: `Lease for Unit ${lease.unit_id} has ended. Unit is now in Maintenance for turnover.`,
+                        type: 'lease',
+                        severity: 'info'
+                    });
+                }
+
+                // Notify Treasurers (Refund Alert)
+                const treasurers = await db.query("SELECT user_id FROM users WHERE role = 'treasurer'").then(([rows]) => rows);
+                for (const t of treasurers) {
+                    await notificationModel.create({
+                        userId: t.user_id,
+                        message: `Lease #${lease.lease_id} has ended. Please process the Security Deposit Refund.`,
+                        type: 'lease',
+                        severity: 'warning'
+                    });
+                }
             }
         }
 
