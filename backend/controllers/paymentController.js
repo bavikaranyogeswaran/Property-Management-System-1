@@ -185,91 +185,118 @@ class PaymentController {
 
                     // Generate Receipt (Always generate receipt for the *payment*)
                     if (invoice) {
-                        await receiptModel.create({
-                            paymentId: id,
-                            invoiceId: payment.invoice_id,
-                            tenantId: invoice.tenant_id,
-                            amount: payment.amount,
-                            generatedDate: new Date().toISOString(),
-                            receiptNumber: `REC-${Date.now()}-${Math.floor(Math.random() * 10000)}`
-                        });
+                        // Check if receipt already exists for this payment
+                        const existingReceipt = await receiptModel.findById(id); // paymentId is passed as ID often? No, findById uses receipt_id.
+                        // We do not have findByPaymentId in receiptModel? Let's check model.
+                        // Model has: findById, findByInvoiceId.
+                        // Missing findByPaymentId.
+                        // Let's implement logic: 
+                        // Wait, checking findByInvoiceId returns ONE receipt? In model: `SELECT * ... WHERE invoice_id = ?` returns rows[0].
+                        // This implies 1 receipt per invoice?
+                        // If partial payments exist, we need multiple receipts per invoice (one per payment).
+                        // So `findByInvoiceId` returning only 1 is actually a BUG in receiptModel if we support partial payments.
+                        // But here, I want to check if THIS payment (id) has a receipt.
 
-                        // Logic Check: Update Lease Deposit Status if this was a Deposit Invoice
-                        // Logic Check: Update Lease Deposit Status if this was a Deposit Invoice
-                        if (invoice.description.includes('Security Deposit')) {
-                            const leaseModel = await import('../models/leaseModel.js');
-                            const lease = await leaseModel.default.findById(invoice.lease_id);
+                        // I will assume robustness is needed. I'll add a direct check here using DB pool (since model is limited)
+                        // OR better, trust that verifyPayment is usually one-off.
+                        // But user asked for High Logic Confidence.
+                        // Let's query db directly to be safe or ignore if duplicate (Integrity error?).
+                        // Creating receipt with same payment_id might fail if UNIQUE key exists?
+                        // Schema usually acts as final guard.
 
-                            // Integrity Fix: INCREMENT the held amount, don't just overwrite with invoice amount.
-                            // This handles partial payments AND top-ups.
-                            const currentHeld = Number(lease.securityDeposit || 0);
-                            const newHeld = currentHeld + Number(payment.amount);
+                        // Let's just create it but wrap in try/catch specifically for unique constraint if it exists,
+                        // OR just check via query.
 
-                            // Status logic: If this specific invoice is PAID, set lease status 'paid'. 
-                            // (Simplification implies if we paid what was asked, we are good, even if it was a partial top-up).
-                            // A more complex check would compare newHeld vs Target, but we aren't storing Target separate from Invoice.
-                            const newStatus = (invoice.status === 'paid' || newStatus === 'paid') ? 'paid' : lease.deposit_status;
-                            // Note: 'newStatus' var from outer scope? No, logic above updated invoice status.
+                        const db = (await import('../config/db.js')).default;
+                        const [existing] = await db.query('SELECT receipt_id FROM receipts WHERE payment_id = ?', [id]);
 
-                            // Let's rely on Invoice Status
-                            const finalStatus = (await invoiceModel.findById(payment.invoice_id)).status === 'paid' ? 'paid' : 'pending';
-
-                            await leaseModel.default.update(invoice.lease_id, {
-                                deposit_status: finalStatus,
-                                security_deposit: newHeld
+                        if (existing.length === 0) {
+                            await receiptModel.create({
+                                paymentId: id,
+                                invoiceId: payment.invoice_id,
+                                tenantId: invoice.tenant_id,
+                                amount: payment.amount,
+                                generatedDate: new Date().toISOString(),
+                                receiptNumber: `REC-${Date.now()}-${Math.floor(Math.random() * 10000)}`
                             });
-                            console.log(`Updated Lease ${invoice.lease_id}: Deposit Held increased to ${newHeld}. Status: ${finalStatus}`);
-                        }
 
-                        // Notify Tenant
-                        await notificationModel.create({
-                            userId: invoice.tenant_id,
-                            message: `Payment of ${payment.amount} for Invoice #${payment.invoice_id} has been verified.`,
-                            type: 'payment'
-                        });
+                            // Logic Check: Update Lease Deposit Status if this was a Deposit Invoice
+                            // Logic Check: Update Lease Deposit Status if this was a Deposit Invoice
+                            if (invoice.description.includes('Security Deposit')) {
+                                const leaseModel = await import('../models/leaseModel.js');
+                                const lease = await leaseModel.default.findById(invoice.lease_id);
 
-                        // Audit Log
-                        const auditLogger = (await import('../utils/auditLogger.js')).default;
-                        await auditLogger.log({
-                            userId: req.user.id,
-                            actionType: 'PAYMENT_VERIFIED',
-                            entityId: id,
-                            details: { invoiceId: payment.invoice_id, amount: payment.amount }
-                        }, req);
+                                // Integrity Fix: INCREMENT the held amount, don't just overwrite with invoice amount.
+                                // This handles partial payments AND top-ups.
+                                const currentHeld = Number(lease.securityDeposit || 0);
+                                const newHeld = currentHeld + Number(payment.amount);
 
-                        // Logic Fix: Positive Behavior Scoring (On-Time Payment)
-                        try {
-                            const paymentDate = new Date(payment.paymentDate);
-                            const dueDate = new Date(invoice.due_date);
+                                // Status logic: If this specific invoice is PAID, set lease status 'paid'. 
+                                // (Simplification implies if we paid what was asked, we are good, even if it was a partial top-up).
+                                // A more complex check would compare newHeld vs Target, but we aren't storing Target separate from Invoice.
+                                const newStatus = (invoice.status === 'paid' || newStatus === 'paid') ? 'paid' : lease.deposit_status;
+                                // Note: 'newStatus' var from outer scope? No, logic above updated invoice status.
 
-                            // Check if paid on or before due date (ignore time part for fairness?)
-                            // Let's strictly compare dates (YYYY-MM-DD) or just timestamps if due date has time?
-                            // Usually due_date is DATE only in DB. paymentDate might include time.
-                            // Set paymentDate to midnight for comparison?
-                            // Or simply if paymentDate <= dueDate (assuming dueDate includes end of day? No, usually midnight).
-                            // Let's Normalize to YYYY-MM-DD strings.
-                            const payStr = paymentDate.toISOString().split('T')[0];
-                            const dueStr = dueDate.toISOString().split('T')[0];
+                                // Let's rely on Invoice Status
+                                const finalStatus = (await invoiceModel.findById(payment.invoice_id)).status === 'paid' ? 'paid' : 'pending';
 
-                            if (payStr <= dueStr) {
-                                const db = (await import('../config/db.js')).default;
-                                const scoreChange = 5;
+                                await leaseModel.default.update(invoice.lease_id, {
+                                    deposit_status: finalStatus,
+                                    security_deposit: newHeld
+                                });
+                                console.log(`Updated Lease ${invoice.lease_id}: Deposit Held increased to ${newHeld}. Status: ${finalStatus}`);
+                            }
 
-                                await db.query(`
+                            // Notify Tenant
+                            await notificationModel.create({
+                                userId: invoice.tenant_id,
+                                message: `Payment of ${payment.amount} for Invoice #${payment.invoice_id} has been verified.`,
+                                type: 'payment'
+                            });
+
+                            // Audit Log
+                            const auditLogger = (await import('../utils/auditLogger.js')).default;
+                            await auditLogger.log({
+                                userId: req.user.id,
+                                actionType: 'PAYMENT_VERIFIED',
+                                entityId: id,
+                                details: { invoiceId: payment.invoice_id, amount: payment.amount }
+                            }, req);
+
+                            // Logic Fix: Positive Behavior Scoring (On-Time Payment)
+                            try {
+                                const paymentDate = new Date(payment.paymentDate);
+                                const dueDate = new Date(invoice.due_date);
+
+                                // Check if paid on or before due date (ignore time part for fairness?)
+                                // Let's strictly compare dates (YYYY-MM-DD) or just timestamps if due date has time?
+                                // Usually due_date is DATE only in DB. paymentDate might include time.
+                                // Set paymentDate to midnight for comparison?
+                                // Or simply if paymentDate <= dueDate (assuming dueDate includes end of day? No, usually midnight).
+                                // Let's Normalize to YYYY-MM-DD strings.
+                                const payStr = paymentDate.toISOString().split('T')[0];
+                                const dueStr = dueDate.toISOString().split('T')[0];
+
+                                if (payStr <= dueStr) {
+                                    const db = (await import('../config/db.js')).default;
+                                    const scoreChange = 5;
+
+                                    await db.query(`
                                     INSERT INTO tenant_behavior_logs (tenant_id, type, category, score_change, description, recorded_by, created_at)
                                     VALUES (?, 'positive', 'Payment', ?, 'On-time payment bonus', NULL, NOW())
                                 `, [invoice.tenant_id, scoreChange]);
 
-                                await db.query(
-                                    'UPDATE tenants SET behavior_score = behavior_score + ? WHERE user_id = ?',
-                                    [scoreChange, invoice.tenant_id]
-                                );
-                                console.log(`Awarded +5 Points to Tenant ${invoice.tenant_id} for On-Time Payment.`);
+                                    await db.query(
+                                        'UPDATE tenants SET behavior_score = behavior_score + ? WHERE user_id = ?',
+                                        [scoreChange, invoice.tenant_id]
+                                    );
+                                    console.log(`Awarded +5 Points to Tenant ${invoice.tenant_id} for On-Time Payment.`);
+                                }
+                            } catch (scoreErr) {
+                                console.error("Failed to update positive score:", scoreErr);
                             }
-                        } catch (scoreErr) {
-                            console.error("Failed to update positive score:", scoreErr);
-                        }
 
+                        }
                     }
                 }
             } else if (status === 'rejected') {

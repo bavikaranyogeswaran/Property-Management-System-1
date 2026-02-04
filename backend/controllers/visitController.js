@@ -156,11 +156,21 @@ class VisitController {
                 return res.status(404).json({ error: 'Visit not found' });
             }
 
-            // Logic Fix: Update Lead Timestamp on Completion
+            // Logic Fix: Update Lead Timestamp & Status on Completion
             if (status === 'completed' || status === 'confirmed') {
                 const visit = await visitModel.findById(id);
                 if (visit && visit.leadId) {
-                    await leadModel.update(visit.leadId, { lastContactedAt: new Date() });
+                    const leadModel = (await import('../models/leadModel.js')).default;
+                    const lead = await leadModel.findById(visit.leadId);
+
+                    const updateData = { lastContactedAt: new Date() };
+
+                    // Upgrade status to 'visited' if currently just 'interested'
+                    if (status === 'completed' && lead && lead.status === 'interested') {
+                        updateData.status = 'visited';
+                    }
+
+                    await leadModel.update(visit.leadId, updateData);
                 }
             }
 
