@@ -334,6 +334,35 @@ export const applyLateFees = async () => {
                 console.error('Failed to send late fee email:', emailErr);
             }
 
+            // Logic Fix: Sync Behavior Score (Deduct 10 points)
+            try {
+                const scoreChange = -10;
+                // Import locally if not at top, or assume available.
+                // We need to dynamic import if not readily available or add to top.
+                // Let's add dynamic imports for safety inside the loop/function or better yet, just use pool/db if models aren't easy.
+                // But we used invoiceModel so models should be fine.
+                // We'll use the raw queries or models. Let's use models pattern if possible.
+                // But cronJobs.js has imports at top. Let's check imports.
+                // I will add the logic using DB queries directly for speed/safety like in the controller example.
+
+                // 1. Create Log
+                // We need behaviorLogModel. Let's use direct DB insert to avoid circular dep issues or import mess.
+                await db.query(`
+                    INSERT INTO tenant_behavior_logs (tenant_id, type, category, score_change, description, recorded_by, created_at)
+                    VALUES (?, 'negative', 'Payment', ?, ?, NULL, NOW())
+                `, [inv.tenant_id, scoreChange, `Late Fee applied for Invoice #${inv.invoice_id}`]);
+
+                // 2. Update Tenant Score
+                await db.query(
+                    'UPDATE tenants SET behavior_score = behavior_score + ? WHERE user_id = ?',
+                    [scoreChange, inv.tenant_id]
+                );
+                console.log(`Auto-deducted 10 points for Tenant ${inv.tenant_id} due to late fee.`);
+
+            } catch (scoreErr) {
+                console.error('Failed to update behavior score on auto-late fee:', scoreErr);
+            }
+
             appliedCount++;
         }
         console.log(`Applied late fees to ${appliedCount} invoices.`);
