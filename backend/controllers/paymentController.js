@@ -199,7 +199,7 @@ class PaymentController {
                             const leaseModel = await import('../models/leaseModel.js');
                             await leaseModel.default.update(invoice.lease_id, {
                                 deposit_status: 'paid',
-                                security_deposit: payment.amount
+                                security_deposit: invoice.amount
                             });
                             console.log(`Updated Lease ${invoice.lease_id} deposit status to PAID.`);
                         }
