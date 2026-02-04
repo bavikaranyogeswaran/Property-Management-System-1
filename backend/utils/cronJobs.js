@@ -37,16 +37,33 @@ export const generateRentInvoices = async () => {
                 continue;
             }
 
-            // Check if invoice exists for this month
-            // FIXED: usage of 'rent' type to avoid skipping if maintenance invoice exists
+            // Proration Logic For Last Month
+            let rentAmount = lease.monthlyRent;
+            let description = `Rent for ${currentYear}-${currentMonth}`;
+
+            // Check if lease ends this month
+            if (lease.endDate) {
+                const endDate = new Date(lease.endDate);
+                if (endDate.getFullYear() === currentYear && (endDate.getMonth() + 1) === currentMonth) {
+                    const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
+                    const endDay = endDate.getDate();
+
+                    if (endDay < daysInMonth) {
+                        rentAmount = Math.round((lease.monthlyRent / daysInMonth) * endDay * 100) / 100;
+                        description += ` (Prorated: ${endDay}/${daysInMonth} days)`;
+                        console.log(`Prorating Final Month for Lease ${lease.id}: ${rentAmount}`);
+                    }
+                }
+            }
+
             const exists = await invoiceModel.exists(lease.id, currentYear, currentMonth, 'rent');
             if (!exists) {
                 console.log(`Creating invoice for Lease ${lease.id} (Unit ${lease.unitNumber})...`);
                 await invoiceModel.create({
                     leaseId: lease.id,
-                    amount: lease.monthlyRent,
+                    amount: rentAmount,
                     dueDate: dueDate.toISOString().split('T')[0],
-                    description: `Rent for ${currentYear}-${currentMonth}`,
+                    description: description,
                     type: 'rent'
                 });
 
