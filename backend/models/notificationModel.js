@@ -32,6 +32,14 @@ class NotificationModel {
         );
         return result.affectedRows > 0;
     }
+
+    async markAllAsRead(userId) {
+        const [result] = await pool.query(
+            'UPDATE notifications SET is_read = TRUE WHERE user_id = ?',
+            [userId]
+        );
+        return result.affectedRows > 0;
+    }
 }
 
 export default new NotificationModel();

@@ -26,6 +26,18 @@ class NotificationController {
             res.status(500).json({ error: 'Failed to update notification' });
         }
     }
+
+    async markAllAsRead(req, res) {
+        try {
+            const userId = req.user.id;
+            // No success check needed, if 0 rows updated it means they were already read or no notifications exist
+            await notificationModel.markAllAsRead(userId);
+            res.json({ message: 'All notifications marked as read' });
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ error: 'Failed to update notifications' });
+        }
+    }
 }
 
 export default new NotificationController();
