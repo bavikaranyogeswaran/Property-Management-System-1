@@ -194,12 +194,14 @@ export const sendLeaseExpiryWarnings = async () => {
     const dateStr = warningDate.toISOString().split('T')[0];
 
     try {
-        // Find leases expiring exactly in 30 days logic? 
-        // Or "Between now and 30 days" that havent been warned?
-        // Simpler: Find leases with end_date = dateStr (Exact 30 days out)
+        // Find leases expiring exactly in 30 days
+        // Join units and properties to find the specific owner of the unit
         const [expiringLeases] = await db.query(`
-            SELECT l.*, u.email FROM leases l
-            JOIN users u ON l.tenant_id = u.user_id
+            SELECT l.*, t.email as tenant_email, p.owner_id 
+            FROM leases l
+            JOIN users t ON l.tenant_id = t.user_id
+            JOIN units un ON l.unit_id = un.unit_id
+            JOIN properties p ON un.property_id = p.property_id
             WHERE l.status = 'active'
             AND l.end_date = ?
         `, [dateStr]);
@@ -207,7 +209,7 @@ export const sendLeaseExpiryWarnings = async () => {
         if (expiringLeases.length > 0) {
             console.log(`Found ${expiringLeases.length} leases expiring on ${dateStr}. Sending warnings...`);
             for (const lease of expiringLeases) {
-                // Send Notification
+                // 1. Notify Tenant
                 await notificationModel.create({
                     userId: lease.tenant_id,
                     message: `Your lease is expiring in 30 days (on ${lease.end_date}). Please contact us if you wish to renew.`,
@@ -215,9 +217,15 @@ export const sendLeaseExpiryWarnings = async () => {
                     severity: 'warning'
                 });
 
-                // Send Email? (Optional but good)
-                // Assuming emailService has generic send?
-                // emailService.sendExpiryWarning(lease.email, lease); 
+                // 2. Notify Owner
+                if (lease.owner_id) {
+                    await notificationModel.create({
+                        userId: lease.owner_id,
+                        message: `Lease for Unit ${lease.unit_id} is expiring in 30 days (on ${lease.end_date}).`,
+                        type: 'system',
+                        severity: 'warning'
+                    });
+                }
             }
         }
     } catch (error) {
