@@ -87,7 +87,7 @@ class PaymentController {
                     tenantId: invoice.tenant_id,
                     amount,
                     generatedDate: new Date().toISOString(),
-                    receiptNumber: `REC-CASH-${Date.now()}`
+                    receiptNumber: `REC-CASH-${Date.now()}-${Math.floor(Math.random() * 10000)}`
                 });
 
                 // Audit Log (Cash Payment)
@@ -191,7 +191,7 @@ class PaymentController {
                             tenantId: invoice.tenant_id,
                             amount: payment.amount,
                             generatedDate: new Date().toISOString(),
-                            receiptNumber: `REC-${Date.now()}`
+                            receiptNumber: `REC-${Date.now()}-${Math.floor(Math.random() * 10000)}`
                         });
 
                         // Logic Check: Update Lease Deposit Status if this was a Deposit Invoice

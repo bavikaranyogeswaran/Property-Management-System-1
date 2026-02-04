@@ -374,7 +374,7 @@ class LeaseService {
                         tenantId: lease.tenantId,
                         amount: toPay,
                         generatedDate: new Date().toISOString(),
-                        receiptNumber: `REC-OFFSET-${Date.now()}`
+                        receiptNumber: `REC-OFFSET-${Date.now()}-${Math.floor(Math.random() * 10000)}`
                     });
                     withheldAmount -= toPay;
                 }
@@ -412,7 +412,7 @@ class LeaseService {
                 tenantId: lease.tenantId,
                 amount: withheldAmount,
                 generatedDate: new Date().toISOString(),
-                receiptNumber: `REC-DEDUCT-${Date.now()}`
+                receiptNumber: `REC-DEDUCT-${Date.now()}-${Math.floor(Math.random() * 10000)}`
             });
             console.log(`Created Deduction Invoice ${invId} for Remaining Withheld: ${withheldAmount}`);
         }
