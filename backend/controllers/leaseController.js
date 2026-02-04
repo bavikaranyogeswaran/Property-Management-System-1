@@ -5,12 +5,20 @@ import leaseService from '../services/leaseService.js';
 class LeaseController {
     async getLeases(req, res) {
         try {
-            // RBAC: Owner sees all, Tenant sees their own?
-            // Currently assuming Owner use case or generic fetch
-            // But strict RBAC is good.
-            if (req.user.role === 'owner' || req.user.role === 'treasurer') {
+            // RBAC: Owner sees all (conceptually their own), Treasurer sees ASSIGNED only.
+            // Tenant sees their own.
+            if (req.user.role === 'owner') {
                 const results = await leaseModel.findAll();
                 res.json(results);
+            } else if (req.user.role === 'treasurer') {
+                const results = await leaseModel.findAll();
+                // Filter by assigned
+                const staffModel = (await import('../models/staffModel.js')).default;
+                const assigned = await staffModel.getAssignedProperties(req.user.id);
+                const assignedIds = assigned.map(p => p.property_id.toString());
+
+                const filtered = results.filter(l => assignedIds.includes(l.propertyId.toString()));
+                res.json(filtered);
             } else if (req.user.role === 'tenant') {
                 const results = await leaseModel.findByTenantId(req.user.id);
                 res.json(results);

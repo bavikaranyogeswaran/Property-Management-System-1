@@ -95,7 +95,7 @@ export const checkLeaseExpiration = async () => {
 
         const today = new Date().toISOString().split('T')[0];
 
-        // Find active leases past end date
+        // 1. Find active leases past end date
         const [expiredLeases] = await connection.query(`
             SELECT lease_id, unit_id FROM leases 
             WHERE status = 'active' AND end_date < ?
@@ -105,19 +105,55 @@ export const checkLeaseExpiration = async () => {
             console.log(`Found ${expiredLeases.length} expired leases.`);
 
             for (const lease of expiredLeases) {
-                // valid ENUM is 'ended'
+                // Update Lease to 'ended'
                 await connection.query(
                     "UPDATE leases SET status = 'ended' WHERE lease_id = ?",
                     [lease.lease_id]
                 );
 
+                // Update Unit to 'maintenance' (Turnover Buffer)
+                // Instead of 'available' immediately.
                 await connection.query(
-                    "UPDATE units SET status = 'available' WHERE unit_id = ?",
+                    "UPDATE units SET status = 'maintenance' WHERE unit_id = ?",
                     [lease.unit_id]
                 );
+
+                console.log(`Lease ${lease.lease_id} ended. Unit ${lease.unit_id} set to Maintenance (Turnover).`);
             }
-        } else {
-            console.log('No expired leases found.');
+        }
+
+        // 2. Process Turnover Buffer (Maintenance -> Available)
+        // Find units in maintenance that had a lease end >= 3 days ago
+        // AND do not have any active/pending maintenance requests (Safety check)
+        const bufferDate = new Date();
+        bufferDate.setDate(bufferDate.getDate() - 3);
+        const bufferDateStr = bufferDate.toISOString().split('T')[0];
+
+        // Query: Units in 'maintenance' where LATEST lease end_date <= bufferDate
+        // And NO active maintenance requests.
+        const [turnoverUnits] = await connection.query(`
+            SELECT u.unit_id 
+            FROM units u
+            JOIN leases l ON u.unit_id = l.unit_id
+            WHERE u.status = 'maintenance'
+            AND l.status = 'ended'
+            AND l.end_date <= ?
+            AND l.end_date = (SELECT MAX(end_date) FROM leases WHERE unit_id = u.unit_id)
+            AND NOT EXISTS (
+                SELECT 1 FROM maintenance_requests mr 
+                WHERE mr.unit_id = u.unit_id 
+                AND mr.status IN ('submitted', 'in_progress')
+            )
+        `, [bufferDateStr]);
+
+        if (turnoverUnits.length > 0) {
+            console.log(`Found ${turnoverUnits.length} units ready for Turnover (Maintenance -> Available).`);
+            for (const u of turnoverUnits) {
+                await connection.query(
+                    "UPDATE units SET status = 'available' WHERE unit_id = ?",
+                    [u.unit_id]
+                );
+            }
         }
 
         await connection.commit();

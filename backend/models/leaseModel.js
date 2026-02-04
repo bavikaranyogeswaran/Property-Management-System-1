@@ -35,6 +35,7 @@ class LeaseModel {
         const [rows] = await db.query(`
             SELECT l.*, 
                    u.unit_number,
+                   u.property_id,
                    p.name as property_name
             FROM leases l
             JOIN units u ON l.unit_id = u.unit_id
@@ -48,6 +49,7 @@ class LeaseModel {
         const [rows] = await db.query(`
             SELECT l.*, 
                    u.unit_number,
+                   u.property_id,
                    p.name as property_name
             FROM leases l
             JOIN units u ON l.unit_id = u.unit_id
@@ -62,6 +64,7 @@ class LeaseModel {
         const [rows] = await db.query(`
             SELECT l.*, 
                    u.unit_number,
+                   u.property_id,
                    p.name as property_name
             FROM leases l
             JOIN units u ON l.unit_id = u.unit_id
@@ -75,6 +78,7 @@ class LeaseModel {
         const [rows] = await db.query(`
             SELECT l.*, 
                    u.unit_number,
+                   u.property_id,
                    p.name as property_name
             FROM leases l
             JOIN units u ON l.unit_id = u.unit_id
@@ -110,6 +114,7 @@ class LeaseModel {
             createdAt: row.created_at,
             // Extra info useful for frontend listing
             unitNumber: row.unit_number,
+            propertyId: row.property_id.toString(),
             propertyName: row.property_name
         }));
     }
