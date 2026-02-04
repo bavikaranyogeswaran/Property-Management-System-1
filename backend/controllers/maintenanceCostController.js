@@ -35,23 +35,33 @@ class MaintenanceCostController {
                     // Assuming 'tenant_id' on request is the current tenant.
                     // Let's find ACTIVE lease for this tenant and unit.
 
-                    // Optimization: Use leaseModel.findActiveByUnit(request.unit_id)? 
-                    // Or query manually.
-                    // Let's assume leaseModel.findActiveByUnit exists or use raw query.
-                    // Actually, I can use `findActive` and filter, but that's slow.
-                    // Let's assume the request was made by the active tenant.
-                    const [leases] = await leaseModel.findByTenant(request.tenant_id);
-                    const activeLease = leases.find(l => l.unit_id === request.unit_id && l.status === 'active');
+                    // Logic Fix: Correct Method Name & Data Handling
+                    const leases = await leaseModel.findByTenantId(request.tenant_id);
+                    // findByTenantId returns an array of mapped objects (id, unitId, etc.)
+
+                    // Find active lease for this unit
+                    const activeLease = leases.find(l => String(l.unitId) === String(request.unit_id) && l.status === 'active');
 
                     if (activeLease) {
                         const invoiceModel = (await import('../models/invoiceModel.js')).default;
                         await invoiceModel.create({
-                            leaseId: activeLease.lease_id,
+                            leaseId: activeLease.id, // Mapped model uses 'id'
                             amount: amount,
                             dueDate: new Date(), // Immediate
-                            description: `Maintenance Charge: ${description || 'Repair Costs'}`
+                            description: `Maintenance Charge: ${description || 'Repair Costs'}`,
+                            type: 'maintenance' // Logic Fix: Correct Type
                         });
-                        console.log(`Billed Maintenace Cost to Lease ${activeLease.lease_id}`);
+
+                        // Logic Fix: In-App Notification
+                        const notificationModel = (await import('../models/notificationModel.js')).default;
+                        await notificationModel.create({
+                            userId: request.tenant_id,
+                            message: `A new maintenance charge of ${amount} has been added to your account.`,
+                            type: 'invoice',
+                            severity: 'warning'
+                        });
+
+                        console.log(`Billed Maintenance Cost to Lease ${activeLease.id}`);
                     } else {
                         console.warn('Cannot bill maintenance: No active lease found for this unit/tenant.');
                     }
