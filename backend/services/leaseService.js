@@ -278,8 +278,21 @@ class LeaseService {
                 dueDate: new Date(), // Immediate
                 description: 'Security Deposit Deductions (Damages/Cleaning)'
             });
+
+            // FIX: Create a 'Payment' record so this Income shows up in Owner Payouts
+            const paymentModel = (await import('../models/paymentModel.js')).default;
+            const payId = await paymentModel.create({
+                invoiceId: invId,
+                amount: deduction,
+                paymentDate: new Date(),
+                paymentMethod: 'deposit_deduction',
+                referenceNumber: `SYS-DEDUCT-${Date.now()}`,
+                evidenceUrl: null
+            });
+            await paymentModel.updateStatus(payId, 'verified');
+
             await invoice.default.updateStatus(invId, 'paid'); // Paid via deposit
-            console.log(`Created Deduction Invoice ${invId} for ${deduction}`);
+            console.log(`Created Deduction Invoice ${invId} and Verified Payment ${payId} for ${deduction}`);
         }
 
         await leaseModel.update(leaseId, {
