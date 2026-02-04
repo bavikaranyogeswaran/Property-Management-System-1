@@ -64,7 +64,7 @@ class PaymentModel {
             JOIN rent_invoices ri ON p.invoice_id = ri.invoice_id
             JOIN leases l ON ri.lease_id = l.lease_id
             JOIN units un ON l.unit_id = un.unit_id
-            JOIN start_property_assignments spa ON un.property_id = spa.property_id
+            JOIN staff_property_assignments spa ON un.property_id = spa.property_id
             JOIN users u ON l.tenant_id = u.user_id
             WHERE spa.user_id = ?
             ORDER BY p.payment_date DESC

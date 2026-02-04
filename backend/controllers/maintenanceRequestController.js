@@ -10,7 +10,18 @@ class MaintenanceRequestController {
             const { unitId, title, description, priority, images } = req.body;
             const tenantId = req.user.id; // From auth middleware
 
-            // Verify tenant belongs to unit? (Ideally yes, but skipping strict check for speed, relying on frontend)
+            // RBAC/Security: Verify tenant currently LEASES this unit
+            const leaseModel = (await import('../models/leaseModel.js')).default;
+            const activeLease = await leaseModel.findActive(); // This returns ALL active. Too heavy.
+            // Better: specialized query or generic findByTenantId and filter.
+            const tenantLeases = await leaseModel.findByTenantId(tenantId);
+            const isLeased = tenantLeases.some(l =>
+                l.unitId === unitId.toString() && l.status === 'active'
+            );
+
+            if (!isLeased) {
+                return res.status(403).json({ error: 'Access denied. You do not have an active lease for this unit.' });
+            }
 
             const requestId = await maintenanceRequestModel.create({
                 unitId,
