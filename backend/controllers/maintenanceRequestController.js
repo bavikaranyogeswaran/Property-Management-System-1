@@ -103,6 +103,57 @@ class MaintenanceRequestController {
             res.status(500).json({ error: 'Failed to update status' });
         }
     }
+
+    async createInvoice(req, res) {
+        try {
+            // RBAC: Owner or Treasurer
+            if (req.user.role !== 'owner' && req.user.role !== 'treasurer') {
+                return res.status(403).json({ error: 'Access denied' });
+            }
+
+            const { requestId, amount, dueDate, description } = req.body;
+            const request = await maintenanceRequestModel.findById(requestId);
+            if (!request) return res.status(404).json({ error: 'Maintenance Request not found' });
+
+            // Need lease ID from unit/tenant?
+            // Maintenance Request has unitId, tenantId.
+            // We need the *Active Lease* for this unit/tenant to link the invoice.
+            const leaseModel = (await import('../models/leaseModel.js')).default;
+            // Use findByTenantId(request.tenant_id) and filter for active?
+            // Or findActive() and filter?
+            // Better: 'leaseModel.findActiveByUnitId(request.unitId)'?
+            // Currently checkOverlap logic is close.
+            // Let's use simple generic fetch:
+            const leases = await leaseModel.findByTenantId(request.tenant_id);
+            const activeLease = leases.find(l => l.unitId === request.unit_id.toString() && l.status === 'active');
+
+            if (!activeLease) {
+                return res.status(400).json({ error: 'No active lease found for this tenant/unit. Cannot invoice.' });
+            }
+
+            const invoiceModel = (await import('../models/invoiceModel.js')).default;
+            const invoiceId = await invoiceModel.create({
+                leaseId: activeLease.id,
+                amount,
+                dueDate: dueDate || new Date(),
+                description: description || `Maintenance Bill: ${request.title}`,
+                type: 'maintenance'
+            });
+
+            // Notify Tenant
+            await notificationModel.create({
+                userId: request.tenant_id,
+                message: `You have been billed ${amount} for maintenance: ${request.title}`,
+                type: 'invoice' // New type support?
+            });
+
+            res.status(201).json({ message: 'Maintenance Invoice Created', invoiceId });
+
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ error: 'Failed to create invoice' });
+        }
+    }
 }
 
 export default new MaintenanceRequestController();

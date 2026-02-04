@@ -176,6 +176,10 @@ class PaymentController {
                             }
                         }
                     } else {
+                        // Partial Payment Support
+                        if (totalVerified > 0) {
+                            await invoiceModel.updateStatus(payment.invoice_id, 'partially_paid');
+                        }
                         console.log(`Invoice ${payment.invoice_id} partially paid. Total: ${totalVerified}/${invoice.amount}`);
                     }
 

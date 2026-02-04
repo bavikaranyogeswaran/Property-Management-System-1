@@ -5,15 +5,15 @@ import leaseModel from './leaseModel.js';
 
 class InvoiceModel {
     async create(data) {
-        const { leaseId, amount, dueDate, description } = data;
+        const { leaseId, amount, dueDate, description, type } = data;
         // Need to determine year/month from dueDate
         const date = new Date(dueDate);
         const year = date.getFullYear();
         const month = date.getMonth() + 1; // 1-12
 
         const [result] = await pool.query(
-            'INSERT INTO rent_invoices (lease_id, year, month, amount, due_date, status) VALUES (?, ?, ?, ?, ?, ?)',
-            [leaseId, year, month, amount, dueDate, 'pending']
+            'INSERT INTO rent_invoices (lease_id, year, month, amount, due_date, status, invoice_type, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            [leaseId, year, month, amount, dueDate, 'pending', type || 'rent', description]
         );
         const invoiceId = result.insertId;
 
@@ -118,7 +118,7 @@ class InvoiceModel {
     }
 
     async createLateFeeInvoice(data) {
-        const { leaseId, amount, dueDate, description } = data;
+        const { leaseId, amount, dueDate, description, type } = data;
         const date = new Date();
         const year = date.getFullYear();
         const month = date.getMonth() + 1;
@@ -127,8 +127,8 @@ class InvoiceModel {
         // Or should we link it to the original invoice? 
         // For now, standalone 'Late Fee' invoice.
         const [result] = await pool.query(
-            'INSERT INTO rent_invoices (lease_id, year, month, amount, due_date, status, description) VALUES (?, ?, ?, ?, ?, ?, ?)',
-            [leaseId, year, month, amount, dueDate, 'pending', description]
+            'INSERT INTO rent_invoices (lease_id, year, month, amount, due_date, status, invoice_type, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            [leaseId, year, month, amount, dueDate, 'pending', 'late_fee', description]
         );
         return result.insertId;
     }
@@ -142,9 +142,9 @@ class InvoiceModel {
             SELECT ri.*, l.tenant_id
             FROM rent_invoices ri
             JOIN leases l ON ri.lease_id = l.lease_id
-            WHERE ri.status = 'pending' 
+            WHERE ri.status IN ('pending', 'partially_paid')
             AND ri.due_date < DATE_SUB(CURDATE(), INTERVAL ? DAY)
-            AND ri.description NOT LIKE 'Late Fee%'
+            AND ri.invoice_type = 'rent'
             AND NOT EXISTS (
                 SELECT 1 FROM rent_invoices ri2 
                 WHERE ri2.lease_id = ri.lease_id 

@@ -236,10 +236,10 @@ CREATE TABLE rent_invoices (
     month TINYINT NOT NULL,
     amount DECIMAL(10,2) NOT NULL,
     due_date DATE NOT NULL,
-    status ENUM('pending','paid','overdue','void') DEFAULT 'pending',
+    status ENUM('pending','partially_paid','paid','overdue','void') DEFAULT 'pending',
+    invoice_type ENUM('rent', 'maintenance', 'late_fee', 'deposit', 'other') DEFAULT 'rent',
     description VARCHAR(255),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE (lease_id, year, month),
     FOREIGN KEY (lease_id) REFERENCES leases(lease_id)
 );
 
