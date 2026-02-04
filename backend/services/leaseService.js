@@ -518,6 +518,31 @@ class LeaseService {
             details: { terminationDate, status: lease.status } // Status changed *to* ended/cancelled
         });
 
+        // 4. Notifications (Logic Fix)
+        const notificationModel = (await import('../models/notificationModel.js')).default;
+
+        // A. Notify Tenant
+        await notificationModel.create({
+            userId: lease.tenantId,
+            message: `Your lease for Unit has been terminated effective ${terminationDate}. Please contact management for move-out procedures.`,
+            type: 'lease',
+            severity: 'warning'
+        });
+
+        // B. Notify Treasurer (Deposit Refund Action)
+        // Find treasurers
+        const userModel = (await import('../models/userModel.js')).default;
+        const treasurers = await userModel.findByRole('treasurer');
+
+        for (const t of treasurers) {
+            await notificationModel.create({
+                userId: t.user_id,
+                message: `Lease #${leaseId} has been terminated manually. Please process the Security Deposit Refund.`,
+                type: 'lease',
+                severity: 'warning'
+            });
+        }
+
         return { status: 'ended', terminationDate };
     }
 }
