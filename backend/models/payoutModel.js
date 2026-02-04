@@ -20,6 +20,19 @@ class PayoutModel {
         return true;
     }
 
+    async checkOverlap(ownerId, startDate, endDate) {
+        // Check if any existing payout overlaps with the requested range
+        // Overlap logic: (StartA <= EndB) and (EndA >= StartB)
+        const [rows] = await pool.query(`
+            SELECT 1 FROM owner_payouts 
+            WHERE owner_id = ? 
+            AND period_start <= ? 
+            AND period_end >= ?
+            LIMIT 1
+        `, [ownerId, endDate, startDate]);
+        return rows.length > 0;
+    }
+
     // Core Logic: Rent - Expenses
     async calculateNetPayout(ownerId, startDate, endDate) {
         // 1. Total Verified Payments (Income)

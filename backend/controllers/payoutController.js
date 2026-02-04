@@ -33,6 +33,12 @@ class PayoutController {
                 return res.status(403).json({ error: 'Access denied' });
             }
 
+            // Logic Fix: Prevent Overlapping Payouts
+            const hasOverlap = await payoutModel.checkOverlap(ownerId, startDate, endDate);
+            if (hasOverlap) {
+                return res.status(400).json({ error: 'A payout record already exists for this period.' });
+            }
+
             const { netPayout } = await payoutModel.calculateNetPayout(ownerId, startDate, endDate);
 
             // Logic: Can we implement a check to ensure we don't pay for the same period twice? 
