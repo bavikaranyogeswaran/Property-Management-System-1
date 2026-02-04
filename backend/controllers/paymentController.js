@@ -243,9 +243,15 @@ class PaymentController {
                             .reduce((sum, p) => sum + Number(p.amount), 0);
 
                         if (totalVerified < invoice.amount) {
-                            // Revert to 'pending' or 'overdue' based on date
-                            const isOverdue = new Date() > new Date(invoice.due_date);
-                            const newStatus = isOverdue ? 'overdue' : 'pending';
+                            // Revert logic: If we still have SOME verified payments, it's 'partially_paid'.
+                            // Otherwise, it's 'pending' or 'overdue'.
+                            let newStatus;
+                            if (totalVerified > 0) {
+                                newStatus = 'partially_paid';
+                            } else {
+                                const isOverdue = new Date() > new Date(invoice.due_date);
+                                newStatus = isOverdue ? 'overdue' : 'pending';
+                            }
                             await invoiceModel.updateStatus(invoice.invoice_id, newStatus);
                             console.log(`Reverted Invoice ${invoice.invoice_id} to ${newStatus}`);
                         }

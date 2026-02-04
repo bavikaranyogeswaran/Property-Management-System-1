@@ -68,6 +68,13 @@ class TenantModel {
             [amount, userId]
         );
     }
+
+    async deductCredit(userId, amount) {
+        await pool.query(
+            'UPDATE tenants SET credit_balance = credit_balance - ? WHERE user_id = ?',
+            [amount, userId]
+        );
+    }
 }
 
 

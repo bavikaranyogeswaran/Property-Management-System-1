@@ -249,6 +249,21 @@ class LeaseService {
             console.log(`Lease Renewal: Rent increased. Invoiced Top-Up ${diff}. Reset Deposit Status.`);
         }
 
+        // 4. Sync Future Invoices
+        // If rent was updated, we must ensure any *already generated* pending invoices for future months (e.g. from Cron) are updated.
+        if (newMonthlyRent) {
+            const today = new Date().toISOString().split('T')[0];
+            await pool.query(`
+                UPDATE rent_invoices 
+                SET amount = ?, description = CONCAT(description, ' (Rent Adjusted)')
+                WHERE lease_id = ? 
+                AND status = 'pending' 
+                AND invoice_type = 'rent'
+                AND due_date > ?
+            `, [newMonthlyRent, leaseId, today]);
+            console.log(`Synced future invoices for Lease ${leaseId} to new rent ${newMonthlyRent}`);
+        }
+
         // Audit Log
         const auditLogger = (await import('../utils/auditLogger.js')).default;
         // userId? We don't have req here easily unless passed.

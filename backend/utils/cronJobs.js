@@ -59,7 +59,7 @@ export const generateRentInvoices = async () => {
             const exists = await invoiceModel.exists(lease.id, currentYear, currentMonth, 'rent');
             if (!exists) {
                 console.log(`Creating invoice for Lease ${lease.id} (Unit ${lease.unitNumber})...`);
-                await invoiceModel.create({
+                const invoiceId = await invoiceModel.create({
                     leaseId: lease.id,
                     amount: rentAmount,
                     dueDate: dueDate.toISOString().split('T')[0],
@@ -67,7 +67,55 @@ export const generateRentInvoices = async () => {
                     type: 'rent'
                 });
 
-                // Send Notification
+                // Logic Fix: Auto-Apply Credits
+                const tenantModel = (await import('../models/tenantModel.js')).default;
+                // Fetch fresh tenant data (specifically credit balance)
+                const tenant = await tenantModel.findByUserId(lease.tenantId);
+
+                if (tenant && tenant.creditBalance > 0) {
+                    const amountToApply = Math.min(tenant.creditBalance, rentAmount);
+
+                    if (amountToApply > 0) {
+                        const paymentModel = (await import('../models/paymentModel.js')).default;
+
+                        // 1. Create Verified Payment
+                        const payId = await paymentModel.create({
+                            invoiceId,
+                            amount: amountToApply,
+                            paymentDate: new Date(),
+                            paymentMethod: 'credit_applied',
+                            referenceNumber: `CREDIT-${Date.now()}`,
+                            evidenceUrl: null
+                        });
+                        await paymentModel.updateStatus(payId, 'verified');
+
+                        // 2. Deduct Credit
+                        await tenantModel.deductCredit(lease.tenantId, amountToApply);
+
+                        // 3. Update Invoice Status
+                        // Logic simplified: If applied starts == rentAmount, it's paid.
+                        // But we should use the standard 'verifyPayment' check logic or just update manually.
+                        // verifyPayment controller logic is safer but we are in cron.
+                        // Simple Update:
+                        if (amountToApply >= rentAmount) {
+                            await invoiceModel.updateStatus(invoiceId, 'paid');
+                        } else {
+                            await invoiceModel.updateStatus(invoiceId, 'partially_paid');
+                        }
+
+                        console.log(`Auto-applied credit ${amountToApply} to Invoice ${invoiceId}. Remaining Credit: ${tenant.creditBalance - amountToApply}`);
+
+                        // Notify Tenant of Credit Usage
+                        await notificationModel.create({
+                            userId: lease.tenantId,
+                            message: `A credit of LKR ${amountToApply} was automatically applied to your new rent invoice.`,
+                            type: 'payment',
+                            isRead: false
+                        });
+                    }
+                }
+
+                // Send Notification (Invoice Created)
                 await notificationModel.create({
                     userId: lease.tenantId,
                     message: `A new rent invoice for ${currentYear}-${currentMonth} has been generated. Due date: ${dueDate.toISOString().split('T')[0]}`,
