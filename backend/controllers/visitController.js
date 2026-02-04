@@ -40,9 +40,11 @@ class VisitController {
             // Ideally we check existence first to avoid duplicates, but LeadModel.create doesn't seem to enforce unique email in the provided code snippet (checked earlier).
             // However, typical systems should. Let's try to query first.
 
+            // 1. Check if lead exists FOR THIS PROPERTY specifically
+            // This prevents linking a visit for Property B to a Lead profile for Property A (Privacy/RBAC)
             const [existingLeads] = await db.query(
-                `SELECT lead_id FROM leads WHERE email = ? LIMIT 1`,
-                [email]
+                `SELECT lead_id FROM leads WHERE email = ? AND property_id = ? LIMIT 1`,
+                [email, propertyId]
             );
 
             let leadId = null;
