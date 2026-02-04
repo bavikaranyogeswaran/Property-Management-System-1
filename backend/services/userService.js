@@ -276,7 +276,8 @@ class UserService {
                         unitId: lead.interestedUnit,
                         startDate: leaseStart,
                         endDate: leaseEnd,
-                        monthlyRent: unit.monthlyRent
+                        monthlyRent: unit.monthlyRent,
+                        securityDeposit: unit.monthlyRent // Default 1 month deposit
                     }, connection);
                 }
             }
