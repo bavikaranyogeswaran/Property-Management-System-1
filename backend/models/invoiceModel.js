@@ -153,6 +153,7 @@ class InvoiceModel {
             AND NOT EXISTS (
                 SELECT 1 FROM rent_invoices ri2 
                 WHERE ri2.lease_id = ri.lease_id 
+                AND ri2.invoice_type = 'late_fee'
                 AND ri2.description LIKE CONCAT('%Invoice #', ri.invoice_id, '%')
             )
         `, [gracePeriodDays]);

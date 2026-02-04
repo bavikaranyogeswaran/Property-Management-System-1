@@ -59,6 +59,10 @@ class LeaseService {
             // We will keep relying on overlap check, but the Lock ensures no one else changes status or leases in parallel.
         }
 
+        if (unit.status === 'maintenance') {
+            throw new Error('Unit is currently under maintenance and cannot be leased.');
+        }
+
         // 2. Check for Date Overlaps
         const hasOverlap = await leaseModel.checkOverlap(unitId, startDate, endDate);
         if (hasOverlap) {
