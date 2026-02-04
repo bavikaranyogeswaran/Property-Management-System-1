@@ -29,8 +29,33 @@ class MaintenanceRequestController {
                 title,
                 description,
                 priority,
+                priority,
                 images
             });
+
+            // Logic Fix: Notify Owner
+            try {
+                // Find Owner of the property
+                const unitModel = (await import('../models/unitModel.js')).default;
+                const unit = await unitModel.findById(unitId);
+                if (unit && unit.propertyId) {
+                    // We need ownerId. propertyModel?
+                    const propertyModel = (await import('../models/propertyModel.js')).default;
+                    const property = await propertyModel.findById(unit.propertyId);
+
+                    if (property && property.owner_id) {
+                        await notificationModel.create({
+                            userId: property.owner_id,
+                            message: `New Maintenance Request for Unit ${unit.unitNumber}: ${title}`,
+                            type: 'maintenance',
+                            severity: 'warning'
+                        });
+                    }
+                }
+            } catch (notifyErr) {
+                console.error("Failed to notify owner of maintenance request:", notifyErr);
+            }
+
 
             res.status(201).json({ message: 'Maintenance request created', requestId });
         } catch (error) {

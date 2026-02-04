@@ -236,6 +236,40 @@ class PaymentController {
                             entityId: id,
                             details: { invoiceId: payment.invoice_id, amount: payment.amount }
                         }, req);
+
+                        // Logic Fix: Positive Behavior Scoring (On-Time Payment)
+                        try {
+                            const paymentDate = new Date(payment.paymentDate);
+                            const dueDate = new Date(invoice.due_date);
+
+                            // Check if paid on or before due date (ignore time part for fairness?)
+                            // Let's strictly compare dates (YYYY-MM-DD) or just timestamps if due date has time?
+                            // Usually due_date is DATE only in DB. paymentDate might include time.
+                            // Set paymentDate to midnight for comparison?
+                            // Or simply if paymentDate <= dueDate (assuming dueDate includes end of day? No, usually midnight).
+                            // Let's Normalize to YYYY-MM-DD strings.
+                            const payStr = paymentDate.toISOString().split('T')[0];
+                            const dueStr = dueDate.toISOString().split('T')[0];
+
+                            if (payStr <= dueStr) {
+                                const db = (await import('../config/db.js')).default;
+                                const scoreChange = 5;
+
+                                await db.query(`
+                                    INSERT INTO tenant_behavior_logs (tenant_id, type, category, score_change, description, recorded_by, created_at)
+                                    VALUES (?, 'positive', 'Payment', ?, 'On-time payment bonus', NULL, NOW())
+                                `, [invoice.tenant_id, scoreChange]);
+
+                                await db.query(
+                                    'UPDATE tenants SET behavior_score = behavior_score + ? WHERE user_id = ?',
+                                    [scoreChange, invoice.tenant_id]
+                                );
+                                console.log(`Awarded +5 Points to Tenant ${invoice.tenant_id} for On-Time Payment.`);
+                            }
+                        } catch (scoreErr) {
+                            console.error("Failed to update positive score:", scoreErr);
+                        }
+
                     }
                 }
             } else if (status === 'rejected') {
