@@ -312,7 +312,7 @@ class LeaseService {
         return { status, refundedAmount: amount };
     }
 
-    async terminateLease(leaseId, terminationDate) {
+    async terminateLease(leaseId, terminationDate, terminationFee = 0) {
         const lease = await leaseModel.findById(leaseId);
         if (!lease) throw new Error('Lease not found');
 
@@ -327,7 +327,10 @@ class LeaseService {
         // If the lease is terminated BEFORE the start date, it is a cancellation.
         // We should void all pending invoices and mark lease as 'cancelled'.
         if (today < start) {
-            console.log(`Lease ${leaseId} cancelled before start date. Voiding invoices...`);
+            console.log(`Lease ${leaseId} cancelled before start date.`);
+            // Note: We typically don't charge termination fees for pre-move-in cancellations
+            // unless specified. If user passes fee here, we COULD charge it, but usually
+            // we just void everything. Let's assume Fee applies to Active Leases (Post-Move-In).
 
             // 1. Update Lease Status to 'cancelled'
             await leaseModel.update(leaseId, {
@@ -353,13 +356,26 @@ class LeaseService {
         }
 
         // Standard Termination (Post-Move-In)
-        // 1. Update Lease Status & End Date
+
+        // 1. Generate Termination Fee Invoice (if applicable)
+        if (terminationFee > 0) {
+            const invoiceModel = (await import('../models/invoiceModel.js')).default;
+            await invoiceModel.create({
+                leaseId,
+                amount: terminationFee,
+                dueDate: new Date(), // Immediate
+                description: 'Early Termination Fee'
+            });
+            console.log(`Generated Termination Fee Invoice: ${terminationFee}`);
+        }
+
+        // 2. Update Lease Status & End Date
         await leaseModel.update(leaseId, {
             status: 'ended',
             end_date: terminationDate
         });
 
-        // 2. Free up the Unit immediately
+        // 3. Free up the Unit immediately
         await unitModel.update(lease.unitId, { status: 'available' });
 
         // Limit: Audit Log

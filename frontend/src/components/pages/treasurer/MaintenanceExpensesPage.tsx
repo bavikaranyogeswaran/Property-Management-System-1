@@ -15,6 +15,7 @@ export function MaintenanceExpensesPage() {
     const [selectedRequest, setSelectedRequest] = useState<string | null>(null);
     const [amount, setAmount] = useState('');
     const [description, setDescription] = useState('');
+    const [billToTenant, setBillToTenant] = useState(false);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
 
     // Filter for completed or relevant requests
@@ -40,6 +41,7 @@ export function MaintenanceExpensesPage() {
             requestId: selectedRequest,
             amount: value,
             description,
+            billToTenant
         });
 
         toast.success('Expense recorded successfully');
@@ -217,6 +219,18 @@ export function MaintenanceExpensesPage() {
                                 value={description}
                                 onChange={(e) => setDescription(e.target.value)}
                             />
+                        </div>
+                        <div className="flex items-center space-x-2 pt-2">
+                            <input
+                                type="checkbox"
+                                id="billToTenant"
+                                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                checked={billToTenant}
+                                onChange={(e) => setBillToTenant(e.target.checked)}
+                            />
+                            <Label htmlFor="billToTenant" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                                Bill to Tenant (Create Invoice)
+                            </Label>
                         </div>
                     </div>
                     <DialogFooter>

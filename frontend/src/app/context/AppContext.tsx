@@ -169,6 +169,7 @@ export interface MaintenanceCost {
   amount: number;
   description: string;
   recordedDate: string;
+  billToTenant?: boolean;
 }
 
 export interface Visit {
@@ -1251,7 +1252,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       const res = await maintenanceApi.addCost(cost);
       if (res.status === 201) {
-        toast.success("Cost recorded");
+        toast.success(cost.billToTenant ? "Cost recorded & Invoice generated" : "Cost recorded");
         // Refresh costs
         const mcRes = await maintenanceApi.getCosts('');
         setMaintenanceCosts(mcRes.data);
