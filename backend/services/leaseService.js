@@ -271,6 +271,11 @@ class LeaseService {
             throw new Error('No security deposit to refund');
         }
 
+        // Logic Check: Idempotency
+        if (lease.deposit_status === 'refunded') {
+            throw new Error('Deposit has already been refunded.');
+        }
+
         if (amount > lease.securityDeposit) {
             throw new Error('Refund amount cannot exceed security deposit');
         }
@@ -386,8 +391,10 @@ class LeaseService {
             end_date: terminationDate
         });
 
-        // 3. Free up the Unit immediately
-        await unitModel.update(lease.unitId, { status: 'available' });
+        // 3. Free up the Unit (Set to 'maintenance' for turnover buffer)
+        // Was 'available', but we should allow cleaning.
+        // Cron job will auto-release it after 3 days if no active maintenance requests.
+        await unitModel.update(lease.unitId, { status: 'maintenance' });
 
         // Limit: Audit Log
         const auditLogger = (await import('../utils/auditLogger.js')).default;
