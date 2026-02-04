@@ -161,6 +161,14 @@ class LeaseService {
             details: { tenantId, unitId, startDate, endDate, monthlyRent }
         });
 
+        // 5. Role Promotion (Lead -> Tenant)
+        const userModel = (await import('../models/userModel.js')).default;
+        const tenantUser = await userModel.findById(tenantId);
+        if (tenantUser && (tenantUser.role === 'lead' || tenantUser.role === 'prospective')) {
+            await userModel.updateRole(tenantId, 'tenant');
+            console.log(`Promoted User ${tenantId} from '${tenantUser.role}' to 'tenant'.`);
+        }
+
         return leaseId;
     }
     async renewLease(leaseId, newEndDate, newMonthlyRent = null) {
@@ -409,7 +417,7 @@ class LeaseService {
         }
 
         await leaseModel.update(leaseId, {
-            refunded_amount: amount,
+            refunded_amount: newTotalRefunded,
             deposit_status: status
         });
 
