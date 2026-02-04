@@ -160,9 +160,10 @@ export function OwnerInvoicesPage() {
                   <div className="flex gap-2">
                     <Badge variant={
                       invoice.status === 'paid' ? 'default' :
-                        isOverdue ? 'destructive' : 'secondary'
-                    }>
-                      {isOverdue ? 'Overdue' : invoice.status}
+                        invoice.status === 'partially_paid' ? 'outline' : // Changed to outline or custom class for visibility
+                          isOverdue ? 'destructive' : 'secondary'
+                    } className={invoice.status === 'partially_paid' ? 'bg-yellow-100 text-yellow-800 border-yellow-200' : ''}>
+                      {isOverdue ? 'Overdue' : invoice.status === 'partially_paid' ? 'Partially Paid' : invoice.status}
                     </Badge>
                     {isLateFee && <Badge variant="destructive" className="bg-red-100 text-red-700 border-red-200">Late Fee</Badge>}
                   </div>
@@ -302,6 +303,7 @@ export function OwnerInvoicesPage() {
                 <TabsTrigger value="all">All Invoices ({invoices.length})</TabsTrigger>
                 <TabsTrigger value="pending">Pending ({pendingInvoices.length})</TabsTrigger>
                 <TabsTrigger value="overdue">Overdue ({overdueInvoices.length})</TabsTrigger>
+                <TabsTrigger value="partially_paid">Partially Paid ({invoices.filter(i => i.status === 'partially_paid').length})</TabsTrigger>
                 <TabsTrigger value="paid">Paid ({paidInvoices.length})</TabsTrigger>
               </TabsList>
             </div>
@@ -313,6 +315,9 @@ export function OwnerInvoicesPage() {
             </TabsContent>
             <TabsContent value="overdue" className="m-0">
               <InvoiceTable invoicesList={overdueInvoices} />
+            </TabsContent>
+            <TabsContent value="partially_paid" className="m-0">
+              <InvoiceTable invoicesList={invoices.filter(i => i.status === 'partially_paid')} />
             </TabsContent>
             <TabsContent value="paid" className="m-0">
               <InvoiceTable invoicesList={paidInvoices} />

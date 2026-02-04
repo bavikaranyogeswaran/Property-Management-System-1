@@ -22,14 +22,21 @@ export function OwnerMaintenancePage() {
     updateMaintenanceRequest,
     addMaintenanceCost,
     deleteMaintenanceCost,
+    createMaintenanceInvoice,
   } = useApp();
 
   const [selectedRequest, setSelectedRequest] = useState<MaintenanceRequest | null>(null);
   const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false);
   const [isCostDialogOpen, setIsCostDialogOpen] = useState(false);
+  const [isBillDialogOpen, setIsBillDialogOpen] = useState(false);
   const [costFormData, setCostFormData] = useState({
     amount: '',
     description: '',
+  });
+  const [billFormData, setBillFormData] = useState({
+    amount: '',
+    description: '',
+    dueDate: '',
   });
 
   const submittedRequests = maintenanceRequests.filter(r => r.status === 'submitted');
@@ -63,6 +70,25 @@ export function OwnerMaintenancePage() {
       amount: '',
       description: '',
     });
+  };
+
+  const handleBillTenant = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedRequest) return;
+
+    try {
+      await createMaintenanceInvoice(
+        selectedRequest.id,
+        parseFloat(billFormData.amount),
+        billFormData.description,
+        billFormData.dueDate
+      );
+      setIsBillDialogOpen(false);
+      setSelectedRequest(null);
+      setBillFormData({ amount: '', description: '', dueDate: '' });
+    } catch (error) {
+      // Error handling done in context
+    }
   };
 
   const getRequestCosts = (requestId: string) => {

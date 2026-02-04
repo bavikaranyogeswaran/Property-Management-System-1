@@ -48,6 +48,8 @@ export const maintenanceApi = {
     addCost: (data: any) => apiClient.post('/maintenance-costs', data),
     getCosts: (requestId: string) => apiClient.get(`/maintenance-costs?requestId=${requestId}`),
     deleteCost: (id: string) => apiClient.delete(`/maintenance-costs/${id}`),
+    createInvoice: (data: { requestId: string; amount: number; description: string; dueDate?: string }) =>
+        apiClient.post('/maintenance/invoice', data),
 };
 
 // Payment API

@@ -122,7 +122,7 @@ export interface RentInvoice {
   unitId: string;
   amount: number;
   dueDate: string;
-  status: 'pending' | 'paid' | 'overdue';
+  status: 'pending' | 'partially_paid' | 'paid' | 'overdue';
   description?: string;
   generatedDate: string;
 }
@@ -281,6 +281,7 @@ interface AppContextType {
   updateMaintenanceRequest: (id: string, request: Partial<MaintenanceRequest>) => void;
   addMaintenanceCost: (cost: Omit<MaintenanceCost, 'id' | 'recordedDate'>) => void;
   deleteMaintenanceCost: (id: string) => void;
+  createMaintenanceInvoice: (requestId: string, amount: number, description: string, dueDate?: string) => Promise<void>;
 
   // Visit operations
   visits: Visit[];
@@ -1393,6 +1394,33 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const createMaintenanceInvoice = async (requestId: string, amount: number, description: string, dueDate?: string) => {
+    try {
+      await maintenanceApi.createInvoice({ requestId, amount, description, dueDate });
+      // Refresh invoices
+      const invRes = await invoiceApi.getInvoices();
+      if (invRes.data) {
+        const mappedInvoices = invRes.data.map((i: any) => ({
+          id: i.invoice_id.toString(),
+          leaseId: i.lease_id.toString(),
+          tenantId: i.tenant_id.toString(),
+          unitId: i.unit_id ? i.unit_id.toString() : '',
+          amount: parseFloat(i.amount),
+          dueDate: i.due_date ? i.due_date.split('T')[0] : '',
+          status: i.status,
+          description: i.description,
+          generatedDate: i.created_at ? i.created_at.split('T')[0] : ''
+        }));
+        setInvoices(mappedInvoices);
+      }
+      toast.success('Maintenance invoice created successfully');
+    } catch (e: any) {
+      console.error("Failed to create maintenance invoice", e);
+      toast.error(`Failed to create invoice: ${e.response?.data?.error || e.message}`);
+      throw e;
+    }
+  };
+
   return (
     <AppContext.Provider value={{
       properties,
@@ -1454,6 +1482,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       fetchVisits,
       updateVisitStatus,
       markNotificationAsRead,
+      createMaintenanceInvoice,
     }}>
       {children}
     </AppContext.Provider>
