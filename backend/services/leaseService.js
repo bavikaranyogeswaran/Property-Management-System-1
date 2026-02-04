@@ -299,46 +299,91 @@ class LeaseService {
             throw new Error('Cannot refund deposit that has not been fully paid.');
         }
 
-        // Logic Check: Unpaid Debt
-        const invoiceModel = (await import('../models/invoiceModel.js')).default;
-        const pendingDebt = await invoiceModel.getPendingTotal(leaseId);
-        if (pendingDebt > 0) {
-            throw new Error(`Cannot refund deposit. Tenant has outstanding debt of $${pendingDebt}. Please clear invoices first.`);
-        }
+        const status = amount >= lease.securityDeposit ? 'refunded' : 'partially_refunded';
 
         if (amount > lease.securityDeposit) {
             throw new Error('Refund amount cannot exceed security deposit');
         }
 
-        const status = amount >= lease.securityDeposit ? 'refunded' : 'partially_refunded';
+        // Logic Check: Unpaid Debt (Smart Offset)
+        const invoiceModel = (await import('../models/invoiceModel.js')).default;
+        // We no longer BLOCK on debt. We OFFSET it.
 
-        // Logic Check: Deduction Invoice
-        // If refund is less than deposit, the difference is withheld.
-        // We should generate a PAID invoice for "Security Deposit Deduction" to track this income/expense.
-        if (amount < lease.securityDeposit) {
-            const deduction = lease.securityDeposit - amount;
-            const invoice = await import('../models/invoiceModel.js');
-            const invId = await invoice.default.create({
+        let withheldAmount = lease.securityDeposit - amount;
+
+        // 1. Pay off Pending Debt with Withheld Amount
+        if (withheldAmount > 0) {
+            const paymentModel = (await import('../models/paymentModel.js')).default;
+
+            // Fetch pending invoices
+            const pendingInvoices = await pool.query(
+                `SELECT * FROM rent_invoices WHERE lease_id = ? AND status IN ('pending', 'partially_paid') ORDER BY due_date ASC`,
+                [leaseId]
+            ).then(([rows]) => rows);
+
+            for (const inv of pendingInvoices) {
+                if (withheldAmount <= 0) break;
+
+                // Calculate outstanding for this invoice
+                // We need to know how much is already paid? 
+                // We can fetch payments or rely on 'pending' status?
+                // Safer: Get payments sum.
+                const payments = await paymentModel.findByInvoiceId(inv.invoice_id);
+                const paidAlready = payments
+                    .filter(p => p.status === 'verified')
+                    .reduce((sum, p) => sum + Number(p.amount), 0);
+
+                const outstanding = inv.amount - paidAlready;
+                const toPay = Math.min(withheldAmount, outstanding);
+
+                if (toPay > 0) {
+                    // Create Payment (Deposit Offset)
+                    const payId = await paymentModel.create({
+                        invoiceId: inv.invoice_id,
+                        amount: toPay,
+                        paymentDate: new Date(),
+                        paymentMethod: 'deposit_offset',
+                        referenceNumber: `DEP-OFF-${Date.now()}`,
+                        evidenceUrl: null
+                    });
+                    await paymentModel.updateStatus(payId, 'verified'); // This triggers invoice status update in controller logic if we called controller, but here we are in service.
+                    // We must verify invoice status manually or call shared logic.
+                    // Simple update:
+                    if (toPay >= outstanding) {
+                        await invoiceModel.updateStatus(inv.invoice_id, 'paid');
+                    } else {
+                        await invoiceModel.updateStatus(inv.invoice_id, 'partially_paid');
+                    }
+
+                    console.log(`Offset Pending Invoice ${inv.invoice_id} with ${toPay} from Deposit.`);
+                    withheldAmount -= toPay;
+                }
+            }
+        }
+
+        // 2. Create Deduction Invoice for REMAINDER (True Damages)
+        if (withheldAmount > 0) {
+            // If money is STILL left after paying all debts, this remaining amount is the actual "Deduction/Damages"
+            const invId = await invoiceModel.create({
                 leaseId,
-                amount: deduction,
+                amount: withheldAmount,
                 dueDate: new Date(), // Immediate
                 description: 'Security Deposit Deductions (Damages/Cleaning)'
             });
 
-            // FIX: Create a 'Payment' record so this Income shows up in Owner Payouts
+            // Create Payment for it
             const paymentModel = (await import('../models/paymentModel.js')).default;
             const payId = await paymentModel.create({
                 invoiceId: invId,
-                amount: deduction,
+                amount: withheldAmount,
                 paymentDate: new Date(),
                 paymentMethod: 'deposit_deduction',
                 referenceNumber: `SYS-DEDUCT-${Date.now()}`,
                 evidenceUrl: null
             });
             await paymentModel.updateStatus(payId, 'verified');
-
-            await invoice.default.updateStatus(invId, 'paid'); // Paid via deposit
-            console.log(`Created Deduction Invoice ${invId} and Verified Payment ${payId} for ${deduction}`);
+            await invoiceModel.updateStatus(invId, 'paid');
+            console.log(`Created Deduction Invoice ${invId} for Remaining Withheld: ${withheldAmount}`);
         }
 
         await leaseModel.update(leaseId, {
