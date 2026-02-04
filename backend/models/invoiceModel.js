@@ -54,6 +54,14 @@ class InvoiceModel {
         return rows.length > 0;
     }
 
+    async getPendingTotal(leaseId) {
+        const [rows] = await pool.query(
+            'SELECT SUM(amount) as total FROM rent_invoices WHERE lease_id = ? AND status = ?',
+            [leaseId, 'pending']
+        );
+        return rows[0].total || 0;
+    }
+
     async findById(id) {
         // Join with leases to get tenant_id for scoring hooks
         const [rows] = await pool.query(`

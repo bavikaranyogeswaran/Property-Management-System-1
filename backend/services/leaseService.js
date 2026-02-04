@@ -276,6 +276,13 @@ class LeaseService {
             throw new Error('Deposit has already been refunded.');
         }
 
+        // Logic Check: Unpaid Debt
+        const invoiceModel = (await import('../models/invoiceModel.js')).default;
+        const pendingDebt = await invoiceModel.getPendingTotal(leaseId);
+        if (pendingDebt > 0) {
+            throw new Error(`Cannot refund deposit. Tenant has outstanding debt of $${pendingDebt}. Please clear invoices first.`);
+        }
+
         if (amount > lease.securityDeposit) {
             throw new Error('Refund amount cannot exceed security deposit');
         }
