@@ -85,17 +85,13 @@ export function TenantInvoicesPage() {
     });
   };
 
-  const openPaymentDialog = (invoiceId: string) => {
-    const invoice = invoices.find(i => i.id === invoiceId);
-    if (invoice) {
-      setSelectedInvoice(invoiceId);
-      setPaymentData({
-        ...paymentData,
-        amount: invoice.amount.toString(),
-      });
-      setSelectedFile(null);
-      setIsPaymentDialogOpen(true);
-    }
+
+
+  const getInvoiceBalance = (invoiceId: string, totalAmount: number) => {
+    const verifiedPayments = payments
+      .filter(p => p.invoiceId === invoiceId && p.status === 'verified')
+      .reduce((sum, p) => sum + Number(p.amount), 0);
+    return Math.max(0, totalAmount - verifiedPayments);
   };
 
   const getInvoicePayment = (invoiceId: string) => {
@@ -110,13 +106,13 @@ export function TenantInvoicesPage() {
     {
       label: 'Pending Invoices',
       value: pendingInvoices.length,
-      subtitle: `LKR ${pendingInvoices.reduce((sum, i) => sum + i.amount, 0).toLocaleString()}`,
+      subtitle: `LKR ${pendingInvoices.reduce((sum, i) => sum + getInvoiceBalance(i.id, i.amount), 0).toLocaleString()}`,
       color: 'bg-orange-50 text-orange-700',
     },
     {
       label: 'Overdue',
       value: overdueInvoices.length,
-      subtitle: `LKR ${overdueInvoices.reduce((sum, i) => sum + i.amount, 0).toLocaleString()}`,
+      subtitle: `LKR ${overdueInvoices.reduce((sum, i) => sum + getInvoiceBalance(i.id, i.amount), 0).toLocaleString()}`,
       color: 'bg-red-50 text-red-700',
     },
     {
@@ -132,6 +128,20 @@ export function TenantInvoicesPage() {
       color: 'bg-blue-50 text-blue-700',
     },
   ];
+
+  const openPaymentDialog = (invoiceId: string) => {
+    const invoice = invoices.find(i => i.id === invoiceId);
+    if (invoice) {
+      const balance = getInvoiceBalance(invoiceId, invoice.amount);
+      setSelectedInvoice(invoiceId);
+      setPaymentData({
+        ...paymentData,
+        amount: balance.toString(),
+      });
+      setSelectedFile(null);
+      setIsPaymentDialogOpen(true);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -151,7 +161,7 @@ export function TenantInvoicesPage() {
                   You have {overdueInvoices.length} overdue invoice{overdueInvoices.length > 1 ? 's' : ''}
                 </p>
                 <p className="text-sm text-red-700">
-                  Total overdue amount: LKR {overdueInvoices.reduce((sum, i) => sum + i.amount, 0).toLocaleString()}
+                  Total overdue amount: LKR {overdueInvoices.reduce((sum, i) => sum + getInvoiceBalance(i.id, i.amount), 0).toLocaleString()}
                 </p>
               </div>
             </div>
@@ -200,10 +210,12 @@ export function TenantInvoicesPage() {
                 {tenantInvoices.map((invoice) => {
                   const unit = units.find(u => u.id === invoice.unitId);
                   const property = unit ? properties.find(p => p.id === unit.propertyId) : null;
-                  const isOverdue = invoice.status === 'pending' && new Date(invoice.dueDate) < new Date();
+                  const isOverdue = (invoice.status === 'pending' || invoice.status === 'partially_paid') && new Date(invoice.dueDate) < new Date();
                   const isLateFee = invoice.description?.includes('Late Fee');
                   const payment = getInvoicePayment(invoice.id);
                   const receipt = getInvoiceReceipt(invoice.id);
+                  const balance = getInvoiceBalance(invoice.id, invoice.amount);
+                  const isPartial = balance < invoice.amount && balance > 0;
 
                   return (
                     <TableRow key={invoice.id} className={isLateFee ? 'bg-red-50' : ''}>
@@ -214,7 +226,12 @@ export function TenantInvoicesPage() {
                       </TableCell>
                       <TableCell>{property?.name || 'N/A'}</TableCell>
                       <TableCell>{unit?.unitNumber || 'N/A'}</TableCell>
-                      <TableCell className="font-semibold">LKR {invoice.amount}</TableCell>
+                      <TableCell className="font-semibold">
+                        <div className="flex flex-col">
+                          <span>LKR {balance.toLocaleString()}</span>
+                          {isPartial && <span className="text-[10px] text-gray-500">of {invoice.amount.toLocaleString()}</span>}
+                        </div>
+                      </TableCell>
                       <TableCell>
                         <div className={isOverdue ? 'text-red-600 font-medium' : ''}>
                           {invoice.dueDate}
@@ -223,12 +240,16 @@ export function TenantInvoicesPage() {
                       </TableCell>
                       <TableCell>
                         <div className="space-y-1">
-                          <Badge variant={
-                            invoice.status === 'paid' ? 'default' :
-                              isOverdue ? 'destructive' : 'secondary'
-                          }>
-                            {isOverdue && invoice.status === 'pending' ? 'Overdue' : invoice.status}
-                          </Badge>
+                          {invoice.status === 'partially_paid' ? (
+                            <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200 hover:bg-yellow-100">Partially Paid</Badge>
+                          ) : (
+                            <Badge variant={
+                              invoice.status === 'paid' ? 'default' :
+                                isOverdue ? 'destructive' : 'secondary'
+                            }>
+                              {isOverdue && invoice.status !== 'paid' ? 'Overdue' : invoice.status}
+                            </Badge>
+                          )}
                           {payment && payment.status === 'pending' && (
                             <Badge variant="outline" className="ml-2">
                               Payment Pending
@@ -238,7 +259,7 @@ export function TenantInvoicesPage() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex gap-2 justify-end">
-                          {invoice.status === 'pending' && !payment && (
+                          {invoice.status !== 'paid' && !payment && (
                             <Button
                               size="sm"
                               onClick={() => openPaymentDialog(invoice.id)}

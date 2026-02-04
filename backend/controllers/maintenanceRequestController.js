@@ -132,11 +132,23 @@ class MaintenanceRequestController {
             }
 
             const invoiceModel = (await import('../models/invoiceModel.js')).default;
+
+            // Logic Check: Duplicate Billing Prevention
+            const proposedDescription = description || `Maintenance Bill: ${request.title}`;
+            const existingInvoices = await invoiceModel.findByLeaseAndDescription(activeLease.id, proposedDescription);
+
+            if (existingInvoices.length > 0) {
+                // Check if any existing invoice was created recently (e.g., today) or if we want to block strictly
+                // Strict block: "An invoice with this description already exists."
+                // But allow if user explicitly wants to? For now, strict block to be safe.
+                return res.status(409).json({ error: 'An invoice for this maintenance request already exists.' });
+            }
+
             const invoiceId = await invoiceModel.create({
                 leaseId: activeLease.id,
                 amount,
                 dueDate: dueDate || new Date(),
-                description: description || `Maintenance Bill: ${request.title}`,
+                description: proposedDescription,
                 type: 'maintenance'
             });
 

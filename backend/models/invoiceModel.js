@@ -159,8 +159,13 @@ class InvoiceModel {
         return rows;
     }
 
-    // Check for existing invoice for valid period to prevent duplicates?
-    // Leaving simple for now.
+    async findByLeaseAndDescription(leaseId, description) {
+        const [rows] = await pool.query(
+            'SELECT * FROM rent_invoices WHERE lease_id = ? AND description LIKE ?',
+            [leaseId, `%${description}%`]
+        );
+        return rows;
+    }
 }
 
 export default new InvoiceModel();
