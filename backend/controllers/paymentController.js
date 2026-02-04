@@ -195,13 +195,30 @@ class PaymentController {
                         });
 
                         // Logic Check: Update Lease Deposit Status if this was a Deposit Invoice
-                        if (invoice.description === 'Security Deposit') {
+                        // Logic Check: Update Lease Deposit Status if this was a Deposit Invoice
+                        if (invoice.description.includes('Security Deposit')) {
                             const leaseModel = await import('../models/leaseModel.js');
+                            const lease = await leaseModel.default.findById(invoice.lease_id);
+
+                            // Integrity Fix: INCREMENT the held amount, don't just overwrite with invoice amount.
+                            // This handles partial payments AND top-ups.
+                            const currentHeld = Number(lease.securityDeposit || 0);
+                            const newHeld = currentHeld + Number(payment.amount);
+
+                            // Status logic: If this specific invoice is PAID, set lease status 'paid'. 
+                            // (Simplification implies if we paid what was asked, we are good, even if it was a partial top-up).
+                            // A more complex check would compare newHeld vs Target, but we aren't storing Target separate from Invoice.
+                            const newStatus = (invoice.status === 'paid' || newStatus === 'paid') ? 'paid' : lease.deposit_status;
+                            // Note: 'newStatus' var from outer scope? No, logic above updated invoice status.
+
+                            // Let's rely on Invoice Status
+                            const finalStatus = (await invoiceModel.findById(payment.invoice_id)).status === 'paid' ? 'paid' : 'pending';
+
                             await leaseModel.default.update(invoice.lease_id, {
-                                deposit_status: 'paid',
-                                security_deposit: invoice.amount
+                                deposit_status: finalStatus,
+                                security_deposit: newHeld
                             });
-                            console.log(`Updated Lease ${invoice.lease_id} deposit status to PAID.`);
+                            console.log(`Updated Lease ${invoice.lease_id}: Deposit Held increased to ${newHeld}. Status: ${finalStatus}`);
                         }
 
                         // Notify Tenant

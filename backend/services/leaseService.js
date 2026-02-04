@@ -75,7 +75,8 @@ class LeaseService {
             startDate,
             endDate,
             monthlyRent,
-            securityDeposit,
+            monthlyRent,
+            securityDeposit: 0, // Held amount starts at 0. Target is in Invoice.
             status: 'active'
         };
 
@@ -236,8 +237,8 @@ class LeaseService {
             // Usually 'security_deposit' is the Required Amount.
 
             // New logic:
-            // 1. Update security_deposit target in DB.
-            await leaseModel.update(leaseId, { security_deposit: newMonthlyRent });
+            // 1. DO NOT update 'security_deposit' here. It tracks HELD amount.
+            // verifying the payment for the Top-Up Invoice will increment it.
 
             // 2. Create Invoice for Difference
             const invoiceModel = (await import('../models/invoiceModel.js')).default;
