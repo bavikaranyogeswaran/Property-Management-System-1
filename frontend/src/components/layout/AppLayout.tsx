@@ -20,8 +20,10 @@ import {
   Settings,
   DollarSign,
   Receipt,
-  Bell
+  Bell,
+  Calendar
 } from 'lucide-react';
+
 import { Link, useLocation } from 'react-router-dom';
 
 interface AppLayoutProps {
@@ -45,7 +47,9 @@ export function AppLayout({ children }: AppLayoutProps) {
     { path: '/dashboard', label: 'Dashboard', icon: Home },
     { path: '/properties', label: 'Properties', icon: Building2 },
     { path: '/units', label: 'Units', icon: Building2 },
+    { path: '/visits', label: 'Visits', icon: Calendar },
     { path: '/leads', label: 'Leads', icon: UserPlus },
+
     { path: '/tenants', label: 'Tenants', icon: Users },
     { path: '/treasurers', label: 'Treasurers', icon: Shield },
     { path: '/leases', label: 'Leases', icon: FileText },
@@ -141,7 +145,16 @@ export function AppLayout({ children }: AppLayoutProps) {
                     </div>
                   )}
                 </ScrollArea>
+                <div className="p-2 border-t text-center">
+                  <Link
+                    to="/notifications"
+                    className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                  >
+                    View all notifications
+                  </Link>
+                </div>
               </PopoverContent>
+
             </Popover>
 
             <div className="text-right hidden sm:block">

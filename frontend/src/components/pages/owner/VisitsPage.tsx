@@ -1,0 +1,166 @@
+
+import React, { useState } from 'react';
+import { useApp, Visit } from '@/app/context/AppContext';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Calendar, Clock, MapPin, User, Check, X, CheckCircle, Phone, Mail } from 'lucide-react';
+import { format } from 'date-fns';
+
+export function VisitsPage() {
+    const { visits, updateVisitStatus } = useApp();
+    const [filter, setFilter] = useState<Visit['status'] | 'all'>('all');
+
+    const filteredVisits = visits.filter(v =>
+        filter === 'all' ? true : v.status === filter
+    ).sort((a, b) => new Date(a.scheduled_date).getTime() - new Date(b.scheduled_date).getTime());
+
+    const handleStatusUpdate = async (id: string, newStatus: Visit['status']) => {
+        await updateVisitStatus(id, newStatus);
+    };
+
+    const getStatusColor = (status: string) => {
+        switch (status) {
+            case 'pending': return 'bg-yellow-100 text-yellow-800';
+            case 'confirmed': return 'bg-blue-100 text-blue-800';
+            case 'completed': return 'bg-green-100 text-green-800';
+            case 'cancelled': return 'bg-red-100 text-red-800';
+            default: return 'bg-gray-100 text-gray-800';
+        }
+    };
+
+    return (
+        <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                    <h2 className="text-2xl font-bold text-gray-900">Property Visits</h2>
+                    <p className="text-sm text-gray-500">Manage scheduled property viewings</p>
+                </div>
+                <div className="flex gap-2">
+                    {(['all', 'pending', 'confirmed', 'completed', 'cancelled'] as const).map((status) => (
+                        <Button
+                            key={status}
+                            variant={filter === status ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setFilter(status)}
+                            className="capitalize"
+                        >
+                            {status}
+                        </Button>
+                    ))}
+                </div>
+            </div>
+
+            <div className="grid gap-4">
+                {filteredVisits.length === 0 ? (
+                    <Card>
+                        <CardContent className="p-8 text-center text-gray-500">
+                            No visits found for the selected filter.
+                        </CardContent>
+                    </Card>
+                ) : (
+                    filteredVisits.map((visit) => (
+                        <Card key={visit.visit_id} className="overflow-hidden">
+                            <div className="p-6 flex flex-col lg:flex-row gap-6 items-start lg:items-center justify-between">
+                                {/* Visitor Info */}
+                                <div className="flex items-start gap-4 min-w-[250px]">
+                                    <div className="bg-gray-100 p-3 rounded-full">
+                                        <User className="size-6 text-gray-600" />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-semibold text-gray-900">{visit.visitor_name}</h3>
+                                        <div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
+                                            <Mail className="size-3" />
+                                            {visit.visitor_email}
+                                        </div>
+                                        <div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
+                                            <Phone className="size-3" />
+                                            {visit.visitor_phone}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Property Info */}
+                                <div className="flex flex-col gap-2 min-w-[250px]">
+                                    <div className="flex items-center gap-2 text-gray-700">
+                                        <MapPin className="size-4 text-blue-500" />
+                                        <span className="font-medium">{visit.property_name || 'Unknown Property'}</span>
+                                    </div>
+                                    {visit.unit_number && (
+                                        <div className="text-sm text-gray-500 ml-6">
+                                            Unit {visit.unit_number}
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Schedule Info */}
+                                <div className="flex flex-col gap-2 min-w-[200px]">
+                                    <div className="flex items-center gap-2 text-gray-700">
+                                        <Calendar className="size-4 text-purple-500" />
+                                        <span>{format(new Date(visit.scheduled_date), 'MMM dd, yyyy')}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2 text-gray-700">
+                                        <Clock className="size-4 text-purple-500" />
+                                        <span>{format(new Date(visit.scheduled_date), 'hh:mm a')}</span>
+                                    </div>
+                                </div>
+
+                                {/* Status & Actions */}
+                                <div className="flex items-center gap-4 flex-1 justify-end min-w-[200px]">
+                                    <Badge className={`${getStatusColor(visit.status)} capitalize`}>
+                                        {visit.status}
+                                    </Badge>
+
+                                    {visit.status === 'pending' && (
+                                        <div className="flex gap-2">
+                                            <Button
+                                                size="sm"
+                                                className="bg-green-600 hover:bg-green-700 text-white"
+                                                onClick={() => handleStatusUpdate(visit.visit_id, 'confirmed')}
+                                            >
+                                                <Check className="size-4 mr-1" /> Confirm
+                                            </Button>
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                className="text-red-600 hover:bg-red-50 hover:text-red-700 border-red-200"
+                                                onClick={() => handleStatusUpdate(visit.visit_id, 'cancelled')}
+                                            >
+                                                <X className="size-4 mr-1" /> Rej
+                                            </Button>
+                                        </div>
+                                    )}
+
+                                    {visit.status === 'confirmed' && (
+                                        <div className="flex gap-2">
+                                            <Button
+                                                size="sm"
+                                                className="bg-blue-600 hover:bg-blue-700 text-white"
+                                                onClick={() => handleStatusUpdate(visit.visit_id, 'completed')}
+                                            >
+                                                <CheckCircle className="size-4 mr-1" /> Complete
+                                            </Button>
+                                            <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                className="text-red-600 hover:bg-red-50"
+                                                onClick={() => handleStatusUpdate(visit.visit_id, 'cancelled')}
+                                            >
+                                                Cancel
+                                            </Button>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                            {visit.notes && (
+                                <div className="bg-gray-50 px-6 py-3 border-t text-sm text-gray-600">
+                                    <span className="font-semibold mr-2">Notes:</span> {visit.notes}
+                                </div>
+                            )}
+                        </Card>
+                    ))
+                )}
+            </div>
+        </div>
+    );
+}
