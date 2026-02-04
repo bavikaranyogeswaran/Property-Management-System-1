@@ -1,4 +1,7 @@
 import pool from '../config/db.js';
+import emailService from '../utils/emailService.js';
+import userModel from './userModel.js';
+import leaseModel from './leaseModel.js';
 
 class InvoiceModel {
     async create(data) {
@@ -12,7 +15,35 @@ class InvoiceModel {
             'INSERT INTO rent_invoices (lease_id, year, month, amount, due_date, status) VALUES (?, ?, ?, ?, ?, ?)',
             [leaseId, year, month, amount, dueDate, 'pending']
         );
-        return result.insertId;
+        const invoiceId = result.insertId;
+
+        // Notify Tenant via Email
+        try {
+            // Need tenant email. create(data) has leaseId.
+            // data might have tenantId? If not, fetch from lease.
+            let tenantId = data.tenantId;
+            if (!tenantId) {
+                const lease = await leaseModel.findById(leaseId);
+                tenantId = lease ? lease.tenantId : null;
+            }
+
+            if (tenantId) {
+                const tenant = await userModel.findById(tenantId);
+                if (tenant && tenant.email) {
+                    await emailService.sendInvoiceNotification(tenant.email, {
+                        amount,
+                        dueDate,
+                        month,
+                        year,
+                        invoiceId
+                    });
+                }
+            }
+        } catch (emailErr) {
+            console.error('Failed to send invoice email:', emailErr);
+        }
+
+        return invoiceId;
     }
 
     async exists(leaseId, year, month) {

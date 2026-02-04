@@ -39,6 +39,22 @@ class UnitModel {
         return this.mapRows(rows)[0];
     }
 
+    async findByIdForUpdate(id, connection) {
+        // Must use the transaction connection
+        const [rows] = await connection.query(`
+            SELECT u.*, 
+                   p.name as property_name, 
+                   ut.name as type_name
+            FROM units u
+            JOIN properties p ON u.property_id = p.property_id
+            JOIN unit_types ut ON u.unit_type_id = ut.type_id
+            WHERE u.unit_id = ?
+            FOR UPDATE
+        `, [id]);
+        if (rows.length === 0) return null;
+        return this.mapRows(rows)[0];
+    }
+
     async findByPropertyId(propertyId) {
         const [rows] = await db.query(`
             SELECT u.*, 
