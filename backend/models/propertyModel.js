@@ -58,7 +58,7 @@ class PropertyModel {
             typeName: row.type_name, // Alias from SQL
             image: row.image_url,
             description: row.description,
-            features: row.features ? JSON.parse(row.features) : [],
+            features: row.features || [],
             uniqueId: row.unique_id, // If it exists
             status: row.status,
             createdAt: row.created_at
@@ -101,7 +101,7 @@ class PropertyModel {
             typeName: rows[0].type_name,
             image: rows[0].image_url,
             description: rows[0].description,
-            features: rows[0].features ? JSON.parse(rows[0].features) : [],
+            features: rows[0].features || [],
             uniqueId: rows[0].unique_id,
             status: rows[0].status,
             createdAt: rows[0].created_at
@@ -177,6 +177,26 @@ class PropertyModel {
 
     async getTypes() {
         const [rows] = await db.query("SELECT * FROM property_types");
+        return rows;
+    }
+
+    async addImages(propertyId, imagesData) {
+        if (!imagesData || imagesData.length === 0) return [];
+
+        const values = imagesData.map(img => [img.property_id, img.image_url, img.is_primary, img.display_order]);
+
+        // Bulk insert
+        await db.query(
+            'INSERT INTO property_images (property_id, image_url, is_primary, display_order) VALUES ?',
+            [values]
+        );
+
+        // Fetch and return created images
+        // For simplicity, just selecting by property_id
+        const [rows] = await db.query(
+            'SELECT * FROM property_images WHERE property_id = ? ORDER BY display_order ASC',
+            [propertyId]
+        );
         return rows;
     }
 }

@@ -45,6 +45,19 @@ class PropertyService {
     async getPropertyTypes() {
         return await propertyModel.getTypes();
     }
+    async addImages(propertyId, files) {
+        if (!files || files.length === 0) return [];
+
+        // Construct image URLs
+        const imagesData = files.map((file, index) => ({
+            property_id: propertyId,
+            image_url: `/uploads/${file.filename}`, // Assuming you serve "uploads" folder statically
+            is_primary: index === 0 ? 1 : 0, // First image is primary by default? Or handled by frontend?
+            display_order: index
+        }));
+
+        return await propertyModel.addImages(propertyId, imagesData);
+    }
 }
 
 export default new PropertyService();

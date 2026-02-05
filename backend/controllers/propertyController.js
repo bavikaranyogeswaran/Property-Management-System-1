@@ -58,9 +58,28 @@ class PropertyController {
     async deleteProperty(req, res) {
         try {
             const result = await propertyService.deleteProperty(req.params.id);
-            res.json(result);
+            await propertyService.deleteProperty(req.params.id);
+            res.json({ message: 'Property deleted successfully' });
         } catch (error) {
-            res.status(500).json({ error: error.message });
+            console.error('Error deleting property:', error);
+            res.status(500).json({ error: 'Failed to delete property' });
+        }
+    }
+
+    async uploadImages(req, res) {
+        try {
+            const propertyId = req.params.id;
+            const files = req.files;
+
+            if (!files || files.length === 0) {
+                return res.status(400).json({ error: 'No images uploaded' });
+            }
+
+            const images = await propertyService.addImages(propertyId, files);
+            res.status(201).json({ message: 'Images uploaded successfully', images });
+        } catch (error) {
+            console.error('Error uploading images:', error);
+            res.status(500).json({ error: 'Failed to upload images' });
         }
     }
 

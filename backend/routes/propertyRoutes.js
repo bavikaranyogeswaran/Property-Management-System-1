@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import propertyController from '../controllers/propertyController.js';
 import authenticateToken, { authorizeRoles } from '../middleware/authMiddleware.js';
+import upload from '../middleware/upload.js';
 
 const router = Router();
 
@@ -22,5 +23,8 @@ router.put('/:id', authenticateToken, authorizeRoles('owner'), propertyControlle
 
 // DELETE /:id - Owner only
 router.delete('/:id', authenticateToken, authorizeRoles('owner'), propertyController.deleteProperty);
+
+// POST /:id/images - Upload images
+router.post('/:id/images', authenticateToken, authorizeRoles('owner'), upload.array('images', 10), propertyController.uploadImages);
 
 export default router;
