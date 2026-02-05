@@ -551,17 +551,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
         // Fetch properties (public)
         const response = await apiClient.get('/properties');
         if (response.status === 200) {
+          // Backend returns camelCase keys already mapped in propertyModel.findAll
           const mappedProps = response.data.map((p: any) => ({
-            id: p.property_id.toString(),
+            id: p.id,
             name: p.name,
-            propertyTypeId: p.type_id,
-            typeName: p.type_name,
+            propertyTypeId: p.propertyTypeId,
+            typeName: p.typeName,
             propertyNo: p.propertyNo || '',
             street: p.street || '',
             city: p.city || '',
             district: p.district || '',
-            image: p.image_url,
-            createdAt: p.created_at
+            image: p.image,
+            createdAt: p.createdAt,
+            description: p.description,
+            features: p.features
           }));
           setProperties(mappedProps);
         }
@@ -702,20 +705,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
         // Actually, backend should return the full object or we fetch.
         // For now, let's just re-fetch or naive append for UI snappiness if valid.
         // But better:
-        const newProp = response.data; // Ideally backend returns the created object with ID.
-        // But wait, our backend create returns `findById` which includes joins.
-        // So we can map it directly.
+        const newProp = response.data;
+
+        // Backend returns camelCase keys from findById
         const mapped: Property = {
-          id: newProp.property_id.toString(),
+          id: newProp.id, // propertyModel returns .id as string already
           name: newProp.name,
-          propertyTypeId: newProp.type_id,
-          typeName: newProp.type_name,
+          propertyTypeId: newProp.propertyTypeId,
+          typeName: newProp.typeName,
           propertyNo: newProp.propertyNo,
           street: newProp.street,
           city: newProp.city,
           district: newProp.district,
-          image: newProp.image_url,
-          createdAt: newProp.created_at
+          image: newProp.image,
+          createdAt: newProp.createdAt,
+          description: newProp.description,
+          features: newProp.features
         };
         setProperties([...properties, mapped]);
         return mapped;

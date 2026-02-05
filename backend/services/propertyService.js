@@ -56,7 +56,15 @@ class PropertyService {
             display_order: index
         }));
 
-        return await propertyModel.addImages(propertyId, imagesData);
+        const addedImages = await propertyModel.addImages(propertyId, imagesData);
+
+        // Update main property table with primary image if exists
+        const primaryImage = imagesData.find(img => img.is_primary === 1) || imagesData[0];
+        if (primaryImage) {
+            await propertyModel.update(propertyId, { imageUrl: primaryImage.image_url });
+        }
+
+        return addedImages;
     }
 }
 

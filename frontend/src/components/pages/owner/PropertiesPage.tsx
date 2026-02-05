@@ -100,30 +100,37 @@ export function PropertiesPage() {
           ...values,
           propertyNo: values.propertyNo || '',
           // Property interface expects these. Form values provide them.
-          // We might need to handle 'image' if we want to show it immediately? 
-          // The context handles fetching images. 
         };
         const newProperty = await addProperty(propertyData);
 
-        if (newProperty && uploadFiles.length > 0) {
-          const response = await uploadPropertyImages(newProperty.id, uploadFiles);
-          if (primaryImageIndex > 0 && response.images && response.images.length > primaryImageIndex) {
-            const targetImage = response.images[primaryImageIndex];
-            if (targetImage) {
-              await setPropertyPrimaryImage(newProperty.id, targetImage.image_id || targetImage.id);
+        if (newProperty) {
+          if (uploadFiles.length > 0) {
+            try {
+              const response = await uploadPropertyImages(newProperty.id, uploadFiles);
+              if (primaryImageIndex > 0 && response.images && response.images.length > primaryImageIndex) {
+                const targetImage = response.images[primaryImageIndex];
+                if (targetImage) {
+                  await setPropertyPrimaryImage(newProperty.id, targetImage.image_id || targetImage.id);
+                }
+              }
+            } catch (uploadError: any) {
+              console.error("Image upload failed:", uploadError);
+              toast.error(`Property added, but images failed to upload: ${uploadError.message || 'Unknown error'}`);
             }
           }
+          toast.success("Property added successfully");
         }
-        toast.success("Property added successfully");
       }
       setIsAddDialogOpen(false);
       setEditingProperty(null);
       propertyForm.reset();
       setUploadFiles([]);
       setExistingImages([]);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to save property:', error);
-      toast.error("Failed to save property");
+      // Show specific error if available from backend response
+      const errorMessage = error.response?.data?.error || error.message || "Failed to save property";
+      toast.error(`Failed to save property: ${errorMessage}`);
     }
   };
 
@@ -533,7 +540,7 @@ export function PropertiesPage() {
                   )}
                   <div>
                     <CardTitle className="text-lg">{property.name}</CardTitle>
-                    !property.image && <p className="text-xs text-gray-500 mt-1">{property.typeName}</p>
+                    {!property.image && <p className="text-xs text-gray-500 mt-1">{property.typeName}</p>}
                   </div>
                 </div>
               </div>
