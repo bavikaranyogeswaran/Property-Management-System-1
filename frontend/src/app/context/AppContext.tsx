@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import apiClient, { maintenanceApi, paymentApi, invoiceApi, notificationApi } from '../../services/api';
 import { toast } from 'sonner';
+import { useAuth } from './AuthContext';
 
 // Type definitions
 export interface Property {
@@ -312,6 +313,8 @@ const INITIAL_DATA = {
 };
 
 export function AppProvider({ children }: { children: ReactNode }) {
+  const { user } = useAuth();
+  const [visits, setVisits] = useState<Visit[]>([]);
   const [properties, setProperties] = useState<Property[]>([]);
   const [propertyTypes, setPropertyTypes] = useState<PropertyType[]>([]);
   const [unitTypes, setUnitTypes] = useState<UnitType[]>([]);
@@ -328,7 +331,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [maintenanceRequests, setMaintenanceRequests] = useState<MaintenanceRequest[]>([]);
   const [maintenanceCosts, setMaintenanceCosts] = useState<MaintenanceCost[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [visits, setVisits] = useState<Visit[]>([]);
+
 
   // Fetch initial data
   useEffect(() => {
@@ -1334,6 +1337,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       // Only fetch if owner? Backend checks role, but handled gracefully
       const response = await apiClient.get('/visits');
+      console.log('[AppContext] fetchVisits response:', response.data);
       setVisits(response.data);
     } catch (error) {
       console.error('Failed to fetch visits:', error);
@@ -1392,13 +1396,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // Initial fetch for visits if owner
+  // Initial fetch for visits if owner
   useEffect(() => {
-    const token = localStorage.getItem('authToken');
-    const userRole = localStorage.getItem('userRole'); // Assuming stored
-    if (token && userRole === 'owner') {
+    // Rely on the user state which is loaded on mount
+    if (user && user.role === 'owner') {
+      console.log('[AppContext] User is owner, fetching visits...');
       fetchVisits();
+    } else {
+      console.log('[AppContext] User not owner or not loaded yet. Role:', user?.role);
     }
-  }, []);
+  }, [user]);
 
   const createMaintenanceInvoice = async (requestId: string, amount: number, description: string, dueDate?: string) => {
     try {

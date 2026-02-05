@@ -16,9 +16,12 @@ class UnitController {
 
     async getUnits(req, res) {
         try {
+            console.log('[UnitController] getUnits called by user:', req.user);
             const units = await unitModel.findAll();
+            console.log('[UnitController] unitModel.findAll returned:', units ? units.length : 'null');
 
-            if (req.user.role === 'treasurer') {
+            if (req.user && req.user.role === 'treasurer') {
+                console.log('[UnitController] Filtering for treasurer');
                 const staffModel = (await import('../models/staffModel.js')).default;
                 const assigned = await staffModel.getAssignedProperties(req.user.id);
                 const assignedIds = assigned.map(p => p.property_id.toString());
@@ -27,12 +30,10 @@ class UnitController {
                 return res.json(filtered);
             }
 
-            // Owners / others see all (Public listing? If public, anyone sees? 
-            // Usually Unit Listing is for Admin. Public listing is separate or filtered.
-            // Assuming this endpoint is for Admin Dashboard. If Tenant uses it, restrict?
-            // Existing code didn't restrict. Assuming Owner/Admin use.)
+            console.log('[UnitController] Returning all units');
             res.json(units);
         } catch (error) {
+            console.error('[UnitController] Error in getUnits:', error);
             res.status(500).json({ error: error.message });
         }
     }
