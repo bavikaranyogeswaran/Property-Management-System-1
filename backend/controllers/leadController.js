@@ -43,42 +43,45 @@ class LeadController {
     async getMyLead(req, res) {
         try {
             const email = req.user.email;
-            // find lead by email. leadModel.findAll returns all, we might need a specific query or filter.
-            // For efficiency, let's just use a direct query in model or filter here if list is small.
-            // Better to add findByEmail in model. But for now, let's assume we can filter findAll or add findByEmail.
-            // Actually, leadModel.findAll returns everything.
-            // Let's add findByEmail to leadModel? Or just query 'SELECT * FROM leads WHERE email = ?'
+            console.log(`[DEBUG] getMyLead: Fetching profile for email '${email}'`);
 
-            // I will add a simple query here or use existing model methods if adaptable.
-            // Looking at leadModel, it has findById and findAll.
-            // I should add findByEmail to leadModel for better practice, but I can't edit multiple files in one turn easily if I stick to one tool call.
-            // I'll filter findAll for now as a quick solution, or just add the query here.
+            // Direct query for efficiency and reliability
+            // We find the most recent lead with this email address
+            const [rows] = await db.query(`
+                SELECT 
+                    l.lead_id as id,
+                    l.property_id as propertyId,
+                    l.unit_id as interestedUnit,
+                    l.name,
+                    l.email,
+                    l.phone,
+                    l.notes,
+                    l.status,
+                    l.created_at as createdAt,
+                    l.last_contacted_at as lastContactedAt,
+                    l.user_id as userId
+                FROM leads l
+                WHERE l.email = ? AND l.status != 'dropped'
+                ORDER BY l.created_at DESC
+                LIMIT 1
+            `, [email]);
 
-            const leads = await leadModel.findAll();
-
-            console.log(`[DEBUG] getMyLead: User Email: '${email}'`);
-
-            // Find the most recent active lead for this email (case-insensitive & trimmed)
-            const myLead = leads.find(l => {
-                const leadEmail = l.email ? l.email.trim().toLowerCase() : '';
-                const userEmail = email ? email.trim().toLowerCase() : '';
-
-                // Debug matching logic for first few items or if match found
-                if (leadEmail === userEmail) console.log(`[DEBUG] Match found with lead ${l.id}`);
-
-                return leadEmail === userEmail && l.status !== 'dropped';
-            });
+            const myLead = rows[0];
 
             if (!myLead) {
-                console.log(`[DEBUG] No matching lead found for email: '${email}' among ${leads.length} leads.`);
-                // Log all lead emails to see what's in DB
-                console.log('Available Lead Emails:', leads.map(l => l.email));
+                console.log(`[DEBUG] No lead profile found for email: '${email}'`);
+                // Check if any lead exists even if dropped, for debugging
+                const [check] = await db.query('SELECT count(*) as count FROM leads WHERE email = ?', [email]);
+
                 return res.status(404).json({
-                    error: `Lead profile not found. UserEmail: '${email}' (len: ${email?.length}). Leads: ${leads.length}. First: ${leads[0]?.email} (${leads[0]?.status})`
+                    error: `Lead profile not found for email: ${email}. Records found: ${check[0].count}`
                 });
             }
+
+            console.log(`[DEBUG] Found lead profile: ${myLead.id}`);
             res.json(myLead);
         } catch (error) {
+            console.error('Error in getMyLead:', error);
             res.status(500).json({ error: error.message });
         }
     }
