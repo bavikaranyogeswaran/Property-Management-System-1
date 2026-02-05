@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import { AppProviders } from './providers';
 import { LandingPage } from '@/components/pages/LandingPage';
@@ -97,6 +97,12 @@ function DashboardRoute() {
 function AppContent() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  React.useEffect(() => {
+    console.log('DEBUG: Current Path:', location.pathname);
+    console.log('DEBUG: User Auth:', user);
+  }, [location, user]);
 
   const handleNavigate = (page: string) => {
     navigate(page === 'login' ? '/login' : `/${page}`);
