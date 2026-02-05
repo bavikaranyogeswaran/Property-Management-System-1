@@ -57,6 +57,7 @@ import { LeasesPage } from '@/components/pages/owner/LeasesPage';
 import { OwnerInvoicesPage } from '@/components/pages/owner/OwnerInvoicesPage';
 import { OwnerMaintenancePage } from '@/components/pages/owner/OwnerMaintenancePage';
 import { OwnerReportsPage } from '@/components/pages/owner/OwnerReportsPage';
+import { VisitsPage } from '@/components/pages/owner/VisitsPage';
 
 // Tenant Pages
 import { TenantDashboard } from '@/components/pages/tenant/TenantDashboard';
@@ -148,6 +149,7 @@ function AppContent() {
           {/* Note: If user is owner, they hit the conditional above. */}
 
           <Route path="/units" element={<ProtectedRoute><UnitsPage /></ProtectedRoute>} />
+          <Route path="/visits" element={<ProtectedRoute><VisitsPage /></ProtectedRoute>} />
           <Route path="/leads" element={<ProtectedRoute><LeadsPage /></ProtectedRoute>} />
           <Route path="/tenants" element={<ProtectedRoute><TenantsPage /></ProtectedRoute>} />
           <Route path="/treasurers" element={<ProtectedRoute><TreasurersPage /></ProtectedRoute>} />
