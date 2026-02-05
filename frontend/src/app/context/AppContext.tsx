@@ -250,7 +250,7 @@ interface AppContextType {
   deleteUnitImage: (unitId: string, imageId: string) => Promise<void>;
 
   // Lead operations
-  addLead: (lead: Omit<Lead, 'id' | 'createdAt'> & { password?: string }) => Promise<void>;
+  addLead: (lead: Omit<Lead, 'id' | 'createdAt'>) => Promise<void>;
   updateLead: (id: string, lead: Partial<Lead>) => Promise<void>;
   addLeadFollowUp: (followUp: Omit<LeadFollowUp, 'id'>) => void;
   convertLeadToTenant: (leadId: string, startDate?: string, endDate?: string) => Promise<string>;
@@ -928,7 +928,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   // Lead operations
-  const addLead = async (lead: Omit<Lead, 'id' | 'createdAt'> & { password?: string }) => {
+  const addLead = async (lead: Omit<Lead, 'id' | 'createdAt'>) => {
     try {
       const response = await apiClient.post('/leads', lead);
       if (response.status === 201) {

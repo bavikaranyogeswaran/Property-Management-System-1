@@ -12,7 +12,7 @@ import {
     Car, Wrench, Ruler, Home, Info, Share2, Star, Phone, AlertCircle
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { validatePassword, validateEmail, validatePhoneNumber, validateName, getPasswordStrength } from '@/utils/validators';
+import { validateEmail, validatePhoneNumber, validateName } from '@/utils/validators';
 
 export function PublicPropertyDetailsPage() {
     const { id } = useParams<{ id: string }>();
@@ -29,9 +29,7 @@ export function PublicPropertyDetailsPage() {
         email: '',
         phone: '',
         interestedUnit: '',
-
         propertyId: '',
-        password: '',
         notes: '',
     });
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -40,7 +38,7 @@ export function PublicPropertyDetailsPage() {
 
     // Validation state
     const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({});
-    const [passwordStrength, setPasswordStrength] = useState<'weak' | 'medium' | 'strong' | 'very-strong' | null>(null);
+
 
     // Unit Gallery State
     const [selectedUnit, setSelectedUnit] = useState<Unit | null>(null);
@@ -97,11 +95,7 @@ export function PublicPropertyDetailsPage() {
             errors.phone = phoneValidation.error || 'Invalid phone number';
         }
 
-        // Password validation
-        const passwordValidation = validatePassword(interestFormData.password);
-        if (!passwordValidation.isValid) {
-            errors.password = passwordValidation.errors?.[0] || 'Invalid password';
-        }
+
 
         setFormErrors(errors);
         return Object.keys(errors).length === 0;
@@ -123,9 +117,8 @@ export function PublicPropertyDetailsPage() {
                 status: 'interested',
             });
             toast.success('Account created and interest registered! We will contact you soon.');
-            setInterestFormData({ name: '', email: '', phone: '', interestedUnit: '', notes: '', propertyId: id || '', password: '' });
+            setInterestFormData({ name: '', email: '', phone: '', interestedUnit: '', notes: '', propertyId: id || '' });
             setFormErrors({});
-            setPasswordStrength(null);
             setIsMobileInterestOpen(false);
         } catch (error: any) {
             console.error(error);
@@ -143,19 +136,7 @@ export function PublicPropertyDetailsPage() {
         }
     };
 
-    const handlePasswordChange = (password: string) => {
-        setInterestFormData({ ...interestFormData, password });
-        if (password.length > 0) {
-            const strength = getPasswordStrength(password);
-            setPasswordStrength(strength.strength);
-        } else {
-            setPasswordStrength(null);
-        }
-        // Clear password error on change
-        if (formErrors.password) {
-            setFormErrors({ ...formErrors, password: '' });
-        }
-    };
+
 
     const handleOpenInterestModal = (unitId: string = '') => {
         setInterestFormData(prev => ({ ...prev, interestedUnit: unitId }));
@@ -692,45 +673,7 @@ export function PublicPropertyDetailsPage() {
                             </div>
                         </div>
 
-                        <div className="space-y-2">
-                            <Label htmlFor="lead-password">Create Password (for your account)</Label>
-                            <Input
-                                id="lead-password"
-                                type="password"
-                                placeholder="Min 8 characters"
-                                value={interestFormData.password}
-                                onChange={(e) => handlePasswordChange(e.target.value)}
-                                className={formErrors.password ? 'border-red-500' : ''}
-                                required
-                                minLength={8}
-                            />
-                            {formErrors.password && (
-                                <p className="text-xs text-red-500 flex items-center gap-1">
-                                    <AlertCircle className="w-3 h-3" />
-                                    {formErrors.password}
-                                </p>
-                            )}
-                            {passwordStrength && !formErrors.password && (
-                                <div className="space-y-1">
-                                    <div className="flex gap-1">
-                                        <div className={`h-1 flex-1 rounded ${passwordStrength === 'weak' ? 'bg-red-500' : 'bg-gray-200'}`} />
-                                        <div className={`h-1 flex-1 rounded ${passwordStrength === 'medium' || passwordStrength === 'strong' || passwordStrength === 'very-strong' ? 'bg-yellow-500' : 'bg-gray-200'}`} />
-                                        <div className={`h-1 flex-1 rounded ${passwordStrength === 'strong' || passwordStrength === 'very-strong' ? 'bg-green-500' : 'bg-gray-200'}`} />
-                                        <div className={`h-1 flex-1 rounded ${passwordStrength === 'very-strong' ? 'bg-green-600' : 'bg-gray-200'}`} />
-                                    </div>
-                                    <p className={`text-xs ${passwordStrength === 'weak' ? 'text-red-500' :
-                                        passwordStrength === 'medium' ? 'text-yellow-600' :
-                                            passwordStrength === 'strong' ? 'text-green-600' :
-                                                'text-green-700'
-                                        }`}>
-                                        Password strength: {passwordStrength.replace('-', ' ')}
-                                    </p>
-                                    <p className="text-xs text-gray-500">
-                                        Must include: uppercase, lowercase, number, and special character
-                                    </p>
-                                </div>
-                            )}
-                        </div>
+
                         <div className="space-y-2">
                             <Label htmlFor="lead-notes">Notes / Questions</Label>
                             <Textarea
