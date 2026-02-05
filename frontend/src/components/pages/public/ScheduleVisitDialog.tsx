@@ -6,7 +6,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
-import apiClient from '@/services/api';
 import { Loader2, Calendar as CalendarIcon, Clock } from 'lucide-react';
 
 interface Property {
@@ -26,7 +25,10 @@ interface ScheduleVisitDialogProps {
     unit?: Unit | null;
 }
 
+import { useApp } from '@/app/context/AppContext';
+
 export function ScheduleVisitDialog({ open, onOpenChange, property, unit }: ScheduleVisitDialogProps) {
+    const { scheduleVisit } = useApp();
     const [loading, setLoading] = useState(false);
     const [formData, setFormData] = useState({
         name: '',
@@ -48,7 +50,7 @@ export function ScheduleVisitDialog({ open, onOpenChange, property, unit }: Sche
 
         setLoading(true);
         try {
-            await apiClient.post('/visits', {
+            await scheduleVisit({
                 propertyId: property.id,
                 unitId: unit?.id || null,
                 ...formData

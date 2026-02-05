@@ -35,8 +35,7 @@ class UserModel {
                 u.status, 
                 u.created_at as createdAt,
                 t.nic, 
-                t.permanent_address as permanentAddress, 
-                t.employer_name as employerName,
+                t.employment_status as employmentStatus,
                 t.monthly_income as monthlyIncome,
                 t.behavior_score as behaviorScore
             FROM users u
@@ -47,7 +46,7 @@ class UserModel {
             LEFT JOIN properties p_lease ON ut.property_id = p_lease.property_id
             
             -- Join path 2: via Leads (converted)
-            LEFT JOIN leads ld ON u.user_id = ld.tenant_id
+            LEFT JOIN leads ld ON u.user_id = ld.user_id
             LEFT JOIN properties p_lead ON ld.property_id = p_lead.property_id
             
             WHERE u.role = 'tenant' 

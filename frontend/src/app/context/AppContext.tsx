@@ -286,6 +286,7 @@ interface AppContextType {
   // Visit operations
   visits: Visit[];
   fetchVisits: () => Promise<void>;
+  scheduleVisit: (visitData: any) => Promise<any>;
   updateVisitStatus: (id: string, status: Visit['status']) => Promise<void>;
 }
 
@@ -484,16 +485,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
           const pRes = await apiClient.get('/properties');
           if (pRes.data) {
             const mappedProps = pRes.data.map((p: any) => ({
-              id: p.property_id.toString(),
+              id: p.id || p.property_id?.toString(),
               name: p.name,
-              propertyTypeId: p.type_id,
-              typeName: p.type_name,
-              propertyNo: p.propertyNo,
+              propertyTypeId: p.propertyTypeId || p.type_id,
+              typeName: p.typeName || p.type_name,
+              propertyNo: p.propertyNo || p.property_no,
               street: p.street,
               city: p.city,
               district: p.district,
-              image: p.image_url,
-              createdAt: p.created_at,
+              image: p.image || p.image_url,
+              createdAt: p.createdAt || p.created_at,
               description: p.description,
               features: p.features
             }));
@@ -1485,6 +1486,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
       deleteUnitType,
       visits,
       fetchVisits,
+      scheduleVisit: async (visitData: any) => {
+        try {
+          const response = await apiClient.post('/visits', visitData);
+          // Refresh visits list if the user is authorized (owner)
+          // If public user, this might fail or return empty, which is fine as they don't see the list.
+          // But we want to ensure we don't error out if fetchVisits fails for public.
+          // Existing fetchVisits catches errors.
+          await fetchVisits();
+          return response.data;
+        } catch (error) {
+          console.error('Failed to schedule visit:', error);
+          throw error;
+        }
+      },
       updateVisitStatus,
       markNotificationAsRead,
       createMaintenanceInvoice,

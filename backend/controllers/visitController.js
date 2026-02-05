@@ -134,7 +134,9 @@ class VisitController {
             // Assuming auth middleware puts user in req.user
             // If owner, show their property visits
             const ownerId = req.user?.id;
+            console.log('getVisits called for user:', req.user);
             const visits = await visitModel.findAll({ ownerId });
+            console.log('Found visits:', visits);
             res.json(visits);
         } catch (error) {
             console.error('Error fetching visits:', error);
