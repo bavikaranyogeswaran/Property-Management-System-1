@@ -69,6 +69,28 @@ class VisitModel {
         );
         return result.affectedRows > 0;
     }
+
+    async findById(visitId) {
+        const [rows] = await db.query(
+            `SELECT * FROM property_visits WHERE visit_id = ?`,
+            [visitId]
+        );
+        if (rows.length === 0) return null;
+        const row = rows[0];
+        return {
+            visit_id: row.visit_id.toString(),
+            property_id: row.property_id.toString(),
+            unit_id: row.unit_id ? row.unit_id.toString() : null,
+            lead_id: row.lead_id ? row.lead_id.toString() : null,
+            visitor_name: row.visitor_name,
+            visitor_email: row.visitor_email,
+            visitor_phone: row.visitor_phone,
+            scheduled_date: row.scheduled_date,
+            status: row.status,
+            notes: row.notes,
+            created_at: row.created_at
+        };
+    }
 }
 
 export default new VisitModel();

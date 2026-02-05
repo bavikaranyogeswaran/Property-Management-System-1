@@ -159,9 +159,9 @@ class VisitController {
             // Logic Fix: Update Lead Timestamp & Status on Completion
             if (status === 'completed' || status === 'confirmed') {
                 const visit = await visitModel.findById(id);
-                if (visit && visit.leadId) {
+                if (visit && visit.lead_id) {
                     const leadModel = (await import('../models/leadModel.js')).default;
-                    const lead = await leadModel.findById(visit.leadId);
+                    const lead = await leadModel.findById(visit.lead_id);
 
                     const updateData = { lastContactedAt: new Date() };
 
