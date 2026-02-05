@@ -170,8 +170,23 @@ class VisitController {
                         updateData.status = 'visited';
                     }
 
-                    await leadModel.update(visit.leadId, updateData);
+                    await leadModel.update(visit.lead_id, updateData);
                 }
+            }
+
+            // Send Email Notification to Visitor
+            try {
+                const visit = await visitModel.findById(id);
+                if (visit && visit.visitor_email) {
+                    const emailService = (await import('../utils/emailService.js')).default;
+                    await emailService.sendVisitStatusUpdate(visit.visitor_email, {
+                        propertyName: visit.property_name || 'Property',
+                        unitNumber: visit.unit_number,
+                        scheduledDate: visit.scheduled_date
+                    }, status);
+                }
+            } catch (emailErr) {
+                console.error('Failed to send status email:', emailErr);
             }
 
             // Audit Log

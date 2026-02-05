@@ -271,6 +271,51 @@ class EmailService {
     }
 
 
+    async sendVisitStatusUpdate(visitorEmail, visitDetails, status) {
+        const { propertyName, unitNumber, scheduledDate } = visitDetails;
+        const dateStr = new Date(scheduledDate).toLocaleString();
+
+        const subject = status === 'confirmed'
+            ? `Visit Confirmed: ${propertyName}`
+            : `Visit Update: ${propertyName} - ${status.charAt(0).toUpperCase() + status.slice(1)}`;
+
+        if (!this.transporter) {
+            console.log('==================================================');
+            console.log(`[EMAIL MOCK] Visit Status Update to Visitor: ${visitorEmail}`);
+            console.log(`Property: ${propertyName}`);
+            console.log(`New Status: ${status}`);
+            console.log('==================================================');
+            return true;
+        }
+
+        try {
+            await this.transporter.sendMail({
+                from: `"Property Management System" <${process.env.SMTP_USER}>`,
+                to: visitorEmail,
+                subject: subject,
+                html: this._getTemplate(subject, `
+                    <p>The status of your scheduled visit has been updated.</p>
+                    
+                    <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; margin: 24px 0; border: 1px solid #e2e8f0;">
+                        <h3 style="margin-top: 0; color: #1e293b; font-size: 16px; margin-bottom: 12px;">Visit Details</h3>
+                        <p style="margin: 4px 0; color: #475569;"><strong>Property:</strong> ${propertyName}</p>
+                        ${unitNumber ? `<p style="margin: 4px 0; color: #475569;"><strong>Unit:</strong> ${unitNumber}</p>` : ''}
+                        <p style="margin: 4px 0; color: #475569;"><strong>Date:</strong> ${dateStr}</p>
+                        <p style="margin: 4px 0; color: #475569;"><strong>New Status:</strong> <span style="font-weight: 600; color: ${status === 'confirmed' ? '#16a34a' : '#dc2626'}">${status.charAt(0).toUpperCase() + status.slice(1)}</span></p>
+                    </div>
+
+                    ${status === 'confirmed' ? `
+                    <p>We look forward to seeing you! Please arrive 5 minutes early.</p>
+                    ` : ''}
+                `)
+            });
+            return true;
+        } catch (error) {
+            console.error('Error sending visit status email:', error);
+            return false;
+        }
+    }
+
     _getTemplate(title, content) {
         return `
             <!DOCTYPE html>
