@@ -1337,7 +1337,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       // Only fetch if owner? Backend checks role, but handled gracefully
       const response = await apiClient.get('/visits');
-      console.log('[AppContext] fetchVisits response:', response.data);
       setVisits(response.data);
     } catch (error) {
       console.error('Failed to fetch visits:', error);
@@ -1400,10 +1399,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // Rely on the user state which is loaded on mount
     if (user && user.role === 'owner') {
-      console.log('[AppContext] User is owner, fetching visits...');
       fetchVisits();
-    } else {
-      console.log('[AppContext] User not owner or not loaded yet. Role:', user?.role);
     }
   }, [user]);
 

@@ -16,12 +16,9 @@ class UnitController {
 
     async getUnits(req, res) {
         try {
-            console.log('[UnitController] getUnits called by user:', req.user);
             const units = await unitModel.findAll();
-            console.log('[UnitController] unitModel.findAll returned:', units ? units.length : 'null');
 
             if (req.user && req.user.role === 'treasurer') {
-                console.log('[UnitController] Filtering for treasurer');
                 const staffModel = (await import('../models/staffModel.js')).default;
                 const assigned = await staffModel.getAssignedProperties(req.user.id);
                 const assignedIds = assigned.map(p => p.property_id.toString());
@@ -30,10 +27,8 @@ class UnitController {
                 return res.json(filtered);
             }
 
-            console.log('[UnitController] Returning all units');
             res.json(units);
         } catch (error) {
-            console.error('[UnitController] Error in getUnits:', error);
             res.status(500).json({ error: error.message });
         }
     }
