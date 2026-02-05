@@ -26,17 +26,13 @@ export function LoginPage() {
 
   const onSubmit = async (data: LoginFormValues) => {
     try {
-      const success = await login(data.email, data.password);
-
-      if (success) {
-        toast.success('Login successful!');
-        navigate('/dashboard');
-      } else {
-        toast.error('Invalid credentials. Please try again.');
-      }
-    } catch (error) {
+      await login(data.email, data.password);
+      toast.success('Login successful!');
+      navigate('/dashboard');
+    } catch (error: any) {
       console.error(error);
-      toast.error('An unexpected error occurred.');
+      const errorMessage = error.response?.data?.error || error.message || 'An unexpected error occurred.';
+      toast.error(errorMessage);
     }
   };
 
