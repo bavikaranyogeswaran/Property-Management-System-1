@@ -3,7 +3,7 @@ import invoiceModel from '../models/invoiceModel.js';
 import notificationModel from '../models/notificationModel.js';
 import userModel from '../models/userModel.js';
 import receiptModel from '../models/receiptModel.js';
-import notificationModel from '../models/notificationModel.js';
+
 
 class PaymentController {
     async submitPayment(req, res) {
