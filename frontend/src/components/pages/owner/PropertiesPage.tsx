@@ -24,6 +24,8 @@ export function PropertiesPage() {
     deleteProperty,
     propertyTypes,
     units,
+    unitTypes,
+    addUnit, // Added addUnit
     addLead,
     uploadPropertyImages,
     getPropertyImages,
@@ -72,6 +74,41 @@ export function PropertiesPage() {
   const [primaryImageIndex, setPrimaryImageIndex] = useState(0);
   const [viewProperty, setViewProperty] = useState<Property | null>(null);
 
+  // Quick Add Units State
+  const [quickUnits, setQuickUnits] = useState<{
+    unitNumber: string;
+    unitTypeId: number;
+    monthlyRent: number;
+    status: 'available';
+  }[]>([]);
+  const [newUnitNumber, setNewUnitNumber] = useState('');
+  const [newUnitType, setNewUnitType] = useState(0);
+  const [newUnitRent, setNewUnitRent] = useState<number>(0);
+
+  // Single Unit Mode State
+  const [isSingleUnit, setIsSingleUnit] = useState(false);
+  const [singleUnitRent, setSingleUnitRent] = useState<number>(0);
+
+  const addQuickUnit = () => {
+    if (!newUnitNumber || newUnitType === 0 || !newUnitRent) {
+      toast.error("Please fill all unit fields");
+      return;
+    }
+    setQuickUnits([...quickUnits, {
+      unitNumber: newUnitNumber,
+      unitTypeId: newUnitType,
+      monthlyRent: newUnitRent,
+      status: 'available'
+    }]);
+    setNewUnitNumber('');
+    setNewUnitType(0);
+    setNewUnitRent(0);
+  };
+
+  const removeQuickUnit = (index: number) => {
+    setQuickUnits(quickUnits.filter((_, i) => i !== index));
+  };
+
   const handleImagesChange = (images: { file: File; isPrimary: boolean }[]) => {
     const files = images.map(img => img.file);
     const primaryIndex = images.findIndex(img => img.isPrimary);
@@ -83,10 +120,12 @@ export function PropertiesPage() {
 
   const onSubmitProperty = async (values: PropertyFormValues) => {
     try {
+      let savedPropertyId: string | undefined;
+
       if (editingProperty) {
         // Update existing property
-        await updateProperty(editingProperty.id, values); // values aligns with Property interface mostly? 
-        // Note: Property interface features is string[], values.features is string[]. all good.
+        await updateProperty(editingProperty.id, values);
+        savedPropertyId = editingProperty.id;
 
         // Handle images if any
         if (uploadFiles.length > 0) {
@@ -99,11 +138,12 @@ export function PropertiesPage() {
         const propertyData = {
           ...values,
           propertyNo: values.propertyNo || '',
-          // Property interface expects these. Form values provide them.
         };
         const newProperty = await addProperty(propertyData);
 
         if (newProperty) {
+          savedPropertyId = newProperty.id;
+          // Handle images for new property
           if (uploadFiles.length > 0) {
             try {
               const response = await uploadPropertyImages(newProperty.id, uploadFiles);
@@ -121,14 +161,63 @@ export function PropertiesPage() {
           toast.success("Property added successfully");
         }
       }
+
+      // Handle Units (Quick Add or Single Unit)
+      if (savedPropertyId) {
+        if (isSingleUnit && singleUnitRent > 0) {
+          // Single Unit Mode
+          try {
+            const defaultType = unitTypes && unitTypes.length > 0 ? unitTypes[0] : null;
+            await addUnit({
+              propertyId: savedPropertyId,
+              unitNumber: "Main",
+              unitTypeId: defaultType ? defaultType.type_id : 1,
+              monthlyRent: singleUnitRent,
+              status: 'available',
+              type: defaultType ? defaultType.name : 'Standard'
+            });
+            toast.success("Single unit created successfully");
+          } catch (unitError) {
+            console.error("Failed to add single unit:", unitError);
+            toast.error("Property saved, but failed to add unit.");
+          }
+        } else if (quickUnits.length > 0) {
+          // Multiple Units Mode
+          try {
+            for (const unit of quickUnits) {
+              const unitTypeName = unitTypes.find(t => t.type_id === unit.unitTypeId)?.name || '';
+              await addUnit({
+                propertyId: savedPropertyId,
+                unitNumber: unit.unitNumber,
+                unitTypeId: unit.unitTypeId,
+                monthlyRent: unit.monthlyRent,
+                status: unit.status,
+                type: unitTypeName
+              });
+            }
+            toast.success(`${quickUnits.length} units added successfully`);
+          } catch (unitError) {
+            console.error("Failed to add quick units:", unitError);
+            toast.error("Property saved, but failed to add some units.");
+          }
+        }
+      }
+
+      // Reset Form and State
       setIsAddDialogOpen(false);
       setEditingProperty(null);
       propertyForm.reset();
       setUploadFiles([]);
       setExistingImages([]);
+      setQuickUnits([]);
+      setNewUnitNumber('');
+      setNewUnitType(0);
+      setNewUnitRent(0);
+      setIsSingleUnit(false);
+      setSingleUnitRent(0);
+
     } catch (error: any) {
       console.error('Failed to save property:', error);
-      // Show specific error if available from backend response
       const errorMessage = error.response?.data?.error || error.message || "Failed to save property";
       toast.error(`Failed to save property: ${errorMessage}`);
     }
@@ -181,6 +270,8 @@ export function PropertiesPage() {
     });
     setExistingImages([]);
     setUploadFiles([]);
+    setIsSingleUnit(false);
+    setSingleUnitRent(0);
     setIsAddDialogOpen(true);
   };
 
@@ -496,6 +587,119 @@ export function PropertiesPage() {
                           onSetPrimaryExisting={handleSetPrimaryExisting}
                         />
                       </div>
+                    </div>
+
+                    {/* Quick Add Units Section */}
+                    <div className="mt-6 border-t pt-6 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-1">
+                          <h3 className="text-lg font-medium">Quick Add Units</h3>
+                          <p className="text-sm text-gray-500">
+                            {isSingleUnit
+                              ? "This property is a single unit (e.g. house/villa)."
+                              : "Add multiple units to this property."}
+                          </p>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            id="singleUnitMode"
+                            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            checked={isSingleUnit}
+                            onChange={(e) => setIsSingleUnit(e.target.checked)}
+                          />
+                          <Label htmlFor="singleUnitMode">Single Unit Property</Label>
+                        </div>
+                      </div>
+
+                      {isSingleUnit ? (
+                        <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
+                          <div className="space-y-2 max-w-xs">
+                            <Label>Monthly Rent (LKR)</Label>
+                            <Input
+                              type="number"
+                              placeholder="e.g. 150000"
+                              value={singleUnitRent || ''}
+                              onChange={(e) => setSingleUnitRent(parseFloat(e.target.value))}
+                            />
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end bg-gray-50 p-4 rounded-lg border">
+                            <div className="space-y-2">
+                              <Label>Unit Number</Label>
+                              <Input
+                                placeholder="e.g. A101"
+                                value={newUnitNumber}
+                                onChange={(e) => setNewUnitNumber(e.target.value)}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Type</Label>
+                              <select
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                value={newUnitType}
+                                onChange={(e) => setNewUnitType(parseInt(e.target.value))}
+                              >
+                                <option value={0}>Select Type</option>
+                                {unitTypes?.map((type) => (
+                                  <option key={type.type_id} value={type.type_id}>
+                                    {type.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Monthly Rent (LKR)</Label>
+                              <Input
+                                type="number"
+                                placeholder="e.g. 50000"
+                                value={newUnitRent || ''}
+                                onChange={(e) => setNewUnitRent(parseFloat(e.target.value))}
+                              />
+                            </div>
+                            <Button type="button" onClick={addQuickUnit} className="w-full">
+                              <Plus className="size-4 mr-2" /> Add Unit
+                            </Button>
+                          </div>
+
+                          {quickUnits.length > 0 && (
+                            <div className="border rounded-md overflow-hidden">
+                              <table className="min-w-full divide-y divide-gray-200">
+                                <thead className="bg-gray-50">
+                                  <tr>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unit #</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rent</th>
+                                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="bg-white divide-y divide-gray-200">
+                                  {quickUnits.map((unit, idx) => (
+                                    <tr key={idx}>
+                                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{unit.unitNumber}</td>
+                                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        {unitTypes?.find(t => t.type_id === unit.unitTypeId)?.name || 'Unknown'}
+                                      </td>
+                                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">LKR {unit.monthlyRent}</td>
+                                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                        <button
+                                          type="button"
+                                          onClick={() => removeQuickUnit(idx)}
+                                          className="text-red-600 hover:text-red-900"
+                                        >
+                                          Remove
+                                        </button>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                        </>
+                      )}
                     </div>
 
                     <div className="flex justify-end gap-2 pt-4 border-t">
