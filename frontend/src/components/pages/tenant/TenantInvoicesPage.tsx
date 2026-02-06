@@ -39,7 +39,9 @@ export function TenantInvoicesPage() {
   const tenantInvoices = invoices;
   const pendingInvoices = tenantInvoices.filter(i => i.status === 'pending');
   const paidInvoices = tenantInvoices.filter(i => i.status === 'paid');
-  const overdueInvoices = pendingInvoices.filter(i => new Date(i.dueDate) < new Date());
+  // Fix: Compare dates strictly (YYYY-MM-DD string comparison works if format is ISO)
+  const todayStr = new Date().toISOString().split('T')[0];
+  const overdueInvoices = pendingInvoices.filter(i => i.dueDate < todayStr);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -210,7 +212,9 @@ export function TenantInvoicesPage() {
                 {tenantInvoices.map((invoice) => {
                   const unit = units.find(u => u.id === invoice.unitId);
                   const property = unit ? properties.find(p => p.id === unit.propertyId) : null;
-                  const isOverdue = (invoice.status === 'pending' || invoice.status === 'partially_paid') && new Date(invoice.dueDate) < new Date();
+                  // Fix: Compare dates only
+                  const todayStr = new Date().toISOString().split('T')[0];
+                  const isOverdue = (invoice.status === 'pending' || invoice.status === 'partially_paid') && invoice.dueDate < todayStr;
                   const isLateFee = invoice.description?.includes('Late Fee');
                   const payment = getInvoicePayment(invoice.id);
                   const receipt = getInvoiceReceipt(invoice.id);

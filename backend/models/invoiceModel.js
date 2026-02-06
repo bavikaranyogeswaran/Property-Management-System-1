@@ -82,7 +82,7 @@ class InvoiceModel {
 
     async findByTenantId(tenantId) {
         const [rows] = await pool.query(`
-            SELECT ri.* 
+            SELECT ri.*, l.tenant_id 
             FROM rent_invoices ri
             JOIN leases l ON ri.lease_id = l.lease_id
             WHERE l.tenant_id = ? 
