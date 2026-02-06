@@ -146,6 +146,13 @@ class LeadController {
                 }
             }
 
+            // NEW CHECK: Check if a USER account already exists with this email.
+            // If yes, we block lead creation to prevent duplicate/merged identities.
+            const [existingUsers] = await db.query('SELECT user_id FROM users WHERE email = ?', [email]);
+            if (existingUsers.length > 0) {
+                return res.status(409).json({ error: 'This email is already associated with an account. Please log in or contact the property owner.' });
+            }
+
             // CHECK ARBITRATION: 
             // Instead of creating a USER account, we check if a LEAD exists.
 
