@@ -126,6 +126,9 @@ export interface RentInvoice {
   status: 'pending' | 'partially_paid' | 'paid' | 'overdue';
   description?: string;
   generatedDate: string;
+  tenantName?: string;
+  propertyName?: string;
+  unitNumber?: string;
 }
 
 export interface Payment {
@@ -453,6 +456,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
               // Let's assume we fetch generic invoices. If unit_id is missing, UI might break if it relies on it.
               // Assuming basic mapping for now.
               amount: parseFloat(i.amount),
+              tenantName: i.tenant_name,
+              propertyName: i.property_name,
+              unitNumber: i.unit_number,
               dueDate: i.due_date ? new Date(i.due_date).toLocaleDateString('en-CA') : '',
 
               status: i.status,

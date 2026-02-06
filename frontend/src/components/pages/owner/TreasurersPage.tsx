@@ -49,13 +49,12 @@ export function TreasurersPage() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-  const [status, setStatus] = useState<'active' | 'inactive'>('active');
+  // Status is managed via separate actions
 
   const resetForm = () => {
     setName('');
     setEmail('');
     setPhone('');
-    setStatus('active');
   };
 
 
@@ -107,7 +106,6 @@ export function TreasurersPage() {
     setName(treasurer.name);
     setEmail(treasurer.email);
     setPhone(treasurer.phone);
-    setStatus(treasurer.status);
     setIsEditDialogOpen(true);
   };
 
@@ -128,7 +126,6 @@ export function TreasurersPage() {
         name,
         email,
         phone,
-        status,
       });
 
       // Update local context
@@ -136,7 +133,6 @@ export function TreasurersPage() {
         name,
         email,
         phone,
-        status,
       });
 
       toast.success('Treasurer updated successfully');
@@ -244,19 +240,6 @@ export function TreasurersPage() {
                 <p>
                   <strong>Note:</strong> An invitation email will be sent to the treasurer to set their own password.
                 </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="status">Status</Label>
-                <Select value={status} onValueChange={(value) => setStatus(value as 'active' | 'inactive')}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="inactive">Inactive</SelectItem>
-                  </SelectContent>
-                </Select>
               </div>
 
               <div className="flex gap-2 pt-4">
@@ -444,19 +427,6 @@ export function TreasurersPage() {
             </div>
 
 
-
-            <div className="space-y-2">
-              <Label htmlFor="edit-status">Status</Label>
-              <Select value={status} onValueChange={(value) => setStatus(value as 'active' | 'inactive')}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
 
             <div className="flex gap-2 pt-4">
               <Button type="submit" className="flex-1">Update Treasurer</Button>

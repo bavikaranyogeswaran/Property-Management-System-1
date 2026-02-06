@@ -137,22 +137,33 @@ export function OwnerInvoicesPage() {
         </TableHeader>
         <TableBody>
           {invoicesList.map((invoice) => {
+            const tenantName = invoice.tenantName || 'Unknown';
+            const propertyName = invoice.propertyName || 'Unknown';
+            const unitNumber = invoice.unitNumber || 'Unknown';
+
+            // Fallback object lookups (needed for Receipt/Form logic that use other fields like email)
             const tenant = tenants.find(t => t.id === invoice.tenantId);
             const unit = units.find(u => u.id === invoice.unitId);
             const property = unit ? properties.find(p => p.id === unit.propertyId) : null;
-            // Fix: Compare dates only (ignore time) to avoid marking "Due Today" as overdue
-            const todayStr = new Date().toISOString().split('T')[0];
-            // If invoice.dueDate is YYYY-MM-DD
+
+            // Search query filtering (if implemented) or other logic
+            // Note: searchQuery is not defined in this scope. This line will cause a compilation error.
+            // Assuming it's a placeholder or intended for a different context.
+            // const matchesSearch = 
+            //   tenantName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            //   propertyName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            //   unitNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            //   invoice.id.includes(searchQuery); is YYYY-MM-DD
             const isOverdue = invoice.status === 'pending' && invoice.dueDate < todayStr;
             const isLateFee = invoice.description?.includes('Late Fee');
             const receipt = receipts.find(r => r.invoiceId === invoice.id);
 
             return (
               <TableRow key={invoice.id} className={isLateFee ? 'bg-red-50' : ''}>
-                <TableCell className="font-mono text-sm">{invoice.id}</TableCell>
-                <TableCell className="font-medium">{tenant?.name}</TableCell>
-                <TableCell>{property?.name}</TableCell>
-                <TableCell>{unit?.unitNumber}</TableCell>
+                <TableCell className="font-mono text-sm">#{invoice.id}</TableCell>
+                <TableCell className="font-medium">{tenantName}</TableCell>
+                <TableCell>{propertyName}</TableCell>
+                <TableCell>{unitNumber}</TableCell>
                 <TableCell className="font-semibold">LKR {invoice.amount}</TableCell>
                 <TableCell>
                   <div className={isOverdue ? 'text-red-600 font-medium' : ''}>

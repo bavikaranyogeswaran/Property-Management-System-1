@@ -93,7 +93,7 @@ class InvoiceModel {
 
     async findAll() {
         const [rows] = await pool.query(`
-            SELECT ri.*, l.tenant_id, l.unit_id, u.name as tenant_name, p.name as property_name
+            SELECT ri.*, l.tenant_id, l.unit_id, u.name as tenant_name, p.name as property_name, un.unit_number
             FROM rent_invoices ri
             JOIN leases l ON ri.lease_id = l.lease_id
             JOIN users u ON l.tenant_id = u.user_id
@@ -106,7 +106,7 @@ class InvoiceModel {
 
     async findByTreasurerId(treasurerId) {
         const [rows] = await pool.query(`
-            SELECT ri.*, l.tenant_id, l.unit_id, u.name as tenant_name, p.name as property_name
+            SELECT ri.*, l.tenant_id, l.unit_id, u.name as tenant_name, p.name as property_name, un.unit_number
             FROM rent_invoices ri
             JOIN leases l ON ri.lease_id = l.lease_id
             JOIN users u ON l.tenant_id = u.user_id
