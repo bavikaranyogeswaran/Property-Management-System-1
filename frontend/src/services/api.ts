@@ -28,12 +28,19 @@ apiClient.interceptors.response.use(
     (response) => response,
     (error: any) => {
         if (error.response && error.response.status === 401) {
-            // Clear token if invalid/expired to prevent infinite loops of failed requests
-            console.warn('Authentication failed (401), clearing token.');
-            localStorage.removeItem('authToken');
-            localStorage.removeItem('user');
-            // Optional: Redirect to login
-            window.location.href = '/login';
+            // Check if it's a login request/verify request - if so, DON'T redirect
+            // as the component will handle the error (show invalid credentials etc)
+            const url = error.config?.url || '';
+            const isLoginRequest = url.includes('auth/login');
+
+            if (!isLoginRequest) {
+                // Clear token if invalid/expired for non-login requests
+                console.warn('Authentication failed (401), clearing token.');
+                localStorage.removeItem('authToken');
+                localStorage.removeItem('user');
+                // Redirect to login
+                window.location.href = '/login';
+            }
         }
         return Promise.reject(error);
     }

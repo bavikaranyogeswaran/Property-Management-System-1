@@ -1389,8 +1389,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   // Fetch Notifications from Backend
+  // Fetch Notifications from Backend
   useEffect(() => {
     const fetchNotifications = async () => {
+      // Don't fetch if not logged in
+      if (!user) return;
+
       try {
         const res = await notificationApi.getNotifications();
         if (res.data) {
@@ -1415,7 +1419,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
     };
     fetchNotifications();
-  }, []);
+  }, [user]);
 
   // Initial fetch for visits if owner
   // Initial fetch for visits if owner
