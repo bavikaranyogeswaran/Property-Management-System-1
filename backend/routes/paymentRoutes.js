@@ -11,7 +11,9 @@ import {
 
 const router = Router();
 
-router.post('/', authenticateToken, validateRequest(submitPaymentSchema), paymentController.submitPayment);
+import upload from '../middleware/upload.js';
+
+router.post('/', authenticateToken, upload.single('proof'), validateRequest(submitPaymentSchema), paymentController.submitPayment);
 router.post('/cash', authenticateToken, validateRequest(recordCashPaymentSchema), paymentController.recordCashPayment);
 router.get('/', authenticateToken, paymentController.getPayments);
 router.put('/:id/verify', authenticateToken, validateRequest(verifyPaymentSchema), paymentController.verifyPayment);

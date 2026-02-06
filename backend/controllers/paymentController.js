@@ -8,7 +8,14 @@ import receiptModel from '../models/receiptModel.js';
 class PaymentController {
     async submitPayment(req, res) {
         try {
-            const { invoiceId, amount, paymentDate, paymentMethod, referenceNumber, evidenceUrl } = req.body;
+            const { invoiceId, amount, paymentDate, paymentMethod, referenceNumber } = req.body;
+            let { evidenceUrl } = req.body;
+
+            // Handle file upload
+            if (req.file) {
+                evidenceUrl = `/uploads/${req.file.filename}`;
+            }
+
             const tenantId = req.user.id;
 
             // Integrity Check: Is invoice already paid?

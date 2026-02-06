@@ -54,7 +54,11 @@ export const maintenanceApi = {
 
 // Payment API
 export const paymentApi = {
-    submitPayment: (data: any) => apiClient.post('/payments', data),
+    submitPayment: (data: any) => apiClient.post('/payments', data, {
+        headers: {
+            'Content-Type': data instanceof FormData ? 'multipart/form-data' : 'application/json',
+        }
+    }),
     getPayments: () => apiClient.get('/payments'),
     verifyPayment: (id: string, status: string) => apiClient.put(`/payments/${id}/verify`, { status }),
     recordCashPayment: (invoiceId: string, amount: number, paymentDate: string, referenceNumber?: string) =>
