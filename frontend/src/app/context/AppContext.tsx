@@ -453,11 +453,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
               // Let's assume we fetch generic invoices. If unit_id is missing, UI might break if it relies on it.
               // Assuming basic mapping for now.
               amount: parseFloat(i.amount),
-              dueDate: i.due_date ? i.due_date.split('T')[0] : '',
+              dueDate: i.due_date ? new Date(i.due_date).toLocaleDateString('en-CA') : '',
 
               status: i.status,
               description: i.description,
-              generatedDate: i.created_at ? i.created_at.split('T')[0] : '' // created_at exists? default?
+              generatedDate: i.created_at ? new Date(i.created_at).toLocaleDateString('en-CA') : ''
             }));
             setInvoices(mappedInvoices);
           }
