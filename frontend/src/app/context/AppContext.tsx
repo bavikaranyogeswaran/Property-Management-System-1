@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import authService from '../../services/auth';
 import apiClient, { maintenanceApi, paymentApi, invoiceApi, notificationApi } from '../../services/api';
 import { toast } from 'sonner';
 import { useAuth } from './AuthContext';
@@ -522,6 +523,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     // Fetch leads
     const fetchLeads = async () => {
       try {
+        const currentUser = authService.getCurrentUser();
+        if (currentUser?.role !== 'owner') return;
+
         const token = localStorage.getItem('authToken');
         if (token) {
           const response = await apiClient.get('/leads');
@@ -537,6 +541,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
           }
         }
       } catch (error: any) {
+        // Suppress 403 errors if somehow we got here but shouldn't have, or just log them
+        if (error.response && error.response.status === 403) {
+          console.warn("User not authorized to fetch leads (expected for non-owners)");
+          return;
+        }
         console.error('Failed to fetch leads:', error);
         toast.error(`Failed to fetch leads: ${error.message}`);
       }
@@ -600,6 +609,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     // Fetch Lead Stage History
     const fetchLeadStageHistory = async () => {
       try {
+        const currentUser = authService.getCurrentUser();
+        if (currentUser?.role !== 'owner') return;
+
         const token = localStorage.getItem('authToken');
         if (token) {
           const response = await apiClient.get('/leads/stage-history');
@@ -608,6 +620,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
           }
         }
       } catch (error: any) {
+        if (error.response && error.response.status === 403) {
+          return;
+        }
         console.error('Failed to fetch lead stage history:', error);
       }
     };
