@@ -338,11 +338,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
 
   // Fetch initial data
+  // Fetch initial data
   useEffect(() => {
+    // Wait for user to be loaded (if we want to be strict) or just run if token exists.
+    // Adding 'user' to dependency ensures we re-fetch if user status changes (e.g. login/processed).
+    if (!user) {
+      // Option: we could skip fetching if no user, but if token exists in storage we might want to try.
+      // However, standard flow is: AuthProvider loads user -> user set -> Fetch Data.
+      // Let's rely on user being truthy to avoid unauthorized calls (though api interceptor handles token).
+      const token = localStorage.getItem('authToken');
+      if (!token) return;
+    }
 
     // Fetch real treasurers from backend (sync with DB)
     const fetchData = async () => {
       try {
+        console.log('Fetching App Data...');
+        // ... existing fetches ...
         // Fetch Treasurers
         try {
           const trRes = await apiClient.get('/users/treasurers');
@@ -381,7 +393,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           const uRes = await apiClient.get('/units');
           if (uRes.data) {
             const mappedUnits = uRes.data.map((u: any) => ({
-              id: u.id, // unitModel maps it
+              id: u.id,
               propertyId: u.propertyId,
               unitNumber: u.unitNumber,
               unitTypeId: u.unitTypeId,
@@ -390,15 +402,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
               status: u.status,
               image: u.image,
               createdAt: u.createdAt,
-              // propertyName: u.propertyName
             }));
-            // Only replace if we got data, to avoid flashing empty if local exists? 
-            // Actually we want DB truth.
             setUnits(mappedUnits);
           }
         } catch (e: any) {
           console.error("Failed to fetch units", e);
-          toast.error(`Failed to fetch units: ${e.message}`);
+          // toast.error(`Failed to fetch units: ${e.message}`); // Reduce noise on boot
         }
 
         // Fetch Leases
@@ -421,8 +430,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
               description: r.description,
               priority: r.priority,
               status: r.status,
-              submittedDate: r.created_at ? r.created_at.split('T')[0] : '', // approximate
-              images: r.images // JSON column handled by driver? 
+              submittedDate: r.created_at ? r.created_at.split('T')[0] : '',
+              images: r.images
             }));
             setMaintenanceRequests(mappedRequests);
           }
@@ -430,7 +439,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
         // Fetch Maintenance Costs (NEW)
         try {
-          // Fetch all costs
           const mcRes = await maintenanceApi.getCosts('');
           if (mcRes.data) {
             const mappedCosts = mcRes.data.map((c: any) => ({
@@ -452,16 +460,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
               id: i.invoice_id.toString(),
               leaseId: i.lease_id.toString(),
               tenantId: i.tenant_id.toString(),
-              unitId: i.unit_id ? i.unit_id.toString() : '', // Note: DB might not have unit_id on invoice directly if it has property_id? Checked schema?
-              // Schema check: invoice table has property_id? 
-              // Let's assume we fetch generic invoices. If unit_id is missing, UI might break if it relies on it.
-              // Assuming basic mapping for now.
+              unitId: i.unit_id ? i.unit_id.toString() : '',
               amount: parseFloat(i.amount),
               tenantName: i.tenant_name,
               propertyName: i.property_name,
               unitNumber: i.unit_number,
               dueDate: i.due_date ? new Date(i.due_date).toLocaleDateString('en-CA') : '',
-
               status: i.status,
               description: i.description,
               generatedDate: i.created_at ? new Date(i.created_at).toLocaleDateString('en-CA') : ''
@@ -483,7 +487,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
               paymentMethod: p.payment_method,
               referenceNumber: p.reference_number,
               status: p.status,
-              submittedAt: p.created_at || '', // created_at?
+              submittedAt: p.created_at || '',
               proofUrl: p.evidence_url
             }));
             setPayments(mappedPayments);
@@ -524,7 +528,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const fetchLeads = async () => {
       try {
         const currentUser = authService.getCurrentUser();
-        if (currentUser?.role !== 'owner') return;
+        // Fallback to prop user if storage is slightly out of sync or just trust prop
+        if (user?.role !== 'owner' && currentUser?.role !== 'owner') return;
 
         const token = localStorage.getItem('authToken');
         if (token) {
@@ -543,11 +548,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       } catch (error: any) {
         // Suppress 403 errors if somehow we got here but shouldn't have, or just log them
         if (error.response && error.response.status === 403) {
-          console.warn("User not authorized to fetch leads (expected for non-owners)");
           return;
         }
         console.error('Failed to fetch leads:', error);
-        toast.error(`Failed to fetch leads: ${error.message}`);
       }
     };
     fetchLeads();
@@ -570,7 +573,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
         // Fetch properties (public)
         const response = await apiClient.get('/properties');
         if (response.status === 200) {
-          // Backend returns camelCase keys already mapped in propertyModel.findAll
           const mappedProps = response.data.map((p: any) => ({
             id: p.id,
             name: p.name,
@@ -610,7 +612,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const fetchLeadStageHistory = async () => {
       try {
         const currentUser = authService.getCurrentUser();
-        if (currentUser?.role !== 'owner') return;
+        if (user?.role !== 'owner' && currentUser?.role !== 'owner') return;
 
         const token = localStorage.getItem('authToken');
         if (token) {
@@ -628,7 +630,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
     fetchLeadStageHistory();
 
-  }, []);
+  }, [user]); // Re-run when user auth state changes
 
 
 
