@@ -240,7 +240,7 @@ export function PropertiesPage() {
     }
   };
 
-  const handleEditClick = (property: Property) => {
+  const handleEditClick = async (property: Property) => {
     setEditingProperty(property);
     propertyForm.reset({
       name: property.name,
@@ -252,8 +252,25 @@ export function PropertiesPage() {
       description: property.description || '',
       features: property.features || [],
     });
-    setExistingImages(property.image ? [{ id: '1', url: property.image }] : []); // Simplified for now as we don't have full image objects in Property interface here
+
+    // Initial state with just the primary image (better than nothing while loading)
+    setExistingImages(property.image ? [{ id: 'primary-preview', url: property.image, isPrimary: true }] : []);
     setIsAddDialogOpen(true);
+
+    try {
+      // Fetch all images for editing
+      const images = await getPropertyImages(property.id);
+      if (images && images.length > 0) {
+        setExistingImages(images.map((img: any) => ({
+          id: img.image_id?.toString() || img.id?.toString(),
+          url: img.image_url || img.url,
+          isPrimary: Boolean(img.is_primary)
+        })));
+      }
+    } catch (error) {
+      console.error("Failed to load property images for editing:", error);
+      toast.error("Could not load all property images");
+    }
   };
 
   const handleAddClick = () => {
