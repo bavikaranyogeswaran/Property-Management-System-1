@@ -14,9 +14,9 @@ class LeadController {
             }
 
             const { id } = req.params;
-            const { startDate, endDate, nic, permanentAddress, employerName, monthlyIncome } = req.body;
+            const { startDate, endDate, nic, permanentAddress, employerName, monthlyIncome, unitId } = req.body;
 
-            const tenantData = { nic, permanentAddress, employerName, monthlyIncome };
+            const tenantData = { nic, permanentAddress, employerName, monthlyIncome, unitId };
 
             const result = await userService.convertLeadToTenant(id, startDate, endDate, tenantData);
             res.status(200).json(result);

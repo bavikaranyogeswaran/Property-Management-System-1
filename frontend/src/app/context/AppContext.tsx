@@ -253,7 +253,7 @@ interface AppContextType {
   addLead: (lead: Omit<Lead, 'id' | 'createdAt'>) => Promise<void>;
   updateLead: (id: string, lead: Partial<Lead>) => Promise<void>;
   addLeadFollowUp: (followUp: Omit<LeadFollowUp, 'id'>) => void;
-  convertLeadToTenant: (leadId: string, startDate?: string, endDate?: string) => Promise<string>;
+  convertLeadToTenant: (leadId: string, startDate?: string, endDate?: string, unitId?: string) => Promise<string>;
 
   // Tenant operations
   addTenant: (tenant: Omit<Tenant, 'id' | 'createdAt'>) => void;
@@ -1003,9 +1003,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setLeadFollowUps([...leadFollowUps, newFollowUp]);
   };
 
-  const convertLeadToTenant = async (leadId: string, startDate?: string, endDate?: string) => {
+  const convertLeadToTenant = async (leadId: string, startDate?: string, endDate?: string, unitId?: string) => {
     try {
-      const response = await apiClient.post(`/leads/${leadId}/convert`, { startDate, endDate });
+      const response = await apiClient.post(`/leads/${leadId}/convert`, { startDate, endDate, unitId });
 
       // Since leads, tenants, units, and leases are all affected, 
       // and we haven't refactored the fetch functions to be accessible here yet,

@@ -49,7 +49,8 @@ export function LeadsPage() {
 
   const [conversionData, setConversionData] = useState({
     startDate: new Date().toISOString().split('T')[0],
-    endDate: ''
+    endDate: '',
+    unitId: ''
   });
 
 
@@ -114,7 +115,8 @@ export function LeadsPage() {
       const tenantId = await convertLeadToTenant(
         selectedLead.id,
         conversionData.startDate,
-        conversionData.endDate || undefined
+        conversionData.endDate || undefined,
+        conversionData.unitId || undefined
       );
       toast.success('Lead converted to tenant successfully');
       setIsConvertDialogOpen(false);
@@ -122,7 +124,8 @@ export function LeadsPage() {
       // Reset dates
       setConversionData({
         startDate: new Date().toISOString().split('T')[0],
-        endDate: ''
+        endDate: '',
+        unitId: ''
       });
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to convert lead');
@@ -832,6 +835,42 @@ export function LeadsPage() {
                 <strong>Note:</strong> The lead will be promoted to a Tenant. They can use their existing credentials to log in.
                 After conversion, a lease will be created automatically with the dates selected above.
               </p>
+            </div>
+
+            {/* Unit Selection Logic */}
+            <div className="space-y-2 pt-2 border-t">
+              <Label>Unit Assignment</Label>
+              {selectedLead?.interestedUnit ? (
+                <div className="p-3 bg-gray-50 rounded-md border text-sm text-gray-700 flex justify-between items-center">
+                  <span>Interested Unit: <strong>{units.find(u => u.id === selectedLead.interestedUnit)?.unitNumber || 'Unknown'}</strong></span>
+                  <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded">Pre-selected</span>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-xs text-gray-500">
+                    This lead is interested in the <strong>Whole Property</strong>. Select a unit to create a lease automatically.
+                  </p>
+                  <select
+                    className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    value={conversionData.unitId}
+                    onChange={(e) => setConversionData({ ...conversionData, unitId: e.target.value })}
+                  >
+                    <option value="">Select a Unit (Optional)</option>
+                    {selectedLead && units
+                      .filter(u => u.propertyId === selectedLead.propertyId && u.status === 'available')
+                      .map(u => (
+                        <option key={u.id} value={u.id}>Unit {u.unitNumber} - {u.type} (LKR {u.monthlyRent})</option>
+                      ))
+                    }
+                  </select>
+                  {conversionData.unitId && (
+                    <p className="text-xs text-green-600">Lease will be created for this unit.</p>
+                  )}
+                  {!conversionData.unitId && (
+                    <p className="text-xs text-amber-600">No unit selected. Tenant will be created WITHOUT an active lease.</p>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="flex gap-2 justify-end">

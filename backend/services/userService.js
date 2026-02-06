@@ -236,15 +236,18 @@ class UserService {
             }
 
             // 3. Create Tenant Profile
-            // We use the passed tenantData alongside defaults from Lead if available?
-            // Lead doesn't have NIC/Address usually.
-            await tenantModel.create({
-                userId,
-                nic: tenantData.nic || null,
-                permanentAddress: tenantData.permanentAddress || null,
-                employerName: tenantData.employerName || null,
-                // ... map other fields
-            }, connection);
+            const existingTenant = await tenantModel.findByUserId(userId, connection);
+            if (!existingTenant) {
+                // We use the passed tenantData alongside defaults from Lead if available?
+                // Lead doesn't have NIC/Address usually.
+                await tenantModel.create({
+                    userId,
+                    nic: tenantData.nic || null,
+                    permanentAddress: tenantData.permanentAddress || null,
+                    employerName: tenantData.employerName || null,
+                    // ... map other fields
+                }, connection);
+            }
 
             // 4. Update lead status
             // leadModel.update doesn't support connection?
@@ -253,12 +256,16 @@ class UserService {
             await connection.query('UPDATE leads SET status = ?, user_id = ? WHERE lead_id = ?', ['converted', userId, leadId]);
 
             // 5. Lease & Unit Logic
-            if (lead.interestedUnit) {
+            // Use provided unitId (from conversion dialog) OR the lead's original interest
+            const targetUnitId = tenantData.unitId || lead.interestedUnit;
+
+            if (targetUnitId) {
                 // We rely on LeaseService to handle unit status and lease creation.
                 // However, we need to fetch the unit to get the rent first? 
                 // LeaseService expects us to pass monthlyRent.
 
-                const unit = await unitModel.findById(lead.interestedUnit);
+                const unit = await unitModel.findById(targetUnitId);
+
                 if (unit) {
                     const today = new Date();
                     const leaseStart = startDate ? new Date(startDate) : today;
@@ -273,7 +280,7 @@ class UserService {
                     // Use LeaseService with the existing transaction connection
                     await leaseService.createLease({
                         tenantId: userId,
-                        unitId: lead.interestedUnit,
+                        unitId: targetUnitId,
                         startDate: leaseStart,
                         endDate: leaseEnd,
                         monthlyRent: unit.monthlyRent,
