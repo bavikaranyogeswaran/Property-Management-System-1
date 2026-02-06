@@ -1206,9 +1206,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const invRes = await invoiceApi.getInvoices();
         setInvoices(invRes.data);
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error("Failed to verify payment", e);
-      toast.error("Failed to verify payment");
+      const msg = e.response?.data?.error || "Failed to verify payment";
+      toast.error(msg);
     }
   };
 

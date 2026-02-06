@@ -115,6 +115,9 @@ class PaymentController {
     }
 
     async verifyPayment(req, res) {
+        console.log('--- verifyPayment CALLED ---');
+        console.log('Params:', req.params);
+        console.log('Body:', req.body);
         try {
             const { id } = req.params;
             const { status } = req.body; // 'verified' or 'rejected'
@@ -131,7 +134,7 @@ class PaymentController {
                 if (payment) {
                     // Logic Check: Partial Payments
                     // Calculate total verified amount for this invoice
-                    const allPayments = await paymentModel.findByInvoiceId(payment.invoice_id);
+                    const allPayments = await paymentModel.findByInvoiceId(payment.invoiceId);
                     const totalVerified = allPayments
                         .filter(p => p.status === 'verified')
                         .reduce((sum, p) => sum + Number(p.amount), 0);
@@ -140,12 +143,17 @@ class PaymentController {
                     // No, 'updateStatus' above already set it to 'verified'.
                     // So totalVerified includes the current one.
 
-                    const invoice = await invoiceModel.findById(payment.invoice_id);
+                    const invoice = await invoiceModel.findById(payment.invoiceId);
+
+                    if (!invoice) {
+                        console.error(`Referenced Invoice ${payment.invoiceId} NOT FOUND for Payment ${id}`);
+                        return res.status(404).json({ error: 'Invoice not found for verification' });
+                    }
 
                     // Logic Check: Overpayment Handling (Tips/Credit)
                     if (totalVerified >= invoice.amount) {
-                        await invoiceModel.updateStatus(payment.invoice_id, 'paid');
-                        console.log(`Invoice ${payment.invoice_id} fully paid.`);
+                        await invoiceModel.updateStatus(payment.invoiceId, 'paid');
+                        console.log(`Invoice ${payment.invoiceId} fully paid.`);
 
                         // Calculate Overpayment
                         const overpayment = totalVerified - invoice.amount;
@@ -185,9 +193,9 @@ class PaymentController {
                     } else {
                         // Partial Payment Support
                         if (totalVerified > 0) {
-                            await invoiceModel.updateStatus(payment.invoice_id, 'partially_paid');
+                            await invoiceModel.updateStatus(payment.invoiceId, 'partially_paid');
                         }
-                        console.log(`Invoice ${payment.invoice_id} partially paid. Total: ${totalVerified}/${invoice.amount}`);
+                        console.log(`Invoice ${payment.invoiceId} partially paid. Total: ${totalVerified}/${invoice.amount}`);
                     }
 
                     // Generate Receipt (Always generate receipt for the *payment*)
@@ -220,7 +228,7 @@ class PaymentController {
                         if (existing.length === 0) {
                             await receiptModel.create({
                                 paymentId: id,
-                                invoiceId: payment.invoice_id,
+                                invoiceId: payment.invoiceId,
                                 tenantId: invoice.tenant_id,
                                 amount: payment.amount,
                                 generatedDate: new Date().toISOString(),
@@ -267,7 +275,7 @@ class PaymentController {
                                 userId: req.user.id,
                                 actionType: 'PAYMENT_VERIFIED',
                                 entityId: id,
-                                details: { invoiceId: payment.invoice_id, amount: payment.amount }
+                                details: { invoiceId: payment.invoiceId, amount: payment.amount }
                             }, req);
 
                             // Logic Fix: Positive Behavior Scoring (On-Time Payment)
@@ -313,9 +321,9 @@ class PaymentController {
                     // 1. Check if invoice allows reverting (i.e., was it 'paid'?)
                     // Even if not fully paid, removing a 'verified' payment reduces the balance. I should re-evaluate status.
 
-                    const invoice = await invoiceModel.findById(payment.invoice_id);
+                    const invoice = await invoiceModel.findById(payment.invoiceId);
                     if (invoice) {
-                        const allPayments = await paymentModel.findByInvoiceId(payment.invoice_id);
+                        const allPayments = await paymentModel.findByInvoiceId(payment.invoiceId);
                         // Filter out THIS payment (which is now rejected) and other non-verified
                         // Note: findById might return the OLD status if transaction not committed? 
                         // But here we just updated it above? 
@@ -366,7 +374,7 @@ class PaymentController {
                         // `SELECT ri.*, l.monthly_rent, l.tenant_id FROM rent_invoices...`
                         // Yes, invoice object has tenant_id.
                         userId: invoice ? invoice.tenant_id : null, // Use invoice.tenant_id
-                        message: `Payment of ${payment.amount} for Invoice #${payment.invoice_id} was rejected. Please contact support.`,
+                        message: `Payment of ${payment.amount} for Invoice #${payment.invoiceId} was rejected. Please contact support.`,
                         type: 'payment',
                         severity: 'urgent'
                     });
@@ -375,8 +383,10 @@ class PaymentController {
 
             res.json({ message: `Payment ${status}`, payment: updatedPayment });
         } catch (error) {
+            console.error('--- verifyPayment ERROR ---');
             console.error(error);
-            res.status(500).json({ error: 'Failed to verify payment' });
+            console.error('Stack:', error.stack);
+            res.status(500).json({ error: 'Failed to verify payment: ' + error.message });
         }
     }
 
