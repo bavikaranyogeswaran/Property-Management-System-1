@@ -44,7 +44,15 @@ export function TenantDashboard() {
 
   const currentUnit = currentLease ? units.find(u => u.id === currentLease.unitId) : null;
 
-  const overdueInvoices = pendingInvoices.filter(inv => new Date(inv.dueDate) < new Date());
+  // Fix: Compare dates strictly (YYYY-MM-DD string comparison works if format is ISO)
+  // Use local date to avoid UTC shifts marking today's invoices as overdue
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const todayStr = `${year}-${month}-${day}`;
+
+  const overdueInvoices = pendingInvoices.filter(inv => inv.dueDate < todayStr);
   const totalDue = pendingInvoices.reduce((sum, inv) => sum + inv.amount, 0);
 
   const stats = [
@@ -191,7 +199,8 @@ export function TenantDashboard() {
                 {tenantInvoices.slice(0, 5).map((invoice) => {
                   const unit = units.find(u => u.id === invoice.unitId);
                   const isPaid = invoice.status === 'paid';
-                  const isOverdue = invoice.status === 'pending' && new Date(invoice.dueDate) < new Date();
+                  // Fix: Compare dates only
+                  const isOverdue = invoice.status === 'pending' && invoice.dueDate < todayStr;
                   return (
                     <div key={invoice.id} className="flex justify-between items-center py-2 border-b last:border-0">
                       <div className="flex items-center gap-3">

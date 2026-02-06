@@ -40,7 +40,14 @@ export function TenantInvoicesPage() {
   const pendingInvoices = tenantInvoices.filter(i => i.status === 'pending');
   const paidInvoices = tenantInvoices.filter(i => i.status === 'paid');
   // Fix: Compare dates strictly (YYYY-MM-DD string comparison works if format is ISO)
-  const todayStr = new Date().toISOString().split('T')[0];
+  // Fix: Compare dates strictly (YYYY-MM-DD string comparison works if format is ISO)
+  // Use local date to avoid UTC shifts marking today's invoices as overdue
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const todayStr = `${year}-${month}-${day}`;
+
   const overdueInvoices = pendingInvoices.filter(i => i.dueDate < todayStr);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -218,7 +225,13 @@ export function TenantInvoicesPage() {
                   const unit = units.find(u => u.id === invoice.unitId);
                   const property = unit ? properties.find(p => p.id === unit.propertyId) : null;
                   // Fix: Compare dates only
-                  const todayStr = new Date().toISOString().split('T')[0];
+                  // Use local date to avoid UTC shifts marking today's invoices as overdue
+                  const d = new Date();
+                  const year = d.getFullYear();
+                  const month = String(d.getMonth() + 1).padStart(2, '0');
+                  const day = String(d.getDate()).padStart(2, '0');
+                  const todayStr = `${year}-${month}-${day}`;
+
                   const isOverdue = (invoice.status === 'pending' || invoice.status === 'partially_paid') && invoice.dueDate < todayStr;
                   const isLateFee = invoice.description?.includes('Late Fee');
                   const payment = getInvoicePayment(invoice.id);

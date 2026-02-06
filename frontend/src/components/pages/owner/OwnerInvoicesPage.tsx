@@ -81,7 +81,13 @@ export function OwnerInvoicesPage() {
   const pendingInvoices = invoices.filter(i => i.status === 'pending');
   const paidInvoices = invoices.filter(i => i.status === 'paid');
   // Fix: Compare dates strictly (YYYY-MM-DD string comparison works if format is ISO)
-  const todayStr = new Date().toISOString().split('T')[0];
+  // Use local date to avoid UTC shifts marking today's invoices as overdue
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const todayStr = `${year}-${month}-${day}`;
+
   const overdueInvoices = pendingInvoices.filter(i => i.dueDate < todayStr);
 
   const handleGenerateInvoices = () => {
