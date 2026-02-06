@@ -11,7 +11,9 @@ class InvoiceController {
                 const invoices = await invoiceModel.findByTenantId(req.user.id);
                 return res.json(invoices);
             } else if (req.user.role === 'treasurer') {
+                console.log(`Treasurer ${req.user.id} fetching invoices via findByTreasurerId`);
                 const invoices = await invoiceModel.findByTreasurerId(req.user.id);
+                console.log(`Found ${invoices.length} invoices for treasurer ${req.user.id}`);
                 return res.json(invoices);
             } else if (req.user.role === 'owner') {
                 const invoices = await invoiceModel.findAll();
@@ -58,10 +60,21 @@ class InvoiceController {
             console.log(`Generating invoices for ${year}-${month}`);
 
             const activeLeases = await leaseModel.findActive();
+
+            // Filter for Treasurer: Only generate for assigned properties
+            const staffModel = (await import('../models/staffModel.js')).default;
+            const assigned = await staffModel.getAssignedProperties(req.user.id);
+            const assignedPropertyIds = assigned.map(p => p.property_id.toString());
+
+            // If treasurer has no assignments, this will be empty, preventing unauthorized generation
+            const targetLeases = activeLeases.filter(l => assignedPropertyIds.includes(l.propertyId.toString()));
+
+            console.log(`Generating for ${req.user.role} ${req.user.id}. Assigned Properties: ${assignedPropertyIds.length}. Target Leases: ${targetLeases.length}`);
+
             let generatedCount = 0;
             let skippedCount = 0;
 
-            for (const lease of activeLeases) {
+            for (const lease of targetLeases) {
                 // Check Lease Start Date
                 // Lease must start ON or BEFORE the 1st of the invoice month to get an auto-invoice for that month
                 // (e.g. Generating for Feb: Lease starts Feb 15 -> Skip. Lease starts Feb 1 -> Include. Lease starts Jan 15 -> Include.)
@@ -123,6 +136,7 @@ class InvoiceController {
             // Only Treasurer can update status manually (e.g. to 'overdue' or 'cancelled')
             // 'paid' is usually handled by payment verification, but allowing manual override.
             // Owner is VIEW ONLY.
+            console.log(`Update Status by ${req.user.role} ${req.user.id}`);
             if (req.user.role !== 'treasurer') {
                 return res.status(403).json({ error: 'Access denied. Only Treasurers can update invoice status.' });
             }
