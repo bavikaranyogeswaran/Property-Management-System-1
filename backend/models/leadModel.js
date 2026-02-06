@@ -94,7 +94,6 @@ class LeadModel {
                     l.status,
                     l.created_at as createdAt,
                     l.last_contacted_at as lastContactedAt,
-                    l.last_contacted_at as lastContactedAt,
                     l.user_id as userId
                 FROM leads l
                 INNER JOIN properties p ON l.property_id = p.property_id
@@ -115,7 +114,6 @@ class LeadModel {
                 notes,
                 status,
                 created_at as createdAt,
-                last_contacted_at as lastContactedAt,
                 last_contacted_at as lastContactedAt,
                 user_id as userId
             FROM leads ORDER BY created_at DESC`);

@@ -4,16 +4,17 @@ import userModel from './userModel.js';
 import leaseModel from './leaseModel.js';
 
 class InvoiceModel {
-    async create(data) {
-        const { leaseId, amount, dueDate, description, type } = data;
+    async create(data, connection = null) {
+        const { leaseId, amount, dueDate, description } = data;
         // Need to determine year/month from dueDate
         const date = new Date(dueDate);
         const year = date.getFullYear();
         const month = date.getMonth() + 1; // 1-12
 
-        const [result] = await pool.query(
-            'INSERT INTO rent_invoices (lease_id, year, month, amount, due_date, status, invoice_type, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-            [leaseId, year, month, amount, dueDate, 'pending', type || 'rent', description]
+        const db = connection || pool;
+        const [result] = await db.query(
+            'INSERT INTO rent_invoices (lease_id, year, month, amount, due_date, status, description) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [leaseId, year, month, amount, dueDate, 'pending', description]
         );
         const invoiceId = result.insertId;
 
@@ -46,16 +47,17 @@ class InvoiceModel {
         return invoiceId;
     }
 
-    async exists(leaseId, year, month, type = null) {
+    async exists(leaseId, year, month, type = null, connection = null) {
         let query = 'SELECT invoice_id FROM rent_invoices WHERE lease_id = ? AND year = ? AND month = ?';
         const params = [leaseId, year, month];
 
-        if (type) {
-            query += ' AND invoice_type = ?';
-            params.push(type);
-        }
+        // if (type) {
+        //     query += ' AND invoice_type = ?';
+        //     params.push(type);
+        // }
 
-        const [rows] = await pool.query(query, params);
+        const db = connection || pool;
+        const [rows] = await db.query(query, params);
         return rows.length > 0;
     }
 
@@ -132,8 +134,8 @@ class InvoiceModel {
         // Or should we link it to the original invoice? 
         // For now, standalone 'Late Fee' invoice.
         const [result] = await pool.query(
-            'INSERT INTO rent_invoices (lease_id, year, month, amount, due_date, status, invoice_type, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-            [leaseId, year, month, amount, dueDate, 'pending', 'late_fee', description]
+            'INSERT INTO rent_invoices (lease_id, year, month, amount, due_date, status, description) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [leaseId, year, month, amount, dueDate, 'pending', description]
         );
         return result.insertId;
     }
@@ -149,11 +151,11 @@ class InvoiceModel {
             JOIN leases l ON ri.lease_id = l.lease_id
             WHERE ri.status IN ('pending', 'partially_paid')
             AND ri.due_date < DATE_SUB(CURDATE(), INTERVAL ? DAY)
-            AND ri.invoice_type = 'rent'
+            -- AND ri.invoice_type = 'rent' (Removed due to missing column)
             AND NOT EXISTS (
                 SELECT 1 FROM rent_invoices ri2 
                 WHERE ri2.lease_id = ri.lease_id 
-                AND ri2.invoice_type = 'late_fee'
+                -- AND ri2.invoice_type = 'late_fee'
                 AND ri2.description LIKE CONCAT('%Invoice #', ri.invoice_id, '%')
             )
         `, [gracePeriodDays]);

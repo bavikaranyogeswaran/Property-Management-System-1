@@ -10,12 +10,13 @@ class AuditLogger {
      * @param {Object|string} params.details - Details object or string
      * @param {Object} [req] - Express request object for IP
      */
-    async log({ userId, actionType, entityId, details }, req = null) {
+    async log({ userId, actionType, entityId, details }, req = null, connection = null) {
         try {
             const ipAddress = req ? (req.headers['x-forwarded-for'] || req.socket.remoteAddress) : 'SYSTEM';
             const detailsStr = typeof details === 'object' ? JSON.stringify(details) : details;
 
-            await pool.query(
+            const db = connection || pool;
+            await db.query(
                 `INSERT INTO system_audit_logs (user_id, action_type, entity_id, details, ip_address) 
                  VALUES (?, ?, ?, ?, ?)`,
                 [userId, actionType, entityId, detailsStr, ipAddress]

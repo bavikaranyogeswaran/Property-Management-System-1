@@ -3,42 +3,44 @@ import pool from '../config/db.js';
 class TenantModel {
     async create(tenantData, connection) {
         const {
-            userId, nic, permanentAddress,
+            userId, nic,
             emergencyContactName, emergencyContactPhone,
-            employerName, employmentStatus, monthlyIncome, dateOfBirth
+            employmentStatus, monthlyIncome
         } = tenantData;
 
         // Uses the provided connection for transaction support
         const query = `
             INSERT INTO tenants 
-            (user_id, nic, permanent_address, emergency_contact_name, emergency_contact_phone, 
-             employer_name, employment_status, monthly_income, date_of_birth) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (user_id, nic, emergency_contact_name, emergency_contact_phone, 
+             employment_status, monthly_income) 
+            VALUES (?, ?, ?, ?, ?, ?)
         `;
 
         await connection.query(query, [
-            userId, nic, permanentAddress,
+            userId, nic,
             emergencyContactName, emergencyContactPhone,
-            employerName, employmentStatus, monthlyIncome, dateOfBirth
+            employmentStatus, monthlyIncome
         ]);
 
         return userId;
     }
 
-    async findByUserId(userId) {
-        const [rows] = await pool.query('SELECT * FROM tenants WHERE user_id = ?', [userId]);
+    async findByUserId(userId, connection = null) {
+        // Use provided connection or default pool
+        const db = connection || pool;
+        const [rows] = await db.query('SELECT * FROM tenants WHERE user_id = ?', [userId]);
         const row = rows[0];
         if (!row) return null;
         return {
             userId: row.user_id,
             nic: row.nic,
-            permanentAddress: row.permanent_address,
+            // permanentAddress removed as it's not in DB
             emergencyContactName: row.emergency_contact_name,
             emergencyContactPhone: row.emergency_contact_phone,
-            employerName: row.employer_name,
+            // employerName removed
             employmentStatus: row.employment_status,
             monthlyIncome: parseFloat(row.monthly_income),
-            dateOfBirth: row.date_of_birth,
+            // dateOfBirth removed
             creditBalance: parseFloat(row.credit_balance || 0),
             behaviorScore: row.behavior_score
         };

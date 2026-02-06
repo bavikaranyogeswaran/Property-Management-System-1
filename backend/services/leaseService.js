@@ -31,7 +31,7 @@ class LeaseService {
             throw new Error('Monthly rent must be greater than 0');
         }
 
-        const tenant = await tenantModel.findByUserId(tenantId);
+        const tenant = await tenantModel.findByUserId(tenantId, connection);
         if (!tenant) {
             throw new Error('Tenant not found');
         }
@@ -119,7 +119,7 @@ class LeaseService {
                 amount: securityDeposit,
                 dueDate: startDate, // Due on start date?
                 description: 'Security Deposit'
-            });
+            }, connection);
         }
 
         // B. First Month Rent (Logic Check: PRORATION)
@@ -143,14 +143,14 @@ class LeaseService {
         }
 
         const invoice = await import('../models/invoiceModel.js');
-        const exists = await invoice.default.exists(leaseId, year, month);
+        const exists = await invoice.default.exists(leaseId, year, month, null, connection);
         if (!exists) {
             await invoice.default.create({
                 leaseId,
                 amount: initialRentAmount,
                 dueDate: startDate,
                 description: invoiceDescription
-            });
+            }, connection);
         }
 
         // Audit Log
@@ -160,7 +160,7 @@ class LeaseService {
             actionType: 'LEASE_CREATED',
             entityId: leaseId,
             details: { tenantId, unitId, startDate, endDate, monthlyRent }
-        });
+        }, null, connection);
 
         // 5. Role Promotion (Lead -> Tenant)
         const userModel = (await import('../models/userModel.js')).default;

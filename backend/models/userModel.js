@@ -62,7 +62,7 @@ class UserModel {
         // Joining everything is safer to fetch all data in one go.
         const query = `
             SELECT u.*, 
-                   t.nic as tenant_nic, t.permanent_address, t.employer_name, t.monthly_income,
+                   t.nic as tenant_nic, t.monthly_income,
                    o.nic as owner_nic, o.tin, o.bank_name, o.account_number,
                    s.employee_id, s.job_title
             FROM users u
