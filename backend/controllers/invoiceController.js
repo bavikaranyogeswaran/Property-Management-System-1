@@ -35,9 +35,9 @@ class InvoiceController {
             // Strictly Treasurer only
             if (req.user.role !== 'treasurer') return res.status(403).json({ error: 'Denied. Only Treasurers can create invoices.' });
 
-            const { leaseId, tenantId, propertyId, amount, dueDate, description } = req.body;
+            const { leaseId, tenantId, propertyId, amount, dueDate, description, type } = req.body;
             const id = await invoiceModel.create({
-                leaseId, tenantId, propertyId, amount, dueDate, description
+                leaseId, tenantId, propertyId, amount, dueDate, description, type
             });
             res.status(201).json({ message: 'Invoice created', id });
         } catch (error) {
