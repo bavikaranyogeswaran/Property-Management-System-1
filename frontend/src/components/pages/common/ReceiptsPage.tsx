@@ -26,8 +26,19 @@ export function ReceiptsPage() {
 
     // Filter receipts by role
     const userReceipts = useMemo(() => {
+        console.log('--- ReceiptsPage Debug ---');
+        console.log('User:', user);
+        console.log('Receipts (Total):', receipts);
+
         if (user?.role === 'tenant') {
-            return receipts.filter(r => r.tenantId === user.id);
+            console.log('Filtering for tenant ID:', user.id);
+            const filtered = receipts.filter(r => {
+                const match = r.tenantId === user.id.toString();
+                console.log(`Receipt ${r.id}: tenantId=${r.tenantId}, user.id=${user.id} -> Match? ${match}`);
+                return match;
+            });
+            console.log('Filtered Receipts:', filtered);
+            return filtered;
         }
         // Treasurer and owner see all
         return receipts;

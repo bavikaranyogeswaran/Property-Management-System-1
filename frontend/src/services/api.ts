@@ -95,6 +95,12 @@ export const auditApi = {
     getLogs: (limit = 50) => apiClient.get(`/audit-logs?limit=${limit}`),
 };
 
+// Receipts
+export const receiptApi = {
+    getReceipts: () => apiClient.get('/receipts'),
+    getReceiptById: (id: string) => apiClient.get(`/receipts/${id}`),
+};
+
 export default apiClient;
 
 

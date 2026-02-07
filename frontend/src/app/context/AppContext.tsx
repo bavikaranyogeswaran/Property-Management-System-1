@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import authService from '../../services/auth';
-import apiClient, { maintenanceApi, paymentApi, invoiceApi, notificationApi } from '../../services/api';
+import apiClient, { maintenanceApi, paymentApi, invoiceApi, notificationApi, receiptApi } from '../../services/api';
 import { toast } from 'sonner';
 import { useAuth } from './AuthContext';
 
@@ -493,6 +493,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
             setPayments(mappedPayments);
           }
         } catch (e) { console.error("Failed to fetch payments", e); }
+
+        // Fetch Receipts (NEW)
+        try {
+          const receiptRes = await receiptApi.getReceipts();
+          if (receiptRes.data) {
+            const mappedReceipts = receiptRes.data.map((r: any) => ({
+              id: r.id || r.receipt_id?.toString(),
+              paymentId: r.paymentId,
+              invoiceId: r.invoiceId,
+              tenantId: r.tenantId,
+              amount: typeof r.amount === 'string' ? parseFloat(r.amount) : r.amount,
+              generatedDate: r.receiptDate || r.generatedDate || r.createdAt,
+              receiptNumber: r.receiptNumber
+            }));
+            setReceipts(mappedReceipts);
+          }
+        } catch (e) { console.error("Failed to fetch receipts", e); }
 
         // Fetch Properties (if not already fetched via initial props or whatever)
         try {
@@ -1205,6 +1222,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setPayments(payRes.data);
         const invRes = await invoiceApi.getInvoices();
         setInvoices(invRes.data);
+        // Refresh receipts
+        try {
+          const receiptRes = await receiptApi.getReceipts();
+          if (receiptRes.data) {
+            const mappedReceipts = receiptRes.data.map((r: any) => ({
+              id: r.id || r.receipt_id?.toString(),
+              paymentId: r.paymentId,
+              invoiceId: r.invoiceId,
+              tenantId: r.tenantId,
+              amount: typeof r.amount === 'string' ? parseFloat(r.amount) : r.amount,
+              generatedDate: r.receiptDate || r.generatedDate || r.createdAt,
+              receiptNumber: r.receiptNumber
+            }));
+            setReceipts(mappedReceipts);
+          }
+        } catch (e) { console.error("Failed to refresh receipts", e); }
       }
     } catch (e: any) {
       console.error("Failed to verify payment", e);
@@ -1276,6 +1309,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
         status: i.status,
         generatedDate: i.created_at ? i.created_at.split('T')[0] : ''
       })));
+      // Refresh receipts
+      try {
+        const receiptRes = await receiptApi.getReceipts();
+        if (receiptRes.data) {
+          const mappedReceipts = receiptRes.data.map((r: any) => ({
+            id: r.id || r.receipt_id?.toString(),
+            paymentId: r.paymentId,
+            invoiceId: r.invoiceId,
+            tenantId: r.tenantId,
+            amount: typeof r.amount === 'string' ? parseFloat(r.amount) : r.amount,
+            generatedDate: r.receiptDate || r.generatedDate || r.createdAt,
+            receiptNumber: r.receiptNumber
+          }));
+          setReceipts(mappedReceipts);
+        }
+      } catch (e) { console.error("Failed to refresh receipts", e); }
     } catch (e: any) {
       console.error("Failed to record cash payment", e);
       toast.error(e.response?.data?.error || "Failed to record cash payment");
