@@ -22,6 +22,7 @@ export function ReceiptsPage() {
         unitNumber: string;
         paymentMethod: string;
         paymentDate: string;
+        description: string;
     } | null>(null);
 
     // Filter receipts by role
@@ -84,17 +85,16 @@ export function ReceiptsPage() {
         const unit = invoice ? units.find(u => u.id === invoice.unitId) : null;
         const property = unit ? properties.find(p => p.id === unit.propertyId) : null;
 
-        if (tenant && payment && unit && property) {
-            setSelectedReceipt({
-                receipt,
-                tenantName: tenant.name,
-                tenantEmail: tenant.email,
-                propertyName: property.name,
-                unitNumber: unit.unitNumber,
-                paymentMethod: payment.paymentMethod,
-                paymentDate: payment.paymentDate,
-            });
-        }
+        setSelectedReceipt({
+            receipt,
+            tenantName: receipt.tenantName || tenant?.name || 'N/A',
+            tenantEmail: receipt.tenantEmail || tenant?.email || 'N/A',
+            propertyName: receipt.propertyName || property?.name || (invoice ? 'Property #' + (invoice.propertyName || 'N/A') : 'N/A'),
+            unitNumber: receipt.unitNumber || unit?.unitNumber || (invoice ? invoice.unitNumber || 'N/A' : 'N/A'),
+            paymentMethod: receipt.paymentMethod || payment?.paymentMethod || 'N/A',
+            paymentDate: receipt.paymentDate || (payment ? payment.paymentDate : 'N/A'),
+            description: receipt.description || (invoice ? invoice.description || 'Payment Receipt' : 'Payment Receipt')
+        });
     };
 
     const stats = [
@@ -307,6 +307,7 @@ export function ReceiptsPage() {
                             unitNumber={selectedReceipt.unitNumber}
                             paymentMethod={selectedReceipt.paymentMethod}
                             paymentDate={selectedReceipt.paymentDate}
+                            description={selectedReceipt.description}
                             onClose={() => setSelectedReceipt(null)}
                         />
                     )}

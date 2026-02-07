@@ -11,6 +11,7 @@ interface ReceiptViewerProps {
   unitNumber: string;
   paymentMethod: string;
   paymentDate: string;
+  description: string;
   onClose?: () => void;
 }
 
@@ -22,6 +23,7 @@ export function ReceiptViewer({
   unitNumber,
   paymentMethod,
   paymentDate,
+  description,
   onClose,
 }: ReceiptViewerProps) {
   const receiptRef = useRef<HTMLDivElement>(null);
@@ -187,6 +189,10 @@ export function ReceiptViewer({
                 <div className="flex justify-between border-b border-gray-200 pb-2">
                   <span className="text-gray-600">Payment Method:</span>
                   <span className="font-semibold text-right">{paymentMethod}</span>
+                </div>
+                <div className="flex justify-between border-b border-gray-200 pb-2">
+                  <span className="text-gray-600">Payment For:</span>
+                  <span className="font-semibold text-right">{description}</span>
                 </div>
               </div>
             </div>

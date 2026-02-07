@@ -17,7 +17,8 @@ class ReceiptModel {
         const [rows] = await pool.query(`
             SELECT r.*, p.invoice_id, l.tenant_id, 
                    pr.name as property_name, u.unit_number,
-                   tu.name as tenant_name, tu.email as tenant_email
+                   tu.name as tenant_name, tu.email as tenant_email,
+                   p.payment_method, p.payment_date, i.description
             FROM receipts r 
             LEFT JOIN payments p ON r.payment_id = p.payment_id 
             LEFT JOIN rent_invoices i ON p.invoice_id = i.invoice_id
@@ -34,7 +35,8 @@ class ReceiptModel {
         const [rows] = await pool.query(`
             SELECT r.*, p.invoice_id, l.tenant_id, 
                    pr.name as property_name, u.unit_number,
-                   tu.name as tenant_name, tu.email as tenant_email
+                   tu.name as tenant_name, tu.email as tenant_email,
+                   p.payment_method, p.payment_date, i.description
             FROM receipts r 
             LEFT JOIN payments p ON r.payment_id = p.payment_id 
             LEFT JOIN rent_invoices i ON p.invoice_id = i.invoice_id
@@ -60,9 +62,12 @@ class ReceiptModel {
             createdAt: row.receipt_date,
             propertyName: row.property_name || null,
             unitNumber: row.unit_number || null,
-            // Added tenant details
             tenantName: row.tenant_name || null,
-            tenantEmail: row.tenant_email || null
+            tenantEmail: row.tenant_email || null,
+            // Added payment details
+            paymentMethod: row.payment_method || null,
+            paymentDate: row.payment_date || null,
+            description: row.description || `Invoice #${row.invoice_id}`
         };
     }
 }

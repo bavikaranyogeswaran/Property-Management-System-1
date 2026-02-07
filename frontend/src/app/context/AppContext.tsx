@@ -155,6 +155,11 @@ export interface Receipt {
   receiptNumber: string;
   propertyName?: string;
   unitNumber?: string;
+  tenantName?: string;
+  tenantEmail?: string;
+  paymentMethod?: string;
+  paymentDate?: string;
+  description?: string;
 }
 
 export interface MaintenanceRequest {
@@ -519,7 +524,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
               propertyName: r.propertyName,
               unitNumber: r.unitNumber,
               tenantName: r.tenantName,
-              tenantEmail: r.tenantEmail
+              tenantEmail: r.tenantEmail,
+              paymentMethod: r.paymentMethod,
+              paymentDate: r.paymentDate ? r.paymentDate.split('T')[0] : r.generatedDate,
+              description: r.description
             }));
             setReceipts(mappedReceipts);
           }
