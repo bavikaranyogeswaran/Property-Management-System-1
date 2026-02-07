@@ -15,24 +15,33 @@ class ReceiptModel {
 
     async findById(id) {
         const [rows] = await pool.query(`
-            SELECT r.*, p.invoice_id, l.tenant_id 
+            SELECT r.*, p.invoice_id, l.tenant_id, 
+                   pr.name as property_name, u.unit_number,
+                   tu.name as tenant_name, tu.email as tenant_email
             FROM receipts r 
             LEFT JOIN payments p ON r.payment_id = p.payment_id 
             LEFT JOIN rent_invoices i ON p.invoice_id = i.invoice_id
             LEFT JOIN leases l ON i.lease_id = l.lease_id
+            LEFT JOIN units u ON l.unit_id = u.unit_id
+            LEFT JOIN properties pr ON u.property_id = pr.property_id
+            LEFT JOIN users tu ON l.tenant_id = tu.user_id
             WHERE r.receipt_id = ?
         `, [id]);
         return this.mapRow(rows[0]);
     }
 
     async findAll() {
-        // Need to join payments -> invoices -> leases to get tenant_id
         const [rows] = await pool.query(`
-            SELECT r.*, p.invoice_id, l.tenant_id 
+            SELECT r.*, p.invoice_id, l.tenant_id, 
+                   pr.name as property_name, u.unit_number,
+                   tu.name as tenant_name, tu.email as tenant_email
             FROM receipts r 
             LEFT JOIN payments p ON r.payment_id = p.payment_id 
             LEFT JOIN rent_invoices i ON p.invoice_id = i.invoice_id
             LEFT JOIN leases l ON i.lease_id = l.lease_id
+            LEFT JOIN units u ON l.unit_id = u.unit_id
+            LEFT JOIN properties pr ON u.property_id = pr.property_id
+            LEFT JOIN users tu ON l.tenant_id = tu.user_id
             ORDER BY r.receipt_date DESC
         `);
         return rows.map(row => this.mapRow(row));
@@ -43,14 +52,17 @@ class ReceiptModel {
         return {
             id: row.receipt_id.toString(),
             paymentId: row.payment_id.toString(),
-            // invoiceId from payments table join
             invoiceId: row.invoice_id ? row.invoice_id.toString() : null,
-            // tenantId from leases table join (via rent_invoices)
             tenantId: row.tenant_id ? row.tenant_id.toString() : null,
             amount: parseFloat(row.amount),
             receiptDate: row.receipt_date,
             receiptNumber: row.receipt_number,
-            createdAt: row.receipt_date
+            createdAt: row.receipt_date,
+            propertyName: row.property_name || null,
+            unitNumber: row.unit_number || null,
+            // Added tenant details
+            tenantName: row.tenant_name || null,
+            tenantEmail: row.tenant_email || null
         };
     }
 }

@@ -153,6 +153,8 @@ export interface Receipt {
   amount: number;
   generatedDate: string;
   receiptNumber: string;
+  propertyName?: string;
+  unitNumber?: string;
 }
 
 export interface MaintenanceRequest {
@@ -354,39 +356,43 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const fetchData = async () => {
       try {
         console.log('Fetching App Data...');
-        // ... existing fetches ...
-        // Fetch Treasurers
-        try {
-          const trRes = await apiClient.get('/users/treasurers');
-          if (trRes.data) {
-            const mappedTreasurers = trRes.data.map((u: any) => ({
-              id: (u.id || u.user_id).toString(),
-              name: u.name,
-              email: u.email,
-              phone: u.phone || '',
-              password: '',
-              createdAt: u.createdAt || u.created_at,
-              status: u.status
-            }));
-            setTreasurers(mappedTreasurers);
-          }
-        } catch (e) { console.error("Failed to fetch treasurers", e); }
 
-        // Fetch Tenants
-        try {
-          const tRes = await apiClient.get('/users/tenants');
-          if (tRes.data) {
-            const mappedTenants = tRes.data.map((u: any) => ({
-              id: (u.id || u.user_id).toString(),
-              name: u.name,
-              email: u.email,
-              phone: u.phone,
-              createdAt: u.createdAt,
-              status: u.status
-            }));
-            setTenants(mappedTenants);
-          }
-        } catch (e) { console.error("Failed to fetch tenants", e); }
+        // Fetch Treasurers (Only for Owner)
+        if (user?.role === 'owner') {
+          try {
+            const trRes = await apiClient.get('/users/treasurers');
+            if (trRes.data) {
+              const mappedTreasurers = trRes.data.map((u: any) => ({
+                id: (u.id || u.user_id).toString(),
+                name: u.name,
+                email: u.email,
+                phone: u.phone || '',
+                password: '',
+                createdAt: u.createdAt || u.created_at,
+                status: u.status
+              }));
+              setTreasurers(mappedTreasurers);
+            }
+          } catch (e) { console.error("Failed to fetch treasurers", e); }
+        }
+
+        // Fetch Tenants (Owner and Treasurer)
+        if (user?.role === 'owner' || user?.role === 'treasurer') {
+          try {
+            const tRes = await apiClient.get('/users/tenants');
+            if (tRes.data) {
+              const mappedTenants = tRes.data.map((u: any) => ({
+                id: (u.id || u.user_id).toString(),
+                name: u.name,
+                email: u.email,
+                phone: u.phone,
+                createdAt: u.createdAt,
+                status: u.status
+              }));
+              setTenants(mappedTenants);
+            }
+          } catch (e) { console.error("Failed to fetch tenants", e); }
+        }
 
         // Fetch Units
         try {
@@ -407,10 +413,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
           }
         } catch (e: any) {
           console.error("Failed to fetch units", e);
-          // toast.error(`Failed to fetch units: ${e.message}`); // Reduce noise on boot
         }
 
-        // Fetch Leases
+        // Fetch Leases (Owner, Treasurer, Tenant sees own?)
+        // Assuming /leases endpoint handles filtering or we filter here.
+        // For now, let's allow fetching and assume backend secures it or returns subset.
+        // Actually, for Tenant, they might need their own lease.
         try {
           const lRes = await apiClient.get('/leases');
           if (lRes.data) {
@@ -438,19 +446,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
         } catch (e) { console.error("Failed to fetch maintenance requests", e); }
 
         // Fetch Maintenance Costs (NEW)
-        try {
-          const mcRes = await maintenanceApi.getCosts('');
-          if (mcRes.data) {
-            const mappedCosts = mcRes.data.map((c: any) => ({
-              id: c.cost_id.toString(),
-              requestId: c.request_id.toString(),
-              amount: parseFloat(c.amount),
-              description: c.description,
-              recordedDate: c.recorded_date ? c.recorded_date.split('T')[0] : ''
-            }));
-            setMaintenanceCosts(mappedCosts);
-          }
-        } catch (e) { console.error("Failed to fetch maintenance costs", e); }
+        if (user?.role === 'owner' || user?.role === 'treasurer') {
+          try {
+            const mcRes = await maintenanceApi.getCosts('');
+            if (mcRes.data) {
+              const mappedCosts = mcRes.data.map((c: any) => ({
+                id: c.cost_id.toString(),
+                requestId: c.request_id.toString(),
+                amount: parseFloat(c.amount),
+                description: c.description,
+                recordedDate: c.recorded_date ? c.recorded_date.split('T')[0] : ''
+              }));
+              setMaintenanceCosts(mappedCosts);
+            }
+          } catch (e) { console.error("Failed to fetch maintenance costs", e); }
+        }
 
         // Fetch Invoices (NEW)
         try {
@@ -479,9 +489,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
           const payRes = await paymentApi.getPayments();
           if (payRes.data) {
             const mappedPayments = payRes.data.map((p: any) => ({
-              id: p.payment_id.toString(),
-              invoiceId: p.invoice_id.toString(),
-              tenantId: p.tenant_id.toString(),
+              id: p.payment_id?.toString() || '', // Safe access
+              invoiceId: p.invoice_id?.toString() || '',
+              tenantId: p.tenant_id?.toString() || '',
               amount: parseFloat(p.amount),
               paymentDate: p.payment_date ? p.payment_date.split('T')[0] : '',
               paymentMethod: p.payment_method,
@@ -505,7 +515,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
               tenantId: r.tenantId,
               amount: typeof r.amount === 'string' ? parseFloat(r.amount) : r.amount,
               generatedDate: r.receiptDate || r.generatedDate || r.createdAt,
-              receiptNumber: r.receiptNumber
+              receiptNumber: r.receiptNumber,
+              propertyName: r.propertyName,
+              unitNumber: r.unitNumber,
+              tenantName: r.tenantName,
+              tenantEmail: r.tenantEmail
             }));
             setReceipts(mappedReceipts);
           }

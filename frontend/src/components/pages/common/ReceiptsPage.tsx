@@ -240,15 +240,19 @@ export function ReceiptsPage() {
                                                 {user?.role !== 'tenant' && (
                                                     <TableCell>
                                                         <div className="text-sm">
-                                                            <div className="font-medium">{tenant?.name || 'N/A'}</div>
-                                                            <div className="text-xs text-gray-500">{tenant?.email}</div>
+                                                            <div className="font-medium">{receipt.tenantName || tenant?.name || 'N/A'}</div>
+                                                            <div className="text-xs text-gray-500">{receipt.tenantEmail || tenant?.email}</div>
                                                         </div>
                                                     </TableCell>
                                                 )}
                                                 <TableCell>
                                                     <div className="text-sm">
-                                                        <div className="font-medium">{property?.name || 'N/A'}</div>
-                                                        <div className="text-xs text-gray-500">Unit {unit?.unitNumber || 'N/A'}</div>
+                                                        <div className="font-medium">
+                                                            {receipt.propertyName || property?.name || (invoice ? 'Property #' + (invoice.propertyName || 'N/A') : 'N/A')}
+                                                        </div>
+                                                        <div className="text-xs text-gray-500">
+                                                            Unit {receipt.unitNumber || unit?.unitNumber || (invoice ? invoice.unitNumber : 'N/A')}
+                                                        </div>
                                                     </div>
                                                 </TableCell>
                                                 <TableCell className="text-right font-semibold">
