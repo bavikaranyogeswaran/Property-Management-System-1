@@ -12,10 +12,9 @@ class InvoiceModel {
         const month = date.getMonth() + 1; // 1-12
 
         const db = connection || pool;
-        const invoiceType = type || 'rent';
         const [result] = await db.query(
-            'INSERT INTO rent_invoices (lease_id, year, month, amount, due_date, status, description, invoice_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-            [leaseId, year, month, amount, dueDate, 'pending', description, invoiceType]
+            'INSERT INTO rent_invoices (lease_id, year, month, amount, due_date, status, description) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [leaseId, year, month, amount, dueDate, 'pending', description]
         );
         const invoiceId = result.insertId;
 
@@ -52,10 +51,10 @@ class InvoiceModel {
         let query = 'SELECT invoice_id FROM rent_invoices WHERE lease_id = ? AND year = ? AND month = ?';
         const params = [leaseId, year, month];
 
-        if (type) {
-            query += ' AND invoice_type = ?';
-            params.push(type);
-        }
+        // if (type) {
+        //     query += ' AND invoice_type = ?';
+        //     params.push(type);
+        // }
 
         const db = connection || pool;
         const [rows] = await db.query(query, params);
@@ -135,8 +134,8 @@ class InvoiceModel {
         // Or should we link it to the original invoice? 
         // For now, standalone 'Late Fee' invoice.
         const [result] = await pool.query(
-            'INSERT INTO rent_invoices (lease_id, year, month, amount, due_date, status, description, invoice_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-            [leaseId, year, month, amount, dueDate, 'pending', description, 'late_fee']
+            'INSERT INTO rent_invoices (lease_id, year, month, amount, due_date, status, description) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [leaseId, year, month, amount, dueDate, 'pending', description]
         );
         return result.insertId;
     }
@@ -152,11 +151,9 @@ class InvoiceModel {
             JOIN leases l ON ri.lease_id = l.lease_id
             WHERE ri.status IN ('pending', 'partially_paid')
             AND ri.due_date < DATE_SUB(CURDATE(), INTERVAL ? DAY)
-            AND ri.invoice_type = 'rent'
             AND NOT EXISTS (
                 SELECT 1 FROM rent_invoices ri2 
                 WHERE ri2.lease_id = ri.lease_id 
-                AND ri2.invoice_type = 'late_fee'
                 AND ri2.description LIKE CONCAT('%Invoice #', ri.invoice_id, '%')
             )
         `, [gracePeriodDays]);
