@@ -1,4 +1,5 @@
 import userService from '../services/userService.js';
+import staffModel from '../models/staffModel.js';
 import { validateEmail } from '../utils/validators.js';
 
 class UserController {
