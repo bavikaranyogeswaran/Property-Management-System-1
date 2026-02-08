@@ -7,7 +7,7 @@ class UnitModel {
         const [result] = await db.query(
             `INSERT INTO units (property_id, unit_number, unit_type_id, monthly_rent, status, image_url)
              VALUES (?, ?, ?, ?, ?, ?)`,
-            [propertyId, unitNumber, unitTypeId, monthlyRent, status || 'available', imageUrl]
+            [propertyId, unitNumber, unitTypeId, monthlyRent, status || 'available', imageUrl || null]
         );
         return result.insertId;
     }
