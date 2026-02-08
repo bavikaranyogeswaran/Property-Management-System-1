@@ -792,10 +792,10 @@ export function PropertiesPage() {
                 <div className="flex flex-wrap gap-2 pt-4">
                   <Button
                     className="flex-1"
-                    variant={user?.role === 'owner' ? 'secondary' : 'default'}
-                    onClick={() => user?.role === 'owner' ? handleViewGallery(property) : handleInterestClick(property)}
+                    variant={(user?.role === 'owner' || user?.role === 'treasurer') ? 'secondary' : 'default'}
+                    onClick={() => (user?.role === 'owner' || user?.role === 'treasurer') ? handleViewGallery(property) : handleInterestClick(property)}
                   >
-                    {user?.role === 'owner' ? (
+                    {(user?.role === 'owner' || user?.role === 'treasurer') ? (
                       <>
                         <Eye className="size-4 mr-2" /> View Gallery
                       </>
