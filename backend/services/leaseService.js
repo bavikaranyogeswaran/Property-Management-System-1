@@ -143,15 +143,14 @@ class LeaseService {
         }
 
         const invoice = await import('../models/invoiceModel.js');
-        const exists = await invoice.default.exists(leaseId, year, month, null, connection);
-        if (!exists) {
-            await invoice.default.create({
-                leaseId,
-                amount: initialRentAmount,
-                dueDate: startDate,
-                description: invoiceDescription
-            }, connection);
-        }
+        // Unconditionally create initial rent invoice for new lease.
+        // We removed 'invoice_type' so 'exists' check would falsely match the deposit invoice we just created.
+        await invoice.default.create({
+            leaseId,
+            amount: initialRentAmount,
+            dueDate: startDate,
+            description: invoiceDescription
+        }, connection);
 
         // Audit Log
         const auditLogger = (await import('../utils/auditLogger.js')).default;
