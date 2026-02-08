@@ -22,16 +22,19 @@ class PropertyController {
             // For now, to match the previous logic but safely:
 
             const userId = req.user ? req.user.id : null;
+            const isPublic = req.query.public === 'true';
 
             let properties;
-            if (req.user && req.user.role === 'treasurer') {
-                // Treasurer sees only assigned properties
+            if (!isPublic && req.user && req.user.role === 'treasurer') {
+                // Treasurer sees only assigned properties (unless browsing public)
                 const staffModel = (await import('../models/staffModel.js')).default;
                 properties = await staffModel.getAssignedProperties(req.user.id);
-            } else {
-                // Public or Owner view (service handles owner filtering if needed, or returns all public)
-                // For now, existing logic:
+            } else if (!isPublic && userId) {
+                // Owner (or other logged in user seeking "My Properties")
                 properties = await propertyService.getProperties(userId);
+            } else {
+                // Public view or Guest
+                properties = await propertyService.getProperties(null);
             }
 
             res.json(properties);

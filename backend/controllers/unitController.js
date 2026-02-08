@@ -17,8 +17,9 @@ class UnitController {
     async getUnits(req, res) {
         try {
             const units = await unitModel.findAll();
+            const isPublic = req.query.public === 'true';
 
-            if (req.user && req.user.role === 'treasurer') {
+            if (!isPublic && req.user && req.user.role === 'treasurer') {
                 const staffModel = (await import('../models/staffModel.js')).default;
                 const assigned = await staffModel.getAssignedProperties(req.user.id);
                 const assignedIds = assigned.map(p => p.property_id.toString());

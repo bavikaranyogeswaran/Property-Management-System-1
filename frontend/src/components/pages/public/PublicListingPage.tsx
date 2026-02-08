@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useApp, Property } from '@/app/context/AppContext';
+import { useApp, Property, Unit } from '@/app/context/AppContext';
+import apiClient from '@/services/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,7 +15,63 @@ import { ScheduleVisitDialog } from './ScheduleVisitDialog';
 
 export function PublicListingPage({ onNavigate }: { onNavigate?: (page: string) => void }) {
 
-    const { properties, units, addLead } = useApp();
+    const { addLead } = useApp();
+    const [properties, setProperties] = useState<Property[]>([]);
+    const [units, setUnits] = useState<Unit[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchPublicData = async () => {
+            setLoading(true);
+            try {
+                // Fetch properties with public flag
+                const pRes = await apiClient.get('/properties?public=true');
+                if (pRes.data) {
+                    // Map if necessary, similar to AppContext
+                    const mappedProps = pRes.data.map((p: any) => ({
+                        id: p.id,
+                        name: p.name,
+                        propertyTypeId: p.propertyTypeId,
+                        typeName: p.typeName,
+                        propertyNo: p.propertyNo || '',
+                        street: p.street || '',
+                        city: p.city || '',
+                        district: p.district || '',
+                        image: p.image,
+                        createdAt: p.createdAt,
+                        description: p.description,
+                        features: p.features
+                    }));
+                    setProperties(mappedProps);
+                }
+
+                // Fetch units with public flag
+                const uRes = await apiClient.get('/units?public=true');
+                if (uRes.data) {
+                    const mappedUnits = uRes.data.map((u: any) => ({
+                        id: u.id,
+                        propertyId: u.propertyId,
+                        unitNumber: u.unitNumber,
+                        unitTypeId: u.unitTypeId,
+                        type: u.type,
+                        monthlyRent: u.monthlyRent,
+                        status: u.status,
+                        image: u.image,
+                        createdAt: u.createdAt,
+                    }));
+                    setUnits(mappedUnits);
+                }
+            } catch (error) {
+                console.error("Failed to fetch public listings", error);
+                toast.error("Failed to load properties");
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchPublicData();
+    }, []);
+
     const [isInterestDialogOpen, setIsInterestDialogOpen] = useState(false);
     const [interestFormData, setInterestFormData] = useState({
         name: '',
