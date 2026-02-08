@@ -57,6 +57,45 @@ class UserModel {
         return rows;
     }
 
+    async findTenantsByTreasurer(treasurerId) {
+        // Get tenants relevant to this treasurer's assigned properties
+        const [rows] = await pool.query(`
+            SELECT DISTINCT 
+                u.user_id as id, 
+                u.name, 
+                u.email, 
+                u.phone, 
+                u.role, 
+                u.status, 
+                u.created_at as createdAt,
+                t.nic, 
+                t.employment_status as employmentStatus,
+                t.monthly_income as monthlyIncome,
+                t.behavior_score as behaviorScore
+            FROM users u
+            JOIN tenants t ON u.user_id = t.user_id
+            -- Join path 1: via Leases for Assigned Properties
+            LEFT JOIN leases l ON u.user_id = l.tenant_id
+            LEFT JOIN units ut ON l.unit_id = ut.unit_id
+            
+            -- Join path 2: via Leads (converted) for Assigned Properties
+            LEFT JOIN leads ld ON u.user_id = ld.user_id
+            
+            -- Filter by Assignment
+            JOIN staff_property_assignments spa ON spa.user_id = ?
+            
+            WHERE u.role = 'tenant' 
+                AND (
+                    (ut.property_id = spa.property_id) -- Match active lease property
+                    OR 
+                    (ld.property_id = spa.property_id) -- Match lead interest property
+                )
+                AND u.email NOT LIKE "deleted_%"
+            ORDER BY u.created_at DESC
+        `, [treasurerId]);
+        return rows;
+    }
+
     async findById(id) {
         // We first fetch the user to know the role, or we just LEFT JOIN everything.
         // Joining everything is safer to fetch all data in one go.

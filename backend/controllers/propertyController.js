@@ -23,13 +23,17 @@ class PropertyController {
 
             const userId = req.user ? req.user.id : null;
 
-            // If the intention of this specific controller method is "Get All Properties contextually",
-            // we should probably just fetch all active ones for public view,
-            // OR fetch specific ones if filtering is requested.
-            // The previous code was `propertyService.getProperties(req.user.id)`.
-            // If we want to support public view, we pass null.
+            let properties;
+            if (req.user && req.user.role === 'treasurer') {
+                // Treasurer sees only assigned properties
+                const staffModel = (await import('../models/staffModel.js')).default;
+                properties = await staffModel.getAssignedProperties(req.user.id);
+            } else {
+                // Public or Owner view (service handles owner filtering if needed, or returns all public)
+                // For now, existing logic:
+                properties = await propertyService.getProperties(userId);
+            }
 
-            const properties = await propertyService.getProperties(userId);
             res.json(properties);
         } catch (error) {
             res.status(500).json({ error: error.message });

@@ -159,9 +159,12 @@ class UserService {
         return await userModel.findByRole('treasurer');
     }
 
-    async getTenants(ownerId = null) {
+    async getTenants(ownerId = null, treasurerId = null) {
         if (ownerId) {
             return await userModel.findTenantsByOwner(ownerId);
+        }
+        if (treasurerId) {
+            return await userModel.findTenantsByTreasurer(treasurerId);
         }
         return await userModel.findByRole('tenant');
     }

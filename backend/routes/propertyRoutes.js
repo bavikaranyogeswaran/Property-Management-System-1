@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import propertyController from '../controllers/propertyController.js';
-import authenticateToken, { authorizeRoles } from '../middleware/authMiddleware.js';
+import authenticateToken, { authorizeRoles, optionalAuthenticateToken } from '../middleware/authMiddleware.js';
 import upload from '../middleware/upload.js';
 
 const router = Router();
@@ -9,8 +9,8 @@ const router = Router();
 router.get('/types', propertyController.getPropertyTypes);
 
 // CRUD
-// GET / - Public listing of all properties
-router.get('/', propertyController.getProperties);
+// GET / - Public listing of all properties (but contextual if auth)
+router.get('/', optionalAuthenticateToken, propertyController.getProperties);
 
 // POST / - Owner only
 router.post('/', authenticateToken, authorizeRoles('owner'), propertyController.createProperty);

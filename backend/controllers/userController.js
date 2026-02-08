@@ -108,12 +108,18 @@ class UserController {
 
     async getTenants(req, res) {
         try {
-            if (req.user.role !== 'owner') {
+            if (req.user.role !== 'owner' && req.user.role !== 'treasurer') {
                 return res.status(403).json({ error: 'Access denied.' });
             }
-            console.log(`[DEBUG] getTenants called by UserID: ${req.user.id}`);
-            // Filter tenants by this owner's properties
-            const result = await userService.getTenants(req.user.id);
+            console.log(`[DEBUG] getTenants called by ${req.user.role} ${req.user.id}`);
+
+            let result;
+            if (req.user.role === 'owner') {
+                result = await userService.getTenants(req.user.id);
+            } else if (req.user.role === 'treasurer') {
+                result = await userService.getTenants(null, req.user.id);
+            }
+
             console.log(`[DEBUG] getTenants found ${result.length} tenants.`);
             res.json(result);
         } catch (error) {
