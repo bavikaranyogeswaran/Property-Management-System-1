@@ -180,6 +180,7 @@ function AppContent() {
           <Route path="/expenses" element={<ProtectedRoute><MaintenanceExpensesPage /></ProtectedRoute>} />
           <Route path="/analytics" element={<ProtectedRoute><AnalyticsPage /></ProtectedRoute>} />
           <Route path="/receipts" element={<ProtectedRoute><ReceiptsPage /></ProtectedRoute>} />
+          <Route path="/tenants" element={<ProtectedRoute><TenantsPage /></ProtectedRoute>} />
         </>
       )}
 

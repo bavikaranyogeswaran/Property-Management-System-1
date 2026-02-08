@@ -75,21 +75,15 @@ class UserModel {
             FROM users u
             JOIN tenants t ON u.user_id = t.user_id
             -- Join path 1: via Leases for Assigned Properties
-            LEFT JOIN leases l ON u.user_id = l.tenant_id
-            LEFT JOIN units ut ON l.unit_id = ut.unit_id
-            
-            -- Join path 2: via Leads (converted) for Assigned Properties
-            LEFT JOIN leads ld ON u.user_id = ld.user_id
+            JOIN leases l ON u.user_id = l.tenant_id
+            JOIN units ut ON l.unit_id = ut.unit_id
             
             -- Filter by Assignment
             JOIN staff_property_assignments spa ON spa.user_id = ?
             
             WHERE u.role = 'tenant' 
-                AND (
-                    (ut.property_id = spa.property_id) -- Match active lease property
-                    OR 
-                    (ld.property_id = spa.property_id) -- Match lead interest property
-                )
+                AND ut.property_id = spa.property_id
+                AND l.status = 'active'
                 AND u.email NOT LIKE "deleted_%"
             ORDER BY u.created_at DESC
         `, [treasurerId]);
