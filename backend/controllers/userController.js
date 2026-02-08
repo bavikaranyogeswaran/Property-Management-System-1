@@ -184,9 +184,12 @@ class UserController {
                 return res.status(403).json({ error: 'Access denied.' });
             }
 
+            console.log(`[DEBUG] Fetching assignments for user ${userId}`);
             const properties = await staffModel.getAssignedProperties(userId);
+            console.log(`[DEBUG] Found ${properties.length} assignments for user ${userId}`);
             res.json(properties);
         } catch (error) {
+            console.error('[DEBUG] Error fetching assignments:', error);
             res.status(500).json({ error: error.message });
         }
     }
