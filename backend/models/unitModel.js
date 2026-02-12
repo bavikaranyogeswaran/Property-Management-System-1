@@ -16,7 +16,12 @@ class UnitModel {
         const [rows] = await db.query(`
             SELECT u.*, 
                    p.name as property_name, 
-                   ut.name as type_name
+                   ut.name as type_name,
+                   (SELECT COUNT(*) FROM leases l 
+                    WHERE l.unit_id = u.unit_id 
+                    AND l.status = 'active' 
+                    AND l.start_date <= CURRENT_DATE() 
+                    AND l.end_date >= CURRENT_DATE()) as active_lease_count
             FROM units u
             JOIN properties p ON u.property_id = p.property_id
             JOIN unit_types ut ON u.unit_type_id = ut.type_id
@@ -29,7 +34,12 @@ class UnitModel {
         const [rows] = await db.query(`
             SELECT u.*, 
                    p.name as property_name, 
-                   ut.name as type_name
+                   ut.name as type_name,
+                   (SELECT COUNT(*) FROM leases l 
+                    WHERE l.unit_id = u.unit_id 
+                    AND l.status = 'active' 
+                    AND l.start_date <= CURRENT_DATE() 
+                    AND l.end_date >= CURRENT_DATE()) as active_lease_count
             FROM units u
             JOIN properties p ON u.property_id = p.property_id
             JOIN unit_types ut ON u.unit_type_id = ut.type_id
@@ -44,7 +54,12 @@ class UnitModel {
         const [rows] = await connection.query(`
             SELECT u.*, 
                    p.name as property_name, 
-                   ut.name as type_name
+                   ut.name as type_name,
+                   (SELECT COUNT(*) FROM leases l 
+                    WHERE l.unit_id = u.unit_id 
+                    AND l.status = 'active' 
+                    AND l.start_date <= CURRENT_DATE() 
+                    AND l.end_date >= CURRENT_DATE()) as active_lease_count
             FROM units u
             JOIN properties p ON u.property_id = p.property_id
             JOIN unit_types ut ON u.unit_type_id = ut.type_id
@@ -59,7 +74,12 @@ class UnitModel {
         const [rows] = await db.query(`
             SELECT u.*, 
                    p.name as property_name, 
-                   ut.name as type_name
+                   ut.name as type_name,
+                   (SELECT COUNT(*) FROM leases l 
+                    WHERE l.unit_id = u.unit_id 
+                    AND l.status = 'active' 
+                    AND l.start_date <= CURRENT_DATE() 
+                    AND l.end_date >= CURRENT_DATE()) as active_lease_count
             FROM units u
             JOIN properties p ON u.property_id = p.property_id
             JOIN unit_types ut ON u.unit_type_id = ut.type_id
@@ -101,18 +121,32 @@ class UnitModel {
     }
 
     mapRows(rows) {
-        return rows.map(row => ({
-            id: row.unit_id.toString(),
-            propertyId: row.property_id.toString(),
-            unitNumber: row.unit_number,
-            unitTypeId: row.unit_type_id,
-            type: row.type_name,
-            monthlyRent: parseFloat(row.monthly_rent),
-            status: row.status,
-            image: row.image_url,
-            createdAt: row.created_at,
-            propertyName: row.property_name
-        }));
+        return rows.map(row => {
+            // Dynamic Status Logic:
+            // If active_lease_count > 0, override status to 'occupied'.
+            // EXCEPT if status is 'maintenance' (Maintenance usually overrides Occupancy? Or concurrent?)
+            // Assuming Maintenance blocks occupancy, so if it is 'maintenance', kept it.
+            // But if there is an ACTIVE lease, it really should be occupied.
+            // Let's say Active Lease > All.
+            
+            let status = row.status;
+            if (row.active_lease_count > 0) {
+                status = 'occupied';
+            }
+
+            return {
+                id: row.unit_id.toString(),
+                propertyId: row.property_id.toString(),
+                unitNumber: row.unit_number,
+                unitTypeId: row.unit_type_id,
+                type: row.type_name,
+                monthlyRent: parseFloat(row.monthly_rent),
+                status: status,
+                image: row.image_url,
+                createdAt: row.created_at,
+                propertyName: row.property_name
+            };
+        });
     }
 }
 
