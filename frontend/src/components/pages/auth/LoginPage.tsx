@@ -25,6 +25,13 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 
+// ============================================================================
+//  LOGIN PAGE (The Security Checkpoint)
+// ============================================================================
+//  This is where users enter their ID (Email) and Key (Password).
+//  If they match, they are allowed inside the system.
+// ============================================================================
+
 export function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();

@@ -6,6 +6,13 @@ export interface LoginCredentials {
   password: string;
 }
 
+// ============================================================================
+//  AUTH SERVICE (The Login Helper)
+// ============================================================================
+//  This file handles the actual Login process.
+//  It sends the Email/Password to the server and saves the "Key" (Token) if valid.
+// ============================================================================
+
 export const authService = {
   // Real login with backend
   login: async (credentials: LoginCredentials) => {

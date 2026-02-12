@@ -1,3 +1,10 @@
+// ============================================================================
+//  MAINTENANCE CONTROLLER (The Repair Shop)
+// ============================================================================
+//  This file handles complaints about broken things.
+//  Tenants report issues ("Leaky faucet"), and Owners/Treasurers fix them.
+// ============================================================================
+
 import maintenanceRequestModel from '../models/maintenanceRequestModel.js';
 import propertyModel from '../models/propertyModel.js';
 import notificationModel from '../models/notificationModel.js';
@@ -5,6 +12,7 @@ import notificationModel from '../models/notificationModel.js';
 import userModel from '../models/userModel.js';
 
 class MaintenanceRequestController {
+  //  REPORT ISSUE: Tenant says "Something is broken".
   async createRequest(req, res) {
     try {
       const { unitId, title, description, priority, images } = req.body;
@@ -152,6 +160,7 @@ class MaintenanceRequestController {
     }
   }
 
+  //  BILL TENANT: If the damage was the tenant's fault, we send them a bill (Invoice).
   async createInvoice(req, res) {
     try {
       // RBAC: Owner or Treasurer

@@ -1,3 +1,10 @@
+// ============================================================================
+//  RECEIPT CONTROLLER (The Records Keeper)
+// ============================================================================
+//  This file allows people to see proof of their payments.
+//  "Show me the receipt for that $500 I paid last month."
+// ============================================================================
+
 import receiptModel from '../models/receiptModel.js';
 
 class ReceiptController {

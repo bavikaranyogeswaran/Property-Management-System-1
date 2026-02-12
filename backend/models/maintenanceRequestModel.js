@@ -1,3 +1,10 @@
+// ============================================================================
+//  MAINTENANCE REQUEST MODEL (The Complaint Box)
+// ============================================================================
+//  This file stores all the reports about broken things ("The AC is dead").
+//  It helps us track what needs fixing and who asked for it.
+// ============================================================================
+
 import pool from '../config/db.js';
 
 class MaintenanceRequestModel {
@@ -97,6 +104,7 @@ class MaintenanceRequestModel {
     return rows;
   }
 
+  //  CREATE REQUEST: Writing down a new complaint card.
   async create(data) {
     const { unitId, tenantId, title, description, priority, images } = data;
 

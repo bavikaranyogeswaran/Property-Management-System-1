@@ -9,9 +9,17 @@ import {
   Shield,
 } from 'lucide-react';
 
+// ============================================================================
+//  LANDING PAGE (The Front Door)
+// ============================================================================
+//  This is the very first screen anyone sees when they visit the website.
+//  It's like the "Welcome Mat". It shows what the company does and has a Login button.
+// ============================================================================
+
 export function LandingPage({
   onNavigate,
 }: {
+  // onNavigate: A special tool to switch screens (like a remote control)
   onNavigate: (page: string) => void;
 }) {
   return (

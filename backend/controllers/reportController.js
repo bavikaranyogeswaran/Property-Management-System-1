@@ -1,3 +1,10 @@
+// ============================================================================
+//  REPORT CONTROLLER (The Analyst)
+// ============================================================================
+//  This file generates PDF documents to show how the business is doing.
+//  It calculates totals, creates charts, and saves them as files.
+// ============================================================================
+
 import PDFDocument from 'pdfkit';
 import invoiceModel from '../models/invoiceModel.js';
 import maintenanceCostModel from '../models/maintenanceCostModel.js';
@@ -7,6 +14,7 @@ import leaseModel from '../models/leaseModel.js';
 import leadModel from '../models/leadModel.js';
 
 class ReportController {
+  //  FINANCIAL REPORT: "How much money did we make vs spend?"
   async generateFinancialReport(req, res) {
     try {
       const year = req.query.year || new Date().getFullYear();
@@ -112,6 +120,7 @@ class ReportController {
     }
   }
 
+  //  OCCUPANCY REPORT: "How many units are full?"
   async generateOccupancyReport(req, res) {
     try {
       // Fetch Units
@@ -205,6 +214,7 @@ class ReportController {
     }
   }
 
+  //  RISK REPORT: "Which tenants are late on payments?"
   async generateTenantRiskReport(req, res) {
     try {
       // Fetch Tenants with profile data

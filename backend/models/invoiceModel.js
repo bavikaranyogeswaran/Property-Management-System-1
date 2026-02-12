@@ -1,9 +1,17 @@
+// ============================================================================
+//  INVOICE MODEL (The Bill Records)
+// ============================================================================
+//  This file keeps track of every bill we've ever sent.
+//  It records who owes money, how much, and for what (Rent, Maintenance).
+// ============================================================================
+
 import pool from '../config/db.js';
 import emailService from '../utils/emailService.js';
 import userModel from './userModel.js';
 import leaseModel from './leaseModel.js';
 
 class InvoiceModel {
+  //  CREATE: Writing a new bill to the ledger.
   async create(data, connection = null) {
     const { leaseId, amount, dueDate, description, type } = data;
     // Need to determine year/month from dueDate

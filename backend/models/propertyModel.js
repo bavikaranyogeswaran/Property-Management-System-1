@@ -1,6 +1,14 @@
+// ============================================================================
+//  PROPERTY MODEL (The Building Blueprints)
+// ============================================================================
+//  This file manages the records of all physical buildings (Properties).
+//  It saves details like address, owner, and description.
+// ============================================================================
+
 import db from '../config/db.js';
 
 class PropertyModel {
+  //  CREATE PROPERTY: Filing a deed for a new building.
   async create(propertyData) {
     const {
       ownerId,

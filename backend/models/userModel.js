@@ -1,3 +1,10 @@
+// ============================================================================
+//  USER MODEL (The Person Records)
+// ============================================================================
+//  This file manages the "Files" for every person in the system.
+//  Whether they are an Owner, Tenant, or Treasurer, their basic info (Name, Email) lives here.
+// ============================================================================
+
 import pool from '../config/db.js';
 
 class UserModel {
@@ -119,6 +126,7 @@ class UserModel {
     return rows[0];
   }
 
+  //  CREATE USER: Making a new file for a person.
   async create(userData, connection) {
     const {
       name,

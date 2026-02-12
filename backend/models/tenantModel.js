@@ -1,6 +1,14 @@
+// ============================================================================
+//  TENANT MODEL (The Renter's Profile)
+// ============================================================================
+//  This file stores extra details about the people living in the units.
+//  Things like Emergency Contacts, Employment Status, and Monthly Income.
+// ============================================================================
+
 import pool from '../config/db.js';
 
 class TenantModel {
+  //  CREATE PROFILE: Saving the detailed info for a new tenant.
   async create(tenantData, connection) {
     const {
       userId,

@@ -1,7 +1,15 @@
+// ============================================================================
+//  AUTH CONTROLLER (The Security Guard)
+// ============================================================================
+//  This file handles all "Entry" requests: Logging in, Setting passwords, etc.
+//  It verifies who you are before letting you into the system.
+// ============================================================================
+
 import authService from '../services/authService.js';
 import { validatePassword, validateEmail } from '../utils/validators.js';
 
 class AuthController {
+  //  LOGIN: Checks email & password. If correct, gives a digital "Key" (Token).
   async login(req, res) {
     try {
       const { email, password } = req.body;

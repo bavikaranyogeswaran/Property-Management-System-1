@@ -54,6 +54,13 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 
+// ============================================================================
+//  LEASES PAGE (The Contract Filing Cabinet)
+// ============================================================================
+//  This page manages all the Rental Agreements.
+//  It tracks who is staying where, when their contract ends, and if they have paid their deposit.
+// ============================================================================
+
 export function LeasesPage() {
   const {
     tenants,

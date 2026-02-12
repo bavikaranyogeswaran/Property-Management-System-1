@@ -1,3 +1,10 @@
+// ============================================================================
+//  REPORT SERVICE (The Document Printer)
+// ============================================================================
+//  This file asks the server to generate PDF reports.
+//  It handles downloading them or opening them in a new tab.
+// ============================================================================
+
 import axios from 'axios';
 
 const API_URL = 'http://localhost:3000/api/reports';

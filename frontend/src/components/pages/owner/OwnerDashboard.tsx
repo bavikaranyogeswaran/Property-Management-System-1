@@ -12,6 +12,13 @@ import {
 } from 'lucide-react';
 import { NotificationBanner } from '@/components/common/NotificationBanner';
 
+// ============================================================================
+//  OWNER DASHBOARD (The Command Center)
+// ============================================================================
+//  This is the main screen for the Owner.
+//  It shows a summary of everything: Money made, Vacant units, and Issues.
+// ============================================================================
+
 export function OwnerDashboard() {
   const {
     properties,

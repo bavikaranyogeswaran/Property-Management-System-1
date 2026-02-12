@@ -33,6 +33,13 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 
+// ============================================================================
+//  PROPERTIES PAGE (The Building List)
+// ============================================================================
+//  This page lists all the buildings the Owner manages.
+//  It's like a catalog. You can Add, Edit, or Delete properties here.
+// ============================================================================
+
 export function PropertiesPage() {
   const { user } = useAuth();
   const {

@@ -1,3 +1,10 @@
+// ============================================================================
+//  LEASE CONTROLLER (The Contract Manager)
+// ============================================================================
+//  This file handles the legal agreements between Owner and Tenant.
+//  It creates contracts, renews them, and handles move-outs (termination).
+// ============================================================================
+
 import leaseModel from '../models/leaseModel.js';
 import unitModel from '../models/unitModel.js';
 import leaseService from '../services/leaseService.js';
@@ -56,6 +63,7 @@ class LeaseController {
     }
   }
 
+  //  CREATE LEASE: Signing a new contract with a tenant.
   async createLease(req, res) {
     try {
       if (req.user.role !== 'owner' && req.user.role !== 'treasurer') {
@@ -136,6 +144,7 @@ class LeaseController {
     }
   }
 
+  //  TERMINATE LEASE: Ending the contract early or moving out.
   async terminateLease(req, res) {
     try {
       if (req.user.role !== 'owner' && req.user.role !== 'treasurer') {

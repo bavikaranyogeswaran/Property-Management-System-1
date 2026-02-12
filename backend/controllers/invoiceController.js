@@ -1,3 +1,10 @@
+// ============================================================================
+//  INVOICE CONTROLLER (The Billing Department)
+// ============================================================================
+//  This file handles the "Bills".
+//  It sends rent bills to tenants and tracks if they are paid or overdue.
+// ============================================================================
+
 import invoiceModel from '../models/invoiceModel.js';
 import leaseModel from '../models/leaseModel.js';
 import behaviorLogModel from '../models/behaviorLogModel.js';
@@ -67,6 +74,8 @@ class InvoiceController {
     }
   }
 
+  //  GENERATE MONTHLY RENT: The automatic system that sends bills on the 1st of the month.
+  //  It checks who has an active lease and creates a bill for them.
   async generateMonthlyInvoices(req, res) {
     try {
       if (req.user.role !== 'treasurer') {
@@ -158,6 +167,7 @@ class InvoiceController {
     }
   }
 
+  //  UPDATE STATUS: Marking a bill as 'Paid', 'Overdue', or 'Cancelled'.
   async updateStatus(req, res) {
     try {
       const { id } = req.params;

@@ -1,6 +1,14 @@
+// ============================================================================
+//  UNIT MODEL (The Room Details)
+// ============================================================================
+//  This file manages the specific details of each room or apartment.
+//  It knows the Unit Number (e.g., "A101"), the Rent Price, and the Type.
+// ============================================================================
+
 import db from '../config/db.js';
 
 class UnitModel {
+  //  CREATE UNIT: Adding a new room to the system.
   async create(data) {
     // data: propertyId, unitNumber, unitTypeId, monthlyRent, status, imageUrl
     const {

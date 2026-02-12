@@ -1,6 +1,14 @@
+// ============================================================================
+//  UNIT CONTROLLER (The Apartment Manager)
+// ============================================================================
+//  This file manages the individual rooms or houses (Units).
+//  It tracks if they are vacant or occupied and who lives there.
+// ============================================================================
+
 import unitModel from '../models/unitModel.js';
 
 class UnitController {
+  //  ADD UNIT: Adding a new room/house to the system.
   async createUnit(req, res) {
     try {
       const unit = await unitModel.create(req.body);

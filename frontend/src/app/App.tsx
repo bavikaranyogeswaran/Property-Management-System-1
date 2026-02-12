@@ -1,3 +1,11 @@
+// ============================================================================
+//  FRONTEND ENTRY POINT (The Main Map)
+// ============================================================================
+//  This file acts as the "Traffic Controller" for the website.
+//  It checks "Who are you?" (Owner, Tenant, etc.) and "Where do you want to go?"
+//  then shows the correct page.
+// ============================================================================
+
 import React from 'react';
 import {
   BrowserRouter,
@@ -123,6 +131,7 @@ function AppContent() {
   const location = useLocation();
 
   React.useEffect(() => {
+    // These logs help developers see what's happening in the browser console
     console.log('DEBUG: Current Path:', location.pathname);
     console.log('DEBUG: User Auth:', user);
   }, [location, user]);
@@ -133,6 +142,10 @@ function AppContent() {
 
   return (
     <Routes>
+      {/* ======================================================================= */}
+      {/*  PUBLIC ROUTES (Open to Everyone) */}
+      {/*  Pages that anyone can see without logging in (Landing Page, Login). */}
+      {/* ======================================================================= */}
       {/* Public Routes */}
       <Route path="/" element={<LandingPageWrapper />} />
       <Route path="/login" element={<LoginPage />} />
@@ -171,6 +184,10 @@ function AppContent() {
         }
       />
 
+      {/* ======================================================================= */}
+      {/*  This determines if we show the main Dashboard or redirect to login */}
+      {/* ======================================================================= */}
+
       {/* Protected Routes */}
       {/* Dashboard */}
       <Route
@@ -190,6 +207,10 @@ function AppContent() {
         }
       />
 
+      {/* ======================================================================= */}
+      {/*  OWNER ROUTES (Landlord Area) */}
+      {/*  Only users with 'owner' role can see these pages. */}
+      {/* ======================================================================= */}
       {/* Owner Routes */}
       {user?.role === 'owner' && (
         <>
@@ -287,6 +308,10 @@ function AppContent() {
         </>
       )}
 
+      {/* ======================================================================= */}
+      {/*  TENANT ROUTES (Renter Area) */}
+      {/*  Only users with 'tenant' role can see these pages. */}
+      {/* ======================================================================= */}
       {/* Tenant Routes */}
       {user?.role === 'tenant' && (
         <>
@@ -325,6 +350,10 @@ function AppContent() {
         </>
       )}
 
+      {/* ======================================================================= */}
+      {/*  TREASURER ROUTES (Accountant Area) */}
+      {/*  Only users with 'treasurer' role can see these pages. */}
+      {/* ======================================================================= */}
       {/* Treasurer Routes */}
       {user?.role === 'treasurer' && (
         <>

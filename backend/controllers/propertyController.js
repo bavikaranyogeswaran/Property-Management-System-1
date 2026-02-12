@@ -1,6 +1,14 @@
+// ============================================================================
+//  PROPERTY CONTROLLER (The Building Manager)
+// ============================================================================
+//  This file handles everything related to the physical buildings:
+//  Adding new houses, listing them, and updating their details.
+// ============================================================================
+
 import propertyService from '../services/propertyService.js';
 
 class PropertyController {
+  //  ADD PROPERTY: Owner registers a new building into the system.
   async createProperty(req, res) {
     try {
       // Owner ID from authenticated user (assuming owner role verification in middleware)
@@ -15,6 +23,9 @@ class PropertyController {
     }
   }
 
+  //  LIST PROPERTIES: Shows all the buildings we manage.
+  //  - Public: Shows available units to potential tenants.
+  //  - Owner: Shows all their assets.
   async getProperties(req, res) {
     try {
       // Check if user is authenticated (req.user exists)

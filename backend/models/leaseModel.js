@@ -1,6 +1,14 @@
+// ============================================================================
+//  LEASE MODEL (The Contract Cabinet)
+// ============================================================================
+//  This file holds all the signed rental agreements.
+//  It knows who lives where, for how long, and how much they pay.
+// ============================================================================
+
 import db from '../config/db.js';
 
 class LeaseModel {
+  //  CREATE LEASE: Filing a new contract.
   async create(data, connection = null) {
     const {
       tenantId,

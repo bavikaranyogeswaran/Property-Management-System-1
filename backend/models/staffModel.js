@@ -1,3 +1,10 @@
+// ============================================================================
+//  STAFF MODEL (The Employee Records)
+// ============================================================================
+//  This file keeps track of people who work for the Owner (like Treasurers).
+//  It stores their Employee ID, Job Title, and Work Hours.
+// ============================================================================
+
 import pool from '../config/db.js';
 
 class StaffModel {
@@ -40,6 +47,7 @@ class StaffModel {
     };
   }
 
+  //  ASSIGN PROPERTY: Giving a Treasurer responsibility for a specific building.
   async assignProperty(userId, propertyId) {
     const [result] = await pool.query(
       'INSERT INTO staff_property_assignments (user_id, property_id) VALUES (?, ?)',

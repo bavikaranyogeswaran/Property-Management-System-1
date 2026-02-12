@@ -1,8 +1,16 @@
+// ============================================================================
+//  USER CONTROLLER (The HR & Staff Manager)
+// ============================================================================
+//  This file handles managing people: Treasurers, Tenants, and Owners.
+//  It allows hiring staff, updating profiles, and assigning work.
+// ============================================================================
+
 import userService from '../services/userService.js';
 import staffModel from '../models/staffModel.js';
 import { validateEmail } from '../utils/validators.js';
 
 class UserController {
+  //  HIRE TREASURER: Owner adds a new staff member to handle money.
   async createTreasurer(req, res) {
     try {
       // RBAC Check: Only owner can create treasurer
@@ -136,6 +144,9 @@ class UserController {
     }
   }
 
+  //  GET TENANTS: Fetches the list of people living in the properties.
+  //  - Owner sees EVERYONE.
+  //  - Treasurer sees only tenants in properties assigned to them.
   async getTenants(req, res) {
     try {
       if (req.user.role !== 'owner' && req.user.role !== 'treasurer') {
@@ -178,6 +189,7 @@ class UserController {
     }
   }
 
+  //  ASSIGN PROPERTY: Owner tells a Treasurer "You are responsible for this Building".
   async assignProperty(req, res) {
     try {
       if (req.user.role !== 'owner') {

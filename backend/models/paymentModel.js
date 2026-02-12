@@ -1,6 +1,14 @@
+// ============================================================================
+//  PAYMENT MODEL (The Cash Register)
+// ============================================================================
+//  This file records every single time money changes hands.
+//  It tracks Cash, Bank Transfers, and checks if payments are Verified.
+// ============================================================================
+
 import pool from '../config/db.js';
 
 class PaymentModel {
+  //  RECORD PAYMENT: Saving a transaction slip.
   async create(data) {
     const {
       invoiceId,

@@ -1,3 +1,12 @@
+// ============================================================================
+//  PAYMENT CONTROLLER (The Bank Teller)
+// ============================================================================
+//  This file handles all money coming IN.
+//  - Tenants submitting proof of payment.
+//  - Treasurers verifying the money is in the bank.
+//  - Generating Receipts.
+// ============================================================================
+
 import paymentModel from '../models/paymentModel.js';
 import invoiceModel from '../models/invoiceModel.js';
 import notificationModel from '../models/notificationModel.js';
@@ -5,6 +14,8 @@ import userModel from '../models/userModel.js';
 import receiptModel from '../models/receiptModel.js';
 
 class PaymentController {
+  //  SUBMIT PAYMENT: Tenant uploads a slip or says "I paid X amount".
+  //  This doesn't count as 'Paid' until a Treasurer checks it.
   async submitPayment(req, res) {
     try {
       const { invoiceId, amount, paymentDate, paymentMethod, referenceNumber } =
@@ -63,6 +74,7 @@ class PaymentController {
     }
   }
 
+  //  RECORD CASH: Treasurer takes physical cash. Checks it instantly.
   async recordCashPayment(req, res) {
     try {
       if (req.user.role !== 'treasurer') {
@@ -130,6 +142,8 @@ class PaymentController {
     }
   }
 
+  //  VERIFY PAYMENT: Treasurer looks at bank statement and says "Yes, money is here".
+  //  This updates the Invoice to 'Paid' and sends a Receipt.
   async verifyPayment(req, res) {
     console.log('--- verifyPayment CALLED ---');
     console.log('Params:', req.params);

@@ -1591,9 +1591,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const response = await apiClient.post('/property-types', type);
       setPropertyTypes([...propertyTypes, response.data]);
       toast.success('Property type added');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to add property type:', error);
-      // @ts-ignore
       const errMsg =
         error.response?.data?.error ||
         error.message ||

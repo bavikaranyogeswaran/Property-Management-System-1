@@ -34,6 +34,14 @@ interface AppLayoutProps {
   children: ReactNode;
 }
 
+// ============================================================================
+//  APP LAYOUT (The Frame)
+// ============================================================================
+//  This file creates the "Skeleton" of the app.
+//  It draws the Top Bar (with Notification Bell) and the Side Menu (Navigation).
+//  It changes the menu items based on who is logged in (Owner vs Tenant).
+// ============================================================================
+
 export function AppLayout({ children }: AppLayoutProps) {
   const { user, logout } = useAuth();
   const { notifications, markNotificationAsRead } = useApp();
