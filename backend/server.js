@@ -19,12 +19,12 @@ app.use(json());
 
 // Rate Limiting for Auth
 const authLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // Limit each IP to 100 requests per windowMs
-    message: 'Too many login attempts from this IP, please try again after 15 minutes'
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per windowMs
+  message:
+    'Too many login attempts from this IP, please try again after 15 minutes',
 });
 app.use('/api/auth', authLimiter);
-
 
 // Serve uploaded files
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
@@ -73,27 +73,29 @@ import payoutRoutes from './routes/payoutRoutes.js';
 app.use('/api/payouts', payoutRoutes);
 
 app.get('/api/health', (req, res) => {
-    res.json({ status: 'ok', message: 'PMS Backend is running' });
+  res.json({ status: 'ok', message: 'PMS Backend is running' });
 });
 
 // Error Handling Middleware
 // Global Error Handler
 app.use((err, req, res, next) => {
-    console.error(err.stack);
+  console.error(err.stack);
 
-    if (err.code === 'LIMIT_FILE_SIZE') {
-        return res.status(413).json({ error: 'File too large. Maximum size is 5MB.' });
-    }
+  if (err.code === 'LIMIT_FILE_SIZE') {
+    return res
+      .status(413)
+      .json({ error: 'File too large. Maximum size is 5MB.' });
+  }
 
-    if (err.message === 'Only image files are allowed') {
-        return res.status(400).json({ error: err.message });
-    }
+  if (err.message === 'Only image files are allowed') {
+    return res.status(400).json({ error: err.message });
+  }
 
-    if (err.code === 'ER_DUP_ENTRY') {
-        return res.status(409).json({ error: 'Duplicate entry' });
-    }
+  if (err.code === 'ER_DUP_ENTRY') {
+    return res.status(409).json({ error: 'Duplicate entry' });
+  }
 
-    res.status(500).json({ error: err.message || 'Something went wrong!' });
+  res.status(500).json({ error: err.message || 'Something went wrong!' });
 });
 
 // Cron Jobs
@@ -101,5 +103,5 @@ import initCronJobs from './utils/cronJobs.js';
 initCronJobs();
 
 app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
+  console.log(`Server is running on port ${PORT}`);
 });

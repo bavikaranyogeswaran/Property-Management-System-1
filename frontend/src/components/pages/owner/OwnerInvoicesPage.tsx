@@ -3,18 +3,44 @@ import { useAuth } from '@/app/context/AuthContext';
 import { useApp, Receipt as ReceiptType } from '@/app/context/AppContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { FileText, Plus, DollarSign, AlertCircle, CheckCircle, Download } from 'lucide-react';
+import {
+  FileText,
+  Plus,
+  DollarSign,
+  AlertCircle,
+  CheckCircle,
+  Download,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { ReceiptViewer } from '@/components/common/ReceiptViewer';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
 // Helper Form Component
-function RecordCashPaymentForm({ invoice, tenantName }: { invoice: any, tenantName?: string }) {
+function RecordCashPaymentForm({
+  invoice,
+  tenantName,
+}: {
+  invoice: any;
+  tenantName?: string;
+}) {
   const { recordCashPayment } = useApp();
   const [amount, setAmount] = useState(invoice.amount.toString());
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -27,7 +53,7 @@ function RecordCashPaymentForm({ invoice, tenantName }: { invoice: any, tenantNa
       await recordCashPayment(invoice.id, parseFloat(amount), date);
       // Close dialog? Ideally parent handles logic, but simple form submission here.
       // We rely on toast from context.
-      // To close dialog, we might need a prop or use DialogClose. 
+      // To close dialog, we might need a prop or use DialogClose.
       // For now, let it submit.
     } finally {
       setLoading(false);
@@ -38,7 +64,9 @@ function RecordCashPaymentForm({ invoice, tenantName }: { invoice: any, tenantNa
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
         <Label>Tenant</Label>
-        <div className="p-2 bg-gray-50 rounded border">{tenantName || 'Unknown'}</div>
+        <div className="p-2 bg-gray-50 rounded border">
+          {tenantName || 'Unknown'}
+        </div>
       </div>
       <div>
         <Label>Amount (LKR)</Label>
@@ -67,7 +95,16 @@ function RecordCashPaymentForm({ invoice, tenantName }: { invoice: any, tenantNa
 
 export function OwnerInvoicesPage() {
   const { user } = useAuth();
-  const { invoices, tenants, units, properties, leases, receipts, payments, generateMonthlyInvoices } = useApp();
+  const {
+    invoices,
+    tenants,
+    units,
+    properties,
+    leases,
+    receipts,
+    payments,
+    generateMonthlyInvoices,
+  } = useApp();
   const [selectedReceipt, setSelectedReceipt] = useState<{
     receipt: ReceiptType;
     tenantName: string;
@@ -78,8 +115,8 @@ export function OwnerInvoicesPage() {
     paymentDate: string;
   } | null>(null);
 
-  const pendingInvoices = invoices.filter(i => i.status === 'pending');
-  const paidInvoices = invoices.filter(i => i.status === 'paid');
+  const pendingInvoices = invoices.filter((i) => i.status === 'pending');
+  const paidInvoices = invoices.filter((i) => i.status === 'paid');
   // Fix: Compare dates strictly (YYYY-MM-DD string comparison works if format is ISO)
   // Use local date to avoid UTC shifts marking today's invoices as overdue
   const d = new Date();
@@ -88,7 +125,7 @@ export function OwnerInvoicesPage() {
   const day = String(d.getDate()).padStart(2, '0');
   const todayStr = `${year}-${month}-${day}`;
 
-  const overdueInvoices = pendingInvoices.filter(i => i.dueDate < todayStr);
+  const overdueInvoices = pendingInvoices.filter((i) => i.dueDate < todayStr);
 
   const handleGenerateInvoices = () => {
     generateMonthlyInvoices();
@@ -125,7 +162,11 @@ export function OwnerInvoicesPage() {
     },
   ];
 
-  const InvoiceTable = ({ invoicesList }: { invoicesList: typeof invoices }) => (
+  const InvoiceTable = ({
+    invoicesList,
+  }: {
+    invoicesList: typeof invoices;
+  }) => (
     <div className="overflow-x-auto">
       <Table>
         <TableHeader>
@@ -148,29 +189,39 @@ export function OwnerInvoicesPage() {
             const unitNumber = invoice.unitNumber || 'Unknown';
 
             // Fallback object lookups (needed for Receipt/Form logic that use other fields like email)
-            const tenant = tenants.find(t => t.id === invoice.tenantId);
-            const unit = units.find(u => u.id === invoice.unitId);
-            const property = unit ? properties.find(p => p.id === unit.propertyId) : null;
+            const tenant = tenants.find((t) => t.id === invoice.tenantId);
+            const unit = units.find((u) => u.id === invoice.unitId);
+            const property = unit
+              ? properties.find((p) => p.id === unit.propertyId)
+              : null;
 
             // Search query filtering (if implemented) or other logic
             // Note: searchQuery is not defined in this scope. This line will cause a compilation error.
             // Assuming it's a placeholder or intended for a different context.
-            // const matchesSearch = 
+            // const matchesSearch =
             //   tenantName.toLowerCase().includes(searchQuery.toLowerCase()) ||
             //   propertyName.toLowerCase().includes(searchQuery.toLowerCase()) ||
             //   unitNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
             //   invoice.id.includes(searchQuery); is YYYY-MM-DD
-            const isOverdue = invoice.status === 'pending' && invoice.dueDate < todayStr;
+            const isOverdue =
+              invoice.status === 'pending' && invoice.dueDate < todayStr;
             const isLateFee = invoice.description?.includes('Late Fee');
-            const receipt = receipts.find(r => r.invoiceId === invoice.id);
+            const receipt = receipts.find((r) => r.invoiceId === invoice.id);
 
             return (
-              <TableRow key={invoice.id} className={isLateFee ? 'bg-red-50' : ''}>
-                <TableCell className="font-mono text-sm">#{invoice.id}</TableCell>
+              <TableRow
+                key={invoice.id}
+                className={isLateFee ? 'bg-red-50' : ''}
+              >
+                <TableCell className="font-mono text-sm">
+                  #{invoice.id}
+                </TableCell>
                 <TableCell className="font-medium">{tenantName}</TableCell>
                 <TableCell>{propertyName}</TableCell>
                 <TableCell>{unitNumber}</TableCell>
-                <TableCell className="font-semibold">LKR {invoice.amount}</TableCell>
+                <TableCell className="font-semibold">
+                  LKR {invoice.amount}
+                </TableCell>
                 <TableCell>
                   <div className={isOverdue ? 'text-red-600 font-medium' : ''}>
                     {invoice.dueDate}
@@ -180,14 +231,36 @@ export function OwnerInvoicesPage() {
                 <TableCell>{invoice.generatedDate}</TableCell>
                 <TableCell>
                   <div className="flex gap-2">
-                    <Badge variant={
-                      invoice.status === 'paid' ? 'default' :
-                        invoice.status === 'partially_paid' ? 'outline' : // Changed to outline or custom class for visibility
-                          isOverdue ? 'destructive' : 'secondary'
-                    } className={invoice.status === 'partially_paid' ? 'bg-yellow-100 text-yellow-800 border-yellow-200' : ''}>
-                      {isOverdue ? 'Overdue' : invoice.status === 'partially_paid' ? 'Partially Paid' : invoice.status}
+                    <Badge
+                      variant={
+                        invoice.status === 'paid'
+                          ? 'default'
+                          : invoice.status === 'partially_paid'
+                            ? 'outline' // Changed to outline or custom class for visibility
+                            : isOverdue
+                              ? 'destructive'
+                              : 'secondary'
+                      }
+                      className={
+                        invoice.status === 'partially_paid'
+                          ? 'bg-yellow-100 text-yellow-800 border-yellow-200'
+                          : ''
+                      }
+                    >
+                      {isOverdue
+                        ? 'Overdue'
+                        : invoice.status === 'partially_paid'
+                          ? 'Partially Paid'
+                          : invoice.status}
                     </Badge>
-                    {isLateFee && <Badge variant="destructive" className="bg-red-100 text-red-700 border-red-200">Late Fee</Badge>}
+                    {isLateFee && (
+                      <Badge
+                        variant="destructive"
+                        className="bg-red-100 text-red-700 border-red-200"
+                      >
+                        Late Fee
+                      </Badge>
+                    )}
                   </div>
                 </TableCell>
                 <TableCell className="text-right flex items-center justify-end gap-2">
@@ -195,7 +268,11 @@ export function OwnerInvoicesPage() {
                   {user?.role === 'treasurer' && invoice.status !== 'paid' && (
                     <Dialog>
                       <DialogTrigger asChild>
-                        <Button size="sm" variant="outline" className="text-green-600 border-green-200 hover:bg-green-50">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-green-600 border-green-200 hover:bg-green-50"
+                        >
                           <DollarSign className="size-3 mr-1" />
                           Cash Pay
                         </Button>
@@ -204,61 +281,69 @@ export function OwnerInvoicesPage() {
                         <DialogHeader>
                           <DialogTitle>Record Cash Payment</DialogTitle>
                         </DialogHeader>
-                        <RecordCashPaymentForm invoice={invoice} tenantName={tenant?.name} />
+                        <RecordCashPaymentForm
+                          invoice={invoice}
+                          tenantName={tenant?.name}
+                        />
                       </DialogContent>
                     </Dialog>
                   )}
 
-                  {invoice.status === 'paid' && receipt && (() => {
-                    const receiptPayment = payments.find(p => p.id === receipt.paymentId);
-                    if (!receiptPayment || !tenant || !unit || !property) return null;
+                  {invoice.status === 'paid' &&
+                    receipt &&
+                    (() => {
+                      const receiptPayment = payments.find(
+                        (p) => p.id === receipt.paymentId
+                      );
+                      if (!receiptPayment || !tenant || !unit || !property)
+                        return null;
 
-                    return (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          setSelectedReceipt({
-                            receipt,
-                            tenantName: tenant.name,
-                            tenantEmail: tenant.email,
-                            propertyName: property.name,
-                            unitNumber: unit.unitNumber,
-                            paymentMethod: receiptPayment.paymentMethod,
-                            paymentDate: receiptPayment.paymentDate,
-                          });
-                        }}
-                      >
-                        <Download className="size-4 mr-2" />
-                        Receipt
-                      </Button>
-                    );
-                  })()}
+                      return (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setSelectedReceipt({
+                              receipt,
+                              tenantName: tenant.name,
+                              tenantEmail: tenant.email,
+                              propertyName: property.name,
+                              unitNumber: unit.unitNumber,
+                              paymentMethod: receiptPayment.paymentMethod,
+                              paymentDate: receiptPayment.paymentDate,
+                            });
+                          }}
+                        >
+                          <Download className="size-4 mr-2" />
+                          Receipt
+                        </Button>
+                      );
+                    })()}
                 </TableCell>
               </TableRow>
             );
           })}
         </TableBody>
       </Table>
-      {
-        invoicesList.length === 0 && (
-          <div className="py-12 text-center">
-            <FileText className="size-12 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-600">No invoices found</p>
-          </div>
-        )
-      }
-    </div >
+      {invoicesList.length === 0 && (
+        <div className="py-12 text-center">
+          <FileText className="size-12 text-gray-400 mx-auto mb-4" />
+          <p className="text-gray-600">No invoices found</p>
+        </div>
+      )}
+    </div>
   );
 
-  const activeLeases = leases.filter(l => l.status === 'active');
+  const activeLeases = leases.filter((l) => l.status === 'active');
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-2xl font-semibold text-gray-900">Invoices</h2>
-          <p className="text-sm text-gray-500 mt-1">Manage rent invoices and payments</p>
+          <p className="text-sm text-gray-500 mt-1">
+            Manage rent invoices and payments
+          </p>
         </div>
         {user?.role === 'treasurer' && (
           <Button onClick={handleGenerateInvoices}>
@@ -275,10 +360,13 @@ export function OwnerInvoicesPage() {
             <div className="flex items-start gap-3">
               <DollarSign className="size-5 text-blue-600 mt-0.5" />
               <div>
-                <p className="font-medium text-blue-900">Auto-Generate Invoices</p>
+                <p className="font-medium text-blue-900">
+                  Auto-Generate Invoices
+                </p>
                 <p className="text-sm text-blue-800 mt-1">
-                  Click "Generate Monthly Invoices" to automatically create invoices for all active leases.
-                  Invoices are generated for the current month with a due date of the 5th.
+                  Click "Generate Monthly Invoices" to automatically create
+                  invoices for all active leases. Invoices are generated for the
+                  current month with a due date of the 5th.
                 </p>
                 <p className="text-sm text-blue-700 mt-2">
                   Active leases: <strong>{activeLeases.length}</strong>
@@ -299,11 +387,15 @@ export function OwnerInvoicesPage() {
                 <div className="flex items-start justify-between">
                   <div>
                     <p className="text-xs text-gray-600">{stat.label}</p>
-                    <p className={`text-2xl font-semibold mt-1 ${stat.color.split(' ')[1]}`}>
+                    <p
+                      className={`text-2xl font-semibold mt-1 ${stat.color.split(' ')[1]}`}
+                    >
                       {stat.value}
                     </p>
                     {stat.subtitle && (
-                      <p className="text-xs text-gray-500 mt-1">{stat.subtitle}</p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {stat.subtitle}
+                      </p>
                     )}
                   </div>
                   <div className={`${stat.color.split(' ')[0]} p-2 rounded-lg`}>
@@ -322,11 +414,23 @@ export function OwnerInvoicesPage() {
           <Tabs defaultValue="all" className="w-full">
             <div className="border-b px-6 pt-6">
               <TabsList>
-                <TabsTrigger value="all">All Invoices ({invoices.length})</TabsTrigger>
-                <TabsTrigger value="pending">Pending ({pendingInvoices.length})</TabsTrigger>
-                <TabsTrigger value="overdue">Overdue ({overdueInvoices.length})</TabsTrigger>
-                <TabsTrigger value="partially_paid">Partially Paid ({invoices.filter(i => i.status === 'partially_paid').length})</TabsTrigger>
-                <TabsTrigger value="paid">Paid ({paidInvoices.length})</TabsTrigger>
+                <TabsTrigger value="all">
+                  All Invoices ({invoices.length})
+                </TabsTrigger>
+                <TabsTrigger value="pending">
+                  Pending ({pendingInvoices.length})
+                </TabsTrigger>
+                <TabsTrigger value="overdue">
+                  Overdue ({overdueInvoices.length})
+                </TabsTrigger>
+                <TabsTrigger value="partially_paid">
+                  Partially Paid (
+                  {invoices.filter((i) => i.status === 'partially_paid').length}
+                  )
+                </TabsTrigger>
+                <TabsTrigger value="paid">
+                  Paid ({paidInvoices.length})
+                </TabsTrigger>
               </TabsList>
             </div>
             <TabsContent value="all" className="m-0">
@@ -339,7 +443,11 @@ export function OwnerInvoicesPage() {
               <InvoiceTable invoicesList={overdueInvoices} />
             </TabsContent>
             <TabsContent value="partially_paid" className="m-0">
-              <InvoiceTable invoicesList={invoices.filter(i => i.status === 'partially_paid')} />
+              <InvoiceTable
+                invoicesList={invoices.filter(
+                  (i) => i.status === 'partially_paid'
+                )}
+              />
             </TabsContent>
             <TabsContent value="paid" className="m-0">
               <InvoiceTable invoicesList={paidInvoices} />
@@ -349,7 +457,10 @@ export function OwnerInvoicesPage() {
       </Card>
 
       {/* Receipt Viewer Dialog */}
-      <Dialog open={selectedReceipt !== null} onOpenChange={() => setSelectedReceipt(null)}>
+      <Dialog
+        open={selectedReceipt !== null}
+        onOpenChange={() => setSelectedReceipt(null)}
+      >
         <DialogContent className="max-w-3xl">
           <DialogHeader>
             <DialogTitle className="sr-only">Payment Receipt</DialogTitle>

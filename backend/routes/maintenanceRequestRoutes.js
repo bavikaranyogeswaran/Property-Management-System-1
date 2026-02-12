@@ -6,6 +6,10 @@ const router = Router();
 
 router.post('/', authenticateToken, maintenanceRequestController.createRequest);
 router.get('/', authenticateToken, maintenanceRequestController.getRequests);
-router.put('/:id/status', authenticateToken, maintenanceRequestController.updateStatus);
+router.put(
+  '/:id/status',
+  authenticateToken,
+  maintenanceRequestController.updateStatus
+);
 
 export default router;

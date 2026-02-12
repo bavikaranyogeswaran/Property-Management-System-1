@@ -24,19 +24,28 @@ interface LeadConversionAnalyticsProps {
   leadStageHistory: LeadStageHistory[];
 }
 
-export function LeadConversionAnalytics({ leads, leadStageHistory }: LeadConversionAnalyticsProps) {
+export function LeadConversionAnalytics({
+  leads,
+  leadStageHistory,
+}: LeadConversionAnalyticsProps) {
   // Calculate lead metrics
   const totalLeads = leads.length;
-  const interestedLeads = leads.filter(l => l.status === 'interested').length;
-  const convertedLeads = leads.filter(l => l.status === 'converted').length;
-  const droppedLeads = leads.filter(l => l.status === 'dropped').length;
+  const interestedLeads = leads.filter((l) => l.status === 'interested').length;
+  const convertedLeads = leads.filter((l) => l.status === 'converted').length;
+  const droppedLeads = leads.filter((l) => l.status === 'dropped').length;
 
-  const conversionRate = totalLeads > 0 ? ((convertedLeads / totalLeads) * 100).toFixed(1) : '0.0';
-  const dropOffRate = totalLeads > 0 ? ((droppedLeads / totalLeads) * 100).toFixed(1) : '0.0';
+  const conversionRate =
+    totalLeads > 0 ? ((convertedLeads / totalLeads) * 100).toFixed(1) : '0.0';
+  const dropOffRate =
+    totalLeads > 0 ? ((droppedLeads / totalLeads) * 100).toFixed(1) : '0.0';
 
   // Funnel data
   const funnelData = [
-    { stage: 'Interested', value: interestedLeads + convertedLeads, fill: '#3b82f6' },
+    {
+      stage: 'Interested',
+      value: interestedLeads + convertedLeads,
+      fill: '#3b82f6',
+    },
     { stage: 'Converted', value: convertedLeads, fill: '#10b981' },
   ];
 
@@ -49,19 +58,24 @@ export function LeadConversionAnalytics({ leads, leadStageHistory }: LeadConvers
 
   // Calculate conversion from each stage
   const interestedToConverted = leadStageHistory.filter(
-    h => h.fromStatus === 'interested' && h.toStatus === 'converted'
+    (h) => h.fromStatus === 'interested' && h.toStatus === 'converted'
   ).length;
 
   const interestedToDropped = leadStageHistory.filter(
-    h => h.fromStatus === 'interested' && h.toStatus === 'dropped'
+    (h) => h.fromStatus === 'interested' && h.toStatus === 'dropped'
   ).length;
 
   // Calculate average time in each stage
   const calculateAvgTimeInStage = (stage: Lead['status']) => {
-    const transitionsFromStage = leadStageHistory.filter(h => h.fromStatus === stage);
+    const transitionsFromStage = leadStageHistory.filter(
+      (h) => h.fromStatus === stage
+    );
     if (transitionsFromStage.length === 0) return 0;
 
-    const totalDays = transitionsFromStage.reduce((sum, h) => sum + (h.durationInPreviousStage || 0), 0);
+    const totalDays = transitionsFromStage.reduce(
+      (sum, h) => sum + (h.durationInPreviousStage || 0),
+      0
+    );
     return Math.round(totalDays / transitionsFromStage.length);
   };
 
@@ -69,16 +83,23 @@ export function LeadConversionAnalytics({ leads, leadStageHistory }: LeadConvers
 
   // Calculate average time to convert
   const convertedLeadsHistory = leads
-    .filter(l => l.status === 'converted')
-    .map(lead => {
-      const history = leadStageHistory.filter(h => h.leadId === lead.id);
-      const totalTime = history.reduce((sum, h) => sum + (h.durationInPreviousStage || 0), 0);
+    .filter((l) => l.status === 'converted')
+    .map((lead) => {
+      const history = leadStageHistory.filter((h) => h.leadId === lead.id);
+      const totalTime = history.reduce(
+        (sum, h) => sum + (h.durationInPreviousStage || 0),
+        0
+      );
       return totalTime;
     });
 
-  const avgTimeToConvert = convertedLeadsHistory.length > 0
-    ? Math.round(convertedLeadsHistory.reduce((a, b) => a + b, 0) / convertedLeadsHistory.length)
-    : 0;
+  const avgTimeToConvert =
+    convertedLeadsHistory.length > 0
+      ? Math.round(
+          convertedLeadsHistory.reduce((a, b) => a + b, 0) /
+            convertedLeadsHistory.length
+        )
+      : 0;
 
   // Stage velocity data
   const stageVelocityData = [
@@ -91,9 +112,14 @@ export function LeadConversionAnalytics({ leads, leadStageHistory }: LeadConvers
       stage: 'Interested → Converted',
       converted: interestedToConverted,
       dropped: interestedToDropped,
-      rate: interestedToConverted + interestedToDropped > 0
-        ? ((interestedToConverted / (interestedToConverted + interestedToDropped)) * 100).toFixed(1)
-        : '0.0'
+      rate:
+        interestedToConverted + interestedToDropped > 0
+          ? (
+              (interestedToConverted /
+                (interestedToConverted + interestedToDropped)) *
+              100
+            ).toFixed(1)
+          : '0.0',
     },
   ];
 
@@ -121,7 +147,9 @@ export function LeadConversionAnalytics({ leads, leadStageHistory }: LeadConvers
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-xs text-gray-600">Conversion Rate</p>
-                <p className="text-2xl font-semibold mt-1 text-green-700">{conversionRate}%</p>
+                <p className="text-2xl font-semibold mt-1 text-green-700">
+                  {conversionRate}%
+                </p>
                 <p className="text-xs text-gray-500 mt-1">
                   {convertedLeads} of {totalLeads} converted
                 </p>
@@ -138,7 +166,9 @@ export function LeadConversionAnalytics({ leads, leadStageHistory }: LeadConvers
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-xs text-gray-600">Drop-off Rate</p>
-                <p className="text-2xl font-semibold mt-1 text-red-700">{dropOffRate}%</p>
+                <p className="text-2xl font-semibold mt-1 text-red-700">
+                  {dropOffRate}%
+                </p>
                 <p className="text-xs text-gray-500 mt-1">
                   {droppedLeads} leads lost
                 </p>
@@ -155,7 +185,9 @@ export function LeadConversionAnalytics({ leads, leadStageHistory }: LeadConvers
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-xs text-gray-600">Avg Time to Convert</p>
-                <p className="text-2xl font-semibold mt-1">{avgTimeToConvert}</p>
+                <p className="text-2xl font-semibold mt-1">
+                  {avgTimeToConvert}
+                </p>
                 <p className="text-xs text-gray-500 mt-1">days</p>
               </div>
               <div className="bg-purple-50 p-2 rounded-lg">
@@ -282,11 +314,21 @@ export function LeadConversionAnalytics({ leads, leadStageHistory }: LeadConvers
             <table className="w-full">
               <thead className="border-b">
                 <tr className="text-left">
-                  <th className="pb-3 text-sm font-medium text-gray-600">Stage</th>
-                  <th className="pb-3 text-sm font-medium text-gray-600">Current Leads</th>
-                  <th className="pb-3 text-sm font-medium text-gray-600">Avg Time (days)</th>
-                  <th className="pb-3 text-sm font-medium text-gray-600">Conversion To Next</th>
-                  <th className="pb-3 text-sm font-medium text-gray-600">Drop-off</th>
+                  <th className="pb-3 text-sm font-medium text-gray-600">
+                    Stage
+                  </th>
+                  <th className="pb-3 text-sm font-medium text-gray-600">
+                    Current Leads
+                  </th>
+                  <th className="pb-3 text-sm font-medium text-gray-600">
+                    Avg Time (days)
+                  </th>
+                  <th className="pb-3 text-sm font-medium text-gray-600">
+                    Conversion To Next
+                  </th>
+                  <th className="pb-3 text-sm font-medium text-gray-600">
+                    Drop-off
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -296,23 +338,35 @@ export function LeadConversionAnalytics({ leads, leadStageHistory }: LeadConvers
                   <td className="py-3">{avgTimeInterested} days</td>
                   <td className="py-3">
                     <div className="flex items-center gap-2">
-                      <span className="text-green-700 font-semibold">{interestedToConverted}</span>
+                      <span className="text-green-700 font-semibold">
+                        {interestedToConverted}
+                      </span>
                       <span className="text-xs text-gray-500">
-                        ({interestedToConverted + interestedToDropped > 0
-                          ? ((interestedToConverted / (interestedToConverted + interestedToDropped)) * 100).toFixed(0)
-                          : 0}%)
+                        (
+                        {interestedToConverted + interestedToDropped > 0
+                          ? (
+                              (interestedToConverted /
+                                (interestedToConverted + interestedToDropped)) *
+                              100
+                            ).toFixed(0)
+                          : 0}
+                        %)
                       </span>
                     </div>
                   </td>
                   <td className="py-3">
-                    <span className="text-red-700 font-semibold">{interestedToDropped}</span>
+                    <span className="text-red-700 font-semibold">
+                      {interestedToDropped}
+                    </span>
                   </td>
                 </tr>
                 <tr className="bg-green-50">
                   <td className="py-3 font-medium text-green-900">Converted</td>
                   <td className="py-3 text-green-900">{convertedLeads}</td>
                   <td className="py-3 text-green-900">-</td>
-                  <td className="py-3 text-green-900 font-semibold">Success!</td>
+                  <td className="py-3 text-green-900 font-semibold">
+                    Success!
+                  </td>
                   <td className="py-3 text-green-900">-</td>
                 </tr>
                 <tr className="bg-red-50">
@@ -336,23 +390,32 @@ export function LeadConversionAnalytics({ leads, leadStageHistory }: LeadConvers
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <h4 className="font-medium text-sm text-blue-900 mb-2">Pipeline Health</h4>
+              <h4 className="font-medium text-sm text-blue-900 mb-2">
+                Pipeline Health
+              </h4>
               <p className="text-sm text-blue-800">
-                {interestedLeads} leads currently in active stages.
-                Focus on converting {interestedLeads} interested leads.
+                {interestedLeads} leads currently in active stages. Focus on
+                converting {interestedLeads} interested leads.
               </p>
             </div>
 
             <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-              <h4 className="font-medium text-sm text-green-900 mb-2">Conversion Performance</h4>
+              <h4 className="font-medium text-sm text-green-900 mb-2">
+                Conversion Performance
+              </h4>
               <p className="text-sm text-green-800">
-                Overall conversion rate of {conversionRate}% with an average time of {avgTimeToConvert} days.
-                {parseFloat(conversionRate) > 30 ? ' Excellent performance!' : ' Room for improvement.'}
+                Overall conversion rate of {conversionRate}% with an average
+                time of {avgTimeToConvert} days.
+                {parseFloat(conversionRate) > 30
+                  ? ' Excellent performance!'
+                  : ' Room for improvement.'}
               </p>
             </div>
 
             <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
-              <h4 className="font-medium text-sm text-orange-900 mb-2">Stage Bottleneck</h4>
+              <h4 className="font-medium text-sm text-orange-900 mb-2">
+                Stage Bottleneck
+              </h4>
               <p className="text-sm text-orange-800">
                 {avgTimeInterested > 14
                   ? `Leads spend ${avgTimeInterested} days in Interested stage. Consider faster follow-ups.`
@@ -361,7 +424,9 @@ export function LeadConversionAnalytics({ leads, leadStageHistory }: LeadConvers
             </div>
 
             <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-              <h4 className="font-medium text-sm text-red-900 mb-2">Drop-off Analysis</h4>
+              <h4 className="font-medium text-sm text-red-900 mb-2">
+                Drop-off Analysis
+              </h4>
               <p className="text-sm text-red-800">
                 {droppedLeads} leads lost ({dropOffRate}% drop-off rate).
                 {droppedLeads} leads lost ({dropOffRate}% drop-off rate).

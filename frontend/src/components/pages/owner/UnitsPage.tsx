@@ -4,9 +4,28 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Home, Plus, Edit, Trash2, Filter, Eye } from 'lucide-react';
 import { toast } from 'sonner';
@@ -14,10 +33,29 @@ import { MultiImageUpload } from '@/components/ui/multi-image-upload';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { unitSchema, type UnitFormValues } from '@/schemas/ownerSchemas';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
 
 export function UnitsPage() {
-  const { units, properties, unitTypes, leases, addUnit, updateUnit, deleteUnit, uploadUnitImages, getUnitImages, deleteUnitImage, setUnitPrimaryImage } = useApp();
+  const {
+    units,
+    properties,
+    unitTypes,
+    leases,
+    addUnit,
+    updateUnit,
+    deleteUnit,
+    uploadUnitImages,
+    getUnitImages,
+    deleteUnitImage,
+    setUnitPrimaryImage,
+  } = useApp();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingUnit, setEditingUnit] = useState<Unit | null>(null);
   const [filterProperty, setFilterProperty] = useState<string>('all');
@@ -44,15 +82,17 @@ export function UnitsPage() {
   React.useEffect(() => {
     if (viewUnit) {
       setViewUnitImages([]);
-      getUnitImages(viewUnit.id).then(images => {
-        if (images) setViewUnitImages(images);
-      }).catch(err => console.error(err));
+      getUnitImages(viewUnit.id)
+        .then((images) => {
+          if (images) setViewUnitImages(images);
+        })
+        .catch((err) => console.error(err));
     }
   }, [viewUnit, getUnitImages]);
 
   const handleImagesChange = (images: { file: File; isPrimary: boolean }[]) => {
-    const files = images.map(img => img.file);
-    const primaryIndex = images.findIndex(img => img.isPrimary);
+    const files = images.map((img) => img.file);
+    const primaryIndex = images.findIndex((img) => img.isPrimary);
     setUploadFiles(files);
     setPrimaryImageIndex(primaryIndex >= 0 ? primaryIndex : 0);
   };
@@ -60,7 +100,7 @@ export function UnitsPage() {
   const onSubmit = async (values: UnitFormValues) => {
     try {
       // Derive type name from ID
-      const unitType = unitTypes.find(t => t.type_id === values.unitTypeId);
+      const unitType = unitTypes.find((t) => t.type_id === values.unitTypeId);
       const typeName = unitType?.name || '';
 
       if (editingUnit) {
@@ -69,7 +109,7 @@ export function UnitsPage() {
           ...values,
           type: typeName,
           monthlyRent: values.monthlyRent,
-          image: editingUnit.image
+          image: editingUnit.image,
         });
 
         // Upload new images if any
@@ -85,7 +125,7 @@ export function UnitsPage() {
           ...values,
           type: typeName,
           monthlyRent: values.monthlyRent,
-          image: undefined
+          image: undefined,
         });
 
         if (newUnit && uploadFiles.length > 0) {
@@ -114,11 +154,6 @@ export function UnitsPage() {
     }
   };
 
-
-
-
-
-
   const handleRemoveExistingImage = async (image: any) => {
     if (!editingUnit) return;
     if (confirm('Delete this image?')) {
@@ -126,11 +161,13 @@ export function UnitsPage() {
         await deleteUnitImage(editingUnit.id, image.id);
         // Refresh images
         const images = await getUnitImages(editingUnit.id);
-        setExistingImages(images.map((img: any) => ({
-          id: img.image_id?.toString() || img.id?.toString(),
-          url: img.image_url,
-          isPrimary: Boolean(img.is_primary)
-        })));
+        setExistingImages(
+          images.map((img: any) => ({
+            id: img.image_id?.toString() || img.id?.toString(),
+            url: img.image_url,
+            isPrimary: Boolean(img.is_primary),
+          }))
+        );
         toast.success('Image deleted');
       } catch (e) {
         toast.error('Failed to delete image');
@@ -144,11 +181,13 @@ export function UnitsPage() {
       await setUnitPrimaryImage(editingUnit.id, image.id);
       // Refresh images
       const images = await getUnitImages(editingUnit.id);
-      setExistingImages(images.map((img: any) => ({
-        id: img.image_id?.toString() || img.id?.toString(),
-        url: img.image_url,
-        isPrimary: Boolean(img.is_primary)
-      })));
+      setExistingImages(
+        images.map((img: any) => ({
+          id: img.image_id?.toString() || img.id?.toString(),
+          url: img.image_url,
+          isPrimary: Boolean(img.is_primary),
+        }))
+      );
       toast.success('Primary image updated');
     } catch (e) {
       toast.error('Failed to set primary image');
@@ -187,20 +226,22 @@ export function UnitsPage() {
     try {
       const images = await getUnitImages(unit.id);
       if (images) {
-        setExistingImages(images.map((img: any) => ({
-          id: img.image_id?.toString() || img.id?.toString(),
-          url: img.image_url || img.url,
-          isPrimary: Boolean(img.is_primary)
-        })));
+        setExistingImages(
+          images.map((img: any) => ({
+            id: img.image_id?.toString() || img.id?.toString(),
+            url: img.image_url || img.url,
+            isPrimary: Boolean(img.is_primary),
+          }))
+        );
       }
     } catch (e) {
-      console.error("Failed to load images", e);
-      toast.error("Failed to load unit images");
+      console.error('Failed to load images', e);
+      toast.error('Failed to load unit images');
     }
   };
 
   const handleDelete = (id: string) => {
-    const unit = units.find(u => u.id === id);
+    const unit = units.find((u) => u.id === id);
     if (unit?.status === 'occupied') {
       toast.error('Cannot delete occupied unit');
       return;
@@ -212,14 +253,21 @@ export function UnitsPage() {
     }
   };
 
-  const filteredUnits = units.filter(unit => {
-    if (filterProperty !== 'all' && unit.propertyId !== filterProperty) return false;
+  const filteredUnits = units.filter((unit) => {
+    if (filterProperty !== 'all' && unit.propertyId !== filterProperty)
+      return false;
     if (filterStatus !== 'all' && unit.status !== filterStatus) return false;
     return true;
   });
 
   const getStatusBadge = (status: Unit['status']) => {
-    const variants: Record<Unit['status'], { variant: 'default' | 'secondary' | 'destructive' | 'outline', label: string }> = {
+    const variants: Record<
+      Unit['status'],
+      {
+        variant: 'default' | 'secondary' | 'destructive' | 'outline';
+        label: string;
+      }
+    > = {
       available: { variant: 'default', label: 'Available' },
       occupied: { variant: 'secondary', label: 'Occupied' },
       maintenance: { variant: 'outline', label: 'Maintenance' },
@@ -235,17 +283,17 @@ export function UnitsPage() {
     },
     {
       label: 'Occupied',
-      value: units.filter(u => u.status === 'occupied').length,
+      value: units.filter((u) => u.status === 'occupied').length,
       color: 'bg-green-50 text-green-700',
     },
     {
       label: 'Available',
-      value: units.filter(u => u.status === 'available').length,
+      value: units.filter((u) => u.status === 'available').length,
       color: 'bg-orange-50 text-orange-700',
     },
     {
       label: 'Maintenance',
-      value: units.filter(u => u.status === 'maintenance').length,
+      value: units.filter((u) => u.status === 'maintenance').length,
       color: 'bg-red-50 text-red-700',
     },
   ];
@@ -267,18 +315,25 @@ export function UnitsPage() {
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogContent className="max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>{editingUnit ? 'Edit Unit' : 'Add New Unit'}</DialogTitle>
+                <DialogTitle>
+                  {editingUnit ? 'Edit Unit' : 'Add New Unit'}
+                </DialogTitle>
               </DialogHeader>
               <Form {...unitForm}>
-                <form onSubmit={unitForm.handleSubmit(onSubmit)} className="space-y-4 mt-4">
-
+                <form
+                  onSubmit={unitForm.handleSubmit(onSubmit)}
+                  className="space-y-4 mt-4"
+                >
                   <FormField
                     control={unitForm.control}
                     name="propertyId"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Property</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                        >
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder="Select property" />
@@ -320,7 +375,7 @@ export function UnitsPage() {
                         <Select
                           onValueChange={(val) => {
                             field.onChange(parseInt(val));
-                            // We don't need to manually set 'type' name string here, backend or context likely handles it, 
+                            // We don't need to manually set 'type' name string here, backend or context likely handles it,
                             // or we just need the ID. Schema only asks for unitTypeId.
                             // Wait, schema has strict validation.
                           }}
@@ -334,7 +389,10 @@ export function UnitsPage() {
                           </FormControl>
                           <SelectContent>
                             {unitTypes.map((type) => (
-                              <SelectItem key={type.type_id} value={type.type_id.toString()}>
+                              <SelectItem
+                                key={type.type_id}
+                                value={type.type_id.toString()}
+                              >
                                 {type.name}
                               </SelectItem>
                             ))}
@@ -356,7 +414,9 @@ export function UnitsPage() {
                             type="number"
                             placeholder="e.g., 1200"
                             {...field}
-                            onChange={e => field.onChange(e.target.valueAsNumber)}
+                            onChange={(e) =>
+                              field.onChange(e.target.valueAsNumber)
+                            }
                           />
                         </FormControl>
                         <FormMessage />
@@ -370,7 +430,10 @@ export function UnitsPage() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Status</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                        >
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder="Select status" />
@@ -379,7 +442,9 @@ export function UnitsPage() {
                           <SelectContent>
                             <SelectItem value="available">Available</SelectItem>
                             <SelectItem value="occupied">Occupied</SelectItem>
-                            <SelectItem value="maintenance">Maintenance</SelectItem>
+                            <SelectItem value="maintenance">
+                              Maintenance
+                            </SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -398,10 +463,16 @@ export function UnitsPage() {
                   </div>
 
                   <div className="flex gap-2 justify-end">
-                    <Button type="button" variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setIsAddDialogOpen(false)}
+                    >
                       Cancel
                     </Button>
-                    <Button type="submit">{editingUnit ? 'Save Changes' : 'Add Unit'}</Button>
+                    <Button type="submit">
+                      {editingUnit ? 'Save Changes' : 'Add Unit'}
+                    </Button>
                   </div>
                 </form>
               </Form>
@@ -416,7 +487,9 @@ export function UnitsPage() {
           <Card key={index}>
             <CardContent className="p-4">
               <p className="text-xs text-gray-600">{stat.label}</p>
-              <p className={`text-2xl font-semibold mt-1 ${stat.color.split(' ')[1]}`}>
+              <p
+                className={`text-2xl font-semibold mt-1 ${stat.color.split(' ')[1]}`}
+              >
                 {stat.value}
               </p>
             </CardContent>
@@ -486,7 +559,9 @@ export function UnitsPage() {
               </TableHeader>
               <TableBody>
                 {filteredUnits.map((unit) => {
-                  const property = properties.find(p => p.id === unit.propertyId);
+                  const property = properties.find(
+                    (p) => p.id === unit.propertyId
+                  );
                   const statusBadge = getStatusBadge(unit.status);
                   return (
                     <TableRow key={unit.id}>
@@ -505,12 +580,16 @@ export function UnitsPage() {
                           )}
                         </div>
                       </TableCell>
-                      <TableCell className="font-medium">{unit.unitNumber}</TableCell>
+                      <TableCell className="font-medium">
+                        {unit.unitNumber}
+                      </TableCell>
                       <TableCell>{property?.name}</TableCell>
                       <TableCell>{unit.type}</TableCell>
                       <TableCell>LKR {unit.monthlyRent}</TableCell>
                       <TableCell>
-                        <Badge variant={statusBadge.variant}>{statusBadge.label}</Badge>
+                        <Badge variant={statusBadge.variant}>
+                          {statusBadge.label}
+                        </Badge>
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex gap-2 justify-end">
@@ -548,7 +627,9 @@ export function UnitsPage() {
               <Home className="size-12 text-gray-400 mx-auto mb-4" />
               <p className="text-gray-600">No units found</p>
               <p className="text-sm text-gray-500 mt-1">
-                {units.length === 0 ? 'Add your first unit to get started' : 'Try adjusting your filters'}
+                {units.length === 0
+                  ? 'Add your first unit to get started'
+                  : 'Try adjusting your filters'}
               </p>
             </div>
           )}
@@ -556,7 +637,10 @@ export function UnitsPage() {
       </Card>
 
       {/* View Unit Details Dialog */}
-      <Dialog open={!!viewUnit} onOpenChange={(open) => !open && setViewUnit(null)}>
+      <Dialog
+        open={!!viewUnit}
+        onOpenChange={(open) => !open && setViewUnit(null)}
+      >
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Unit Details</DialogTitle>
@@ -581,11 +665,20 @@ export function UnitsPage() {
 
               {viewUnitImages.length > 0 && (
                 <div>
-                  <h4 className="font-medium mb-2 text-sm text-gray-500 uppercase tracking-wider">Gallery</h4>
+                  <h4 className="font-medium mb-2 text-sm text-gray-500 uppercase tracking-wider">
+                    Gallery
+                  </h4>
                   <div className="grid grid-cols-4 gap-2">
                     {viewUnitImages.map((img, idx) => (
-                      <div key={idx} className="aspect-square rounded-md overflow-hidden bg-gray-100 border">
-                        <img src={img.image_url} alt="" className="w-full h-full object-cover" />
+                      <div
+                        key={idx}
+                        className="aspect-square rounded-md overflow-hidden bg-gray-100 border"
+                      >
+                        <img
+                          src={img.image_url}
+                          alt=""
+                          className="w-full h-full object-cover"
+                        />
                       </div>
                     ))}
                   </div>
@@ -594,17 +687,26 @@ export function UnitsPage() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <h3 className="text-2xl font-bold text-gray-900">Unit {viewUnit.unitNumber}</h3>
+                  <h3 className="text-2xl font-bold text-gray-900">
+                    Unit {viewUnit.unitNumber}
+                  </h3>
                   <div className="mt-2 space-y-1 text-gray-600">
                     <p className="flex items-center gap-2">
-                      <span className="font-medium text-gray-900">Property:</span>
-                      {properties.find(p => p.id === viewUnit.propertyId)?.name}
+                      <span className="font-medium text-gray-900">
+                        Property:
+                      </span>
+                      {
+                        properties.find((p) => p.id === viewUnit.propertyId)
+                          ?.name
+                      }
                     </p>
                     <p className="flex items-center gap-2">
-                      <span className="font-medium text-gray-900">Type:</span> {viewUnit.type}
+                      <span className="font-medium text-gray-900">Type:</span>{' '}
+                      {viewUnit.type}
                     </p>
                     <p className="flex items-center gap-2">
-                      <span className="font-medium text-gray-900">Rent:</span> LKR {viewUnit.monthlyRent}/month
+                      <span className="font-medium text-gray-900">Rent:</span>{' '}
+                      LKR {viewUnit.monthlyRent}/month
                     </p>
                   </div>
                 </div>
@@ -620,13 +722,17 @@ export function UnitsPage() {
               </div>
 
               <div className="flex justify-end gap-2 pt-4 border-t">
-                <Button variant="outline" onClick={() => setViewUnit(null)}>Close</Button>
-                <Button onClick={() => {
-                  if (viewUnit) {
-                    handleEditClick(viewUnit);
-                    setViewUnit(null);
-                  }
-                }}>
+                <Button variant="outline" onClick={() => setViewUnit(null)}>
+                  Close
+                </Button>
+                <Button
+                  onClick={() => {
+                    if (viewUnit) {
+                      handleEditClick(viewUnit);
+                      setViewUnit(null);
+                    }
+                  }}
+                >
                   <Edit className="size-4 mr-2" />
                   Edit Unit
                 </Button>

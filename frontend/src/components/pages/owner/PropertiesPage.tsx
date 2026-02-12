@@ -4,7 +4,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 import { Building2, Plus, Edit, Trash2, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 import { MultiImageUpload } from '@/components/ui/multi-image-upload';
@@ -12,8 +18,20 @@ import { MultiImageUpload } from '@/components/ui/multi-image-upload';
 import { useAuth } from '@/app/context/AuthContext';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { propertySchema, leadSchema, type PropertyFormValues, type LeadFormValues } from '@/schemas/ownerSchemas';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import {
+  propertySchema,
+  leadSchema,
+  type PropertyFormValues,
+  type LeadFormValues,
+} from '@/schemas/ownerSchemas';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
 
 export function PropertiesPage() {
   const { user } = useAuth();
@@ -30,13 +48,15 @@ export function PropertiesPage() {
     uploadPropertyImages,
     getPropertyImages,
     setPropertyPrimaryImage,
-    deletePropertyImage
+    deletePropertyImage,
   } = useApp();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingProperty, setEditingProperty] = useState<Property | null>(null);
   const [isInterestDialogOpen, setIsInterestDialogOpen] = useState(false);
 
-  const [interestProperty, setInterestProperty] = useState<Property | null>(null);
+  const [interestProperty, setInterestProperty] = useState<Property | null>(
+    null
+  );
   const [existingImages, setExistingImages] = useState<any[]>([]);
   const [viewGalleryOpen, setViewGalleryOpen] = useState(false);
   const [galleryImages, setGalleryImages] = useState<any[]>([]);
@@ -75,12 +95,14 @@ export function PropertiesPage() {
   const [viewProperty, setViewProperty] = useState<Property | null>(null);
 
   // Quick Add Units State
-  const [quickUnits, setQuickUnits] = useState<{
-    unitNumber: string;
-    unitTypeId: number;
-    monthlyRent: number;
-    status: 'available';
-  }[]>([]);
+  const [quickUnits, setQuickUnits] = useState<
+    {
+      unitNumber: string;
+      unitTypeId: number;
+      monthlyRent: number;
+      status: 'available';
+    }[]
+  >([]);
   const [newUnitNumber, setNewUnitNumber] = useState('');
   const [newUnitType, setNewUnitType] = useState(0);
   const [newUnitRent, setNewUnitRent] = useState<number>(0);
@@ -91,15 +113,18 @@ export function PropertiesPage() {
 
   const addQuickUnit = () => {
     if (!newUnitNumber || newUnitType === 0 || !newUnitRent) {
-      toast.error("Please fill all unit fields");
+      toast.error('Please fill all unit fields');
       return;
     }
-    setQuickUnits([...quickUnits, {
-      unitNumber: newUnitNumber,
-      unitTypeId: newUnitType,
-      monthlyRent: newUnitRent,
-      status: 'available'
-    }]);
+    setQuickUnits([
+      ...quickUnits,
+      {
+        unitNumber: newUnitNumber,
+        unitTypeId: newUnitType,
+        monthlyRent: newUnitRent,
+        status: 'available',
+      },
+    ]);
     setNewUnitNumber('');
     setNewUnitType(0);
     setNewUnitRent(0);
@@ -110,8 +135,8 @@ export function PropertiesPage() {
   };
 
   const handleImagesChange = (images: { file: File; isPrimary: boolean }[]) => {
-    const files = images.map(img => img.file);
-    const primaryIndex = images.findIndex(img => img.isPrimary);
+    const files = images.map((img) => img.file);
+    const primaryIndex = images.findIndex((img) => img.isPrimary);
     setUploadFiles(files);
     setPrimaryImageIndex(primaryIndex >= 0 ? primaryIndex : 0);
   };
@@ -132,7 +157,7 @@ export function PropertiesPage() {
           await uploadPropertyImages(editingProperty.id, uploadFiles);
         }
 
-        toast.success("Property updated successfully");
+        toast.success('Property updated successfully');
       } else {
         // Add new property
         const propertyData = {
@@ -146,19 +171,31 @@ export function PropertiesPage() {
           // Handle images for new property
           if (uploadFiles.length > 0) {
             try {
-              const response = await uploadPropertyImages(newProperty.id, uploadFiles);
-              if (primaryImageIndex > 0 && response.images && response.images.length > primaryImageIndex) {
+              const response = await uploadPropertyImages(
+                newProperty.id,
+                uploadFiles
+              );
+              if (
+                primaryImageIndex > 0 &&
+                response.images &&
+                response.images.length > primaryImageIndex
+              ) {
                 const targetImage = response.images[primaryImageIndex];
                 if (targetImage) {
-                  await setPropertyPrimaryImage(newProperty.id, targetImage.image_id || targetImage.id);
+                  await setPropertyPrimaryImage(
+                    newProperty.id,
+                    targetImage.image_id || targetImage.id
+                  );
                 }
               }
             } catch (uploadError: any) {
-              console.error("Image upload failed:", uploadError);
-              toast.error(`Property added, but images failed to upload: ${uploadError.message || 'Unknown error'}`);
+              console.error('Image upload failed:', uploadError);
+              toast.error(
+                `Property added, but images failed to upload: ${uploadError.message || 'Unknown error'}`
+              );
             }
           }
-          toast.success("Property added successfully");
+          toast.success('Property added successfully');
         }
       }
 
@@ -167,38 +204,41 @@ export function PropertiesPage() {
         if (isSingleUnit && singleUnitRent > 0) {
           // Single Unit Mode
           try {
-            const defaultType = unitTypes && unitTypes.length > 0 ? unitTypes[0] : null;
+            const defaultType =
+              unitTypes && unitTypes.length > 0 ? unitTypes[0] : null;
             await addUnit({
               propertyId: savedPropertyId,
-              unitNumber: "Main",
+              unitNumber: 'Main',
               unitTypeId: defaultType ? defaultType.type_id : 1,
               monthlyRent: singleUnitRent,
               status: 'available',
-              type: defaultType ? defaultType.name : 'Standard'
+              type: defaultType ? defaultType.name : 'Standard',
             });
-            toast.success("Single unit created successfully");
+            toast.success('Single unit created successfully');
           } catch (unitError) {
-            console.error("Failed to add single unit:", unitError);
-            toast.error("Property saved, but failed to add unit.");
+            console.error('Failed to add single unit:', unitError);
+            toast.error('Property saved, but failed to add unit.');
           }
         } else if (quickUnits.length > 0) {
           // Multiple Units Mode
           try {
             for (const unit of quickUnits) {
-              const unitTypeName = unitTypes.find(t => t.type_id === unit.unitTypeId)?.name || '';
+              const unitTypeName =
+                unitTypes.find((t) => t.type_id === unit.unitTypeId)?.name ||
+                '';
               await addUnit({
                 propertyId: savedPropertyId,
                 unitNumber: unit.unitNumber,
                 unitTypeId: unit.unitTypeId,
                 monthlyRent: unit.monthlyRent,
                 status: unit.status,
-                type: unitTypeName
+                type: unitTypeName,
               });
             }
             toast.success(`${quickUnits.length} units added successfully`);
           } catch (unitError) {
-            console.error("Failed to add quick units:", unitError);
-            toast.error("Property saved, but failed to add some units.");
+            console.error('Failed to add quick units:', unitError);
+            toast.error('Property saved, but failed to add some units.');
           }
         }
       }
@@ -215,10 +255,12 @@ export function PropertiesPage() {
       setNewUnitRent(0);
       setIsSingleUnit(false);
       setSingleUnitRent(0);
-
     } catch (error: any) {
       console.error('Failed to save property:', error);
-      const errorMessage = error.response?.data?.error || error.message || "Failed to save property";
+      const errorMessage =
+        error.response?.data?.error ||
+        error.message ||
+        'Failed to save property';
       toast.error(`Failed to save property: ${errorMessage}`);
     }
   };
@@ -229,11 +271,13 @@ export function PropertiesPage() {
       await setPropertyPrimaryImage(editingProperty.id, image.id);
       // Refresh
       const images = await getPropertyImages(editingProperty.id);
-      setExistingImages(images.map((img: any) => ({
-        id: img.image_id?.toString() || img.id?.toString(),
-        url: img.image_url || img.url,
-        isPrimary: Boolean(img.is_primary)
-      })));
+      setExistingImages(
+        images.map((img: any) => ({
+          id: img.image_id?.toString() || img.id?.toString(),
+          url: img.image_url || img.url,
+          isPrimary: Boolean(img.is_primary),
+        }))
+      );
       toast.success('Primary image updated');
     } catch (e) {
       toast.error('Failed to set primary image');
@@ -254,22 +298,28 @@ export function PropertiesPage() {
     });
 
     // Initial state with just the primary image (better than nothing while loading)
-    setExistingImages(property.image ? [{ id: 'primary-preview', url: property.image, isPrimary: true }] : []);
+    setExistingImages(
+      property.image
+        ? [{ id: 'primary-preview', url: property.image, isPrimary: true }]
+        : []
+    );
     setIsAddDialogOpen(true);
 
     try {
       // Fetch all images for editing
       const images = await getPropertyImages(property.id);
       if (images && images.length > 0) {
-        setExistingImages(images.map((img: any) => ({
-          id: img.image_id?.toString() || img.id?.toString(),
-          url: img.image_url || img.url,
-          isPrimary: Boolean(img.is_primary)
-        })));
+        setExistingImages(
+          images.map((img: any) => ({
+            id: img.image_id?.toString() || img.id?.toString(),
+            url: img.image_url || img.url,
+            isPrimary: Boolean(img.is_primary),
+          }))
+        );
       }
     } catch (error) {
-      console.error("Failed to load property images for editing:", error);
-      toast.error("Could not load all property images");
+      console.error('Failed to load property images for editing:', error);
+      toast.error('Could not load all property images');
     }
   };
 
@@ -295,7 +345,7 @@ export function PropertiesPage() {
   const handleDeleteClick = async (id: string) => {
     if (confirm('Are you sure you want to delete this property?')) {
       await deleteProperty(id);
-      toast.success("Property deleted successfully");
+      toast.success('Property deleted successfully');
     }
   };
 
@@ -312,12 +362,12 @@ export function PropertiesPage() {
         status: 'interested',
         notes: values.notes || 'Interested from public page',
       });
-      toast.success("Interest submitted successfully");
+      toast.success('Interest submitted successfully');
       setIsInterestDialogOpen(false);
       interestForm.reset();
     } catch (error) {
       console.error('Failed to submit interest:', error);
-      toast.error("Failed to submit interest");
+      toast.error('Failed to submit interest');
     }
   };
 
@@ -336,13 +386,19 @@ export function PropertiesPage() {
   const addFeature = () => {
     if (!currentFeature.trim()) return;
     const currentFeatures = propertyForm.getValues('features') || [];
-    propertyForm.setValue('features', [...currentFeatures, currentFeature.trim()]);
+    propertyForm.setValue('features', [
+      ...currentFeatures,
+      currentFeature.trim(),
+    ]);
     setCurrentFeature('');
   };
 
   const removeFeature = (index: number) => {
     const currentFeatures = propertyForm.getValues('features') || [];
-    propertyForm.setValue('features', currentFeatures.filter((_, i) => i !== index));
+    propertyForm.setValue(
+      'features',
+      currentFeatures.filter((_, i) => i !== index)
+    );
   };
 
   const handleRemoveExistingImage = async (image: any) => {
@@ -352,11 +408,13 @@ export function PropertiesPage() {
         await deletePropertyImage(editingProperty.id, image.id);
         // Refresh images
         const images = await getPropertyImages(editingProperty.id);
-        setExistingImages(images.map((img: any) => ({
-          id: img.image_id?.toString() || img.id?.toString(),
-          url: img.image_url || img.url, // Handle backend naming
-          isPrimary: Boolean(img.is_primary)
-        })));
+        setExistingImages(
+          images.map((img: any) => ({
+            id: img.image_id?.toString() || img.id?.toString(),
+            url: img.image_url || img.url, // Handle backend naming
+            isPrimary: Boolean(img.is_primary),
+          }))
+        );
         toast.success('Image deleted');
       } catch (e) {
         toast.error('Failed to delete image');
@@ -370,11 +428,13 @@ export function PropertiesPage() {
       await setPropertyPrimaryImage(editingProperty.id, image.id);
       // Refresh images
       const images = await getPropertyImages(editingProperty.id);
-      setExistingImages(images.map((img: any) => ({
-        id: img.image_id?.toString() || img.id?.toString(),
-        url: img.image_url,
-        isPrimary: Boolean(img.is_primary)
-      })));
+      setExistingImages(
+        images.map((img: any) => ({
+          id: img.image_id?.toString() || img.id?.toString(),
+          url: img.image_url,
+          isPrimary: Boolean(img.is_primary),
+        }))
+      );
       toast.success('Primary image updated');
     } catch (e) {
       toast.error('Failed to set primary image');
@@ -389,12 +449,12 @@ export function PropertiesPage() {
       const images = await getPropertyImages(property.id);
       if (images) setGalleryImages(images);
     } catch (e) {
-      toast.error("Failed to load images");
+      toast.error('Failed to load images');
     }
   };
 
   const handleDelete = (id: string) => {
-    const propertyUnits = units.filter(u => u.propertyId === id);
+    const propertyUnits = units.filter((u) => u.propertyId === id);
     if (propertyUnits.length > 0) {
       toast.error('Cannot delete property with existing units');
       return;
@@ -406,18 +466,24 @@ export function PropertiesPage() {
     }
   };
 
-
-
   const getUnitCount = (propertyId: string) => {
-    return units.filter(u => u.propertyId === propertyId).length;
+    return units.filter((u) => u.propertyId === propertyId).length;
   };
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-semibold text-gray-900">{user?.role === 'treasurer' ? 'My Assigned Properties' : 'Properties'}</h2>
-          <p className="text-sm text-gray-500 mt-1">{user?.role === 'treasurer' ? 'View properties assigned to you' : 'Manage your properties'}</p>
+          <h2 className="text-2xl font-semibold text-gray-900">
+            {user?.role === 'treasurer'
+              ? 'My Assigned Properties'
+              : 'Properties'}
+          </h2>
+          <p className="text-sm text-gray-500 mt-1">
+            {user?.role === 'treasurer'
+              ? 'View properties assigned to you'
+              : 'Manage your properties'}
+          </p>
         </div>
         {user?.role === 'owner' && (
           <>
@@ -428,15 +494,22 @@ export function PropertiesPage() {
             <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
               <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
-                  <DialogTitle>{editingProperty ? 'Edit Property' : 'Add New Property'}</DialogTitle>
+                  <DialogTitle>
+                    {editingProperty ? 'Edit Property' : 'Add New Property'}
+                  </DialogTitle>
                 </DialogHeader>
 
                 <Form {...propertyForm}>
-                  <form onSubmit={propertyForm.handleSubmit(onSubmitProperty)} className="space-y-6">
+                  <form
+                    onSubmit={propertyForm.handleSubmit(onSubmitProperty)}
+                    className="space-y-6"
+                  >
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       {/* Basic Information */}
                       <div className="space-y-4">
-                        <h3 className="text-lg font-medium">Basic Information</h3>
+                        <h3 className="text-lg font-medium">
+                          Basic Information
+                        </h3>
 
                         <FormField
                           control={propertyForm.control}
@@ -445,7 +518,10 @@ export function PropertiesPage() {
                             <FormItem>
                               <FormLabel>Property Name</FormLabel>
                               <FormControl>
-                                <Input placeholder="e.g. Sunset Apartments" {...field} />
+                                <Input
+                                  placeholder="e.g. Sunset Apartments"
+                                  {...field}
+                                />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -462,12 +538,17 @@ export function PropertiesPage() {
                                 <select
                                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                   {...field}
-                                  onChange={(e) => field.onChange(parseInt(e.target.value))}
+                                  onChange={(e) =>
+                                    field.onChange(parseInt(e.target.value))
+                                  }
                                   value={field.value}
                                 >
                                   <option value={0}>Select Type</option>
                                   {propertyTypes.map((type) => (
-                                    <option key={type.type_id} value={type.type_id}>
+                                    <option
+                                      key={type.type_id}
+                                      value={type.type_id}
+                                    >
                                       {type.name}
                                     </option>
                                   ))}
@@ -523,7 +604,10 @@ export function PropertiesPage() {
                               <FormItem>
                                 <FormLabel>Street</FormLabel>
                                 <FormControl>
-                                  <Input placeholder="e.g. Main Street" {...field} />
+                                  <Input
+                                    placeholder="e.g. Main Street"
+                                    {...field}
+                                  />
                                 </FormControl>
                                 <FormMessage />
                               </FormItem>
@@ -539,7 +623,10 @@ export function PropertiesPage() {
                               <FormItem>
                                 <FormLabel>City</FormLabel>
                                 <FormControl>
-                                  <Input placeholder="e.g. Colombo" {...field} />
+                                  <Input
+                                    placeholder="e.g. Colombo"
+                                    {...field}
+                                  />
                                 </FormControl>
                                 <FormMessage />
                               </FormItem>
@@ -553,7 +640,10 @@ export function PropertiesPage() {
                               <FormItem>
                                 <FormLabel>District</FormLabel>
                                 <FormControl>
-                                  <Input placeholder="e.g. Western" {...field} />
+                                  <Input
+                                    placeholder="e.g. Western"
+                                    {...field}
+                                  />
                                 </FormControl>
                                 <FormMessage />
                               </FormItem>
@@ -572,25 +662,38 @@ export function PropertiesPage() {
                             value={currentFeature}
                             onChange={(e) => setCurrentFeature(e.target.value)}
                             placeholder="Add a feature (e.g. Pool, Gym)"
-                            onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addFeature())}
+                            onKeyPress={(e) =>
+                              e.key === 'Enter' &&
+                              (e.preventDefault(), addFeature())
+                            }
                           />
-                          <Button type="button" onClick={addFeature} variant="outline" size="icon">
+                          <Button
+                            type="button"
+                            onClick={addFeature}
+                            variant="outline"
+                            size="icon"
+                          >
                             <Plus className="h-4 w-4" />
                           </Button>
                         </div>
                         <div className="flex flex-wrap gap-2 mt-2">
-                          {propertyForm.watch('features')?.map((feature, idx) => (
-                            <div key={idx} className="bg-secondary text-secondary-foreground px-3 py-1 rounded-full text-sm flex items-center gap-2">
-                              {feature}
-                              <button
-                                type="button"
-                                onClick={() => removeFeature(idx)}
-                                className="hover:text-destructive"
+                          {propertyForm
+                            .watch('features')
+                            ?.map((feature, idx) => (
+                              <div
+                                key={idx}
+                                className="bg-secondary text-secondary-foreground px-3 py-1 rounded-full text-sm flex items-center gap-2"
                               >
-                                ×
-                              </button>
-                            </div>
-                          ))}
+                                {feature}
+                                <button
+                                  type="button"
+                                  onClick={() => removeFeature(idx)}
+                                  className="hover:text-destructive"
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            ))}
                         </div>
                       </div>
 
@@ -610,11 +713,13 @@ export function PropertiesPage() {
                     <div className="mt-6 border-t pt-6 space-y-4">
                       <div className="flex items-center justify-between">
                         <div className="space-y-1">
-                          <h3 className="text-lg font-medium">Quick Add Units</h3>
+                          <h3 className="text-lg font-medium">
+                            Quick Add Units
+                          </h3>
                           <p className="text-sm text-gray-500">
                             {isSingleUnit
-                              ? "This property is a single unit (e.g. house/villa)."
-                              : "Add multiple units to this property."}
+                              ? 'This property is a single unit (e.g. house/villa).'
+                              : 'Add multiple units to this property.'}
                           </p>
                         </div>
                         <div className="flex items-center space-x-2">
@@ -625,7 +730,9 @@ export function PropertiesPage() {
                             checked={isSingleUnit}
                             onChange={(e) => setIsSingleUnit(e.target.checked)}
                           />
-                          <Label htmlFor="singleUnitMode">Single Unit Property</Label>
+                          <Label htmlFor="singleUnitMode">
+                            Single Unit Property
+                          </Label>
                         </div>
                       </div>
 
@@ -637,7 +744,9 @@ export function PropertiesPage() {
                               type="number"
                               placeholder="e.g. 150000"
                               value={singleUnitRent || ''}
-                              onChange={(e) => setSingleUnitRent(parseFloat(e.target.value))}
+                              onChange={(e) =>
+                                setSingleUnitRent(parseFloat(e.target.value))
+                              }
                             />
                           </div>
                         </div>
@@ -649,7 +758,9 @@ export function PropertiesPage() {
                               <Input
                                 placeholder="e.g. A101"
                                 value={newUnitNumber}
-                                onChange={(e) => setNewUnitNumber(e.target.value)}
+                                onChange={(e) =>
+                                  setNewUnitNumber(e.target.value)
+                                }
                               />
                             </div>
                             <div className="space-y-2">
@@ -657,11 +768,16 @@ export function PropertiesPage() {
                               <select
                                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                 value={newUnitType}
-                                onChange={(e) => setNewUnitType(parseInt(e.target.value))}
+                                onChange={(e) =>
+                                  setNewUnitType(parseInt(e.target.value))
+                                }
                               >
                                 <option value={0}>Select Type</option>
                                 {unitTypes?.map((type) => (
-                                  <option key={type.type_id} value={type.type_id}>
+                                  <option
+                                    key={type.type_id}
+                                    value={type.type_id}
+                                  >
                                     {type.name}
                                   </option>
                                 ))}
@@ -673,10 +789,16 @@ export function PropertiesPage() {
                                 type="number"
                                 placeholder="e.g. 50000"
                                 value={newUnitRent || ''}
-                                onChange={(e) => setNewUnitRent(parseFloat(e.target.value))}
+                                onChange={(e) =>
+                                  setNewUnitRent(parseFloat(e.target.value))
+                                }
                               />
                             </div>
-                            <Button type="button" onClick={addQuickUnit} className="w-full">
+                            <Button
+                              type="button"
+                              onClick={addQuickUnit}
+                              className="w-full"
+                            >
                               <Plus className="size-4 mr-2" /> Add Unit
                             </Button>
                           </div>
@@ -686,20 +808,34 @@ export function PropertiesPage() {
                               <table className="min-w-full divide-y divide-gray-200">
                                 <thead className="bg-gray-50">
                                   <tr>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unit #</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rent</th>
-                                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                      Unit #
+                                    </th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                      Type
+                                    </th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                      Rent
+                                    </th>
+                                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                      Action
+                                    </th>
                                   </tr>
                                 </thead>
                                 <tbody className="bg-white divide-y divide-gray-200">
                                   {quickUnits.map((unit, idx) => (
                                     <tr key={idx}>
-                                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{unit.unitNumber}</td>
-                                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                        {unitTypes?.find(t => t.type_id === unit.unitTypeId)?.name || 'Unknown'}
+                                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                        {unit.unitNumber}
                                       </td>
-                                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">LKR {unit.monthlyRent}</td>
+                                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        {unitTypes?.find(
+                                          (t) => t.type_id === unit.unitTypeId
+                                        )?.name || 'Unknown'}
+                                      </td>
+                                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        LKR {unit.monthlyRent}
+                                      </td>
                                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                         <button
                                           type="button"
@@ -720,7 +856,11 @@ export function PropertiesPage() {
                     </div>
 
                     <div className="flex justify-end gap-2 pt-4 border-t">
-                      <Button type="button" variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setIsAddDialogOpen(false)}
+                      >
                         Cancel
                       </Button>
                       <Button type="submit">
@@ -751,7 +891,7 @@ export function PropertiesPage() {
                 </div>
               </div>
             )}
-            <CardHeader className={property.image ? "pt-4" : ""}>
+            <CardHeader className={property.image ? 'pt-4' : ''}>
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-3">
                   {!property.image && (
@@ -761,7 +901,11 @@ export function PropertiesPage() {
                   )}
                   <div>
                     <CardTitle className="text-lg">{property.name}</CardTitle>
-                    {!property.image && <p className="text-xs text-gray-500 mt-1">{property.typeName}</p>}
+                    {!property.image && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        {property.typeName}
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -769,22 +913,35 @@ export function PropertiesPage() {
             <CardContent className="flex-1">
               <div className="space-y-3">
                 <div>
-                  <p className="text-xs text-gray-500 uppercase tracking-wider font-medium mb-1">Location</p>
-                  <p className="text-sm text-gray-700">
-                    {property.propertyNo ? `No. ${property.propertyNo}, ` : ''}{property.street}
+                  <p className="text-xs text-gray-500 uppercase tracking-wider font-medium mb-1">
+                    Location
                   </p>
-                  <p className="text-sm text-gray-500">{property.city}, {property.district}</p>
+                  <p className="text-sm text-gray-700">
+                    {property.propertyNo ? `No. ${property.propertyNo}, ` : ''}
+                    {property.street}
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    {property.city}, {property.district}
+                  </p>
                 </div>
 
                 <div className="pt-3 border-t grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-xs text-gray-500">Units</p>
-                    <p className="text-lg font-semibold text-gray-900">{getUnitCount(property.id)}</p>
+                    <p className="text-lg font-semibold text-gray-900">
+                      {getUnitCount(property.id)}
+                    </p>
                   </div>
                   <div>
                     <p className="text-xs text-gray-500">Available</p>
                     <p className="text-lg font-semibold text-green-600">
-                      {units.filter(u => u.propertyId === property.id && u.status === 'available').length}
+                      {
+                        units.filter(
+                          (u) =>
+                            u.propertyId === property.id &&
+                            u.status === 'available'
+                        ).length
+                      }
                     </p>
                   </div>
                 </div>
@@ -792,17 +949,23 @@ export function PropertiesPage() {
                 <div className="flex flex-wrap gap-2 pt-4">
                   <Button
                     className="flex-1"
-                    variant={(user?.role === 'owner' || user?.role === 'treasurer') ? 'secondary' : 'default'}
-                    onClick={() => (user?.role === 'owner' || user?.role === 'treasurer') ? handleViewGallery(property) : handleInterestClick(property)}
+                    variant={
+                      user?.role === 'owner' || user?.role === 'treasurer'
+                        ? 'secondary'
+                        : 'default'
+                    }
+                    onClick={() =>
+                      user?.role === 'owner' || user?.role === 'treasurer'
+                        ? handleViewGallery(property)
+                        : handleInterestClick(property)
+                    }
                   >
-                    {(user?.role === 'owner' || user?.role === 'treasurer') ? (
+                    {user?.role === 'owner' || user?.role === 'treasurer' ? (
                       <>
                         <Eye className="size-4 mr-2" /> View Gallery
                       </>
                     ) : (
-                      <>
-                        I'm Interested
-                      </>
+                      <>I'm Interested</>
                     )}
                   </Button>
 
@@ -837,13 +1000,18 @@ export function PropertiesPage() {
           <CardContent className="py-12 text-center">
             <Building2 className="size-12 text-gray-400 mx-auto mb-4" />
             <p className="text-gray-600">No properties yet</p>
-            <p className="text-sm text-gray-500 mt-1">Add your first property to get started</p>
+            <p className="text-sm text-gray-500 mt-1">
+              Add your first property to get started
+            </p>
           </CardContent>
         </Card>
       )}
 
       {/* View Property Details Dialog */}
-      <Dialog open={!!viewProperty} onOpenChange={(open) => !open && setViewProperty(null)}>
+      <Dialog
+        open={!!viewProperty}
+        onOpenChange={(open) => !open && setViewProperty(null)}
+      >
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Property Details</DialogTitle>
@@ -868,39 +1036,57 @@ export function PropertiesPage() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <h3 className="text-2xl font-bold text-gray-900">{viewProperty.name}</h3>
+                  <h3 className="text-2xl font-bold text-gray-900">
+                    {viewProperty.name}
+                  </h3>
                   <div className="mt-2 space-y-1 text-gray-600">
                     <p className="flex items-center gap-2">
-                      <span className="font-medium text-gray-900">Type:</span> {viewProperty.typeName}
+                      <span className="font-medium text-gray-900">Type:</span>{' '}
+                      {viewProperty.typeName}
                     </p>
                     <div>
-                      <span className="font-medium text-gray-900">Address:</span>
+                      <span className="font-medium text-gray-900">
+                        Address:
+                      </span>
                       <p className="ml-2">
-                        {viewProperty.propertyNo ? `No. ${viewProperty.propertyNo}, ` : ''}{viewProperty.street}
+                        {viewProperty.propertyNo
+                          ? `No. ${viewProperty.propertyNo}, `
+                          : ''}
+                        {viewProperty.street}
                       </p>
-                      <p className="ml-2">{viewProperty.city}, {viewProperty.district}</p>
+                      <p className="ml-2">
+                        {viewProperty.city}, {viewProperty.district}
+                      </p>
                     </div>
                   </div>
                 </div>
 
                 <div className="bg-gray-50 p-4 rounded-lg border">
-                  <h4 className="font-semibold text-gray-900 mb-2">Statistics</h4>
+                  <h4 className="font-semibold text-gray-900 mb-2">
+                    Statistics
+                  </h4>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <p className="text-xs text-gray-500">Total Units</p>
-                      <p className="text-xl font-bold">{getUnitCount(viewProperty.id)}</p>
+                      <p className="text-xl font-bold">
+                        {getUnitCount(viewProperty.id)}
+                      </p>
                     </div>
                   </div>
                 </div>
               </div>
 
               <div className="flex justify-end gap-2 pt-4 border-t">
-                <Button variant="outline" onClick={() => setViewProperty(null)}>Close</Button>
+                <Button variant="outline" onClick={() => setViewProperty(null)}>
+                  Close
+                </Button>
                 {user?.role === 'owner' && (
-                  <Button onClick={() => {
-                    handleEditClick(viewProperty);
-                    setViewProperty(null);
-                  }}>
+                  <Button
+                    onClick={() => {
+                      handleEditClick(viewProperty);
+                      setViewProperty(null);
+                    }}
+                  >
                     <Edit className="size-4 mr-2" />
                     Edit Property
                   </Button>
@@ -911,15 +1097,25 @@ export function PropertiesPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isInterestDialogOpen} onOpenChange={setIsInterestDialogOpen}>
+      <Dialog
+        open={isInterestDialogOpen}
+        onOpenChange={setIsInterestDialogOpen}
+      >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>I'm Interested in {interestProperty?.name}</DialogTitle>
-            <p className="text-sm text-gray-500">Leave your details and we'll get back to you.</p>
+            <DialogTitle>
+              I'm Interested in {interestProperty?.name}
+            </DialogTitle>
+            <p className="text-sm text-gray-500">
+              Leave your details and we'll get back to you.
+            </p>
           </DialogHeader>
 
           <Form {...interestForm}>
-            <form onSubmit={interestForm.handleSubmit(onSubmitInterest)} className="space-y-4 mt-4">
+            <form
+              onSubmit={interestForm.handleSubmit(onSubmitInterest)}
+              className="space-y-4 mt-4"
+            >
               <FormField
                 control={interestForm.control}
                 name="name"
@@ -941,7 +1137,11 @@ export function PropertiesPage() {
                   <FormItem>
                     <FormLabel>Email</FormLabel>
                     <FormControl>
-                      <Input type="email" placeholder="your@email.com" {...field} />
+                      <Input
+                        type="email"
+                        placeholder="your@email.com"
+                        {...field}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -981,7 +1181,11 @@ export function PropertiesPage() {
               />
 
               <div className="flex justify-end gap-2 pt-2">
-                <Button type="button" variant="outline" onClick={() => setIsInterestDialogOpen(false)}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsInterestDialogOpen(false)}
+                >
                   Cancel
                 </Button>
                 <Button type="submit">Submit Interest</Button>
@@ -998,7 +1202,10 @@ export function PropertiesPage() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 py-4">
             {galleryImages.length > 0 ? (
               galleryImages.map((img, idx) => (
-                <div key={idx} className="relative aspect-square rounded-lg overflow-hidden border border-gray-100 group">
+                <div
+                  key={idx}
+                  className="relative aspect-square rounded-lg overflow-hidden border border-gray-100 group"
+                >
                   <img
                     src={img.image_url || img.url}
                     alt={`Gallery ${idx}`}
@@ -1015,7 +1222,9 @@ export function PropertiesPage() {
                     rel="noreferrer"
                     className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100"
                   >
-                    <span className="bg-white/90 text-gray-900 px-3 py-1 rounded-full text-sm font-medium shadow-sm">View Full</span>
+                    <span className="bg-white/90 text-gray-900 px-3 py-1 rounded-full text-sm font-medium shadow-sm">
+                      View Full
+                    </span>
                   </a>
                 </div>
               ))

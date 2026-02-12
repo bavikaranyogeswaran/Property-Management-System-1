@@ -10,18 +10,24 @@ interface NotificationBannerProps {
   tenantId?: string;
 }
 
-export function NotificationBanner({ notifications, userRole, tenantId }: NotificationBannerProps) {
+export function NotificationBanner({
+  notifications,
+  userRole,
+  tenantId,
+}: NotificationBannerProps) {
   // Filter notifications based on role and tenant
-  const relevantNotifications = notifications.filter(n => {
-    if (n.targetRole === 'both') return true;
-    if (n.targetRole === userRole) {
-      if (userRole === 'tenant' && tenantId) {
-        return n.targetUserId === tenantId;
+  const relevantNotifications = notifications
+    .filter((n) => {
+      if (n.targetRole === 'both') return true;
+      if (n.targetRole === userRole) {
+        if (userRole === 'tenant' && tenantId) {
+          return n.targetUserId === tenantId;
+        }
+        return true;
       }
-      return true;
-    }
-    return false;
-  }).filter(n => !n.read);
+      return false;
+    })
+    .filter((n) => !n.read);
 
   if (relevantNotifications.length === 0) return null;
 
@@ -34,21 +40,33 @@ export function NotificationBanner({ notifications, userRole, tenantId }: Notifi
   return (
     <div className="space-y-3 mb-6">
       {sortedNotifications.map((notification) => {
-        const Icon = notification.severity === 'urgent' ? AlertTriangle :
-          notification.severity === 'warning' ? AlertCircle :
-            Bell;
+        const Icon =
+          notification.severity === 'urgent'
+            ? AlertTriangle
+            : notification.severity === 'warning'
+              ? AlertCircle
+              : Bell;
 
-        const bgColor = notification.severity === 'urgent' ? 'bg-red-50 border-red-200' :
-          notification.severity === 'warning' ? 'bg-orange-50 border-orange-200' :
-            'bg-blue-50 border-blue-200';
+        const bgColor =
+          notification.severity === 'urgent'
+            ? 'bg-red-50 border-red-200'
+            : notification.severity === 'warning'
+              ? 'bg-orange-50 border-orange-200'
+              : 'bg-blue-50 border-blue-200';
 
-        const textColor = notification.severity === 'urgent' ? 'text-red-900' :
-          notification.severity === 'warning' ? 'text-orange-900' :
-            'text-blue-900';
+        const textColor =
+          notification.severity === 'urgent'
+            ? 'text-red-900'
+            : notification.severity === 'warning'
+              ? 'text-orange-900'
+              : 'text-blue-900';
 
-        const iconColor = notification.severity === 'urgent' ? 'text-red-600' :
-          notification.severity === 'warning' ? 'text-orange-600' :
-            'text-blue-600';
+        const iconColor =
+          notification.severity === 'urgent'
+            ? 'text-red-600'
+            : notification.severity === 'warning'
+              ? 'text-orange-600'
+              : 'text-blue-600';
 
         return (
           <Card key={notification.id} className={`${bgColor} border`}>
@@ -64,13 +82,16 @@ export function NotificationBanner({ notifications, userRole, tenantId }: Notifi
                       <Badge
                         variant="outline"
                         className={
-                          notification.severity === 'urgent' ? 'border-red-400 text-red-700 bg-red-100' :
-                            notification.severity === 'warning' ? 'border-orange-400 text-orange-700 bg-orange-100' :
-                              'border-blue-400 text-blue-700 bg-blue-100'
+                          notification.severity === 'urgent'
+                            ? 'border-red-400 text-red-700 bg-red-100'
+                            : notification.severity === 'warning'
+                              ? 'border-orange-400 text-orange-700 bg-orange-100'
+                              : 'border-blue-400 text-blue-700 bg-blue-100'
                         }
                       >
                         <Clock className="size-3 mr-1" />
-                        {notification.daysUntilExpiry} {notification.daysUntilExpiry === 1 ? 'day' : 'days'}
+                        {notification.daysUntilExpiry}{' '}
+                        {notification.daysUntilExpiry === 1 ? 'day' : 'days'}
                       </Badge>
                     )}
                   </div>
@@ -79,12 +100,16 @@ export function NotificationBanner({ notifications, userRole, tenantId }: Notifi
                   </p>
                   {notification.expiresAt && (
                     <p className={`text-xs ${textColor} opacity-70 mt-1`}>
-                      Expiry Date: {new Date(notification.expiresAt).toLocaleDateString('en-US', {
-                        weekday: 'long',
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric',
-                      })}
+                      Expiry Date:{' '}
+                      {new Date(notification.expiresAt).toLocaleDateString(
+                        'en-US',
+                        {
+                          weekday: 'long',
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric',
+                        }
+                      )}
                     </p>
                   )}
                 </div>

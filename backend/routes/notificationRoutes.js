@@ -6,6 +6,10 @@ const router = Router();
 
 router.get('/', authenticateToken, notificationController.getNotifications);
 router.put('/:id/read', authenticateToken, notificationController.markAsRead);
-router.put('/read-all', authenticateToken, notificationController.markAllAsRead);
+router.put(
+  '/read-all',
+  authenticateToken,
+  notificationController.markAllAsRead
+);
 
 export default router;

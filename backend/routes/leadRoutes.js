@@ -19,7 +19,7 @@ router.put('/:id', leadController.updateLead);
 router.post('/:id/convert', leadController.convertLead);
 
 // Message Routes
-// Note: We use mergeParams implicitly or just passing ID. 
+// Note: We use mergeParams implicitly or just passing ID.
 // Standard REST: GET /leads/:id/messages
 router.get('/:leadId/messages', messageController.getMessages);
 router.post('/:leadId/messages', messageController.sendMessage);

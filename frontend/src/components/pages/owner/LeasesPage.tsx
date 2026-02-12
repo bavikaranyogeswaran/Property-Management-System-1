@@ -4,21 +4,67 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { FileText, Plus, Eye, Calendar, DollarSign, Home, User, XCircle, CheckCircle } from 'lucide-react';
+import {
+  FileText,
+  Plus,
+  Eye,
+  Calendar,
+  DollarSign,
+  Home,
+  User,
+  XCircle,
+  CheckCircle,
+  RotateCcw,
+} from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { leaseSchema, type LeaseFormValues } from '@/schemas/ownerSchemas';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
 
 export function LeasesPage() {
-  const { tenants, leases, units, properties, addLease, endLease, renewLease, refundDeposit } = useApp();
+  const {
+    tenants,
+    leases,
+    units,
+    properties,
+    addLease,
+    endLease,
+    renewLease,
+    refundDeposit,
+  } = useApp();
   const [isAddLeaseDialogOpen, setIsAddLeaseDialogOpen] = useState(false);
   const [selectedLease, setSelectedLease] = useState<Lease | null>(null);
 
@@ -34,7 +80,7 @@ export function LeasesPage() {
   });
 
   const onSubmit = async (values: LeaseFormValues) => {
-    const unit = units.find(u => u.id === values.unitId);
+    const unit = units.find((u) => u.id === values.unitId);
     if (unit?.status === 'occupied') {
       toast.error('This unit is already occupied');
       return;
@@ -55,15 +101,17 @@ export function LeasesPage() {
     }
   };
 
-  const activeLeases = leases.filter(l => l.status === 'active');
-  const endedLeases = leases.filter(l => l.status !== 'active');
+  const activeLeases = leases.filter((l) => l.status === 'active');
+  const endedLeases = leases.filter((l) => l.status !== 'active');
 
   // ... (keep existing calculations)
 
   // Calculate expiring soon (within 30 days)
   const today = new Date();
-  const thirtyDaysFromNow = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
-  const expiringSoon = activeLeases.filter(lease => {
+  const thirtyDaysFromNow = new Date(
+    today.getTime() + 30 * 24 * 60 * 60 * 1000
+  );
+  const expiringSoon = activeLeases.filter((lease) => {
     const endDate = new Date(lease.endDate);
     return endDate <= thirtyDaysFromNow && endDate >= today;
   });
@@ -97,13 +145,18 @@ export function LeasesPage() {
 
   const LeaseRow = ({ lease }: { lease: Lease }) => {
     // ... (keep existing LeaseRow component logic)
-    const tenant = tenants.find(t => t.id === lease.tenantId);
-    const unit = units.find(u => u.id === lease.unitId);
-    const property = unit ? properties.find(p => p.id === unit.propertyId) : null;
+    const tenant = tenants.find((t) => t.id === lease.tenantId);
+    const unit = units.find((u) => u.id === lease.unitId);
+    const property = unit
+      ? properties.find((p) => p.id === unit.propertyId)
+      : null;
 
     // Check if expiring soon
     const endDate = new Date(lease.endDate);
-    const isExpiringSoon = lease.status === 'active' && endDate <= thirtyDaysFromNow && endDate >= today;
+    const isExpiringSoon =
+      lease.status === 'active' &&
+      endDate <= thirtyDaysFromNow &&
+      endDate >= today;
 
     return (
       <TableRow key={lease.id} className={isExpiringSoon ? 'bg-orange-50' : ''}>
@@ -118,7 +171,9 @@ export function LeasesPage() {
             <Home className="size-4 text-gray-400" />
             <div className="text-sm">
               <div className="font-medium">{property?.name || 'Unknown'}</div>
-              <div className="text-gray-500">Unit {unit?.unitNumber || 'N/A'}</div>
+              <div className="text-gray-500">
+                Unit {unit?.unitNumber || 'N/A'}
+              </div>
             </div>
           </div>
         </TableCell>
@@ -137,7 +192,10 @@ export function LeasesPage() {
               {lease.endDate}
             </div>
             {isExpiringSoon && (
-              <Badge variant="outline" className="text-xs mt-1 border-orange-300 text-orange-700">
+              <Badge
+                variant="outline"
+                className="text-xs mt-1 border-orange-300 text-orange-700"
+              >
                 Expiring Soon
               </Badge>
             )}
@@ -145,14 +203,16 @@ export function LeasesPage() {
         </TableCell>
         <TableCell>
           <div className="flex items-center gap-1 font-medium">
-            <DollarSign className="size-3 text-gray-400" />
+            <span className="text-xs text-gray-500">LKR</span>
             {lease.monthlyRent}
           </div>
         </TableCell>
         <TableCell>
           <Badge
             variant={lease.status === 'active' ? 'secondary' : 'outline'}
-            className={lease.status === 'active' ? 'bg-green-100 text-green-700' : ''}
+            className={
+              lease.status === 'active' ? 'bg-green-100 text-green-700' : ''
+            }
           >
             {lease.status}
           </Badge>
@@ -174,7 +234,9 @@ export function LeasesPage() {
                   variant="ghost"
                   onClick={() => {
                     setRenewLeaseId(lease.id);
-                    setRenewDate(new Date(lease.endDate).toISOString().split('T')[0]); // Default to current end date
+                    setRenewDate(
+                      new Date(lease.endDate).toISOString().split('T')[0]
+                    ); // Default to current end date
                     setRenewRent(lease.monthlyRent.toString());
                   }}
                   className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
@@ -193,20 +255,21 @@ export function LeasesPage() {
                 </Button>
               </>
             )}
-            {(lease.status === 'active' || lease.status === 'ended') && lease.depositStatus !== 'refunded' && (
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => {
-                  setRefundLeaseId(lease.id);
-                  // setRefundAmount(lease.securityDeposit?.toString() || '');
-                }}
-                className="text-orange-600 hover:text-orange-700 hover:bg-orange-50"
-                title="Refund Deposit"
-              >
-                <DollarSign className="size-4" />
-              </Button>
-            )}
+            {(lease.status === 'active' || lease.status === 'ended') &&
+              lease.depositStatus !== 'refunded' && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    setRefundLeaseId(lease.id);
+                    // setRefundAmount(lease.securityDeposit?.toString() || '');
+                  }}
+                  className="text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                  title="Refund Deposit"
+                >
+                  <RotateCcw className="size-4" />
+                </Button>
+              )}
           </div>
         </TableCell>
       </TableRow>
@@ -215,7 +278,11 @@ export function LeasesPage() {
 
   // Helper for End Lease (keep outside or inside, reusing existing)
   const handleEndLease = (leaseId: string) => {
-    if (confirm('Are you sure you want to end this lease? This action will mark the lease as ended and free up the unit.')) {
+    if (
+      confirm(
+        'Are you sure you want to end this lease? This action will mark the lease as ended and free up the unit.'
+      )
+    ) {
       endLease(leaseId);
       toast.success('Lease ended successfully');
       setSelectedLease(null);
@@ -242,7 +309,11 @@ export function LeasesPage() {
     e.preventDefault();
     if (!renewLeaseId) return;
     try {
-      await renewLease(renewLeaseId, renewDate, renewRent ? parseFloat(renewRent) : undefined);
+      await renewLease(
+        renewLeaseId,
+        renewDate,
+        renewRent ? parseFloat(renewRent) : undefined
+      );
       setRenewLeaseId(null);
       setRenewDate('');
       setRenewRent('');
@@ -268,10 +339,17 @@ export function LeasesPage() {
       {/* ... existing header ... */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-semibold text-gray-900">Lease Management</h2>
-          <p className="text-sm text-gray-500 mt-1">Manage rental agreements and lease contracts</p>
+          <h2 className="text-2xl font-semibold text-gray-900">
+            Lease Management
+          </h2>
+          <p className="text-sm text-gray-500 mt-1">
+            Manage rental agreements and lease contracts
+          </p>
         </div>
-        <Dialog open={isAddLeaseDialogOpen} onOpenChange={setIsAddLeaseDialogOpen}>
+        <Dialog
+          open={isAddLeaseDialogOpen}
+          onOpenChange={setIsAddLeaseDialogOpen}
+        >
           <DialogTrigger asChild>
             <Button onClick={() => leaseForm.reset()}>
               <Plus className="size-4 mr-2" />
@@ -284,7 +362,10 @@ export function LeasesPage() {
               <DialogTitle>Create New Lease</DialogTitle>
             </DialogHeader>
             <Form {...leaseForm}>
-              <form onSubmit={leaseForm.handleSubmit(onSubmit)} className="space-y-4 mt-4">
+              <form
+                onSubmit={leaseForm.handleSubmit(onSubmit)}
+                className="space-y-4 mt-4"
+              >
                 {/* ... existing fields ... */}
                 {/* I need to make sure I don't delete the form content. 
                      Since I am checking LeasesPage content, it controls the DialogContent.
@@ -304,8 +385,6 @@ export function LeasesPage() {
         </Dialog>
       </div>
 
-
-
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((stat, index) => {
@@ -316,11 +395,15 @@ export function LeasesPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs text-gray-600">{stat.label}</p>
-                    <p className={`text-2xl font-semibold mt-1 ${stat.color.split(' ')[1]}`}>
+                    <p
+                      className={`text-2xl font-semibold mt-1 ${stat.color.split(' ')[1]}`}
+                    >
                       {stat.value}
                     </p>
                   </div>
-                  <Icon className={`size-8 ${stat.color.split(' ')[1]} opacity-20`} />
+                  <Icon
+                    className={`size-8 ${stat.color.split(' ')[1]} opacity-20`}
+                  />
                 </div>
               </CardContent>
             </Card>
@@ -374,7 +457,9 @@ export function LeasesPage() {
                   <div className="py-12 text-center">
                     <FileText className="size-12 text-gray-400 mx-auto mb-4" />
                     <p className="text-gray-600">No active leases</p>
-                    <p className="text-sm text-gray-500 mt-1">Create a lease to get started</p>
+                    <p className="text-sm text-gray-500 mt-1">
+                      Create a lease to get started
+                    </p>
                   </div>
                 )}
               </div>
@@ -405,7 +490,9 @@ export function LeasesPage() {
                   <div className="py-12 text-center">
                     <Calendar className="size-12 text-gray-400 mx-auto mb-4" />
                     <p className="text-gray-600">No leases expiring soon</p>
-                    <p className="text-sm text-gray-500 mt-1">Leases expiring within 30 days will appear here</p>
+                    <p className="text-sm text-gray-500 mt-1">
+                      Leases expiring within 30 days will appear here
+                    </p>
                   </div>
                 )}
               </div>
@@ -445,111 +532,139 @@ export function LeasesPage() {
       </Card>
 
       {/* Lease Details Dialog */}
-      <Dialog open={!!selectedLease} onOpenChange={(open) => !open && setSelectedLease(null)}>
+      <Dialog
+        open={!!selectedLease}
+        onOpenChange={(open) => !open && setSelectedLease(null)}
+      >
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Lease Agreement Details</DialogTitle>
           </DialogHeader>
-          {selectedLease && (() => {
-            const tenant = tenants.find(t => t.id === selectedLease.tenantId);
-            const unit = units.find(u => u.id === selectedLease.unitId);
-            const property = unit ? properties.find(p => p.id === unit.propertyId) : null;
+          {selectedLease &&
+            (() => {
+              const tenant = tenants.find(
+                (t) => t.id === selectedLease.tenantId
+              );
+              const unit = units.find((u) => u.id === selectedLease.unitId);
+              const property = unit
+                ? properties.find((p) => p.id === unit.propertyId)
+                : null;
 
-            // Calculate lease duration
-            const startDate = new Date(selectedLease.startDate);
-            const endDate = new Date(selectedLease.endDate);
-            const durationMonths = Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 30));
+              // Calculate lease duration
+              const startDate = new Date(selectedLease.startDate);
+              const endDate = new Date(selectedLease.endDate);
+              const durationMonths = Math.round(
+                (endDate.getTime() - startDate.getTime()) /
+                  (1000 * 60 * 60 * 24 * 30)
+              );
 
-            return (
-              <div className="space-y-6 mt-4">
-                {/* Lease Status */}
-                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                  <div>
-                    <p className="text-sm text-gray-600">Lease Status</p>
-                    <p className="text-lg font-semibold">{selectedLease.status}</p>
-                  </div>
-                  <Badge
-                    variant={selectedLease.status === 'active' ? 'secondary' : 'outline'}
-                    className={selectedLease.status === 'active' ? 'bg-green-100 text-green-700 text-base px-4 py-2' : 'text-base px-4 py-2'}
-                  >
-                    {selectedLease.status}
-                  </Badge>
-                </div>
-
-                {/* Parties */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="border rounded-lg p-4">
-                    <h4 className="font-semibold mb-3 flex items-center gap-2">
-                      <User className="size-4" />
-                      Tenant
-                    </h4>
-                    <p className="font-medium">{tenant?.name}</p>
-                    <p className="text-sm text-gray-600 mt-1">{tenant?.email}</p>
-                    <p className="text-sm text-gray-600">{tenant?.phone}</p>
-                  </div>
-                  <div className="border rounded-lg p-4">
-                    <h4 className="font-semibold mb-3 flex items-center gap-2">
-                      <Home className="size-4" />
-                      Property
-                    </h4>
-                    <p className="font-medium">{property?.name}</p>
-                    <p className="text-sm text-gray-600 mt-1">Unit {unit?.unitNumber}</p>
-                    <p className="text-sm text-gray-600">{unit?.type}</p>
-                  </div>
-                </div>
-
-                {/* Lease Terms */}
-                <div className="border rounded-lg p-4">
-                  <h4 className="font-semibold mb-3">Lease Terms</h4>
-                  <div className="grid grid-cols-2 gap-4">
+              return (
+                <div className="space-y-6 mt-4">
+                  {/* Lease Status */}
+                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                     <div>
-                      <p className="text-sm text-gray-600">Start Date</p>
-                      <p className="font-medium flex items-center gap-1">
-                        <Calendar className="size-4 text-gray-400" />
-                        {selectedLease.startDate}
+                      <p className="text-sm text-gray-600">Lease Status</p>
+                      <p className="text-lg font-semibold">
+                        {selectedLease.status}
                       </p>
                     </div>
-                    <div>
-                      <p className="text-sm text-gray-600">End Date</p>
-                      <p className="font-medium flex items-center gap-1">
-                        <Calendar className="size-4 text-gray-400" />
-                        {selectedLease.endDate}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-600">Lease Duration</p>
-                      <p className="font-medium">{durationMonths} months</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-600">Monthly Rent</p>
-                      <p className="font-medium flex items-center gap-1">
-                        <DollarSign className="size-4 text-gray-400" />
-                        {selectedLease.monthlyRent}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Actions */}
-                {selectedLease.status === 'active' && (
-                  <div className="flex justify-end gap-2 pt-4 border-t">
-                    <Button
-                      variant="destructive"
-                      onClick={() => handleEndLease(selectedLease.id)}
+                    <Badge
+                      variant={
+                        selectedLease.status === 'active'
+                          ? 'secondary'
+                          : 'outline'
+                      }
+                      className={
+                        selectedLease.status === 'active'
+                          ? 'bg-green-100 text-green-700 text-base px-4 py-2'
+                          : 'text-base px-4 py-2'
+                      }
                     >
-                      <XCircle className="size-4 mr-2" />
-                      End Lease
-                    </Button>
+                      {selectedLease.status}
+                    </Badge>
                   </div>
-                )}
-              </div>
-            );
-          })()}
+
+                  {/* Parties */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="border rounded-lg p-4">
+                      <h4 className="font-semibold mb-3 flex items-center gap-2">
+                        <User className="size-4" />
+                        Tenant
+                      </h4>
+                      <p className="font-medium">{tenant?.name}</p>
+                      <p className="text-sm text-gray-600 mt-1">
+                        {tenant?.email}
+                      </p>
+                      <p className="text-sm text-gray-600">{tenant?.phone}</p>
+                    </div>
+                    <div className="border rounded-lg p-4">
+                      <h4 className="font-semibold mb-3 flex items-center gap-2">
+                        <Home className="size-4" />
+                        Property
+                      </h4>
+                      <p className="font-medium">{property?.name}</p>
+                      <p className="text-sm text-gray-600 mt-1">
+                        Unit {unit?.unitNumber}
+                      </p>
+                      <p className="text-sm text-gray-600">{unit?.type}</p>
+                    </div>
+                  </div>
+
+                  {/* Lease Terms */}
+                  <div className="border rounded-lg p-4">
+                    <h4 className="font-semibold mb-3">Lease Terms</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-sm text-gray-600">Start Date</p>
+                        <p className="font-medium flex items-center gap-1">
+                          <Calendar className="size-4 text-gray-400" />
+                          {selectedLease.startDate}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600">End Date</p>
+                        <p className="font-medium flex items-center gap-1">
+                          <Calendar className="size-4 text-gray-400" />
+                          {selectedLease.endDate}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600">Lease Duration</p>
+                        <p className="font-medium">{durationMonths} months</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600">Monthly Rent</p>
+                        <p className="font-medium flex items-center gap-1">
+                          <span className="text-gray-500">LKR</span>
+                          {selectedLease.monthlyRent}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  {selectedLease.status === 'active' && (
+                    <div className="flex justify-end gap-2 pt-4 border-t">
+                      <Button
+                        variant="destructive"
+                        onClick={() => handleEndLease(selectedLease.id)}
+                      >
+                        <XCircle className="size-4 mr-2" />
+                        End Lease
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
         </DialogContent>
       </Dialog>
 
       {/* Renew Lease Dialog */}
-      <Dialog open={!!renewLeaseId} onOpenChange={(open) => !open && setRenewLeaseId(null)}>
+      <Dialog
+        open={!!renewLeaseId}
+        onOpenChange={(open) => !open && setRenewLeaseId(null)}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Renew Lease</DialogTitle>
@@ -575,7 +690,13 @@ export function LeasesPage() {
               />
             </div>
             <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => setRenewLeaseId(null)}>Cancel</Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setRenewLeaseId(null)}
+              >
+                Cancel
+              </Button>
               <Button type="submit">Renew Lease</Button>
             </div>
           </form>
@@ -583,7 +704,10 @@ export function LeasesPage() {
       </Dialog>
 
       {/* Refund Deposit Dialog */}
-      <Dialog open={!!refundLeaseId} onOpenChange={(open) => !open && setRefundLeaseId(null)}>
+      <Dialog
+        open={!!refundLeaseId}
+        onOpenChange={(open) => !open && setRefundLeaseId(null)}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Refund Security Deposit</DialogTitle>
@@ -598,17 +722,26 @@ export function LeasesPage() {
                 onChange={(e) => setRefundAmount(e.target.value)}
                 required
               />
-              <p className="text-xs text-gray-500 mt-1">Enter the amount to be returned to the tenant. (Max: {
-                leases.find(l => l.id === refundLeaseId)?.securityDeposit || 0
-              })</p>
+              <p className="text-xs text-gray-500 mt-1">
+                Enter the amount to be returned to the tenant. (Max:{' '}
+                {leases.find((l) => l.id === refundLeaseId)?.securityDeposit ||
+                  0}
+                )
+              </p>
             </div>
             <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => setRefundLeaseId(null)}>Cancel</Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setRefundLeaseId(null)}
+              >
+                Cancel
+              </Button>
               <Button type="submit">Process Refund</Button>
             </div>
           </form>
         </DialogContent>
       </Dialog>
-    </div >
+    </div>
   );
 }

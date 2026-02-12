@@ -3,33 +3,51 @@ import { useApp, Tenant } from '@/app/context/AppContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Users, Mail, Phone, Home, Calendar, UserX, UserCheck } from 'lucide-react';
+import {
+  Users,
+  Mail,
+  Phone,
+  Home,
+  Calendar,
+  UserX,
+  UserCheck,
+} from 'lucide-react';
 import { TenantDetailsDialog } from '@/components/tenants/TenantDetailsDialog';
 
 export function TenantsPage() {
   const { tenants, leases, units, properties } = useApp();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
-  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all');
+  const [filterStatus, setFilterStatus] = useState<
+    'all' | 'active' | 'inactive'
+  >('all');
 
   const getTenantLease = (tenantId: string) => {
-    return leases.find(l => l.tenantId === tenantId && l.status === 'active');
+    return leases.find((l) => l.tenantId === tenantId && l.status === 'active');
   };
 
   const getTenantUnit = (tenantId: string) => {
     const lease = getTenantLease(tenantId);
-    return lease ? units.find(u => u.id === lease.unitId) : null;
+    return lease ? units.find((u) => u.id === lease.unitId) : null;
   };
 
   const getTenantProperty = (tenantId: string) => {
     const unit = getTenantUnit(tenantId);
-    return unit ? properties.find(p => p.id === unit.propertyId) : null;
+    return unit ? properties.find((p) => p.id === unit.propertyId) : null;
   };
 
-  const filteredTenants = tenants.filter(tenant => {
-    const matchesSearch = tenant.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  const filteredTenants = tenants.filter((tenant) => {
+    const matchesSearch =
+      tenant.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       tenant.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
       tenant.phone.includes(searchTerm);
 
@@ -42,8 +60,8 @@ export function TenantsPage() {
     return matchesSearch;
   });
 
-  const activeTenants = tenants.filter(t => !!getTenantLease(t.id));
-  const inactiveTenants = tenants.filter(t => !getTenantLease(t.id));
+  const activeTenants = tenants.filter((t) => !!getTenantLease(t.id));
+  const inactiveTenants = tenants.filter((t) => !getTenantLease(t.id));
 
   const stats = [
     {
@@ -71,7 +89,9 @@ export function TenantsPage() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-2xl font-semibold text-gray-900">Tenants</h2>
-          <p className="text-sm text-gray-500 mt-1">Manage tenant information and profiles</p>
+          <p className="text-sm text-gray-500 mt-1">
+            Manage tenant information and profiles
+          </p>
         </div>
       </div>
 
@@ -85,11 +105,15 @@ export function TenantsPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs text-gray-600">{stat.label}</p>
-                    <p className={`text-2xl font-semibold mt-1 ${stat.color.split(' ')[1]}`}>
+                    <p
+                      className={`text-2xl font-semibold mt-1 ${stat.color.split(' ')[1]}`}
+                    >
                       {stat.value}
                     </p>
                   </div>
-                  <Icon className={`size-8 ${stat.color.split(' ')[1]} opacity-20`} />
+                  <Icon
+                    className={`size-8 ${stat.color.split(' ')[1]} opacity-20`}
+                  />
                 </div>
               </CardContent>
             </Card>
@@ -182,16 +206,23 @@ export function TenantsPage() {
                             <Home className="size-4 text-gray-400" />
                             <div className="text-sm">
                               <div className="font-medium">{property.name}</div>
-                              <div className="text-gray-500">Unit {unit.unitNumber}</div>
+                              <div className="text-gray-500">
+                                Unit {unit.unitNumber}
+                              </div>
                             </div>
                           </div>
                         ) : (
-                          <span className="text-gray-400 text-sm">No active lease</span>
+                          <span className="text-gray-400 text-sm">
+                            No active lease
+                          </span>
                         )}
                       </TableCell>
                       <TableCell>
                         {lease ? (
-                          <Badge variant="secondary" className="bg-green-100 text-green-700">
+                          <Badge
+                            variant="secondary"
+                            className="bg-green-100 text-green-700"
+                          >
                             Active
                           </Badge>
                         ) : (
@@ -225,7 +256,9 @@ export function TenantsPage() {
                 <Users className="size-12 text-gray-400 mx-auto mb-4" />
                 <p className="text-gray-600">No tenants found</p>
                 <p className="text-sm text-gray-500 mt-1">
-                  {searchTerm ? 'Try adjusting your search' : 'Convert leads to tenants to get started'}
+                  {searchTerm
+                    ? 'Try adjusting your search'
+                    : 'Convert leads to tenants to get started'}
                 </p>
               </div>
             )}
@@ -234,7 +267,6 @@ export function TenantsPage() {
       </Card>
 
       {/* Tenant Details Dialog */}
-
 
       {/* Tenant Details Dialog */}
       <TenantDetailsDialog
@@ -245,6 +277,6 @@ export function TenantsPage() {
         units={units}
         properties={properties}
       />
-    </div >
+    </div>
   );
 }

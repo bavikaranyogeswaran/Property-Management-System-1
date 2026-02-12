@@ -1,9 +1,9 @@
 import pool from './config/db.js';
 
 async function debugReceiptData() {
-    console.log('--- Debugging Receipt Data ---');
-    try {
-        const query = `
+  console.log('--- Debugging Receipt Data ---');
+  try {
+    const query = `
             SELECT r.receipt_id, r.amount, r.receipt_date, 
                    p.payment_id, p.invoice_id, 
                    i.lease_id, 
@@ -15,24 +15,25 @@ async function debugReceiptData() {
             ORDER BY r.receipt_date DESC
         `;
 
-        const [rows] = await pool.query(query);
-        console.log(`Total Receipts Found: ${rows.length}`);
-        console.log(JSON.stringify(rows, null, 2));
+    const [rows] = await pool.query(query);
+    console.log(`Total Receipts Found: ${rows.length}`);
+    console.log(JSON.stringify(rows, null, 2));
 
-        if (rows.length > 0) {
-            const first = rows[0];
-            if (!first.tenant_id) {
-                console.warn('WARNING: tenant_id is NULL for the receipt. Check payment -> invoice -> lease linkage.');
-            } else {
-                console.log(`Success: Linkage found. Tenant ID: ${first.tenant_id}`);
-            }
-        }
-
-    } catch (err) {
-        console.error('Error:', err);
-    } finally {
-        process.exit();
+    if (rows.length > 0) {
+      const first = rows[0];
+      if (!first.tenant_id) {
+        console.warn(
+          'WARNING: tenant_id is NULL for the receipt. Check payment -> invoice -> lease linkage.'
+        );
+      } else {
+        console.log(`Success: Linkage found. Tenant ID: ${first.tenant_id}`);
+      }
     }
+  } catch (err) {
+    console.error('Error:', err);
+  } finally {
+    process.exit();
+  }
 }
 
 debugReceiptData();

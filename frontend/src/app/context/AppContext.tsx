@@ -1,6 +1,18 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  ReactNode,
+} from 'react';
 import authService from '../../services/auth';
-import apiClient, { maintenanceApi, paymentApi, invoiceApi, notificationApi, receiptApi } from '../../services/api';
+import apiClient, {
+  maintenanceApi,
+  paymentApi,
+  invoiceApi,
+  notificationApi,
+  receiptApi,
+} from '../../services/api';
 import { toast } from 'sonner';
 import { useAuth } from './AuthContext';
 
@@ -22,8 +34,6 @@ export interface Property {
 
 // ... (skipping unchanged interfaces)
 
-
-
 export interface PropertyType {
   type_id: number;
   name: string;
@@ -40,8 +50,8 @@ export interface Unit {
   id: string;
   propertyId: string;
   unitNumber: string;
-  unitTypeId: number;       // FK to unit_types
-  type: string;             // Type name for display (legacy/computed)
+  unitTypeId: number; // FK to unit_types
+  type: string; // Type name for display (legacy/computed)
   monthlyRent: number;
   status: 'available' | 'occupied' | 'maintenance';
   createdAt: string;
@@ -203,7 +213,11 @@ export interface Visit {
 
 export interface Notification {
   id: string;
-  type: 'lease_expiring' | 'lease_expired' | 'invoice_overdue' | 'maintenance_urgent';
+  type:
+    | 'lease_expiring'
+    | 'lease_expired'
+    | 'invoice_overdue'
+    | 'maintenance_urgent';
   title: string;
   message: string;
   targetRole: 'owner' | 'tenant' | 'both';
@@ -237,12 +251,17 @@ interface AppContextType {
   markNotificationAsRead: (id: string) => Promise<void>;
 
   // Property operations
-  addProperty: (property: Omit<Property, 'id' | 'createdAt'>) => Promise<Property | undefined>;
+  addProperty: (
+    property: Omit<Property, 'id' | 'createdAt'>
+  ) => Promise<Property | undefined>;
   updateProperty: (id: string, property: Partial<Property>) => Promise<void>;
   deleteProperty: (id: string) => Promise<void>;
   uploadPropertyImages: (propertyId: string, files: File[]) => Promise<any>;
   getPropertyImages: (propertyId: string) => Promise<any[]>;
-  setPropertyPrimaryImage: (propertyId: string, imageId: string) => Promise<void>;
+  setPropertyPrimaryImage: (
+    propertyId: string,
+    imageId: string
+  ) => Promise<void>;
   deletePropertyImage: (propertyId: string, imageId: string) => Promise<void>;
 
   // Type operations
@@ -264,20 +283,31 @@ interface AppContextType {
   addLead: (lead: Omit<Lead, 'id' | 'createdAt'>) => Promise<void>;
   updateLead: (id: string, lead: Partial<Lead>) => Promise<void>;
   addLeadFollowUp: (followUp: Omit<LeadFollowUp, 'id'>) => void;
-  convertLeadToTenant: (leadId: string, startDate?: string, endDate?: string, unitId?: string) => Promise<string>;
+  convertLeadToTenant: (
+    leadId: string,
+    startDate?: string,
+    endDate?: string,
+    unitId?: string
+  ) => Promise<string>;
 
   // Tenant operations
   addTenant: (tenant: Omit<Tenant, 'id' | 'createdAt'>) => void;
 
   // Treasurer operations
-  addTreasurer: (treasurer: Omit<Treasurer, 'id' | 'createdAt'> & { id?: string }) => void;
+  addTreasurer: (
+    treasurer: Omit<Treasurer, 'id' | 'createdAt'> & { id?: string }
+  ) => void;
   updateTreasurer: (id: string, treasurer: Partial<Treasurer>) => void;
   deleteTreasurer: (id: string) => void;
 
   // Lease operations
   addLease: (lease: Omit<Lease, 'id' | 'createdAt'>) => Promise<void>;
   endLease: (id: string) => void;
-  renewLease: (id: string, newEndDate: string, newMonthlyRent?: number) => Promise<void>;
+  renewLease: (
+    id: string,
+    newEndDate: string,
+    newMonthlyRent?: number
+  ) => Promise<void>;
   refundDeposit: (id: string, amount: number) => Promise<void>;
 
   // Invoice operations
@@ -286,14 +316,31 @@ interface AppContextType {
   // Payment operations
   submitPayment: (payment: Omit<Payment, 'id' | 'submittedAt'>) => void;
   verifyPayment: (id: string, approved: boolean) => void;
-  recordCashPayment: (invoiceId: string, amount: number, paymentDate: string, referenceNumber?: string) => Promise<void>;
+  recordCashPayment: (
+    invoiceId: string,
+    amount: number,
+    paymentDate: string,
+    referenceNumber?: string
+  ) => Promise<void>;
 
   // Maintenance operations
-  addMaintenanceRequest: (request: Omit<MaintenanceRequest, 'id' | 'submittedDate'>) => void;
-  updateMaintenanceRequest: (id: string, request: Partial<MaintenanceRequest>) => void;
-  addMaintenanceCost: (cost: Omit<MaintenanceCost, 'id' | 'recordedDate'>) => void;
+  addMaintenanceRequest: (
+    request: Omit<MaintenanceRequest, 'id' | 'submittedDate'>
+  ) => void;
+  updateMaintenanceRequest: (
+    id: string,
+    request: Partial<MaintenanceRequest>
+  ) => void;
+  addMaintenanceCost: (
+    cost: Omit<MaintenanceCost, 'id' | 'recordedDate'>
+  ) => void;
   deleteMaintenanceCost: (id: string) => void;
-  createMaintenanceInvoice: (requestId: string, amount: number, description: string, dueDate?: string) => Promise<void>;
+  createMaintenanceInvoice: (
+    requestId: string,
+    amount: number,
+    description: string,
+    dueDate?: string
+  ) => Promise<void>;
 
   // Visit operations
   visits: Visit[];
@@ -303,7 +350,6 @@ interface AppContextType {
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
-
 
 const INITIAL_DATA = {
   visits: [],
@@ -332,17 +378,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [units, setUnits] = useState<Unit[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [leadFollowUps, setLeadFollowUps] = useState<LeadFollowUp[]>([]);
-  const [leadStageHistory, setLeadStageHistory] = useState<LeadStageHistory[]>([]);
+  const [leadStageHistory, setLeadStageHistory] = useState<LeadStageHistory[]>(
+    []
+  );
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [treasurers, setTreasurers] = useState<Treasurer[]>([]);
   const [leases, setLeases] = useState<Lease[]>([]);
   const [invoices, setInvoices] = useState<RentInvoice[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [receipts, setReceipts] = useState<Receipt[]>([]);
-  const [maintenanceRequests, setMaintenanceRequests] = useState<MaintenanceRequest[]>([]);
-  const [maintenanceCosts, setMaintenanceCosts] = useState<MaintenanceCost[]>([]);
+  const [maintenanceRequests, setMaintenanceRequests] = useState<
+    MaintenanceRequest[]
+  >([]);
+  const [maintenanceCosts, setMaintenanceCosts] = useState<MaintenanceCost[]>(
+    []
+  );
   const [notifications, setNotifications] = useState<Notification[]>([]);
-
 
   // Fetch initial data
   // Fetch initial data
@@ -374,11 +425,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
                 phone: u.phone || '',
                 password: '',
                 createdAt: u.createdAt || u.created_at,
-                status: u.status
+                status: u.status,
               }));
               setTreasurers(mappedTreasurers);
             }
-          } catch (e) { console.error("Failed to fetch treasurers", e); }
+          } catch (e) {
+            console.error('Failed to fetch treasurers', e);
+          }
         }
 
         // Fetch Tenants (Owner and Treasurer)
@@ -392,11 +445,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
                 email: u.email,
                 phone: u.phone,
                 createdAt: u.createdAt,
-                status: u.status
+                status: u.status,
               }));
               setTenants(mappedTenants);
             }
-          } catch (e) { console.error("Failed to fetch tenants", e); }
+          } catch (e) {
+            console.error('Failed to fetch tenants', e);
+          }
         }
 
         // Fetch Units
@@ -417,7 +472,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             setUnits(mappedUnits);
           }
         } catch (e: any) {
-          console.error("Failed to fetch units", e);
+          console.error('Failed to fetch units', e);
         }
 
         // Fetch Leases (Owner, Treasurer, Tenant sees own?)
@@ -429,7 +484,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
           if (lRes.data) {
             setLeases(lRes.data);
           }
-        } catch (e) { console.error("Failed to fetch leases", e); }
+        } catch (e) {
+          console.error('Failed to fetch leases', e);
+        }
 
         // Fetch Maintenance Requests (NEW)
         try {
@@ -444,11 +501,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
               priority: r.priority,
               status: r.status,
               submittedDate: r.created_at ? r.created_at.split('T')[0] : '',
-              images: r.images
+              images: r.images,
             }));
             setMaintenanceRequests(mappedRequests);
           }
-        } catch (e) { console.error("Failed to fetch maintenance requests", e); }
+        } catch (e) {
+          console.error('Failed to fetch maintenance requests', e);
+        }
 
         // Fetch Maintenance Costs (NEW)
         if (user?.role === 'owner' || user?.role === 'treasurer') {
@@ -460,11 +519,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
                 requestId: c.request_id.toString(),
                 amount: parseFloat(c.amount),
                 description: c.description,
-                recordedDate: c.recorded_date ? c.recorded_date.split('T')[0] : ''
+                recordedDate: c.recorded_date
+                  ? c.recorded_date.split('T')[0]
+                  : '',
               }));
               setMaintenanceCosts(mappedCosts);
             }
-          } catch (e) { console.error("Failed to fetch maintenance costs", e); }
+          } catch (e) {
+            console.error('Failed to fetch maintenance costs', e);
+          }
         }
 
         // Fetch Invoices (NEW)
@@ -480,14 +543,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
               tenantName: i.tenant_name,
               propertyName: i.property_name,
               unitNumber: i.unit_number,
-              dueDate: i.due_date ? new Date(i.due_date).toLocaleDateString('en-CA') : '',
+              dueDate: i.due_date
+                ? new Date(i.due_date).toLocaleDateString('en-CA')
+                : '',
               status: i.status,
               description: i.description,
-              generatedDate: i.created_at ? new Date(i.created_at).toLocaleDateString('en-CA') : ''
+              generatedDate: i.created_at
+                ? new Date(i.created_at).toLocaleDateString('en-CA')
+                : '',
             }));
             setInvoices(mappedInvoices);
           }
-        } catch (e) { console.error("Failed to fetch invoices", e); }
+        } catch (e) {
+          console.error('Failed to fetch invoices', e);
+        }
 
         // Fetch Payments (NEW)
         try {
@@ -503,11 +572,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
               referenceNumber: p.reference_number,
               status: p.status,
               submittedAt: p.created_at || '',
-              proofUrl: p.evidence_url
+              proofUrl: p.evidence_url,
             }));
             setPayments(mappedPayments);
           }
-        } catch (e) { console.error("Failed to fetch payments", e); }
+        } catch (e) {
+          console.error('Failed to fetch payments', e);
+        }
 
         // Fetch Receipts (NEW)
         try {
@@ -518,7 +589,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
               paymentId: r.paymentId,
               invoiceId: r.invoiceId,
               tenantId: r.tenantId,
-              amount: typeof r.amount === 'string' ? parseFloat(r.amount) : r.amount,
+              amount:
+                typeof r.amount === 'string' ? parseFloat(r.amount) : r.amount,
               generatedDate: r.receiptDate || r.generatedDate || r.createdAt,
               receiptNumber: r.receiptNumber,
               propertyName: r.propertyName,
@@ -526,12 +598,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
               tenantName: r.tenantName,
               tenantEmail: r.tenantEmail,
               paymentMethod: r.paymentMethod,
-              paymentDate: r.paymentDate ? r.paymentDate.split('T')[0] : r.generatedDate,
-              description: r.description
+              paymentDate: r.paymentDate
+                ? r.paymentDate.split('T')[0]
+                : r.generatedDate,
+              description: r.description,
             }));
             setReceipts(mappedReceipts);
           }
-        } catch (e) { console.error("Failed to fetch receipts", e); }
+        } catch (e) {
+          console.error('Failed to fetch receipts', e);
+        }
 
         // Fetch Properties (if not already fetched via initial props or whatever)
         try {
@@ -549,19 +625,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
               image: p.image || p.image_url,
               createdAt: p.createdAt || p.created_at,
               description: p.description,
-              features: p.features
+              features: p.features,
             }));
             setProperties(mappedProps);
           }
-        } catch (e) { console.error("Failed to fetch properties", e); }
-
+        } catch (e) {
+          console.error('Failed to fetch properties', e);
+        }
       } catch (error) {
-        console.error("Failed to fetch initial data", error);
+        console.error('Failed to fetch initial data', error);
       }
     };
 
     fetchData();
-
 
     // Fetch leads
     const fetchLeads = async () => {
@@ -577,7 +653,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
             const mappedLeads = response.data.map((l: any) => ({
               ...l,
               id: l.id.toString(),
-              interestedUnit: l.interestedUnit ? l.interestedUnit.toString() : undefined,
+              interestedUnit: l.interestedUnit
+                ? l.interestedUnit.toString()
+                : undefined,
               propertyId: l.propertyId ? l.propertyId.toString() : undefined,
               tenantId: l.tenantId ? l.tenantId.toString() : undefined,
             }));
@@ -606,7 +684,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             setPropertyTypes(typesResponse.data);
           }
         } catch (e) {
-          console.error("Failed to fetch types", e);
+          console.error('Failed to fetch types', e);
         }
 
         // Fetch properties (public)
@@ -624,7 +702,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             image: p.image,
             createdAt: p.createdAt,
             description: p.description,
-            features: p.features
+            features: p.features,
           }));
           setProperties(mappedProps);
         }
@@ -668,10 +746,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
     };
     fetchLeadStageHistory();
-
   }, [user]); // Re-run when user auth state changes
-
-
 
   // Generate lease expiration notifications
   useEffect(() => {
@@ -684,7 +759,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (lease.status !== 'active') return;
 
       const endDate = new Date(lease.endDate);
-      const daysUntilExpiry = Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      const daysUntilExpiry = Math.ceil(
+        (endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+      );
 
       // Don't create notifications for leases that already expired
       if (daysUntilExpiry < 0) return;
@@ -709,28 +786,39 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
 
       if (shouldNotify) {
-        const unit = units.find(u => u.id === lease.unitId);
-        const tenant = tenants.find(t => t.id === lease.tenantId);
-        const property = unit ? properties.find(p => p.id === unit.propertyId) : null;
+        const unit = units.find((u) => u.id === lease.unitId);
+        const tenant = tenants.find((t) => t.id === lease.tenantId);
+        const property = unit
+          ? properties.find((p) => p.id === unit.propertyId)
+          : null;
 
         // Check if notification already exists for this lease and threshold
         const existingNotification = notifications.find(
-          n => n.leaseId === lease.id && n.type === 'lease_expiring' && Math.abs((n.daysUntilExpiry || 0) - daysUntilExpiry) < 2
+          (n) =>
+            n.leaseId === lease.id &&
+            n.type === 'lease_expiring' &&
+            Math.abs((n.daysUntilExpiry || 0) - daysUntilExpiry) < 2
         );
 
         if (!existingNotification && unit && tenant && property) {
-          const message = daysUntilExpiry <= 7
-            ? `Lease for ${tenant.name} in ${property.name} Unit ${unit.unitNumber} expires in ${daysUntilExpiry} days on ${lease.endDate}.`
-            : daysUntilExpiry <= 15
-              ? `Lease expiring in ${daysUntilExpiry} days: ${property.name} Unit ${unit.unitNumber} (${tenant.name}) on ${lease.endDate}.`
-              : daysUntilExpiry <= 30
-                ? `Lease renewal reminder: ${property.name} Unit ${unit.unitNumber} expires on ${lease.endDate} (${daysUntilExpiry} days).`
-                : `Upcoming lease expiration in ${daysUntilExpiry} days for ${property.name} Unit ${unit.unitNumber} on ${lease.endDate}.`;
+          const message =
+            daysUntilExpiry <= 7
+              ? `Lease for ${tenant.name} in ${property.name} Unit ${unit.unitNumber} expires in ${daysUntilExpiry} days on ${lease.endDate}.`
+              : daysUntilExpiry <= 15
+                ? `Lease expiring in ${daysUntilExpiry} days: ${property.name} Unit ${unit.unitNumber} (${tenant.name}) on ${lease.endDate}.`
+                : daysUntilExpiry <= 30
+                  ? `Lease renewal reminder: ${property.name} Unit ${unit.unitNumber} expires on ${lease.endDate} (${daysUntilExpiry} days).`
+                  : `Upcoming lease expiration in ${daysUntilExpiry} days for ${property.name} Unit ${unit.unitNumber} on ${lease.endDate}.`;
 
           generatedNotifications.push({
             id: `notif-${lease.id}-${daysUntilExpiry}`,
             type: 'lease_expiring',
-            title: daysUntilExpiry <= 7 ? `⚠️ Urgent: Lease Expiring Soon` : daysUntilExpiry <= 30 ? 'Lease Expiring Soon' : 'Upcoming Lease Expiration',
+            title:
+              daysUntilExpiry <= 7
+                ? `⚠️ Urgent: Lease Expiring Soon`
+                : daysUntilExpiry <= 30
+                  ? 'Lease Expiring Soon'
+                  : 'Upcoming Lease Expiration',
             message,
             targetRole: 'both',
             targetUserId: tenant.id,
@@ -748,10 +836,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     // Only update notifications if there are new ones to add
     if (generatedNotifications.length > 0) {
-      setNotifications(prev => {
+      setNotifications((prev) => {
         // Remove old notifications for the same leases to avoid duplicates
-        const filtered = prev.filter(n =>
-          !generatedNotifications.some(gn => gn.leaseId === n.leaseId && n.type === 'lease_expiring')
+        const filtered = prev.filter(
+          (n) =>
+            !generatedNotifications.some(
+              (gn) => gn.leaseId === n.leaseId && n.type === 'lease_expiring'
+            )
         );
         return [...filtered, ...generatedNotifications];
       });
@@ -759,11 +850,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [leases, units, tenants, properties]); // Run when leases or related data changes
 
   // Property operations
-  const addProperty = async (property: Omit<Property, 'id' | 'createdAt'>): Promise<Property | undefined> => {
+  const addProperty = async (
+    property: Omit<Property, 'id' | 'createdAt'>
+  ): Promise<Property | undefined> => {
     try {
       const response = await apiClient.post('/properties', {
         ...property,
-        imageUrl: property.image // Map frontend 'image' to backend 'imageUrl'
+        imageUrl: property.image, // Map frontend 'image' to backend 'imageUrl'
       });
       if (response.status === 201) {
         // Re-fetch or append. Since we need type name etc., might be easier to re-fetch or construct carefully.
@@ -786,13 +879,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
           image: newProp.image,
           createdAt: newProp.createdAt,
           description: newProp.description,
-          features: newProp.features
+          features: newProp.features,
         };
         setProperties([...properties, mapped]);
         return mapped;
       }
     } catch (e) {
-      console.error("Failed to add property", e);
+      console.error('Failed to add property', e);
       throw e;
     }
   };
@@ -800,35 +893,51 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const uploadPropertyImages = async (propertyId: string, files: File[]) => {
     try {
       const formData = new FormData();
-      files.forEach(file => {
+      files.forEach((file) => {
         formData.append('images', file);
       });
 
-      const response = await apiClient.post(`/properties/${propertyId}/images`, formData);
+      const response = await apiClient.post(
+        `/properties/${propertyId}/images`,
+        formData
+      );
 
       // We might want to update the property's main image if it was the first upload
-      if (response.status === 201 && response.data.images && response.data.images.length > 0) {
+      if (
+        response.status === 201 &&
+        response.data.images &&
+        response.data.images.length > 0
+      ) {
         const primary = response.data.images.find((img: any) => img.is_primary);
         if (primary) {
-          setProperties(prev => prev.map(p => p.id === propertyId ? { ...p, image: primary.image_url } : p));
+          setProperties((prev) =>
+            prev.map((p) =>
+              p.id === propertyId ? { ...p, image: primary.image_url } : p
+            )
+          );
         }
       }
 
       return response.data;
     } catch (e) {
-      console.error("Failed to upload images", e);
+      console.error('Failed to upload images', e);
       throw e;
     }
   };
 
-  const setPropertyPrimaryImage = async (propertyId: string, imageId: string) => {
+  const setPropertyPrimaryImage = async (
+    propertyId: string,
+    imageId: string
+  ) => {
     try {
-      await apiClient.put(`/properties/${propertyId}/images/${imageId}/primary`);
-      // Note: we'd need to fetch images again or know the URL to update local state perfectly, 
+      await apiClient.put(
+        `/properties/${propertyId}/images/${imageId}/primary`
+      );
+      // Note: we'd need to fetch images again or know the URL to update local state perfectly,
       // but typically we might just re-fetch the property or rely on next page load.
       // For now, let's just return success.
     } catch (e) {
-      console.error("Failed to set primary image", e);
+      console.error('Failed to set primary image', e);
       throw e;
     }
   };
@@ -838,7 +947,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const response = await apiClient.get(`/properties/${propertyId}/images`);
       return response.data.images;
     } catch (e) {
-      console.error("Failed to fetch property images", e);
+      console.error('Failed to fetch property images', e);
       throw e;
     }
   };
@@ -849,10 +958,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       // If we choose to update local state immediately, we can do it here.
       // Currently properties list only holds primary image.
       // If the deleted image was primary, we should probably refresh properties.
-      // But for now, let's just allow the caller to handle state updates if needed, 
+      // But for now, let's just allow the caller to handle state updates if needed,
       // OR we can refetch properties.
     } catch (e) {
-      console.error("Failed to delete property image", e);
+      console.error('Failed to delete property image', e);
       throw e;
     }
   };
@@ -861,17 +970,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       await apiClient.put(`/properties/${id}`, {
         ...updates,
-        imageUrl: updates.image
+        imageUrl: updates.image,
       });
       // Optimistic update or re-fetch
       // If we change typeId, we need new typeName.
       if (updates.propertyTypeId) {
-        const type = propertyTypes.find(t => t.type_id === updates.propertyTypeId);
+        const type = propertyTypes.find(
+          (t) => t.type_id === updates.propertyTypeId
+        );
         if (type) updates.typeName = type.name;
       }
-      setProperties(properties.map(p => p.id === id ? { ...p, ...updates } : p));
+      setProperties(
+        properties.map((p) => (p.id === id ? { ...p, ...updates } : p))
+      );
     } catch (e) {
-      console.error("Failed to update property", e);
+      console.error('Failed to update property', e);
       throw e; // Rethrow to let UI handle error state
     }
   };
@@ -879,19 +992,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const deleteProperty = async (id: string) => {
     try {
       await apiClient.delete(`/properties/${id}`);
-      setProperties(properties.filter(p => p.id !== id));
+      setProperties(properties.filter((p) => p.id !== id));
     } catch (e) {
-      console.error("Failed to delete property", e);
+      console.error('Failed to delete property', e);
       throw e;
     }
   };
 
   // Unit operations
-  const addUnit = async (unit: Omit<Unit, 'id' | 'createdAt'>): Promise<Unit | undefined> => {
+  const addUnit = async (
+    unit: Omit<Unit, 'id' | 'createdAt'>
+  ): Promise<Unit | undefined> => {
     try {
       const response = await apiClient.post('/units', {
         ...unit,
-        imageUrl: unit.image // Map frontend 'image' to backend 'imageUrl'
+        imageUrl: unit.image, // Map frontend 'image' to backend 'imageUrl'
       });
       if (response.status === 201) {
         const newUnit: Unit = {
@@ -910,7 +1025,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         return newUnit;
       }
     } catch (e) {
-      console.error("Failed to add unit", e);
+      console.error('Failed to add unit', e);
       throw e;
     }
   };
@@ -919,10 +1034,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       const response = await apiClient.put(`/units/${id}`, updates);
       if (response.status === 200) {
-        setUnits(units.map(u => u.id === id ? { ...u, ...response.data, id: response.data.id || u.id } : u));
+        setUnits(
+          units.map((u) =>
+            u.id === id
+              ? { ...u, ...response.data, id: response.data.id || u.id }
+              : u
+          )
+        );
       }
     } catch (e) {
-      console.error("Failed to update unit", e);
+      console.error('Failed to update unit', e);
       throw e;
     }
   };
@@ -930,9 +1051,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const deleteUnit = async (id: string) => {
     try {
       await apiClient.delete(`/units/${id}`);
-      setUnits(units.filter(u => u.id !== id));
+      setUnits(units.filter((u) => u.id !== id));
     } catch (e) {
-      console.error("Failed to delete unit", e);
+      console.error('Failed to delete unit', e);
       throw e;
     }
   };
@@ -940,23 +1061,36 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const uploadUnitImages = async (unitId: string, files: File[]) => {
     try {
       const formData = new FormData();
-      files.forEach(file => {
+      files.forEach((file) => {
         formData.append('images', file);
       });
 
-      const response = await apiClient.post(`/units/${unitId}/images`, formData);
+      const response = await apiClient.post(
+        `/units/${unitId}/images`,
+        formData
+      );
 
       // Update local state if primary image set
-      if (response.status === 201 && response.data.images && response.data.images.length > 0) {
-        const primary = response.data.images.find((img: any) => img.is_primary) || response.data.images[0];
+      if (
+        response.status === 201 &&
+        response.data.images &&
+        response.data.images.length > 0
+      ) {
+        const primary =
+          response.data.images.find((img: any) => img.is_primary) ||
+          response.data.images[0];
         if (primary) {
-          setUnits(prev => prev.map(u => u.id === unitId ? { ...u, image: primary.image_url } : u));
+          setUnits((prev) =>
+            prev.map((u) =>
+              u.id === unitId ? { ...u, image: primary.image_url } : u
+            )
+          );
         }
       }
 
       return response.data;
     } catch (e) {
-      console.error("Failed to upload unit images", e);
+      console.error('Failed to upload unit images', e);
       throw e;
     }
   };
@@ -966,7 +1100,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const response = await apiClient.get(`/units/${unitId}/images`);
       return response.data.images;
     } catch (e) {
-      console.error("Failed to fetch unit images", e);
+      console.error('Failed to fetch unit images', e);
       return []; // Return empty array instead of throwing to avoid breaking UI
     }
   };
@@ -975,7 +1109,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       await apiClient.put(`/units/${unitId}/images/${imageId}/primary`);
     } catch (e) {
-      console.error("Failed to set primary unit image", e);
+      console.error('Failed to set primary unit image', e);
       throw e;
     }
   };
@@ -984,7 +1118,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       await apiClient.delete(`/units/images/${imageId}`);
     } catch (e) {
-      console.error("Failed to delete unit image", e);
+      console.error('Failed to delete unit image', e);
       throw e;
     }
   };
@@ -1025,18 +1159,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       await apiClient.put(`/leads/${id}`, updates);
 
-      const currentLead = leads.find(l => l.id === id);
+      const currentLead = leads.find((l) => l.id === id);
 
       // If status is changing, record the transition (Local UI update)
       // Backend should ideally handle history creation, but if we keep it in frontend context for now:
-      if (currentLead && updates.status && updates.status !== currentLead.status) {
+      if (
+        currentLead &&
+        updates.status &&
+        updates.status !== currentLead.status
+      ) {
         // Calculate duration in previous stage
         const previousStageHistory = leadStageHistory
-          .filter(h => h.leadId === id)
-          .sort((a, b) => new Date(b.changedAt).getTime() - new Date(a.changedAt).getTime())[0];
+          .filter((h) => h.leadId === id)
+          .sort(
+            (a, b) =>
+              new Date(b.changedAt).getTime() - new Date(a.changedAt).getTime()
+          )[0];
 
         const durationInDays = previousStageHistory
-          ? Math.floor((new Date().getTime() - new Date(previousStageHistory.changedAt).getTime()) / (1000 * 60 * 60 * 24))
+          ? Math.floor(
+              (new Date().getTime() -
+                new Date(previousStageHistory.changedAt).getTime()) /
+                (1000 * 60 * 60 * 24)
+            )
           : 0;
 
         const historyEntry: LeadStageHistory = {
@@ -1051,7 +1196,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setLeadStageHistory([...leadStageHistory, historyEntry]);
       }
 
-      setLeads(leads.map(l => l.id === id ? { ...l, ...updates } : l));
+      setLeads(leads.map((l) => (l.id === id ? { ...l, ...updates } : l)));
     } catch (error) {
       console.error('Failed to update lead:', error);
     }
@@ -1065,11 +1210,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setLeadFollowUps([...leadFollowUps, newFollowUp]);
   };
 
-  const convertLeadToTenant = async (leadId: string, startDate?: string, endDate?: string, unitId?: string) => {
+  const convertLeadToTenant = async (
+    leadId: string,
+    startDate?: string,
+    endDate?: string,
+    unitId?: string
+  ) => {
     try {
-      const response = await apiClient.post(`/leads/${leadId}/convert`, { startDate, endDate, unitId });
+      const response = await apiClient.post(`/leads/${leadId}/convert`, {
+        startDate,
+        endDate,
+        unitId,
+      });
 
-      // Since leads, tenants, units, and leases are all affected, 
+      // Since leads, tenants, units, and leases are all affected,
       // and we haven't refactored the fetch functions to be accessible here yet,
       // a full page reload is the safest way to sync everything.
       window.location.reload();
@@ -1093,21 +1247,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // Treasurer operations
   // Treasurer operations
-  const addTreasurer = (treasurer: Omit<Treasurer, 'id' | 'createdAt'> & { id?: string }) => {
+  const addTreasurer = (
+    treasurer: Omit<Treasurer, 'id' | 'createdAt'> & { id?: string }
+  ) => {
     const newTreasurer: Treasurer = {
       ...treasurer,
       id: treasurer.id || `treasurer-${Date.now()}`,
       createdAt: new Date().toISOString().split('T')[0],
     };
-    setTreasurers(prev => [...prev, newTreasurer]);
+    setTreasurers((prev) => [...prev, newTreasurer]);
   };
 
   const updateTreasurer = (id: string, updates: Partial<Treasurer>) => {
-    setTreasurers(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
+    setTreasurers((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, ...updates } : t))
+    );
   };
 
   const deleteTreasurer = (id: string) => {
-    setTreasurers(prev => prev.filter(t => t.id !== id));
+    setTreasurers((prev) => prev.filter((t) => t.id !== id));
   };
 
   // Lease operations
@@ -1129,7 +1287,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
       // Also update tenant leasing info if needed, but tenant object here is simple.
     } catch (error) {
-      console.error("Failed to create lease:", error);
+      console.error('Failed to create lease:', error);
       throw error;
     }
   };
@@ -1137,31 +1295,46 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const endLease = async (id: string) => {
     try {
       await apiClient.put(`/leases/${id}/end`);
-      setLeases(prev => prev.map(l => l.id === id ? { ...l, status: 'ended' } : l));
+      setLeases((prev) =>
+        prev.map((l) => (l.id === id ? { ...l, status: 'ended' } : l))
+      );
       // Update unit status to available
-      const lease = leases.find(l => l.id === id);
+      const lease = leases.find((l) => l.id === id);
       if (lease) {
         updateUnit(lease.unitId, { status: 'available' });
       }
       toast.success('Lease ended successfully');
     } catch (e) {
-      console.error("Failed to end lease", e);
-      toast.error("Failed to end lease");
+      console.error('Failed to end lease', e);
+      toast.error('Failed to end lease');
     }
   };
 
-  const renewLease = async (id: string, newEndDate: string, newMonthlyRent?: number) => {
+  const renewLease = async (
+    id: string,
+    newEndDate: string,
+    newMonthlyRent?: number
+  ) => {
     try {
-      await apiClient.put(`/leases/${id}/renew`, { newEndDate, newMonthlyRent });
+      await apiClient.put(`/leases/${id}/renew`, {
+        newEndDate,
+        newMonthlyRent,
+      });
       // Update local state
-      setLeases(prev => prev.map(l => l.id === id ? {
-        ...l,
-        endDate: newEndDate,
-        monthlyRent: newMonthlyRent || l.monthlyRent
-      } : l));
+      setLeases((prev) =>
+        prev.map((l) =>
+          l.id === id
+            ? {
+                ...l,
+                endDate: newEndDate,
+                monthlyRent: newMonthlyRent || l.monthlyRent,
+              }
+            : l
+        )
+      );
       toast.success('Lease renewed successfully');
     } catch (e: any) {
-      console.error("Failed to renew lease", e);
+      console.error('Failed to renew lease', e);
       const msg = e.response?.data?.error || 'Failed to renew lease';
       toast.error(msg);
       throw new Error(msg);
@@ -1176,7 +1349,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setLeases(lRes.data);
       toast.success('Deposit refunded successfully');
     } catch (e: any) {
-      console.error("Failed to refund deposit", e);
+      console.error('Failed to refund deposit', e);
       const msg = e.response?.data?.error || 'Failed to refund deposit';
       toast.error(msg);
       throw new Error(msg);
@@ -1192,8 +1365,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       // Refresh list
       const res = await invoiceApi.getInvoices();
       if (res.data) {
-        // Map data again as in initial fetch? 
-        // Or just trust the same structure if consistent. 
+        // Map data again as in initial fetch?
+        // Or just trust the same structure if consistent.
         // Using same mapping logic for safety
         const mappedInvoices = res.data.map((i: any) => ({
           id: i.invoice_id.toString(),
@@ -1204,32 +1377,34 @@ export function AppProvider({ children }: { children: ReactNode }) {
           dueDate: i.due_date ? i.due_date.split('T')[0] : '',
           status: i.status,
           description: i.description,
-          generatedDate: i.created_at ? i.created_at.split('T')[0] : ''
+          generatedDate: i.created_at ? i.created_at.split('T')[0] : '',
         }));
         setInvoices(mappedInvoices);
         // toast handled by caller? or here? Caller usually does it but we can do it here too or let caller do it for custom msg.
         // Caller (OwnerInvoicesPage) does toast.success.
       }
     } catch (e: any) {
-      console.error("Failed to generate invoices", e);
+      console.error('Failed to generate invoices', e);
       // @ts-ignore
-      toast.error(e.response?.data?.error || "Failed to generate invoices");
+      toast.error(e.response?.data?.error || 'Failed to generate invoices');
     }
   };
 
   // Payment operations
-  const submitPayment = async (payment: Omit<Payment, 'id' | 'submittedAt'>) => {
+  const submitPayment = async (
+    payment: Omit<Payment, 'id' | 'submittedAt'>
+  ) => {
     try {
       const res = await paymentApi.submitPayment(payment);
       if (res.status === 201) {
-        toast.success("Payment submitted successfully");
+        toast.success('Payment submitted successfully');
         // Refresh payments
         const payRes = await paymentApi.getPayments();
         setPayments(payRes.data);
       }
     } catch (e) {
-      console.error("Failed to submit payment", e);
-      toast.error("Failed to submit payment");
+      console.error('Failed to submit payment', e);
+      toast.error('Failed to submit payment');
     }
   };
 
@@ -1253,56 +1428,74 @@ export function AppProvider({ children }: { children: ReactNode }) {
               paymentId: r.paymentId,
               invoiceId: r.invoiceId,
               tenantId: r.tenantId,
-              amount: typeof r.amount === 'string' ? parseFloat(r.amount) : r.amount,
+              amount:
+                typeof r.amount === 'string' ? parseFloat(r.amount) : r.amount,
               generatedDate: r.receiptDate || r.generatedDate || r.createdAt,
-              receiptNumber: r.receiptNumber
+              receiptNumber: r.receiptNumber,
             }));
             setReceipts(mappedReceipts);
           }
-        } catch (e) { console.error("Failed to refresh receipts", e); }
+        } catch (e) {
+          console.error('Failed to refresh receipts', e);
+        }
       }
     } catch (e: any) {
-      console.error("Failed to verify payment", e);
-      const msg = e.response?.data?.error || "Failed to verify payment";
+      console.error('Failed to verify payment', e);
+      const msg = e.response?.data?.error || 'Failed to verify payment';
       toast.error(msg);
     }
   };
 
   // Maintenance operations
   // Maintenance operations
-  const addMaintenanceRequest = async (request: Omit<MaintenanceRequest, 'id' | 'submittedDate'>) => {
+  const addMaintenanceRequest = async (
+    request: Omit<MaintenanceRequest, 'id' | 'submittedDate'>
+  ) => {
     try {
       const res = await maintenanceApi.createRequest(request);
       if (res.status === 201) {
-        toast.success("Maintenance request submitted");
+        toast.success('Maintenance request submitted');
         const refreshRes = await maintenanceApi.getRequests();
         setMaintenanceRequests(refreshRes.data);
       }
     } catch (e) {
-      console.error("Failed to add maintenance request", e);
-      toast.error("Failed to submit request");
+      console.error('Failed to add maintenance request', e);
+      toast.error('Failed to submit request');
     }
   };
 
-  const updateMaintenanceRequest = async (id: string, updates: Partial<MaintenanceRequest>) => {
+  const updateMaintenanceRequest = async (
+    id: string,
+    updates: Partial<MaintenanceRequest>
+  ) => {
     try {
       if (updates.status) {
         await maintenanceApi.updateStatus(id, updates.status);
-        toast.success("Status updated");
+        toast.success('Status updated');
         // Refresh
         const refreshRes = await maintenanceApi.getRequests();
         setMaintenanceRequests(refreshRes.data);
       }
     } catch (e) {
-      console.error("Failed to update status", e);
-      toast.error("Failed to update status");
+      console.error('Failed to update status', e);
+      toast.error('Failed to update status');
     }
   };
 
-  const recordCashPayment = async (invoiceId: string, amount: number, paymentDate: string, referenceNumber?: string) => {
+  const recordCashPayment = async (
+    invoiceId: string,
+    amount: number,
+    paymentDate: string,
+    referenceNumber?: string
+  ) => {
     try {
-      await paymentApi.recordCashPayment(invoiceId, amount, paymentDate, referenceNumber);
-      toast.success("Cash payment recorded");
+      await paymentApi.recordCashPayment(
+        invoiceId,
+        amount,
+        paymentDate,
+        referenceNumber
+      );
+      toast.success('Cash payment recorded');
       // Refresh payments and invoices
       const payRes = await paymentApi.getPayments();
       if (payRes.data) {
@@ -1316,21 +1509,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
           referenceNumber: p.reference_number,
           status: p.status,
           submittedAt: p.created_at || '',
-          proofUrl: p.evidence_url
+          proofUrl: p.evidence_url,
         }));
         setPayments(mappedPayments);
       }
       const invRes = await invoiceApi.getInvoices();
-      setInvoices(invRes.data.map((i: any) => ({
-        id: i.invoice_id.toString(),
-        leaseId: i.lease_id,
-        tenantId: i.tenant_id,
-        unitId: i.unit_id ? i.unit_id.toString() : '',
-        amount: parseFloat(i.amount),
-        dueDate: i.due_date ? i.due_date.split('T')[0] : '',
-        status: i.status,
-        generatedDate: i.created_at ? i.created_at.split('T')[0] : ''
-      })));
+      setInvoices(
+        invRes.data.map((i: any) => ({
+          id: i.invoice_id.toString(),
+          leaseId: i.lease_id,
+          tenantId: i.tenant_id,
+          unitId: i.unit_id ? i.unit_id.toString() : '',
+          amount: parseFloat(i.amount),
+          dueDate: i.due_date ? i.due_date.split('T')[0] : '',
+          status: i.status,
+          generatedDate: i.created_at ? i.created_at.split('T')[0] : '',
+        }))
+      );
       // Refresh receipts
       try {
         const receiptRes = await receiptApi.getReceipts();
@@ -1340,44 +1535,53 @@ export function AppProvider({ children }: { children: ReactNode }) {
             paymentId: r.paymentId,
             invoiceId: r.invoiceId,
             tenantId: r.tenantId,
-            amount: typeof r.amount === 'string' ? parseFloat(r.amount) : r.amount,
+            amount:
+              typeof r.amount === 'string' ? parseFloat(r.amount) : r.amount,
             generatedDate: r.receiptDate || r.generatedDate || r.createdAt,
-            receiptNumber: r.receiptNumber
+            receiptNumber: r.receiptNumber,
           }));
           setReceipts(mappedReceipts);
         }
-      } catch (e) { console.error("Failed to refresh receipts", e); }
+      } catch (e) {
+        console.error('Failed to refresh receipts', e);
+      }
     } catch (e: any) {
-      console.error("Failed to record cash payment", e);
-      toast.error(e.response?.data?.error || "Failed to record cash payment");
+      console.error('Failed to record cash payment', e);
+      toast.error(e.response?.data?.error || 'Failed to record cash payment');
     }
   };
 
-  const addMaintenanceCost = async (cost: Omit<MaintenanceCost, 'id' | 'recordedDate'>) => {
+  const addMaintenanceCost = async (
+    cost: Omit<MaintenanceCost, 'id' | 'recordedDate'>
+  ) => {
     try {
       const res = await maintenanceApi.addCost(cost);
       if (res.status === 201) {
-        toast.success(cost.billToTenant ? "Cost recorded & Invoice generated" : "Cost recorded");
+        toast.success(
+          cost.billToTenant
+            ? 'Cost recorded & Invoice generated'
+            : 'Cost recorded'
+        );
         // Refresh costs
         const mcRes = await maintenanceApi.getCosts('');
         setMaintenanceCosts(mcRes.data);
         // Also refresh requests if total cost affects request display? (Ideally not needed if separate)
       }
     } catch (e) {
-      console.error("Failed to record cost", e);
-      toast.error("Failed to record cost");
+      console.error('Failed to record cost', e);
+      toast.error('Failed to record cost');
     }
   };
 
   const deleteMaintenanceCost = async (id: string) => {
     try {
       await maintenanceApi.deleteCost(id);
-      toast.success("Cost deleted");
+      toast.success('Cost deleted');
       // Update local state or refresh
-      setMaintenanceCosts(prev => prev.filter(c => c.id !== id));
+      setMaintenanceCosts((prev) => prev.filter((c) => c.id !== id));
     } catch (e) {
-      console.error("Failed to delete cost", e);
-      toast.error("Failed to delete cost");
+      console.error('Failed to delete cost', e);
+      toast.error('Failed to delete cost');
     }
   };
 
@@ -1390,7 +1594,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('Failed to add property type:', error);
       // @ts-ignore
-      const errMsg = error.response?.data?.error || error.message || 'Failed to add property type';
+      const errMsg =
+        error.response?.data?.error ||
+        error.message ||
+        'Failed to add property type';
       toast.error(errMsg);
     }
   };
@@ -1398,7 +1605,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const deletePropertyType = async (id: number) => {
     try {
       await apiClient.delete(`/property-types/${id}`);
-      setPropertyTypes(prev => prev.filter(t => t.type_id !== id));
+      setPropertyTypes((prev) => prev.filter((t) => t.type_id !== id));
       toast.success('Property type deleted');
     } catch (error) {
       console.error('Failed to delete property type:', error);
@@ -1420,7 +1627,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const deleteUnitType = async (id: number) => {
     try {
       await apiClient.delete(`/unit-types/${id}`);
-      setUnitTypes(prev => prev.filter(t => t.type_id !== id));
+      setUnitTypes((prev) => prev.filter((t) => t.type_id !== id));
       toast.success('Unit type deleted');
     } catch (error) {
       console.error('Failed to delete unit type:', error);
@@ -1441,7 +1648,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const updateVisitStatus = async (id: string, status: Visit['status']) => {
     try {
       await apiClient.patch(`/visits/${id}/status`, { status });
-      setVisits(prev => prev.map(v => v.visit_id === id ? { ...v, status } : v));
+      setVisits((prev) =>
+        prev.map((v) => (v.visit_id === id ? { ...v, status } : v))
+      );
       toast.success(`Visit ${status}`);
     } catch (error) {
       console.error('Failed to update visit status:', error);
@@ -1451,12 +1660,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const markNotificationAsRead = async (id: string) => {
     try {
-      setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, read: true } : n))
+      );
       if (!id.startsWith('notif-')) {
         await notificationApi.markAsRead(id);
       }
     } catch (e) {
-      console.error("Failed to mark notification as read", e);
+      console.error('Failed to mark notification as read', e);
     }
   };
 
@@ -1473,21 +1684,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
           const backendNotifs = res.data.map((n: any) => ({
             id: n.notification_id.toString(),
             type: n.type,
-            title: n.type === 'maintenance' ? 'Maintenance Update' : 'Notification',
+            title:
+              n.type === 'maintenance' ? 'Maintenance Update' : 'Notification',
             message: n.message,
             targetRole: 'both', // Backend already filtered by user, so 'both' ensures visibility
             severity: 'info',
             createdAt: n.created_at,
-            read: Boolean(n.is_read)
+            read: Boolean(n.is_read),
           }));
-          setNotifications(prev => {
+          setNotifications((prev) => {
             // Keep existing local notifications (those starting with 'notif-')
-            const local = prev.filter(n => n.id.startsWith('notif-'));
+            const local = prev.filter((n) => n.id.startsWith('notif-'));
             return [...local, ...backendNotifs];
           });
         }
       } catch (e) {
-        console.error("Failed to fetch notifications", e);
+        console.error('Failed to fetch notifications', e);
       }
     };
     fetchNotifications();
@@ -1502,9 +1714,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [user]);
 
-  const createMaintenanceInvoice = async (requestId: string, amount: number, description: string, dueDate?: string) => {
+  const createMaintenanceInvoice = async (
+    requestId: string,
+    amount: number,
+    description: string,
+    dueDate?: string
+  ) => {
     try {
-      await maintenanceApi.createInvoice({ requestId, amount, description, dueDate });
+      await maintenanceApi.createInvoice({
+        requestId,
+        amount,
+        description,
+        dueDate,
+      });
       // Refresh invoices
       const invRes = await invoiceApi.getInvoices();
       if (invRes.data) {
@@ -1517,95 +1739,99 @@ export function AppProvider({ children }: { children: ReactNode }) {
           dueDate: i.due_date ? i.due_date.split('T')[0] : '',
           status: i.status,
           description: i.description,
-          generatedDate: i.created_at ? i.created_at.split('T')[0] : ''
+          generatedDate: i.created_at ? i.created_at.split('T')[0] : '',
         }));
         setInvoices(mappedInvoices);
       }
       toast.success('Maintenance invoice created successfully');
     } catch (e: any) {
-      console.error("Failed to create maintenance invoice", e);
-      toast.error(`Failed to create invoice: ${e.response?.data?.error || e.message}`);
+      console.error('Failed to create maintenance invoice', e);
+      toast.error(
+        `Failed to create invoice: ${e.response?.data?.error || e.message}`
+      );
       throw e;
     }
   };
 
   return (
-    <AppContext.Provider value={{
-      properties,
-      propertyTypes,
-      unitTypes,
-      units,
-      leads,
-      leadFollowUps,
-      leadStageHistory,
-      tenants,
-      treasurers,
-      leases,
-      invoices,
-      payments,
-      receipts,
-      maintenanceRequests,
-      maintenanceCosts,
-      notifications,
-      addProperty,
-      updateProperty,
-      deleteProperty,
-      uploadPropertyImages,
-      getPropertyImages,
-      setPropertyPrimaryImage,
-      deletePropertyImage,
+    <AppContext.Provider
+      value={{
+        properties,
+        propertyTypes,
+        unitTypes,
+        units,
+        leads,
+        leadFollowUps,
+        leadStageHistory,
+        tenants,
+        treasurers,
+        leases,
+        invoices,
+        payments,
+        receipts,
+        maintenanceRequests,
+        maintenanceCosts,
+        notifications,
+        addProperty,
+        updateProperty,
+        deleteProperty,
+        uploadPropertyImages,
+        getPropertyImages,
+        setPropertyPrimaryImage,
+        deletePropertyImage,
 
-      addUnit,
-      updateUnit,
-      deleteUnit,
-      uploadUnitImages,
-      getUnitImages,
-      setUnitPrimaryImage,
-      deleteUnitImage,
-      addLead,
-      updateLead,
-      addLeadFollowUp,
-      convertLeadToTenant,
-      addTenant,
-      addTreasurer,
-      updateTreasurer,
-      deleteTreasurer,
-      addLease,
-      endLease,
-      renewLease,
-      refundDeposit,
-      generateMonthlyInvoices,
-      submitPayment,
-      verifyPayment,
-      recordCashPayment,
-      addMaintenanceRequest,
-      updateMaintenanceRequest,
-      addMaintenanceCost,
-      deleteMaintenanceCost,
-      addPropertyType,
-      deletePropertyType,
-      addUnitType,
-      deleteUnitType,
-      visits,
-      fetchVisits,
-      scheduleVisit: async (visitData: any) => {
-        try {
-          const response = await apiClient.post('/visits', visitData);
-          // Refresh visits list if the user is authorized (owner)
-          // If public user, this might fail or return empty, which is fine as they don't see the list.
-          // But we want to ensure we don't error out if fetchVisits fails for public.
-          // Existing fetchVisits catches errors.
-          await fetchVisits();
-          return response.data;
-        } catch (error) {
-          console.error('Failed to schedule visit:', error);
-          throw error;
-        }
-      },
-      updateVisitStatus,
-      markNotificationAsRead,
-      createMaintenanceInvoice,
-    }}>
+        addUnit,
+        updateUnit,
+        deleteUnit,
+        uploadUnitImages,
+        getUnitImages,
+        setUnitPrimaryImage,
+        deleteUnitImage,
+        addLead,
+        updateLead,
+        addLeadFollowUp,
+        convertLeadToTenant,
+        addTenant,
+        addTreasurer,
+        updateTreasurer,
+        deleteTreasurer,
+        addLease,
+        endLease,
+        renewLease,
+        refundDeposit,
+        generateMonthlyInvoices,
+        submitPayment,
+        verifyPayment,
+        recordCashPayment,
+        addMaintenanceRequest,
+        updateMaintenanceRequest,
+        addMaintenanceCost,
+        deleteMaintenanceCost,
+        addPropertyType,
+        deletePropertyType,
+        addUnitType,
+        deleteUnitType,
+        visits,
+        fetchVisits,
+        scheduleVisit: async (visitData: any) => {
+          try {
+            const response = await apiClient.post('/visits', visitData);
+            // Refresh visits list if the user is authorized (owner)
+            // If public user, this might fail or return empty, which is fine as they don't see the list.
+            // But we want to ensure we don't error out if fetchVisits fails for public.
+            // Existing fetchVisits catches errors.
+            await fetchVisits();
+            return response.data;
+          } catch (error) {
+            console.error('Failed to schedule visit:', error);
+            throw error;
+          }
+        },
+        updateVisitStatus,
+        markNotificationAsRead,
+        createMaintenanceInvoice,
+      }}
+    >
       {children}
     </AppContext.Provider>
   );

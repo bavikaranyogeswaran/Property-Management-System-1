@@ -6,23 +6,30 @@ import { DollarSign, CheckCircle, Clock, AlertCircle } from 'lucide-react';
 export function TreasurerDashboard() {
   const { invoices, payments, receipts, leases } = useApp();
 
-  const pendingPayments = payments.filter(p => p.status === 'pending');
-  const verifiedPayments = payments.filter(p => p.status === 'verified');
-  const rejectedPayments = payments.filter(p => p.status === 'rejected');
+  const pendingPayments = payments.filter((p) => p.status === 'pending');
+  const verifiedPayments = payments.filter((p) => p.status === 'verified');
+  const rejectedPayments = payments.filter((p) => p.status === 'rejected');
 
-  const totalPendingAmount = pendingPayments.reduce((sum, p) => sum + p.amount, 0);
-  const totalVerifiedAmount = verifiedPayments.reduce((sum, p) => sum + p.amount, 0);
+  const totalPendingAmount = pendingPayments.reduce(
+    (sum, p) => sum + p.amount,
+    0
+  );
+  const totalVerifiedAmount = verifiedPayments.reduce(
+    (sum, p) => sum + p.amount,
+    0
+  );
 
-  const paidInvoices = invoices.filter(i => i.status === 'paid');
-  const pendingInvoices = invoices.filter(i => i.status === 'pending');
+  const paidInvoices = invoices.filter((i) => i.status === 'paid');
+  const pendingInvoices = invoices.filter((i) => i.status === 'pending');
 
   const expectedMonthlyRevenue = leases
-    .filter(l => l.status === 'active')
+    .filter((l) => l.status === 'active')
     .reduce((sum, l) => sum + l.monthlyRent, 0);
 
-  const collectionRate = expectedMonthlyRevenue > 0
-    ? ((totalVerifiedAmount / expectedMonthlyRevenue) * 100).toFixed(1)
-    : '0';
+  const collectionRate =
+    expectedMonthlyRevenue > 0
+      ? ((totalVerifiedAmount / expectedMonthlyRevenue) * 100).toFixed(1)
+      : '0';
 
   const stats = [
     {
@@ -62,8 +69,12 @@ export function TreasurerDashboard() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-semibold text-gray-900">Treasurer Dashboard</h2>
-        <p className="text-sm text-gray-500 mt-1">Payment verification and financial overview</p>
+        <h2 className="text-2xl font-semibold text-gray-900">
+          Treasurer Dashboard
+        </h2>
+        <p className="text-sm text-gray-500 mt-1">
+          Payment verification and financial overview
+        </p>
       </div>
 
       {/* Stats */}
@@ -78,7 +89,9 @@ export function TreasurerDashboard() {
                     <p className="text-sm text-gray-600">{stat.title}</p>
                     <p className="text-2xl font-semibold mt-2">{stat.value}</p>
                     {stat.subtitle && (
-                      <p className="text-xs text-gray-500 mt-1">{stat.subtitle}</p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {stat.subtitle}
+                      </p>
                     )}
                   </div>
                   <div className={`${stat.bgColor} p-3 rounded-lg`}>
@@ -99,7 +112,8 @@ export function TreasurerDashboard() {
               <AlertCircle className="size-5 text-orange-600" />
               <div>
                 <p className="font-medium text-orange-900">
-                  {pendingPayments.length} payment{pendingPayments.length > 1 ? 's' : ''} awaiting verification
+                  {pendingPayments.length} payment
+                  {pendingPayments.length > 1 ? 's' : ''} awaiting verification
                 </p>
                 <p className="text-sm text-orange-700">
                   Please review and verify pending payments to generate receipts
@@ -120,21 +134,36 @@ export function TreasurerDashboard() {
             {payments.slice(0, 8).length > 0 ? (
               <div className="space-y-3">
                 {payments.slice(0, 8).map((payment) => {
-                  const invoice = invoices.find(i => i.id === payment.invoiceId);
+                  const invoice = invoices.find(
+                    (i) => i.id === payment.invoiceId
+                  );
                   return (
-                    <div key={payment.id} className="flex justify-between items-center py-2 border-b last:border-0">
+                    <div
+                      key={payment.id}
+                      className="flex justify-between items-center py-2 border-b last:border-0"
+                    >
                       <div>
-                        <p className="text-sm font-medium">{payment.paymentMethod}</p>
+                        <p className="text-sm font-medium">
+                          {payment.paymentMethod}
+                        </p>
                         <p className="text-xs text-gray-500">
-                          {invoice?.description} • Ref: {payment.referenceNumber}
+                          {invoice?.description} • Ref:{' '}
+                          {payment.referenceNumber}
                         </p>
                       </div>
                       <div className="text-right">
-                        <p className="text-sm font-semibold">LKR {payment.amount}</p>
-                        <span className={`text-xs px-2 py-1 rounded-full ${payment.status === 'verified' ? 'bg-green-100 text-green-800' :
-                          payment.status === 'pending' ? 'bg-orange-100 text-orange-800' :
-                            'bg-red-100 text-red-800'
-                          }`}>
+                        <p className="text-sm font-semibold">
+                          LKR {payment.amount}
+                        </p>
+                        <span
+                          className={`text-xs px-2 py-1 rounded-full ${
+                            payment.status === 'verified'
+                              ? 'bg-green-100 text-green-800'
+                              : payment.status === 'pending'
+                                ? 'bg-orange-100 text-orange-800'
+                                : 'bg-red-100 text-red-800'
+                          }`}
+                        >
                           {payment.status}
                         </span>
                       </div>
@@ -156,20 +185,33 @@ export function TreasurerDashboard() {
             <div className="space-y-4">
               <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
                 <span className="text-sm text-gray-700">Expected Revenue</span>
-                <span className="text-lg font-semibold">LKR {expectedMonthlyRevenue.toLocaleString()}</span>
+                <span className="text-lg font-semibold">
+                  LKR {expectedMonthlyRevenue.toLocaleString()}
+                </span>
               </div>
               <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
                 <span className="text-sm text-gray-700">Collected</span>
-                <span className="text-lg font-semibold text-green-700">LKR {totalVerifiedAmount.toLocaleString()}</span>
+                <span className="text-lg font-semibold text-green-700">
+                  LKR {totalVerifiedAmount.toLocaleString()}
+                </span>
               </div>
               <div className="flex justify-between items-center p-3 bg-orange-50 rounded-lg">
-                <span className="text-sm text-gray-700">Pending Verification</span>
-                <span className="text-lg font-semibold text-orange-700">LKR {totalPendingAmount.toLocaleString()}</span>
+                <span className="text-sm text-gray-700">
+                  Pending Verification
+                </span>
+                <span className="text-lg font-semibold text-orange-700">
+                  LKR {totalPendingAmount.toLocaleString()}
+                </span>
               </div>
               <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
                 <span className="text-sm text-gray-700">Outstanding</span>
                 <span className="text-lg font-semibold text-gray-700">
-                  LKR {(expectedMonthlyRevenue - totalVerifiedAmount - totalPendingAmount).toLocaleString()}
+                  LKR{' '}
+                  {(
+                    expectedMonthlyRevenue -
+                    totalVerifiedAmount -
+                    totalPendingAmount
+                  ).toLocaleString()}
                 </span>
               </div>
             </div>
@@ -186,23 +228,38 @@ export function TreasurerDashboard() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="p-4 bg-green-50 rounded-lg border border-green-200">
               <p className="text-sm text-gray-700">Paid Invoices</p>
-              <p className="text-2xl font-semibold text-green-700 mt-2">{paidInvoices.length}</p>
+              <p className="text-2xl font-semibold text-green-700 mt-2">
+                {paidInvoices.length}
+              </p>
               <p className="text-xs text-gray-600 mt-1">
-                LKR {paidInvoices.reduce((sum, i) => sum + i.amount, 0).toLocaleString()}
+                LKR{' '}
+                {paidInvoices
+                  .reduce((sum, i) => sum + i.amount, 0)
+                  .toLocaleString()}
               </p>
             </div>
             <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
               <p className="text-sm text-gray-700">Pending Invoices</p>
-              <p className="text-2xl font-semibold text-orange-700 mt-2">{pendingInvoices.length}</p>
+              <p className="text-2xl font-semibold text-orange-700 mt-2">
+                {pendingInvoices.length}
+              </p>
               <p className="text-xs text-gray-600 mt-1">
-                LKR {pendingInvoices.reduce((sum, i) => sum + i.amount, 0).toLocaleString()}
+                LKR{' '}
+                {pendingInvoices
+                  .reduce((sum, i) => sum + i.amount, 0)
+                  .toLocaleString()}
               </p>
             </div>
             <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
               <p className="text-sm text-gray-700">Total Invoices</p>
-              <p className="text-2xl font-semibold text-blue-700 mt-2">{invoices.length}</p>
+              <p className="text-2xl font-semibold text-blue-700 mt-2">
+                {invoices.length}
+              </p>
               <p className="text-xs text-gray-600 mt-1">
-                LKR {invoices.reduce((sum, i) => sum + i.amount, 0).toLocaleString()}
+                LKR{' '}
+                {invoices
+                  .reduce((sum, i) => sum + i.amount, 0)
+                  .toLocaleString()}
               </p>
             </div>
           </div>

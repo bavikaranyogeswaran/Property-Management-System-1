@@ -2,7 +2,13 @@ import { useAuth } from '@/app/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Building2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Link, useNavigate } from 'react-router-dom';
@@ -10,7 +16,14 @@ import { Link, useNavigate } from 'react-router-dom';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { loginSchema, type LoginFormValues } from '@/schemas/authSchemas';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
 
 export function LoginPage() {
   const { login } = useAuth();
@@ -31,7 +44,10 @@ export function LoginPage() {
       navigate('/dashboard');
     } catch (error: any) {
       console.error(error);
-      const errorMessage = error.response?.data?.error || error.message || 'An unexpected error occurred.';
+      const errorMessage =
+        error.response?.data?.error ||
+        error.message ||
+        'An unexpected error occurred.';
       toast.error(errorMessage);
     }
   };
@@ -58,7 +74,11 @@ export function LoginPage() {
                   <FormItem>
                     <FormLabel>Email</FormLabel>
                     <FormControl>
-                      <Input placeholder="Enter your email" type="email" {...field} />
+                      <Input
+                        placeholder="Enter your email"
+                        type="email"
+                        {...field}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -93,7 +113,11 @@ export function LoginPage() {
                 />
               </div>
 
-              <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={form.formState.isSubmitting}
+              >
                 {form.formState.isSubmitting ? 'Signing in...' : 'Sign In'}
               </Button>
             </form>
@@ -103,4 +127,3 @@ export function LoginPage() {
     </div>
   );
 }
-

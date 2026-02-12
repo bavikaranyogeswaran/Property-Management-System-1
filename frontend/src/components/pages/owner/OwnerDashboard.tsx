@@ -1,35 +1,53 @@
 import React from 'react';
 import { useApp } from '@/app/context/AppContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Building2, Home, Users, DollarSign, AlertCircle, Wrench, TrendingUp } from 'lucide-react';
+import {
+  Building2,
+  Home,
+  Users,
+  DollarSign,
+  AlertCircle,
+  Wrench,
+  TrendingUp,
+} from 'lucide-react';
 import { NotificationBanner } from '@/components/common/NotificationBanner';
 
 export function OwnerDashboard() {
-  const { properties, units, tenants, leases, invoices, payments, maintenanceRequests, leads, notifications } = useApp();
+  const {
+    properties,
+    units,
+    tenants,
+    leases,
+    invoices,
+    payments,
+    maintenanceRequests,
+    leads,
+    notifications,
+  } = useApp();
 
   // Logic Fix: Calculate Balance for each invoice to support Partial Payments (Context: "is there any logics i have missed?")
   const getInvoiceBalance = (invoiceId: string, totalAmount: number) => {
     const verifiedPayments = payments
-      .filter(p => p.invoiceId === invoiceId && p.status === 'verified')
+      .filter((p) => p.invoiceId === invoiceId && p.status === 'verified')
       .reduce((sum, p) => sum + Number(p.amount), 0);
     return Math.max(0, totalAmount - verifiedPayments);
   };
 
   const totalProperties = properties.length;
   const totalUnits = units.length;
-  const occupiedUnits = units.filter(u => u.status === 'occupied').length;
-  const availableUnits = units.filter(u => u.status === 'available').length;
-  const activeLeases = leases.filter(l => l.status === 'active').length;
+  const occupiedUnits = units.filter((u) => u.status === 'occupied').length;
+  const availableUnits = units.filter((u) => u.status === 'available').length;
+  const activeLeases = leases.filter((l) => l.status === 'active').length;
   const totalTenants = tenants.length;
 
-  const pendingInvoices = invoices.filter(i => {
+  const pendingInvoices = invoices.filter((i) => {
     // Include 'partially_paid' and 'overdue' in the pending bucket if they have balance
     if (i.status === 'paid') return false;
     const balance = getInvoiceBalance(i.id, i.amount);
     return balance > 0;
   });
 
-  const overdueInvoices = invoices.filter(i => {
+  const overdueInvoices = invoices.filter((i) => {
     // Dynamic Overdue Check
     const balance = getInvoiceBalance(i.id, i.amount);
     if (balance > 0 && new Date(i.dueDate) < new Date()) {
@@ -41,18 +59,25 @@ export function OwnerDashboard() {
   });
 
   // Calculate actual pending money (not just full invoice amounts)
-  const pendingPayments = pendingInvoices.reduce((sum, inv) => sum + getInvoiceBalance(inv.id, inv.amount), 0);
-  const overdueAmount = overdueInvoices.reduce((sum, inv) => sum + getInvoiceBalance(inv.id, inv.amount), 0);
+  const pendingPayments = pendingInvoices.reduce(
+    (sum, inv) => sum + getInvoiceBalance(inv.id, inv.amount),
+    0
+  );
+  const overdueAmount = overdueInvoices.reduce(
+    (sum, inv) => sum + getInvoiceBalance(inv.id, inv.amount),
+    0
+  );
 
   const monthlyRevenue = leases
-    .filter(l => l.status === 'active')
+    .filter((l) => l.status === 'active')
     .reduce((sum, l) => sum + l.monthlyRent, 0);
 
   const openMaintenanceRequests = maintenanceRequests.filter(
-    r => r.status === 'submitted' || r.status === 'in_progress'
+    (r) => r.status === 'submitted' || r.status === 'in_progress'
   ).length;
 
-  const occupancyRate = totalUnits > 0 ? ((occupiedUnits / totalUnits) * 100).toFixed(1) : '0';
+  const occupancyRate =
+    totalUnits > 0 ? ((occupiedUnits / totalUnits) * 100).toFixed(1) : '0';
 
   const stats = [
     {
@@ -124,8 +149,12 @@ export function OwnerDashboard() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-semibold text-gray-900">Owner Dashboard</h2>
-        <p className="text-sm text-gray-500 mt-1">Overview of your property management operations</p>
+        <h2 className="text-2xl font-semibold text-gray-900">
+          Owner Dashboard
+        </h2>
+        <p className="text-sm text-gray-500 mt-1">
+          Overview of your property management operations
+        </p>
       </div>
 
       {/* Main Stats */}
@@ -140,7 +169,9 @@ export function OwnerDashboard() {
                     <p className="text-sm text-gray-600">{stat.title}</p>
                     <p className="text-2xl font-semibold mt-2">{stat.value}</p>
                     {stat.subtitle && (
-                      <p className="text-xs text-gray-500 mt-1">{stat.subtitle}</p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {stat.subtitle}
+                      </p>
                     )}
                   </div>
                   <div className={`${stat.bgColor} p-3 rounded-lg`}>
@@ -155,7 +186,9 @@ export function OwnerDashboard() {
 
       {/* Alerts & Notifications */}
       <div>
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Alerts & Notifications</h3>
+        <h3 className="text-lg font-medium text-gray-900 mb-4">
+          Alerts & Notifications
+        </h3>
 
         {/* Lease Expiration Notifications */}
         <NotificationBanner notifications={notifications} userRole="owner" />
@@ -174,7 +207,9 @@ export function OwnerDashboard() {
                       <p className="text-xs text-gray-600">{alert.title}</p>
                       <p className="text-lg font-semibold">{alert.count}</p>
                       {alert.amount !== undefined && (
-                        <p className="text-xs text-gray-500">LKR {alert.amount.toLocaleString()}</p>
+                        <p className="text-xs text-gray-500">
+                          LKR {alert.amount.toLocaleString()}
+                        </p>
                       )}
                     </div>
                   </div>
@@ -201,7 +236,7 @@ export function OwnerDashboard() {
                 <div>
                   <p className="text-xs text-gray-600">Interested</p>
                   <p className="text-xl font-semibold text-blue-700">
-                    {leads.filter(l => l.status === 'interested').length}
+                    {leads.filter((l) => l.status === 'interested').length}
                   </p>
                 </div>
                 <div className="text-right">
@@ -209,19 +244,17 @@ export function OwnerDashboard() {
                 </div>
               </div>
 
-
-
               <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
                 <div>
                   <p className="text-xs text-gray-600">Converted</p>
                   <p className="text-xl font-semibold text-green-700">
-                    {leads.filter(l => l.status === 'converted').length}
+                    {leads.filter((l) => l.status === 'converted').length}
                   </p>
                 </div>
                 <div className="text-right">
                   <p className="text-xs text-gray-500">
                     {leads.length > 0
-                      ? `${((leads.filter(l => l.status === 'converted').length / leads.length) * 100).toFixed(0)}% rate`
+                      ? `${((leads.filter((l) => l.status === 'converted').length / leads.length) * 100).toFixed(0)}% rate`
                       : '0% rate'}
                   </p>
                 </div>
@@ -238,20 +271,28 @@ export function OwnerDashboard() {
             {maintenanceRequests.slice(0, 5).length > 0 ? (
               <div className="space-y-3">
                 {maintenanceRequests.slice(0, 5).map((request) => {
-                  const unit = units.find(u => u.id === request.unitId);
-                  const tenant = tenants.find(t => t.id === request.tenantId);
+                  const unit = units.find((u) => u.id === request.unitId);
+                  const tenant = tenants.find((t) => t.id === request.tenantId);
                   return (
-                    <div key={request.id} className="flex justify-between items-start py-2 border-b last:border-0">
+                    <div
+                      key={request.id}
+                      className="flex justify-between items-start py-2 border-b last:border-0"
+                    >
                       <div>
                         <p className="text-sm font-medium">{request.title}</p>
                         <p className="text-xs text-gray-500">
                           {unit?.unitNumber} - {tenant?.name}
                         </p>
                       </div>
-                      <span className={`text-xs px-2 py-1 rounded-full ${request.status === 'submitted' ? 'bg-yellow-100 text-yellow-800' :
-                        request.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
-                          'bg-green-100 text-green-800'
-                        }`}>
+                      <span
+                        className={`text-xs px-2 py-1 rounded-full ${
+                          request.status === 'submitted'
+                            ? 'bg-yellow-100 text-yellow-800'
+                            : request.status === 'in_progress'
+                              ? 'bg-blue-100 text-blue-800'
+                              : 'bg-green-100 text-green-800'
+                        }`}
+                      >
                         {request.status.replace('_', ' ')}
                       </span>
                     </div>
@@ -275,23 +316,45 @@ export function OwnerDashboard() {
             {pendingInvoices.slice(0, 5).length > 0 ? (
               <div className="space-y-3">
                 {pendingInvoices.slice(0, 5).map((invoice) => {
-                  const tenant = tenants.find(t => t.id === invoice.tenantId);
-                  const unit = units.find(u => u.id === invoice.unitId);
+                  const tenant = tenants.find((t) => t.id === invoice.tenantId);
+                  const unit = units.find((u) => u.id === invoice.unitId);
                   const isOverdue = new Date(invoice.dueDate) < new Date();
                   const balance = getInvoiceBalance(invoice.id, invoice.amount);
                   const isPartial = balance < invoice.amount;
 
                   return (
-                    <div key={invoice.id} className="flex justify-between items-start py-2 border-b last:border-0">
+                    <div
+                      key={invoice.id}
+                      className="flex justify-between items-start py-2 border-b last:border-0"
+                    >
                       <div>
                         <p className="text-sm font-medium">{tenant?.name}</p>
                         <p className="text-xs text-gray-500">
-                          {invoice.description ? <span className={invoice.description.includes('Late') ? 'text-red-500 font-medium' : ''}>{invoice.description}</span> : `Unit ${unit?.unitNumber}`} • Due {invoice.dueDate}
+                          {invoice.description ? (
+                            <span
+                              className={
+                                invoice.description.includes('Late')
+                                  ? 'text-red-500 font-medium'
+                                  : ''
+                              }
+                            >
+                              {invoice.description}
+                            </span>
+                          ) : (
+                            `Unit ${unit?.unitNumber}`
+                          )}{' '}
+                          • Due {invoice.dueDate}
                         </p>
                       </div>
                       <div className="text-right">
-                        <p className="text-sm font-semibold">LKR {balance.toLocaleString()}</p>
-                        {isPartial && <p className="text-[10px] text-gray-500">of LKR {invoice.amount.toLocaleString()}</p>}
+                        <p className="text-sm font-semibold">
+                          LKR {balance.toLocaleString()}
+                        </p>
+                        {isPartial && (
+                          <p className="text-[10px] text-gray-500">
+                            of LKR {invoice.amount.toLocaleString()}
+                          </p>
+                        )}
                         {isOverdue && (
                           <span className="text-xs text-red-600">Overdue</span>
                         )}

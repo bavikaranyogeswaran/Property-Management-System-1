@@ -1,4 +1,10 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  ReactNode,
+} from 'react';
 import authService from '../../services/auth';
 
 export type UserRole = 'owner' | 'tenant' | 'treasurer' | 'lead';
@@ -47,9 +53,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const updateProfile = async (data: Partial<User>) => {
     try {
       const updatedUser = await authService.updateProfile(data);
-      setUser(prev => prev ? { ...prev, ...updatedUser } : null);
+      setUser((prev) => (prev ? { ...prev, ...updatedUser } : null));
     } catch (error) {
-      console.error("Profile update failed", error);
+      console.error('Profile update failed', error);
       throw error;
     }
   };
@@ -58,7 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await authService.changePassword(data);
     } catch (error) {
-      console.error("Password change failed", error);
+      console.error('Password change failed', error);
       throw error;
     }
   };
@@ -69,14 +75,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{
-      user,
-      login,
-      logout,
-      isAuthenticated: !!user,
-      updateProfile,
-      changePassword,
-    }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        login,
+        logout,
+        isAuthenticated: !!user,
+        updateProfile,
+        changePassword,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

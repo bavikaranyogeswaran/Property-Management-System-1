@@ -33,21 +33,21 @@ export function ReceiptViewer({
   if (!receipt) return null;
 
   const handleDownload = async () => {
-    console.log("Download button clicked");
+    console.log('Download button clicked');
     if (!receiptRef.current) {
-      console.error("Receipt ref is null");
+      console.error('Receipt ref is null');
       return;
     }
 
     try {
-      console.log("Starting html2canvas capture...");
+      console.log('Starting html2canvas capture...');
       const canvas = await html2canvas(receiptRef.current, {
         scale: 2, // Improve quality
         logging: true, // Enable logging for html2canvas
         useCORS: true,
-        backgroundColor: '#ffffff'
+        backgroundColor: '#ffffff',
       });
-      console.log("Canvas captured successfully");
+      console.log('Canvas captured successfully');
 
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF({
@@ -61,10 +61,12 @@ export function ReceiptViewer({
 
       pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
       pdf.save(`receipt-${receipt.receiptNumber}.pdf`);
-      console.log("PDF saved");
+      console.log('PDF saved');
     } catch (error) {
       console.error('Error generating PDF:', error);
-      alert(`Failed to generate PDF: ${error instanceof Error ? error.message : String(error)}`);
+      alert(
+        `Failed to generate PDF: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   };
 
@@ -195,13 +197,25 @@ export function ReceiptViewer({
         </div>
       </div>
 
-      <div ref={receiptRef} className="mt-4 bg-white" style={{ color: '#000000' }}>
+      <div
+        ref={receiptRef}
+        className="mt-4 bg-white"
+        style={{ color: '#000000' }}
+      >
         <div className="border-2 p-8" style={{ borderColor: '#111827' }}>
           {/* Header */}
-          <div className="text-center border-b-2 pb-6 mb-8" style={{ borderColor: '#111827' }}>
+          <div
+            className="text-center border-b-2 pb-6 mb-8"
+            style={{ borderColor: '#111827' }}
+          >
             <h1 className="text-3xl font-bold mb-2">PAYMENT RECEIPT</h1>
-            <div className="text-lg mb-3" style={{ color: '#4b5563' }}>{receipt.receiptNumber}</div>
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-semibold" style={{ backgroundColor: '#d1fae5', color: '#047857' }}>
+            <div className="text-lg mb-3" style={{ color: '#4b5563' }}>
+              {receipt.receiptNumber}
+            </div>
+            <div
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-semibold"
+              style={{ backgroundColor: '#d1fae5', color: '#047857' }}
+            >
               <CheckCircle className="size-5" />
               PAID
             </div>
@@ -210,37 +224,75 @@ export function ReceiptViewer({
           {/* Receipt Details */}
           <div className="grid grid-cols-2 gap-8 mb-8">
             <div>
-              <div className="text-xs font-semibold uppercase mb-3" style={{ color: '#4b5563' }}>Receipt Information</div>
+              <div
+                className="text-xs font-semibold uppercase mb-3"
+                style={{ color: '#4b5563' }}
+              >
+                Receipt Information
+              </div>
               <div className="space-y-2 text-sm">
-                <div className="flex justify-between border-b pb-2" style={{ borderColor: '#e5e7eb' }}>
+                <div
+                  className="flex justify-between border-b pb-2"
+                  style={{ borderColor: '#e5e7eb' }}
+                >
                   <span style={{ color: '#4b5563' }}>Receipt Date:</span>
-                  <span className="font-semibold text-right">{receipt.generatedDate}</span>
+                  <span className="font-semibold text-right">
+                    {receipt.generatedDate}
+                  </span>
                 </div>
-                <div className="flex justify-between border-b pb-2" style={{ borderColor: '#e5e7eb' }}>
+                <div
+                  className="flex justify-between border-b pb-2"
+                  style={{ borderColor: '#e5e7eb' }}
+                >
                   <span style={{ color: '#4b5563' }}>Payment Date:</span>
-                  <span className="font-semibold text-right">{paymentDate}</span>
+                  <span className="font-semibold text-right">
+                    {paymentDate}
+                  </span>
                 </div>
-                <div className="flex justify-between border-b pb-2" style={{ borderColor: '#e5e7eb' }}>
+                <div
+                  className="flex justify-between border-b pb-2"
+                  style={{ borderColor: '#e5e7eb' }}
+                >
                   <span style={{ color: '#4b5563' }}>Payment Method:</span>
-                  <span className="font-semibold text-right">{paymentMethod}</span>
+                  <span className="font-semibold text-right">
+                    {paymentMethod}
+                  </span>
                 </div>
-                <div className="flex justify-between border-b pb-2" style={{ borderColor: '#e5e7eb' }}>
+                <div
+                  className="flex justify-between border-b pb-2"
+                  style={{ borderColor: '#e5e7eb' }}
+                >
                   <span style={{ color: '#4b5563' }}>Payment For:</span>
-                  <span className="font-semibold text-right">{description}</span>
+                  <span className="font-semibold text-right">
+                    {description}
+                  </span>
                 </div>
               </div>
             </div>
 
             <div>
-              <div className="text-xs font-semibold uppercase mb-3" style={{ color: '#4b5563' }}>Tenant Information</div>
+              <div
+                className="text-xs font-semibold uppercase mb-3"
+                style={{ color: '#4b5563' }}
+              >
+                Tenant Information
+              </div>
               <div className="space-y-2 text-sm">
-                <div className="flex justify-between border-b pb-2" style={{ borderColor: '#e5e7eb' }}>
+                <div
+                  className="flex justify-between border-b pb-2"
+                  style={{ borderColor: '#e5e7eb' }}
+                >
                   <span style={{ color: '#4b5563' }}>Name:</span>
                   <span className="font-semibold text-right">{tenantName}</span>
                 </div>
-                <div className="flex justify-between border-b pb-2" style={{ borderColor: '#e5e7eb' }}>
+                <div
+                  className="flex justify-between border-b pb-2"
+                  style={{ borderColor: '#e5e7eb' }}
+                >
                   <span style={{ color: '#4b5563' }}>Email:</span>
-                  <span className="font-semibold text-right">{tenantEmail}</span>
+                  <span className="font-semibold text-right">
+                    {tenantEmail}
+                  </span>
                 </div>
               </div>
             </div>
@@ -248,13 +300,24 @@ export function ReceiptViewer({
 
           {/* Property Information */}
           <div className="mb-8">
-            <div className="text-xs font-semibold uppercase mb-3" style={{ color: '#4b5563' }}>Property Information</div>
+            <div
+              className="text-xs font-semibold uppercase mb-3"
+              style={{ color: '#4b5563' }}
+            >
+              Property Information
+            </div>
             <div className="grid grid-cols-2 gap-4 text-sm">
-              <div className="flex justify-between border-b pb-2" style={{ borderColor: '#e5e7eb' }}>
+              <div
+                className="flex justify-between border-b pb-2"
+                style={{ borderColor: '#e5e7eb' }}
+              >
                 <span style={{ color: '#4b5563' }}>Property:</span>
                 <span className="font-semibold text-right">{propertyName}</span>
               </div>
-              <div className="flex justify-between border-b pb-2" style={{ borderColor: '#e5e7eb' }}>
+              <div
+                className="flex justify-between border-b pb-2"
+                style={{ borderColor: '#e5e7eb' }}
+              >
                 <span style={{ color: '#4b5563' }}>Unit Number:</span>
                 <span className="font-semibold text-right">{unitNumber}</span>
               </div>
@@ -262,17 +325,29 @@ export function ReceiptViewer({
           </div>
 
           {/* Amount Section */}
-          <div className="p-6 rounded-lg my-8" style={{ backgroundColor: '#f9fafb' }}>
+          <div
+            className="p-6 rounded-lg my-8"
+            style={{ backgroundColor: '#f9fafb' }}
+          >
             <div className="text-center">
-              <div className="text-sm mb-2" style={{ color: '#4b5563' }}>Total Amount Paid</div>
-              <div className="text-4xl font-bold">LKR {receipt.amount.toLocaleString()}</div>
+              <div className="text-sm mb-2" style={{ color: '#4b5563' }}>
+                Total Amount Paid
+              </div>
+              <div className="text-4xl font-bold">
+                LKR {receipt.amount.toLocaleString()}
+              </div>
             </div>
           </div>
 
           {/* Footer */}
-          <div className="border-t-2 pt-6 mt-8 text-center text-xs" style={{ borderColor: '#111827', color: '#4b5563' }}>
+          <div
+            className="border-t-2 pt-6 mt-8 text-center text-xs"
+            style={{ borderColor: '#111827', color: '#4b5563' }}
+          >
             <p className="mb-2">This is an official payment receipt.</p>
-            <p>For any inquiries, please contact the property management office.</p>
+            <p>
+              For any inquiries, please contact the property management office.
+            </p>
             <p className="mt-4 font-semibold">Thank you for your payment!</p>
           </div>
         </div>

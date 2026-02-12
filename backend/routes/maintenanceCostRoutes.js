@@ -7,7 +7,12 @@ import { addMaintenanceCostSchema } from '../schemas/maintenanceCostSchemas.js';
 
 const router = Router();
 
-router.post('/', authenticateToken, validateRequest(addMaintenanceCostSchema), maintenanceCostController.addCost);
+router.post(
+  '/',
+  authenticateToken,
+  validateRequest(addMaintenanceCostSchema),
+  maintenanceCostController.addCost
+);
 router.get('/', authenticateToken, maintenanceCostController.getCosts);
 router.delete('/:id', authenticateToken, maintenanceCostController.deleteCost);
 

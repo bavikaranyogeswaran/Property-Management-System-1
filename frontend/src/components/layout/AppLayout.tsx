@@ -2,7 +2,11 @@ import React, { ReactNode, useState } from 'react';
 import { useAuth } from '@/app/context/AuthContext';
 import { useApp } from '@/app/context/AppContext';
 import { Button } from '@/components/ui/button';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Building2,
@@ -21,7 +25,7 @@ import {
   DollarSign,
   Receipt,
   Bell,
-  Calendar
+  Calendar,
 } from 'lucide-react';
 
 import { Link, useLocation } from 'react-router-dom';
@@ -36,7 +40,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const location = useLocation();
 
-  const unreadCount = notifications.filter(n => !n.read).length;
+  const unreadCount = notifications.filter((n) => !n.read).length;
 
   const isActive = (path: string) => {
     if (path === '/dashboard' && location.pathname === '/') return true;
@@ -63,7 +67,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   const treasurerMenu = [
     { path: '/dashboard', label: 'Dashboard', icon: Home },
     { path: '/properties', label: 'My Properties', icon: Building2 }, // New
-    { path: '/tenants', label: 'Tenants', icon: Users },      // New
+    { path: '/tenants', label: 'Tenants', icon: Users }, // New
     { path: '/invoices', label: 'Invoices', icon: FileText },
     { path: '/payments', label: 'Payment Verification', icon: CreditCard },
     { path: '/receipts', label: 'Receipts', icon: Receipt },
@@ -79,9 +83,7 @@ export function AppLayout({ children }: AppLayoutProps) {
     { path: '/maintenance', label: 'Maintenance Requests', icon: Wrench },
   ];
 
-  const leadMenu = [
-    { path: '/dashboard', label: 'Dashboard', icon: Home },
-  ];
+  const leadMenu = [{ path: '/dashboard', label: 'Dashboard', icon: Home }];
 
   // Add settings to all menus
   const commonItems = [
@@ -93,7 +95,7 @@ export function AppLayout({ children }: AppLayoutProps) {
     ...(user?.role === 'treasurer' ? treasurerMenu : []),
     ...(user?.role === 'tenant' ? tenantMenu : []),
     ...(user?.role === 'lead' ? leadMenu : []),
-    ...commonItems
+    ...commonItems,
   ];
 
   return (
@@ -106,12 +108,20 @@ export function AppLayout({ children }: AppLayoutProps) {
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               className="lg:hidden p-2 hover:bg-gray-100 rounded-lg"
             >
-              {isMobileMenuOpen ? <X className="size-5" /> : <Menu className="size-5" />}
+              {isMobileMenuOpen ? (
+                <X className="size-5" />
+              ) : (
+                <Menu className="size-5" />
+              )}
             </button>
             <Building2 className="size-6 text-blue-600" />
             <div>
-              <h1 className="font-semibold text-gray-900">Property Management System</h1>
-              <p className="text-xs text-gray-500 capitalize">{user?.role} Portal</p>
+              <h1 className="font-semibold text-gray-900">
+                Property Management System
+              </h1>
+              <p className="text-xs text-gray-500 capitalize">
+                {user?.role} Portal
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -128,19 +138,29 @@ export function AppLayout({ children }: AppLayoutProps) {
                 <div className="p-4 border-b font-semibold">Notifications</div>
                 <ScrollArea className="h-[300px]">
                   {notifications.length === 0 ? (
-                    <div className="p-4 text-center text-sm text-gray-500">No notifications</div>
+                    <div className="p-4 text-center text-sm text-gray-500">
+                      No notifications
+                    </div>
                   ) : (
                     <div className="divide-y">
                       {notifications.map((notification) => (
                         <div
                           key={notification.id}
                           className={`p-4 hover:bg-gray-50 cursor-pointer ${!notification.read ? 'bg-blue-50/50' : ''}`}
-                          onClick={() => markNotificationAsRead(notification.id)}
+                          onClick={() =>
+                            markNotificationAsRead(notification.id)
+                          }
                         >
-                          <div className="text-sm font-medium mb-1">{notification.title}</div>
-                          <div className="text-xs text-gray-600 mb-1">{notification.message}</div>
+                          <div className="text-sm font-medium mb-1">
+                            {notification.title}
+                          </div>
+                          <div className="text-xs text-gray-600 mb-1">
+                            {notification.message}
+                          </div>
                           <div className="text-xs text-gray-400">
-                            {new Date(notification.createdAt).toLocaleDateString()}
+                            {new Date(
+                              notification.createdAt
+                            ).toLocaleDateString()}
                           </div>
                         </div>
                       ))}
@@ -156,7 +176,6 @@ export function AppLayout({ children }: AppLayoutProps) {
                   </Link>
                 </div>
               </PopoverContent>
-
             </Popover>
 
             <div className="text-right hidden sm:block">
@@ -182,10 +201,11 @@ export function AppLayout({ children }: AppLayoutProps) {
                 <Link
                   key={item.path}
                   to={item.path}
-                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${active
-                    ? 'bg-blue-50 text-blue-700 font-medium'
-                    : 'text-gray-700 hover:bg-gray-100'
-                    }`}
+                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
+                    active
+                      ? 'bg-blue-50 text-blue-700 font-medium'
+                      : 'text-gray-700 hover:bg-gray-100'
+                  }`}
                 >
                   <Icon className="size-4" />
                   {item.label}
@@ -207,10 +227,11 @@ export function AppLayout({ children }: AppLayoutProps) {
                     key={item.path}
                     to={item.path}
                     onClick={() => setIsMobileMenuOpen(false)}
-                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${active
-                      ? 'bg-blue-50 text-blue-700 font-medium'
-                      : 'text-gray-700 hover:bg-gray-100'
-                      }`}
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
+                      active
+                        ? 'bg-blue-50 text-blue-700 font-medium'
+                        : 'text-gray-700 hover:bg-gray-100'
+                    }`}
                   >
                     <Icon className="size-4" />
                     {item.label}
@@ -222,9 +243,7 @@ export function AppLayout({ children }: AppLayoutProps) {
         )}
 
         {/* Main Content */}
-        <main className="flex-1 p-4 lg:p-8">
-          {children}
-        </main>
+        <main className="flex-1 p-4 lg:p-8">{children}</main>
       </div>
     </div>
   );

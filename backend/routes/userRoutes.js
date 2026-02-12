@@ -5,7 +5,11 @@ import authenticateToken from '../middleware/authMiddleware.js';
 const router = Router();
 
 // Treasurer creation (Owner only)
-router.post('/create-treasurer', authenticateToken, userController.createTreasurer);
+router.post(
+  '/create-treasurer',
+  authenticateToken,
+  userController.createTreasurer
+);
 
 // Update own profile (Specific route must come before generic /:id)
 router.put('/profile', authenticateToken, userController.updateProfile);
@@ -26,10 +30,20 @@ router.get('/tenants', authenticateToken, userController.getTenants);
 router.get('/:id', authenticateToken, userController.getUserById);
 
 // Property Assignments
-router.post('/assign-property', authenticateToken, userController.assignProperty);
-router.delete('/:userId/assign-property/:propertyId', authenticateToken, userController.removeProperty);
-router.get('/:userId/assigned-properties', authenticateToken, userController.getAssignedProperties);
-
-
+router.post(
+  '/assign-property',
+  authenticateToken,
+  userController.assignProperty
+);
+router.delete(
+  '/:userId/assign-property/:propertyId',
+  authenticateToken,
+  userController.removeProperty
+);
+router.get(
+  '/:userId/assigned-properties',
+  authenticateToken,
+  userController.getAssignedProperties
+);
 
 export default router;

@@ -1,5 +1,8 @@
 import express from 'express';
-import { addBehaviorLog, getTenantBehavior } from '../controllers/behaviorController.js';
+import {
+  addBehaviorLog,
+  getTenantBehavior,
+} from '../controllers/behaviorController.js';
 
 const router = express.Router();
 

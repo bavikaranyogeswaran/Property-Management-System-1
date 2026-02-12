@@ -1,6 +1,9 @@
 import { Router } from 'express';
 import propertyController from '../controllers/propertyController.js';
-import authenticateToken, { authorizeRoles, optionalAuthenticateToken } from '../middleware/authMiddleware.js';
+import authenticateToken, {
+  authorizeRoles,
+  optionalAuthenticateToken,
+} from '../middleware/authMiddleware.js';
 import upload from '../middleware/upload.js';
 
 const router = Router();
@@ -13,18 +16,39 @@ router.get('/types', propertyController.getPropertyTypes);
 router.get('/', optionalAuthenticateToken, propertyController.getProperties);
 
 // POST / - Owner only
-router.post('/', authenticateToken, authorizeRoles('owner'), propertyController.createProperty);
+router.post(
+  '/',
+  authenticateToken,
+  authorizeRoles('owner'),
+  propertyController.createProperty
+);
 
 // GET /:id - Allow all authenticated users
 router.get('/:id', authenticateToken, propertyController.getPropertyById);
 
 // PUT /:id - Owner only
-router.put('/:id', authenticateToken, authorizeRoles('owner'), propertyController.updateProperty);
+router.put(
+  '/:id',
+  authenticateToken,
+  authorizeRoles('owner'),
+  propertyController.updateProperty
+);
 
 // DELETE /:id - Owner only
-router.delete('/:id', authenticateToken, authorizeRoles('owner'), propertyController.deleteProperty);
+router.delete(
+  '/:id',
+  authenticateToken,
+  authorizeRoles('owner'),
+  propertyController.deleteProperty
+);
 
 // POST /:id/images - Upload images
-router.post('/:id/images', authenticateToken, authorizeRoles('owner'), upload.array('images', 10), propertyController.uploadImages);
+router.post(
+  '/:id/images',
+  authenticateToken,
+  authorizeRoles('owner'),
+  upload.array('images', 10),
+  propertyController.uploadImages
+);
 
 export default router;
