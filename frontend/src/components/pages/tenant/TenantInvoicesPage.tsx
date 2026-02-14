@@ -54,6 +54,7 @@ export function TenantInvoicesPage() {
     unitNumber: string;
     paymentMethod: string;
     paymentDate: string;
+    description: string;
   } | null>(null);
   const [paymentData, setPaymentData] = useState({
     amount: '',
@@ -398,6 +399,7 @@ export function TenantInvoicesPage() {
                                       paymentMethod:
                                         receiptPayment.paymentMethod,
                                       paymentDate: receiptPayment.paymentDate,
+                                      description: invoice.description || 'Rent Invoice',
                                     });
                                   }}
                                 >
@@ -558,6 +560,7 @@ export function TenantInvoicesPage() {
               unitNumber={selectedReceipt.unitNumber}
               paymentMethod={selectedReceipt.paymentMethod}
               paymentDate={selectedReceipt.paymentDate}
+              description={selectedReceipt.description}
               onClose={() => setSelectedReceipt(null)}
             />
           )}

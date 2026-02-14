@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useAuth } from '@/app/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,7 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { Building2 } from 'lucide-react';
+import { Building2, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 import { Link, useNavigate } from 'react-router-dom';
 
@@ -43,6 +44,7 @@ export function LoginPage() {
       password: '',
     },
   });
+  const [showPassword, setShowPassword] = useState(false);
 
   const onSubmit = async (data: LoginFormValues) => {
     try {
@@ -108,11 +110,26 @@ export function LoginPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormControl>
-                        <Input
-                          placeholder="Enter your password"
-                          type="password"
-                          {...field}
-                        />
+                       <div className="relative">
+                          <Input
+                            placeholder="Enter your password"
+                            type={showPassword ? 'text' : 'password'}
+                            {...field}
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                            onClick={() => setShowPassword(!showPassword)}
+                          >
+                            {showPassword ? (
+                              <EyeOff className="size-4 text-gray-500" />
+                            ) : (
+                              <Eye className="size-4 text-gray-500" />
+                            )}
+                          </Button>
+                        </div>
                       </FormControl>
                       <FormMessage />
                     </FormItem>

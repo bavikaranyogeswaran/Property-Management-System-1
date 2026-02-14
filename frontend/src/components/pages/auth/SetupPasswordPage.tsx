@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   Card,
@@ -9,7 +10,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, Lock, ArrowRight } from 'lucide-react';
+import { Loader2, Lock, ArrowRight, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 import authService from '@/services/auth';
 
@@ -40,6 +41,9 @@ export function SetupPasswordPage() {
       confirmPassword: '',
     },
   });
+
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const onSubmit = async (data: ResetPasswordFormValues) => {
     if (!token) {
@@ -100,11 +104,26 @@ export function SetupPasswordPage() {
                   <FormItem>
                     <FormLabel>New Password</FormLabel>
                     <FormControl>
-                      <Input
-                        placeholder="Min. 8 characters"
-                        type="password"
-                        {...field}
-                      />
+                      <div className="relative">
+                        <Input
+                          placeholder="Min. 8 characters"
+                          type={showPassword ? 'text' : 'password'}
+                          {...field}
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                          onClick={() => setShowPassword(!showPassword)}
+                        >
+                          {showPassword ? (
+                            <EyeOff className="size-4 text-gray-500" />
+                          ) : (
+                            <Eye className="size-4 text-gray-500" />
+                          )}
+                        </Button>
+                      </div>
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -117,11 +136,26 @@ export function SetupPasswordPage() {
                   <FormItem>
                     <FormLabel>Confirm Password</FormLabel>
                     <FormControl>
-                      <Input
-                        placeholder="Re-enter password"
-                        type="password"
-                        {...field}
-                      />
+                      <div className="relative">
+                        <Input
+                          placeholder="Re-enter password"
+                          type={showConfirmPassword ? 'text' : 'password'}
+                          {...field}
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        >
+                          {showConfirmPassword ? (
+                            <EyeOff className="size-4 text-gray-500" />
+                          ) : (
+                            <Eye className="size-4 text-gray-500" />
+                          )}
+                        </Button>
+                      </div>
                     </FormControl>
                     <FormMessage />
                   </FormItem>

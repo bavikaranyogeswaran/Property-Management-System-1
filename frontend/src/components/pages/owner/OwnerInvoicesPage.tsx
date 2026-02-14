@@ -113,6 +113,7 @@ export function OwnerInvoicesPage() {
     unitNumber: string;
     paymentMethod: string;
     paymentDate: string;
+    description: string;
   } | null>(null);
 
   const pendingInvoices = invoices.filter((i) => i.status === 'pending');
@@ -311,6 +312,7 @@ export function OwnerInvoicesPage() {
                               unitNumber: unit.unitNumber,
                               paymentMethod: receiptPayment.paymentMethod,
                               paymentDate: receiptPayment.paymentDate,
+                              description: invoice.description || 'Rent Payment',
                             });
                           }}
                         >
@@ -474,6 +476,7 @@ export function OwnerInvoicesPage() {
               unitNumber={selectedReceipt.unitNumber}
               paymentMethod={selectedReceipt.paymentMethod}
               paymentDate={selectedReceipt.paymentDate}
+              description={selectedReceipt.description}
               onClose={() => setSelectedReceipt(null)}
             />
           )}
