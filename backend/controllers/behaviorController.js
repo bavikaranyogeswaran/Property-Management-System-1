@@ -1,4 +1,5 @@
 import behaviorLogModel from '../models/behaviorLogModel.js';
+import tenantModel from '../models/tenantModel.js';
 import pool from '../config/db.js';
 
 export const addBehaviorLog = async (req, res) => {
@@ -24,25 +25,10 @@ export const addBehaviorLog = async (req, res) => {
     );
 
     // 2. Update Tenant Score
-    // Get current score first to clamp if needed, or just add directly
-    // We will just do a direct update: behavior_score = behavior_score + scoreChange
-    await connection.query(
-      `
-            UPDATE tenants 
-            SET behavior_score = behavior_score + ? 
-            WHERE user_id = ?
-        `,
-      [scoreChange, tenantId]
-    );
+    await tenantModel.incrementBehaviorScore(tenantId, scoreChange, connection);
 
     // 3. Fetch updated score
-    const [rows] = await connection.query(
-      `
-            SELECT behavior_score FROM tenants WHERE user_id = ?
-        `,
-      [tenantId]
-    );
-    const newScore = rows[0]?.behavior_score;
+    const newScore = await tenantModel.getBehaviorScore(tenantId, connection);
 
     await connection.commit();
 
@@ -67,14 +53,7 @@ export const getTenantBehavior = async (req, res) => {
     const logs = await behaviorLogModel.findByTenantId(tenantId);
 
     // Get current score
-    const [rows] = await pool.query(
-      `
-            SELECT behavior_score FROM tenants WHERE user_id = ?
-        `,
-      [tenantId]
-    );
-
-    const score = rows[0]?.behavior_score || 100;
+    const score = await tenantModel.getBehaviorScore(tenantId);
 
     res.status(200).json({ score, logs });
   } catch (error) {

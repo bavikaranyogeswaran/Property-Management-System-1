@@ -108,6 +108,15 @@ class VisitModel {
       created_at: row.created_at,
     };
   }
+  async cancelVisitsForUnit(unitId, date, connection = null) {
+    const dbConn = connection || db;
+    await dbConn.query(
+      `UPDATE property_visits 
+             SET status = 'cancelled', notes = CONCAT(COALESCE(notes, ''), ' [System: Unit Leased]') 
+             WHERE unit_id = ? AND status = 'scheduled' AND scheduled_date >= ?`,
+      [unitId, date]
+    );
+  }
 }
 
 export default new VisitModel();

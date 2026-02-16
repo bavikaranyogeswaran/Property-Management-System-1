@@ -12,6 +12,8 @@ import invoiceModel from '../models/invoiceModel.js';
 import notificationModel from '../models/notificationModel.js';
 import userModel from '../models/userModel.js';
 import receiptModel from '../models/receiptModel.js';
+import behaviorLogModel from '../models/behaviorLogModel.js';
+import tenantModel from '../models/tenantModel.js';
 
 class PaymentController {
   //  SUBMIT PAYMENT: Tenant uploads a slip or says "I paid X amount".
@@ -245,34 +247,10 @@ class PaymentController {
           // Generate Receipt (Always generate receipt for the *payment*)
           if (invoice) {
             // Check if receipt already exists for this payment
-            const existingReceipt = await receiptModel.findById(id); // paymentId is passed as ID often? No, findById uses receipt_id.
-            // We do not have findByPaymentId in receiptModel? Let's check model.
-            // Model has: findById, findByInvoiceId.
-            // Missing findByPaymentId.
-            // Let's implement logic:
-            // Wait, checking findByInvoiceId returns ONE receipt? In model: `SELECT * ... WHERE invoice_id = ?` returns rows[0].
-            // This implies 1 receipt per invoice?
-            // If partial payments exist, we need multiple receipts per invoice (one per payment).
-            // So `findByInvoiceId` returning only 1 is actually a BUG in receiptModel if we support partial payments.
-            // But here, I want to check if THIS payment (id) has a receipt.
+            // We use receiptModel.findByPaymentId which we added.
+            const existingReceipt = await receiptModel.findByPaymentId(id);
 
-            // I will assume robustness is needed. I'll add a direct check here using DB pool (since model is limited)
-            // OR better, trust that verifyPayment is usually one-off.
-            // But user asked for High Logic Confidence.
-            // Let's query db directly to be safe or ignore if duplicate (Integrity error?).
-            // Creating receipt with same payment_id might fail if UNIQUE key exists?
-            // Schema usually acts as final guard.
-
-            // Let's just create it but wrap in try/catch specifically for unique constraint if it exists,
-            // OR just check via query.
-
-            const db = (await import('../config/db.js')).default;
-            const [existing] = await db.query(
-              'SELECT receipt_id FROM receipts WHERE payment_id = ?',
-              [id]
-            );
-
-            if (existing.length === 0) {
+            if (!existingReceipt) {
               await receiptModel.create({
                 paymentId: id,
                 invoiceId: payment.invoiceId,
@@ -358,20 +336,15 @@ class PaymentController {
                 const dueStr = dueDate.toISOString().split('T')[0];
 
                 if (payStr <= dueStr) {
-                  const db = (await import('../config/db.js')).default;
-                  const scoreChange = 5;
-
-                  await db.query(
-                    `
-                                    INSERT INTO tenant_behavior_logs (tenant_id, type, category, score_change, description, recorded_by, created_at)
-                                    VALUES (?, 'positive', 'Payment', ?, 'On-time payment bonus', NULL, NOW())
-                                `,
-                    [invoice.tenant_id, scoreChange]
+                  // Behavior Score Update using Models
+                  await behaviorLogModel.logPositivePayment(
+                    invoice.tenant_id,
+                    5 // scoreChange
                   );
 
-                  await db.query(
-                    'UPDATE tenants SET behavior_score = behavior_score + ? WHERE user_id = ?',
-                    [scoreChange, invoice.tenant_id]
+                  await tenantModel.incrementBehaviorScore(
+                    invoice.tenant_id,
+                    5 // scoreChange
                   );
                   console.log(
                     `Awarded +5 Points to Tenant ${invoice.tenant_id} for On-Time Payment.`

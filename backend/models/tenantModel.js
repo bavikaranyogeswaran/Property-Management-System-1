@@ -93,6 +93,13 @@ class TenantModel {
       [amount, userId]
     );
   }
+  async incrementBehaviorScore(userId, scoreChange, connection = null) {
+    const db = connection || pool;
+    await db.query(
+      'UPDATE tenants SET behavior_score = behavior_score + ? WHERE user_id = ?',
+      [scoreChange, userId]
+    );
+  }
 }
 
 export default new TenantModel();

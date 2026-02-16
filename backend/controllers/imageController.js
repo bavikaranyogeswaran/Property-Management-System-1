@@ -1,7 +1,6 @@
 import propertyImageModel from '../models/propertyImageModel.js';
 import propertyModel from '../models/propertyModel.js';
-import unitImageModel from '../models/unitImageModel.js';
-import db from '../config/db.js';
+import unitModel from '../models/unitModel.js';
 
 class ImageController {
   // Property Images
@@ -125,10 +124,7 @@ class ImageController {
       const currentPrimary =
         allImages.find((img) => img.is_primary) || allImages[0];
       if (currentPrimary) {
-        await db.query('UPDATE units SET image_url = ? WHERE unit_id = ?', [
-          currentPrimary.image_url,
-          unitId,
-        ]);
+        await unitModel.updateImageUrl(unitId, currentPrimary.image_url);
       }
 
       res.status(201).json({ images: allImages });
@@ -160,10 +156,7 @@ class ImageController {
       const images = await unitImageModel.findByUnitId(unitId);
       const primary = images.find((img) => img.is_primary);
       if (primary) {
-        await db.query('UPDATE units SET image_url = ? WHERE unit_id = ?', [
-          primary.image_url,
-          unitId,
-        ]);
+        await unitModel.updateImageUrl(unitId, primary.image_url);
       }
 
       res.json({ message: 'Primary image updated' });

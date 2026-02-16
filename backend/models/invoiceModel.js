@@ -191,6 +191,38 @@ class InvoiceModel {
     );
     return rows;
   }
+  async syncFutureRentInvoices(leaseId, newAmount, fromDate) {
+    await pool.query(
+      `UPDATE rent_invoices 
+             SET amount = ?, description = CONCAT(description, ' (Rent Adjusted)')
+             WHERE lease_id = ? 
+             AND status = 'pending' 
+             AND invoice_type = 'rent'
+             AND due_date > ?`,
+      [newAmount, leaseId, fromDate]
+    );
+  }
+
+  async voidPendingByLeaseId(leaseId) {
+    await pool.query(
+      "UPDATE rent_invoices SET status='void' WHERE lease_id = ? AND status='pending'",
+      [leaseId]
+    );
+  }
+
+  async voidFuturePendingByLeaseId(leaseId, date) {
+    await pool.query(
+      "UPDATE rent_invoices SET status='void' WHERE lease_id = ? AND status='pending' AND due_date > ?",
+      [leaseId, date]
+    );
+  }
+  async findPendingDebts(leaseId) {
+    const [rows] = await pool.query(
+      `SELECT * FROM rent_invoices WHERE lease_id = ? AND status IN ('pending', 'partially_paid') ORDER BY due_date ASC`,
+      [leaseId]
+    );
+    return rows;
+  }
 }
 
 export default new InvoiceModel();

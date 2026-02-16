@@ -1,7 +1,9 @@
 import userService from '../services/userService.js';
 import leadModel from '../models/leadModel.js';
 import leadStageHistoryModel from '../models/leadStageHistoryModel.js';
-import db from '../config/db.js';
+import unitModel from '../models/unitModel.js';
+import propertyModel from '../models/propertyModel.js';
+import userModel from '../models/userModel.js';
 import emailService from '../utils/emailService.js';
 import {
   validatePassword,
@@ -72,42 +74,18 @@ class LeadController {
       const email = req.user.email;
       console.log(`[DEBUG] getMyLead: Fetching profile for email '${email}'`);
 
-      // Direct query for efficiency and reliability
-      // We find the most recent lead with this email address
-      const [rows] = await db.query(
-        `
-                SELECT 
-                    l.lead_id as id,
-                    l.property_id as propertyId,
-                    l.unit_id as interestedUnit,
-                    l.name,
-                    l.email,
-                    l.phone,
-                    l.notes,
-                    l.status,
-                    l.created_at as createdAt,
-                    l.last_contacted_at as lastContactedAt,
-                    l.user_id as userId
-                FROM leads l
-                WHERE l.email = ? AND l.status != 'dropped'
-                ORDER BY l.created_at DESC
-                LIMIT 1
-            `,
-        [email]
-      );
-
-      const myLead = rows[0];
+      // Use model method
+      const myLead = await leadModel.findByEmail(email);
 
       if (!myLead) {
         console.log(`[DEBUG] No lead profile found for email: '${email}'`);
         // Check if any lead exists even if dropped, for debugging
-        const [check] = await db.query(
-          'SELECT count(*) as count FROM leads WHERE email = ?',
-          [email]
-        );
-
+        // We can just rely on not found here or add countByEmail if critical.
+        // For now, simple 404 is fine or just return error as before.
+        // User wanted strict Model usage.
+        
         return res.status(404).json({
-          error: `Lead profile not found for email: ${email}. Records found: ${check[0].count}`,
+          error: `Lead profile not found for email: ${email}`,
         });
       }
 
@@ -151,18 +129,13 @@ class LeadController {
       let finalUnitId = unitId || interestedUnit;
 
       if (finalUnitId && finalUnitId !== '' && finalUnitId !== 'null') {
-        const [unitCheck] = await db.query(
-          'SELECT property_id FROM units WHERE unit_id = ?',
-          [finalUnitId]
-        );
+        const unitCheck = await unitModel.findById(finalUnitId);
 
-        if (unitCheck.length === 0) {
-          // Invalid unit is not fatal, just ignore it? Or error?
-          // Let's error to be safe.
+        if (!unitCheck) {
           return res.status(400).json({ error: 'Invalid unit selected' });
         }
 
-        if (String(unitCheck[0].property_id) !== String(propertyId)) {
+        if (String(unitCheck.propertyId) !== String(propertyId)) {
           return res
             .status(400)
             .json({
@@ -173,12 +146,9 @@ class LeadController {
         finalUnitId = null;
 
         // NEW CHECK: If "Whole Property" interest (no specific unit), check if any units are OCCUPIED.
-        const [occupiedCheck] = await db.query(
-          "SELECT COUNT(*) as count FROM units WHERE property_id = ? AND status IN ('occupied', 'maintenance')",
-          [propertyId]
-        );
+        const occupiedCount = await unitModel.countOccupied(propertyId);
 
-        if (occupiedCheck[0].count > 0) {
+        if (occupiedCount > 0) {
           return res.status(400).json({
             error:
               'Cannot express interest in the whole property because some units are currently occupied. Please select a specific unit.',
@@ -188,11 +158,8 @@ class LeadController {
 
       // NEW CHECK: Check if a USER account already exists with this email.
       // If yes, we block lead creation to prevent duplicate/merged identities.
-      const [existingUsers] = await db.query(
-        'SELECT user_id FROM users WHERE email = ?',
-        [email]
-      );
-      if (existingUsers.length > 0) {
+      const existingUser = await userModel.findByEmail(email);
+      if (existingUser) {
         return res
           .status(409)
           .json({
@@ -209,15 +176,15 @@ class LeadController {
       // In this DB schema, `leads` table has `property_id`. So one person can be a lead for multiple properties.
       // However, we don't want to create duplicates if they inquire about the SAME property twice.
 
-      const [existingLeads] = await db.query(
-        `SELECT lead_id FROM leads WHERE email = ? AND property_id = ? LIMIT 1`,
-        [email, propertyId]
+      const existingLeadId = await leadModel.findIdByEmailAndProperty(
+        email,
+        propertyId
       );
 
       let leadId;
-      if (existingLeads.length > 0) {
+      if (existingLeadId) {
         // Lead exists for this property -> Update it (e.g. new notes, timestamp)
-        leadId = existingLeads[0].lead_id;
+        leadId = existingLeadId;
         await leadModel.update(leadId, {
           lastContactedAt: new Date(),
           notes: notes ? `${notes} (Re-inquiry)` : undefined,
@@ -226,12 +193,8 @@ class LeadController {
 
         // Send Confirmation Email for re-inquiry
         try {
-          const [propRows] = await db.query(
-            'SELECT name FROM properties WHERE property_id = ?',
-            [propertyId]
-          );
-          const propertyName =
-            propRows.length > 0 ? propRows[0].name : 'our property';
+          const property = await propertyModel.findById(propertyId);
+          const propertyName = property ? property.name : 'our property';
           await emailService.sendWelcomeLead(email, name, propertyName); // name from request might differ from DB, but we use current request name
         } catch (emailErr) {
           console.error(
@@ -263,12 +226,8 @@ class LeadController {
         // Send Confirmation Email
         try {
           // Fetch property Name for the email
-          const [propRows] = await db.query(
-            'SELECT name FROM properties WHERE property_id = ?',
-            [propertyId]
-          );
-          const propertyName =
-            propRows.length > 0 ? propRows[0].name : 'our property';
+          const property = await propertyModel.findById(propertyId);
+          const propertyName = property ? property.name : 'our property';
           await emailService.sendWelcomeLead(email, name, propertyName);
         } catch (emailErr) {
           console.error('Failed to send interest confirmation email', emailErr);

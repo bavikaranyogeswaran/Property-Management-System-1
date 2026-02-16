@@ -196,6 +196,24 @@ class UnitModel {
       };
     });
   }
+
+
+  async updateImageUrl(unitId, imageUrl, connection = null) {
+    const dbConn = connection || db;
+    const [result] = await dbConn.query(
+      'UPDATE units SET image_url = ? WHERE unit_id = ?',
+      [imageUrl, unitId]
+    );
+    return result.affectedRows > 0;
+  }
+
+  async countOccupied(propertyId) {
+    const [rows] = await db.query(
+      "SELECT COUNT(*) as count FROM units WHERE property_id = ? AND status IN ('occupied', 'maintenance')",
+      [propertyId]
+    );
+    return rows[0].count;
+  }
 }
 
 export default new UnitModel();

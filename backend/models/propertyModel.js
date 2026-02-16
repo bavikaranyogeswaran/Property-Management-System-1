@@ -237,6 +237,16 @@ class PropertyModel {
     );
     return rows;
   }
+  async findOwnerDetails(propertyId) {
+    const [rows] = await db.query(
+      `SELECT p.name as property_name, u.email as owner_email, u.user_id as owner_id 
+             FROM properties p
+             JOIN users u ON p.owner_id = u.user_id
+             WHERE p.property_id = ?`,
+      [propertyId]
+    );
+    return rows[0];
+  }
 }
 
 export default new PropertyModel();

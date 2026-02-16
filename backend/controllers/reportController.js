@@ -12,6 +12,7 @@ import unitModel from '../models/unitModel.js';
 import propertyModel from '../models/propertyModel.js';
 import leaseModel from '../models/leaseModel.js';
 import leadModel from '../models/leadModel.js';
+import tenantModel from '../models/tenantModel.js';
 
 class ReportController {
   //  FINANCIAL REPORT: "How much money did we make vs spend?"
@@ -227,22 +228,8 @@ class ReportController {
       // Quickest way: Fetch all invoices to check payment history + Fetch all tenants for scores.
 
       // 1. Fetch Tenants (users with role 'tenant')
-      // We assume userModel has a way to find by role or we use raw query here for speed/custom join
-      // Let's perform a custom query to get everything we need for the report.
-
-      const [tenants] = await invoiceModel.pool.query(`
-                SELECT u.user_id, u.name, u.email, t.behavior_score,
-                       (SELECT COUNT(*) FROM rent_invoices ri 
-                        JOIN leases l ON ri.lease_id = l.lease_id 
-                        WHERE l.tenant_id = u.user_id AND ri.status = 'overdue') as overdue_count,
-                       (SELECT COUNT(*) FROM rent_invoices ri 
-                        JOIN leases l ON ri.lease_id = l.lease_id 
-                        WHERE l.tenant_id = u.user_id AND ri.status = 'paid') as paid_count
-                FROM users u
-                JOIN tenants t ON u.user_id = t.user_id
-                WHERE u.role = 'tenant'
-                ORDER BY t.behavior_score ASC
-            `);
+      // use the new tenantModel method
+      const tenants = await tenantModel.getTenantRiskProfiles();
 
       const doc = new PDFDocument({ margin: 50 });
       res.setHeader('Content-Type', 'application/pdf');

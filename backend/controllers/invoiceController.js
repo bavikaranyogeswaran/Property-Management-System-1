@@ -9,7 +9,7 @@ import invoiceModel from '../models/invoiceModel.js';
 import leaseModel from '../models/leaseModel.js';
 import behaviorLogModel from '../models/behaviorLogModel.js';
 import paymentModel from '../models/paymentModel.js';
-import pool from '../config/db.js';
+import tenantModel from '../models/tenantModel.js';
 
 class InvoiceController {
   async getInvoices(req, res) {
@@ -237,9 +237,9 @@ class InvoiceController {
           });
 
           // 2. Update Tenant Score
-          await pool.query(
-            'UPDATE tenants SET behavior_score = behavior_score + ? WHERE user_id = ?',
-            [scoreChange, invoice.tenant_id]
+          await tenantModel.incrementBehaviorScore(
+            invoice.tenant_id,
+            scoreChange
           );
 
           console.log(

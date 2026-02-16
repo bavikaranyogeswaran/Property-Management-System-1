@@ -35,6 +35,16 @@ class BehaviorLogModel {
     const [rows] = await pool.query(query, [tenantId]);
     return rows;
   }
+  async logPositivePayment(tenantId, amount, connection = null) {
+    const db = connection || pool;
+    const scoreChange = 5;
+    await db.query(
+      `INSERT INTO tenant_behavior_logs (tenant_id, type, category, score_change, description, recorded_by, created_at)
+              VALUES (?, 'positive', 'Payment', ?, 'On-time payment bonus', NULL, NOW())`,
+      [tenantId, scoreChange]
+    );
+    return scoreChange;
+  }
 }
 
 export default new BehaviorLogModel();

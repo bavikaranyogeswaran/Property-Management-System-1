@@ -176,8 +176,9 @@ class UserModel {
     return result.affectedRows > 0;
   }
 
-  async updateRole(id, role) {
-    const [result] = await pool.query(
+  async updateRole(id, role, connection = null) {
+    const db = connection || pool;
+    const [result] = await db.query(
       'UPDATE users SET role = ? WHERE user_id = ?',
       [role, id]
     );

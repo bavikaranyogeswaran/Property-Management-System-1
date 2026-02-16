@@ -1,7 +1,10 @@
 import leaseModel from '../models/leaseModel.js';
 import unitModel from '../models/unitModel.js';
 import tenantModel from '../models/tenantModel.js';
-import pool from '../config/db.js';
+// Removed direct pool import
+import invoiceModel from '../models/invoiceModel.js';
+import visitModel from '../models/visitModel.js';
+import leadModel from '../models/leadModel.js';
 
 class LeaseService {
   /**
@@ -112,21 +115,13 @@ class LeaseService {
     if (startDate <= today) {
       await unitModel.update(unitId, { status: 'occupied' }, connection);
 
+      await unitModel.update(unitId, { status: 'occupied' }, connection);
+
       // CLEANUP: Cancel conflicting future/current visits
-      await connection.query(
-        `UPDATE property_visits 
-             SET status = 'cancelled', notes = CONCAT(COALESCE(notes, ''), ' [System: Unit Leased]') 
-             WHERE unit_id = ? AND status = 'scheduled' AND scheduled_date >= ?`,
-        [unitId, today]
-      );
+      await visitModel.cancelVisitsForUnit(unitId, today, connection);
 
       // CLEANUP: Mark specific-unit leads as dropped
-      await connection.query(
-        `UPDATE leads 
-             SET status = 'dropped', notes = CONCAT(COALESCE(notes, ''), ' [System: Unit Leased]') 
-             WHERE unit_id = ? AND status = 'interested'`,
-        [unitId]
-      );
+      await leadModel.dropLeadsForUnit(unitId, connection);
     }
 
     // 4. Generate Initial Invoices (Logic Check: Missed Item)
@@ -306,16 +301,10 @@ class LeaseService {
     // If rent was updated, we must ensure any *already generated* pending invoices for future months (e.g. from Cron) are updated.
     if (newMonthlyRent) {
       const today = new Date().toISOString().split('T')[0];
-      await pool.query(
-        `
-                UPDATE rent_invoices 
-                SET amount = ?, description = CONCAT(description, ' (Rent Adjusted)')
-                WHERE lease_id = ? 
-                AND status = 'pending' 
-                AND invoice_type = 'rent'
-                AND due_date > ?
-            `,
-        [newMonthlyRent, leaseId, today]
+      await invoiceModel.syncFutureRentInvoices(
+        leaseId,
+        newMonthlyRent,
+        today
       );
       console.log(
         `Synced future invoices for Lease ${leaseId} to new rent ${newMonthlyRent}`
@@ -375,12 +364,7 @@ class LeaseService {
       const paymentModel = (await import('../models/paymentModel.js')).default;
 
       // Fetch pending invoices
-      const pendingInvoices = await pool
-        .query(
-          `SELECT * FROM rent_invoices WHERE lease_id = ? AND status IN ('pending', 'partially_paid') ORDER BY due_date ASC`,
-          [leaseId]
-        )
-        .then(([rows]) => rows);
+      const pendingInvoices = await invoiceModel.findPendingDebts(leaseId);
 
       for (const inv of pendingInvoices) {
         if (withheldAmount <= 0) break;
@@ -519,17 +503,12 @@ class LeaseService {
 
       // 2. Void all PENDING invoices for this lease
       // We need a method or raw query. Assuming raw for speed or import invoiceModel.
-      const invoice = await import('../models/invoiceModel.js');
-      // We need a voidByLeaseId method or similar. Let's iterate or use raw update in model.
       // invoiceModel usually has updateStatus.
       // Let's assume we fetch pending and update.
       // Or better, add `voidPendingByLeaseId` to invoiceModel?
       // I'll stick to logic here:
       // "UPDATE rent_invoices SET status='void' WHERE lease_id=? AND status='pending'"
-      await pool.query(
-        "UPDATE rent_invoices SET status='void' WHERE lease_id = ? AND status='pending'",
-        [leaseId]
-      );
+      await invoiceModel.voidPendingByLeaseId(leaseId);
 
       // 3. Free up unit
       await unitModel.update(lease.unitId, { status: 'available' });
@@ -559,10 +538,7 @@ class LeaseService {
 
     // 2b. Void Future Pending Invoices
     // Ensure we don't leave ghost debt for months after termination
-    await pool.query(
-      "UPDATE rent_invoices SET status='void' WHERE lease_id = ? AND status='pending' AND due_date > ?",
-      [leaseId, terminationDate]
-    );
+    await invoiceModel.voidFuturePendingByLeaseId(leaseId, terminationDate);
 
     // 3. Free up the Unit (Set to 'maintenance' for turnover buffer)
     // Was 'available', but we should allow cleaning.

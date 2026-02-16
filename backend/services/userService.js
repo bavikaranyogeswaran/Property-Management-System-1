@@ -208,12 +208,8 @@ class UserService {
         if (existingUser.role === 'lead') {
           await userModel.updateRole(userId, 'tenant'); // Should support connection?
           // Ideally we update userModel.updateRole to accept connection too.
-          // For now, executing query directly or hoping implicit consistency is enough?
           // No, must be in transaction.
-          await connection.query(
-            'UPDATE users SET role = ? WHERE user_id = ?',
-            ['tenant', userId]
-          );
+          await userModel.updateRole(userId, 'tenant', connection);
 
           // Send confirmation
           await emailService.sendTenantConfirmation(
@@ -270,9 +266,10 @@ class UserService {
       // leadModel.update doesn't support connection?
       // Need to support it or use raw query.
       // user_id is likely already set if they were created as a lead, but we ensure it's linked to the converted user.
-      await connection.query(
-        'UPDATE leads SET status = ?, user_id = ? WHERE lead_id = ?',
-        ['converted', userId, leadId]
+      await leadModel.update(
+        leadId,
+        { status: 'converted', userId },
+        connection
       );
 
       // 5. Lease & Unit Logic

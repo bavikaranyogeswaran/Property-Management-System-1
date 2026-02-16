@@ -80,6 +80,13 @@ class ReceiptModel {
       description: row.description || `Invoice #${row.invoice_id}`,
     };
   }
+  async findByPaymentId(paymentId) {
+    const [rows] = await pool.query(
+      'SELECT * FROM receipts WHERE payment_id = ?',
+      [paymentId]
+    );
+    return rows.length > 0 ? this.mapRow(rows[0]) : null;
+  }
 }
 
 export default new ReceiptModel();

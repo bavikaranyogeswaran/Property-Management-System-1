@@ -1,6 +1,7 @@
 import visitModel from '../models/visitModel.js';
 import leadModel from '../models/leadModel.js';
-import db from '../config/db.js';
+import propertyModel from '../models/propertyModel.js';
+import unitModel from '../models/unitModel.js';
 import notificationModel from '../models/notificationModel.js';
 import emailService from '../utils/emailService.js';
 
@@ -22,15 +23,9 @@ class VisitController {
       const scheduledDate = new Date(`${date}T${time}`);
 
       // 1. Check if lead exists FOR THIS PROPERTY specifically
-      const [existingLeads] = await db.query(
-        `SELECT lead_id FROM leads WHERE email = ? AND property_id = ? LIMIT 1`,
-        [email, propertyId]
-      );
+      let leadId = await leadModel.findIdByEmailAndProperty(email, propertyId);
 
-      let leadId = null;
-      if (existingLeads.length > 0) {
-        leadId = existingLeads[0].lead_id;
-      } else {
+      if (!leadId) {
         // Create new lead
         leadId = await leadModel.create({
           propertyId,
@@ -45,6 +40,7 @@ class VisitController {
       }
 
       // 2. Create Visit
+      // Also fetch property name for email if needed, but visitModel.create returns ID.
       const visitId = await visitModel.create({
         propertyId,
         unitId,
@@ -59,25 +55,16 @@ class VisitController {
       // 3. Send Notifications (Email & In-App)
       try {
         // Get Property & Owner details
-        const [propRows] = await db.query(
-          `SELECT p.name as property_name, u.email as owner_email, u.user_id as owner_id 
-                     FROM properties p
-                     JOIN users u ON p.owner_id = u.user_id
-                     WHERE p.property_id = ?`,
-          [propertyId]
-        );
+        const propertyDetails = await propertyModel.findOwnerDetails(propertyId);
 
-        if (propRows.length > 0) {
-          const { property_name, owner_email, owner_id } = propRows[0];
+        if (propertyDetails) {
+          const { property_name, owner_email, owner_id } = propertyDetails;
 
           // Get unit number if applicable
           let unit_number = null;
           if (unitId) {
-            const [unitRows] = await db.query(
-              'SELECT unit_number FROM units WHERE unit_id = ?',
-              [unitId]
-            );
-            if (unitRows.length > 0) unit_number = unitRows[0].unit_number;
+            const unit = await unitModel.findById(unitId);
+            if (unit) unit_number = unit.unitNumber;
           }
 
           // A. Send Email
