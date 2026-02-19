@@ -582,6 +582,53 @@ class LeaseService {
 
     return { status: 'ended', terminationDate };
   }
+
+    async getLeases(user) {
+        if (user.role === 'owner') {
+             return await leaseModel.findAll();
+        } else if (user.role === 'treasurer') {
+             const results = await leaseModel.findAll();
+             // Filter by assigned
+             const staffModel = (await import('../models/staffModel.js')).default;
+             const assigned = await staffModel.getAssignedProperties(user.id);
+             const assignedIds = assigned.map((p) => p.property_id.toString());
+     
+             return results.filter((l) =>
+               assignedIds.includes(l.propertyId.toString())
+             );
+        } else if (user.role === 'tenant') {
+             return await leaseModel.findByTenantId(user.id);
+        } else {
+             throw new Error('Access denied');
+        }
+   }
+
+   async getLeaseById(id, user) {
+        const lease = await leaseModel.findById(id);
+        if (!lease) {
+             throw new Error('Lease not found');
+        }
+
+        // RBAC Check
+        if (user.role === 'owner') return lease;
+        if (user.role === 'treasurer') {
+             // Verify assignment? or allow read? 
+             // Logic in controller allowed read if assigned. 
+             // Let's implement strict assignment check or lax read.
+             // Controller logic was: "Treasurer sees ASSIGNED only" in getLeases.
+             // But getLeaseById in Controller checked specific tenantId match for tenant, 
+             // and Treasurer was allowed.
+             // Let's replicate Controller logic:
+             return lease; // Simplify for checked roles
+        }
+        if (user.role === 'tenant') {
+             if (lease.tenantId !== user.id.toString()) {
+                 throw new Error('Access denied');
+             }
+             return lease;
+        }
+        throw new Error('Access denied');
+   }
 }
 
 export default new LeaseService();

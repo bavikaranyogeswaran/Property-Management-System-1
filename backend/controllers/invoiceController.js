@@ -5,35 +5,18 @@
 //  It sends rent bills to tenants and tracks if they are paid or overdue.
 // ============================================================================
 
-import invoiceModel from '../models/invoiceModel.js';
-import leaseModel from '../models/leaseModel.js';
-import behaviorLogModel from '../models/behaviorLogModel.js';
-import paymentModel from '../models/paymentModel.js';
-import tenantModel from '../models/tenantModel.js';
+import invoiceService from '../services/invoiceService.js';
 
 class InvoiceController {
   async getInvoices(req, res) {
     try {
-      if (req.user.role === 'tenant') {
-        const invoices = await invoiceModel.findByTenantId(req.user.id);
-        return res.json(invoices);
-      } else if (req.user.role === 'treasurer') {
-        console.log(
-          `Treasurer ${req.user.id} fetching invoices via findByTreasurerId`
-        );
-        const invoices = await invoiceModel.findByTreasurerId(req.user.id);
-        console.log(
-          `Found ${invoices.length} invoices for treasurer ${req.user.id}`
-        );
-        return res.json(invoices);
-      } else if (req.user.role === 'owner') {
-        const invoices = await invoiceModel.findAll();
-        return res.json(invoices);
-      } else {
-        return res.status(403).json({ error: 'Access denied' });
-      }
+      const invoices = await invoiceService.getInvoices(req.user);
+      return res.json(invoices);
     } catch (error) {
       console.error(error);
+      if (error.message.includes('Access denied')) {
+          return res.status(403).json({ error: error.message });
+      }
       res.status(500).json({ error: 'Failed to fetch invoices' });
     }
   }
@@ -43,33 +26,13 @@ class InvoiceController {
   // Let's add a manual create for Owner to seed data.
   async createInvoice(req, res) {
     try {
-      // Strictly Treasurer only
-      if (req.user.role !== 'treasurer')
-        return res
-          .status(403)
-          .json({ error: 'Denied. Only Treasurers can create invoices.' });
-
-      const {
-        leaseId,
-        tenantId,
-        propertyId,
-        amount,
-        dueDate,
-        description,
-        type,
-      } = req.body;
-      const id = await invoiceModel.create({
-        leaseId,
-        tenantId,
-        propertyId,
-        amount,
-        dueDate,
-        description,
-        type,
-      });
+      const id = await invoiceService.createInvoice(req.body, req.user);
       res.status(201).json({ message: 'Invoice created', id });
     } catch (error) {
       console.error(error);
+      if (error.message.includes('Denied')) {
+          return res.status(403).json({ error: error.message });
+      }
       res.status(500).json({ error: 'Error creating invoice' });
     }
   }
@@ -78,91 +41,18 @@ class InvoiceController {
   //  It checks who has an active lease and creates a bill for them.
   async generateMonthlyInvoices(req, res) {
     try {
-      if (req.user.role !== 'treasurer') {
-        return res
-          .status(403)
-          .json({
-            error: 'Access denied. Only Treasurers can generate invoices.',
-          });
-      }
-
-      // Default to current year/month if not provided
-      const now = new Date();
-      const year = req.body.year || now.getFullYear();
-      const month = req.body.month || now.getMonth() + 1;
-
-      console.log(`Generating invoices for ${year}-${month}`);
-
-      const activeLeases = await leaseModel.findActive();
-
-      // Filter for Treasurer: Only generate for assigned properties
-      const staffModel = (await import('../models/staffModel.js')).default;
-      const assigned = await staffModel.getAssignedProperties(req.user.id);
-      const assignedPropertyIds = assigned.map((p) => p.property_id.toString());
-
-      // If treasurer has no assignments, this will be empty, preventing unauthorized generation
-      const targetLeases = activeLeases.filter((l) =>
-        assignedPropertyIds.includes(l.propertyId.toString())
-      );
-
-      console.log(
-        `Generating for ${req.user.role} ${req.user.id}. Assigned Properties: ${assignedPropertyIds.length}. Target Leases: ${targetLeases.length}`
-      );
-
-      let generatedCount = 0;
-      let skippedCount = 0;
-
-      for (const lease of targetLeases) {
-        // Check Lease Start Date
-        // Lease must start ON or BEFORE the 1st of the invoice month to get an auto-invoice for that month
-        // (e.g. Generating for Feb: Lease starts Feb 15 -> Skip. Lease starts Feb 1 -> Include. Lease starts Jan 15 -> Include.)
-        const leaseStart = new Date(lease.startDate);
-        // Reset time to midnight for accurate comparison
-        leaseStart.setHours(0, 0, 0, 0);
-
-        const targetMonthStart = new Date(year, month - 1, 1);
-        targetMonthStart.setHours(0, 0, 0, 0);
-
-        if (leaseStart > targetMonthStart) {
-          console.log(
-            `Skipping lease ${lease.id} (Starts ${lease.startDate} after target month start)`
-          );
-          skippedCount++;
-          continue;
-        }
-
-        // Check if invoice already exists
-        const exists = await invoiceModel.exists(lease.id, year, month);
-        if (exists) {
-          skippedCount++;
-          continue;
-        }
-
-        // Create Invoice
-        // Due date defaults to 5th of the month
-        // Note: new Date(year, monthIndex, day) -> monthIndex is 0-11
-        const dueDate = new Date(year, month - 1, 5);
-
-        // Adjust to YYYY-MM-DD string
-        // We'll trust the model/DB to handle the date object or string, model uses native Date object logic effectively
-        const dueDateStr = dueDate.toISOString().split('T')[0];
-
-        await invoiceModel.create({
-          leaseId: lease.id,
-          amount: lease.monthlyRent,
-          dueDate: dueDateStr,
-          description: `Rent for ${year}-${month}`,
-        });
-        generatedCount++;
-      }
-
+      const { year, month } = req.body;
+      const result = await invoiceService.generateMonthlyInvoices(year, month, req.user);
+      
       res.json({
         message: 'Invoice generation complete',
-        generated: generatedCount,
-        skipped: skippedCount,
+        ...result,
       });
     } catch (error) {
       console.error('Error generating invoices:', error);
+      if (error.message.includes('Access denied')) {
+           return res.status(403).json({ error: error.message });
+      }
       res.status(500).json({ error: 'Failed to generate invoices' });
     }
   }
@@ -173,83 +63,9 @@ class InvoiceController {
       const { id } = req.params;
       const { status } = req.body;
 
-      // Only Treasurer can update status manually (e.g. to 'overdue' or 'cancelled')
-      // 'paid' is usually handled by payment verification, but allowing manual override.
-      // Owner is VIEW ONLY.
       console.log(`Update Status by ${req.user.role} ${req.user.id}`);
-      if (req.user.role !== 'treasurer') {
-        return res
-          .status(403)
-          .json({
-            error: 'Access denied. Only Treasurers can update invoice status.',
-          });
-      }
-
-      const invoice = await invoiceModel.findById(id);
-      if (!invoice) return res.status(404).json({ error: 'Invoice not found' });
-
-      const oldStatus = invoice.status;
-
-      // SAFEGUARDS FOR OVERDUE STATUS
-      if (status === 'overdue') {
-        // Safeguard 1: Due Date Check
-        const dueDate = new Date(invoice.due_date);
-        const today = new Date();
-        // Set hours to 0 to compare dates only, avoiding time issues
-        today.setHours(0, 0, 0, 0);
-        dueDate.setHours(0, 0, 0, 0);
-
-        if (today <= dueDate) {
-          return res.status(400).json({
-            error: 'Cannot mark invoice as overdue before the due date.',
-          });
-        }
-
-        // Safeguard 2: Pending Payment Check
-        const payments = await paymentModel.findByInvoiceId(id);
-        const pendingPayments = payments.filter((p) => p.status === 'pending');
-
-        if (pendingPayments.length > 0) {
-          return res.status(400).json({
-            error: 'Cannot mark as overdue. A payment is pending verification.',
-          });
-        }
-      }
-
-      const updatedInvoice = await invoiceModel.updateStatus(id, status);
-
-      // AUTOMATIC SCORING HOOK
-      if (status === 'overdue' && oldStatus !== 'overdue') {
-        try {
-          console.log(
-            `Invoice ${id} marked overdue. Deducting points for tenant ${invoice.tenant_id}`
-          );
-          const scoreChange = -10;
-
-          // 1. Create Log
-          await behaviorLogModel.create({
-            tenantId: invoice.tenant_id,
-            type: 'negative',
-            category: 'Payment',
-            scoreChange: scoreChange,
-            description: `Invoice #${id} marked as overdue.`,
-            recordedBy: req.user.id,
-          });
-
-          // 2. Update Tenant Score
-          await tenantModel.incrementBehaviorScore(
-            invoice.tenant_id,
-            scoreChange
-          );
-
-          console.log(
-            `Updated behavior_score for tenant ${invoice.tenant_id} by ${scoreChange}`
-          );
-        } catch (err) {
-          console.error('Failed to update behavior score:', err);
-          // Don't fail the request, just log error
-        }
-      }
+      
+      const updatedInvoice = await invoiceService.updateStatus(id, status, req.user);
 
       res.json({
         message: `Invoice status updated to ${status}`,
@@ -257,6 +73,15 @@ class InvoiceController {
       });
     } catch (error) {
       console.error(error);
+      if (error.message.includes('Access denied')) {
+           return res.status(403).json({ error: error.message });
+      }
+      if (error.message.includes('measure') || error.message.includes('Cannot mark')) {
+           return res.status(400).json({ error: error.message });
+      }
+      if (error.message.includes('not found')) {
+           return res.status(404).json({ error: error.message });
+      }
       res.status(500).json({ error: 'Failed to update invoice status' });
     }
   }
