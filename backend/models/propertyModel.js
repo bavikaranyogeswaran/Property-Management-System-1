@@ -61,6 +61,7 @@ class PropertyModel {
                 p.features,
                 p.status, 
                 p.created_at,
+                p.property_type_id,
                 pt.name as type_name,
                 pt.type_id as type_id
             FROM properties p
@@ -111,6 +112,7 @@ class PropertyModel {
                 p.features,
                 p.status, 
                 p.created_at,
+                p.property_type_id,
                 pt.name as type_name,
                 pt.type_id as type_id
             FROM properties p
