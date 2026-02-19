@@ -1,0 +1,118 @@
+
+import leadModel from '../models/leadModel.js';
+import unitModel from '../models/unitModel.js';
+import propertyModel from '../models/propertyModel.js';
+import userModel from '../models/userModel.js';
+import leadStageHistoryModel from '../models/leadStageHistoryModel.js';
+import emailService from '../utils/emailService.js';
+import { validateEmail, validatePhoneNumber } from '../utils/validators.js';
+
+class LeadService {
+
+    async registerInterest(data) {
+        const { name, email, phone, propertyId, interestedUnit, unitId, notes } = data;
+
+        if (!name || !email || !propertyId) {
+            throw new Error('Name, email, and property are required');
+        }
+
+        const emailValidation = validateEmail(email);
+        if (!emailValidation.isValid) throw new Error(emailValidation.error);
+
+        if (phone) {
+            const phoneValidation = validatePhoneNumber(phone);
+            if (!phoneValidation.isValid) throw new Error(phoneValidation.error);
+        }
+
+        let finalUnitId = unitId || interestedUnit;
+
+        if (finalUnitId && finalUnitId !== '' && finalUnitId !== 'null') {
+            const unitCheck = await unitModel.findById(finalUnitId);
+            if (!unitCheck) throw new Error('Invalid unit selected');
+            
+            if (String(unitCheck.propertyId) !== String(propertyId)) {
+                throw new Error('Selected unit does not belong to the specified property');
+            }
+        } else {
+            finalUnitId = null;
+            const occupiedCount = await unitModel.countOccupied(propertyId);
+            if (occupiedCount > 0) {
+                 throw new Error('Cannot express interest in the whole property because some units are currently occupied. Please select a specific unit.');
+            }
+        }
+
+        const existingUser = await userModel.findByEmail(email);
+        if (existingUser) {
+             throw new Error('This email is already associated with an account. Please log in or contact the property owner.');
+        }
+
+        const existingLeadId = await leadModel.findIdByEmailAndProperty(email, propertyId);
+        
+        let leadId;
+        let message;
+        let isNew = false;
+
+        if (existingLeadId) {
+            leadId = existingLeadId;
+            await leadModel.update(leadId, {
+                lastContactedAt: new Date(),
+                notes: notes ? `${notes} (Re-inquiry)` : undefined,
+            });
+            message = 'Interest updated. We will contact you soon.';
+        } else {
+            leadId = await leadModel.create({
+                propertyId,
+                unitId: finalUnitId,
+                interestedUnit: finalUnitId, // Alias
+                name,
+                phone,
+                email,
+                notes,
+                status: 'interested',
+                userId: null,
+            });
+            message = 'Interest registered! We will contact you soon.';
+            isNew = true;
+        }
+
+        // Email Notification
+        try {
+            const property = await propertyModel.findById(propertyId);
+            const propertyName = property ? property.name : 'our property';
+            await emailService.sendWelcomeLead(email, name, propertyName); 
+        } catch (emailErr) {
+            console.error('Failed to send confirmation email', emailErr);
+        }
+
+        return { id: leadId, message, isNew };
+    }
+
+    async getLeads(user) {
+        if (user.role !== 'owner') {
+             throw new Error('Access denied.');
+        }
+        return await leadModel.findAll(user.id);
+    }
+
+    async getMyLead(email) {
+        return await leadModel.findByEmail(email);
+    }
+    
+    async updateLead(id, data, user) {
+        if (user.role !== 'owner') {
+             throw new Error('Access denied.');
+        }
+        const success = await leadModel.update(id, data);
+        if (!success) throw new Error('Lead not found');
+        return success;
+    }
+
+    async getLeadStageHistory(user) {
+         if (user.role !== 'owner') {
+             throw new Error('Access denied.');
+         }
+         return await leadStageHistoryModel.findAll(user.id);
+    }
+}
+
+export default new LeadService();
