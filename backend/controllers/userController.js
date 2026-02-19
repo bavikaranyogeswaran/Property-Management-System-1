@@ -1,5 +1,5 @@
 // ============================================================================
-//  USER CONTROLLER (The HR & Staff Manager)
+//  USER CONTROLLER (The Staff Manager)
 // ============================================================================
 //  This file handles managing people: Treasurers, Tenants, and Owners.
 //  It allows hiring staff, updating profiles, and assigning work.

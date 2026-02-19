@@ -329,18 +329,20 @@ export function LeadsPage() {
         </div>
 
         <div className="flex gap-1 items-center">
-          <Button
-            size="sm"
-            variant="ghost"
-            className="flex-1 h-7 text-xs inline-flex items-center justify-center"
-            onClick={() => {
-              setSelectedLead(lead);
-              setIsFollowUpDialogOpen(true);
-            }}
-          >
-            <Calendar className="size-3 mr-1 flex-shrink-0" />
-            Follow-up {leadFollowUpsCount > 0 && `(${leadFollowUpsCount})`}
-          </Button>
+{lead.status !== 'converted' && lead.status !== 'dropped' && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="flex-1 h-7 text-xs inline-flex items-center justify-center"
+              onClick={() => {
+                setSelectedLead(lead);
+                setIsFollowUpDialogOpen(true);
+              }}
+            >
+              <Calendar className="size-3 mr-1 flex-shrink-0" />
+              Follow-up {leadFollowUpsCount > 0 && `(${leadFollowUpsCount})`}
+            </Button>
+          )}
 
           <Button
             size="sm"
@@ -501,6 +503,7 @@ export function LeadsPage() {
             <TableHead>Name</TableHead>
             <TableHead>Contact</TableHead>
             <TableHead>Interested Unit</TableHead>
+            <TableHead>Details</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Last Contact</TableHead>
             <TableHead className="text-right">Actions</TableHead>
@@ -524,6 +527,20 @@ export function LeadsPage() {
                   </div>
                 </TableCell>
                 <TableCell>{unit?.unitNumber || 'N/A'}</TableCell>
+                <TableCell>
+                  <div className="text-sm text-gray-600">
+                    <div>
+                      <span className="font-medium">Move-in:</span>{' '}
+                      {lead.moveInDate
+                        ? new Date(lead.moveInDate).toLocaleDateString()
+                        : '-'}
+                    </div>
+                    <div>
+                      <span className="font-medium">Occupants:</span>{' '}
+                      {lead.occupantsCount || '-'}
+                    </div>
+                  </div>
+                </TableCell>
                 <TableCell>
                   <Select
                     value={lead.status}
@@ -553,22 +570,25 @@ export function LeadsPage() {
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex gap-2 justify-end">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => {
-                        setSelectedLead(lead);
-                        setIsFollowUpDialogOpen(true);
-                      }}
-                      title="Add Follow-up"
-                    >
-                      <Calendar className="size-4" />
-                      {leadFollowUpsCount > 0 && (
-                        <span className="ml-1 text-xs">
-                          ({leadFollowUpsCount})
-                        </span>
+{lead.status !== 'converted' &&
+                      lead.status !== 'dropped' && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => {
+                            setSelectedLead(lead);
+                            setIsFollowUpDialogOpen(true);
+                          }}
+                          title="Add Follow-up"
+                        >
+                          <Calendar className="size-4" />
+                          {leadFollowUpsCount > 0 && (
+                            <span className="ml-1 text-xs">
+                              ({leadFollowUpsCount})
+                            </span>
+                          )}
+                        </Button>
                       )}
-                    </Button>
                     <Button
                       size="sm"
                       variant="ghost"

@@ -168,6 +168,8 @@ CREATE TABLE leads (
     email VARCHAR(100),
     status ENUM('interested','converted','dropped') DEFAULT 'interested',
     notes TEXT,
+    move_in_date DATE,                       -- [ADDED] Lead qualification
+    occupants_count INT DEFAULT 1,           -- [ADDED] Lead qualification
     score INT DEFAULT 0,                     -- [ADDED] Lead scoring
     last_contacted_at DATETIME,              -- [ADDED] For follow-up tracking
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,

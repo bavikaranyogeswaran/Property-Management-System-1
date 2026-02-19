@@ -12,6 +12,8 @@ class LeadModel {
       phone,
       email,
       notes,
+      move_in_date,
+      occupants_count,
       status = 'interested',
     } = data;
 
@@ -22,9 +24,20 @@ class LeadModel {
     }
 
     const [result] = await db.query(
-      `INSERT INTO leads (property_id, unit_id, user_id, name, phone, email, notes, status) 
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [propertyId, finalUnitId, userId, name, phone, email, notes, status]
+      `INSERT INTO leads (property_id, unit_id, user_id, name, phone, email, notes, move_in_date, occupants_count, status) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        propertyId,
+        finalUnitId,
+        userId,
+        name,
+        phone,
+        email,
+        notes,
+        move_in_date || null,
+        occupants_count || 1,
+        status,
+      ]
     );
 
     const leadId = result.insertId;
@@ -45,6 +58,8 @@ class LeadModel {
                 email,
                 phone,
                 notes,
+                move_in_date as moveInDate,
+                occupants_count as occupantsCount,
                 status,
                 created_at as createdAt,
                 last_contacted_at as lastContactedAt,
@@ -127,6 +142,8 @@ class LeadModel {
                     l.email,
                     l.phone,
                     l.notes,
+                    l.move_in_date as moveInDate,
+                    l.occupants_count as occupantsCount,
                     l.status,
                     l.created_at as createdAt,
                     l.last_contacted_at as lastContactedAt,
@@ -184,6 +201,8 @@ class LeadModel {
         email,
         phone,
         notes,
+        move_in_date as moveInDate,
+        occupants_count as occupantsCount,
         status,
         created_at as createdAt,
         last_contacted_at as lastContactedAt,

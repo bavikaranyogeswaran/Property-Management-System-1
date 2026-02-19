@@ -10,7 +10,7 @@ import { validateEmail, validatePhoneNumber } from '../utils/validators.js';
 class LeadService {
 
     async registerInterest(data) {
-        const { name, email, phone, propertyId, interestedUnit, unitId, notes } = data;
+        const { name, email, phone, propertyId, interestedUnit, unitId, notes, moveInDate, occupantsCount } = data;
 
         if (!name || !email || !propertyId) {
             throw new Error('Name, email, and property are required');
@@ -68,6 +68,8 @@ class LeadService {
                 phone,
                 email,
                 notes,
+                move_in_date: moveInDate,
+                occupants_count: occupantsCount,
                 status: 'interested',
                 userId: null,
             });

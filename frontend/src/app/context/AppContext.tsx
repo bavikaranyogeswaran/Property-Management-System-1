@@ -72,6 +72,8 @@ export interface Lead {
   items?: any[];
   tenantId?: string;
   score?: number;
+  moveInDate?: string; // New field
+  occupantsCount?: number; // New field
 }
 
 export interface LeadFollowUp {

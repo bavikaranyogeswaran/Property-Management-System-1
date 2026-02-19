@@ -53,6 +53,8 @@ export function PublicPropertyDetailsPage() {
     interestedUnit: '',
     propertyId: '',
     notes: '',
+    moveInDate: '',
+    occupantsCount: '1',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isMobileInterestOpen, setIsMobileInterestOpen] = useState(false);
@@ -137,6 +139,7 @@ export function PublicPropertyDetailsPage() {
     try {
       await addLead({
         ...interestFormData,
+        occupantsCount: parseInt(interestFormData.occupantsCount, 10),
         status: 'interested',
       });
       toast.success(
@@ -148,6 +151,8 @@ export function PublicPropertyDetailsPage() {
         phone: '',
         interestedUnit: '',
         notes: '',
+        moveInDate: '',
+        occupantsCount: '1',
         propertyId: id || '',
       });
       setFormErrors({});
