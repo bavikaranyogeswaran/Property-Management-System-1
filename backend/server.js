@@ -84,6 +84,12 @@ app.use('/api/maintenance-costs', maintenanceCostRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/invoices', invoiceRoutes);
 app.use('/api/behavior', behaviorRoutes);
+
+// Lead Portal (public, no auth) — MUST be mounted before imageRoutes
+// because imageRoutes is on '/api' with a broad auth middleware
+import leadPortalRoutes from './routes/leadPortalRoutes.js';
+app.use('/api/lead-portal', leadPortalRoutes);
+
 app.use('/api', imageRoutes);
 import visitRoutes from './routes/visitRoutes.js';
 app.use('/api/visits', visitRoutes);

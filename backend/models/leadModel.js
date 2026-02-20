@@ -53,6 +53,7 @@ class LeadModel {
       `
             SELECT 
                 lead_id as id,
+                property_id as propertyId,
                 unit_id as interestedUnit,
                 name,
                 email,

@@ -108,7 +108,7 @@ import { PublicListingPage } from '@/components/pages/public/PublicListingPage';
 import { PublicPropertyDetailsPage } from '@/components/pages/public/PublicPropertyDetailsPage';
 
 // Lead Pages
-import { LeadDashboard } from '@/components/pages/lead/LeadDashboard';
+import { LeadPortalPage } from '@/components/pages/lead/LeadPortalPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -121,7 +121,7 @@ function DashboardRoute() {
   if (user?.role === 'owner') return <OwnerDashboard />;
   if (user?.role === 'tenant') return <TenantDashboard />;
   if (user?.role === 'treasurer') return <TreasurerDashboard />;
-  if (user?.role === 'lead') return <LeadDashboard />;
+  if (user?.role === 'lead') return <Navigate to="/" />;
   return <Navigate to="/login" />;
 }
 
@@ -168,6 +168,14 @@ function AppContent() {
         element={
           <PublicPropertiesWrapper>
             <PublicPropertyDetailsPage />
+          </PublicPropertiesWrapper>
+        }
+      />
+      <Route
+        path="/lead/portal"
+        element={
+          <PublicPropertiesWrapper>
+            <LeadPortalPage />
           </PublicPropertiesWrapper>
         }
       />

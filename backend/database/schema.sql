@@ -210,6 +210,18 @@ CREATE TABLE messages (
 );
 
 -- =========================
+-- LEAD ACCESS TOKENS (Guest Portal)
+-- =========================
+CREATE TABLE lead_access_tokens (
+    token_id INT AUTO_INCREMENT PRIMARY KEY,
+    lead_id INT NOT NULL,
+    token VARCHAR(255) UNIQUE NOT NULL,
+    expires_at DATETIME NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (lead_id) REFERENCES leads(lead_id) ON DELETE CASCADE
+);
+
+-- =========================
 -- LEASES
 -- =========================
 CREATE TABLE leases (

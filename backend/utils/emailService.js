@@ -24,16 +24,32 @@ class EmailService {
     }
   }
 
-  async sendWelcomeLead(email, name, propertyName = 'our property') {
+  async sendWelcomeLead(email, name, propertyName = 'our property', portalToken = null) {
+    const portalUrl = portalToken
+      ? `${process.env.FRONTEND_URL || 'http://localhost:5173'}/lead/portal?token=${portalToken}`
+      : null;
+
     if (!this.transporter) {
       console.log('==================================================');
       console.log(`[EMAIL MOCK] Welcome/Interest Confirmation: ${email}`);
       console.log(`Name: ${name}`);
       console.log(`Property: ${propertyName}`);
+      if (portalUrl) {
+        console.log(`Portal Link: ${portalUrl}`);
+      }
       console.log('==================================================');
       return true;
     }
     try {
+      const portalLinkHtml = portalUrl
+        ? `
+                  <div style="text-align: center; margin: 24px 0;">
+                      <a href="${portalUrl}" style="display: inline-block; padding: 14px 32px; background-color: #2563eb; color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">View Your Application</a>
+                  </div>
+                  <p style="text-align: center; color: #64748b; font-size: 13px;">Or copy this link: <a href="${portalUrl}" style="color: #2563eb;">${portalUrl}</a></p>
+              `
+        : '';
+
       await this.transporter.sendMail({
         from: `"Property Management System" <${process.env.SMTP_USER}>`,
         to: email,
@@ -41,18 +57,20 @@ class EmailService {
         html: this._getTemplate(
           'Thanks for your interest!',
           `
-                    <p>Hi ${name},</p>
-                    <p>We have received your interest in <strong>${propertyName}</strong>.</p>
-                    <p>One of our property managers will review your inquiry and get back to you shortly to schedule a viewing or answer any questions you may have.</p>
-                    
-                    <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; margin: 24px 0; border: 1px solid #e2e8f0;">
-                        <p style="margin: 0; color: #1e293b; font-weight: 600;">Next Steps:</p>
-                        <ul style="margin-top: 12px; color: #475569; padding-left: 20px;">
-                            <li style="margin-bottom: 8px;">Wait for our call or email (usually within 24 hours)</li>
-                            <li>Prepare any questions you might have about the property</li>
-                        </ul>
-                    </div>
-                `
+                  <p>Hi ${name},</p>
+                  <p>We have received your interest in <strong>${propertyName}</strong>.</p>
+                  <p>One of our property managers will review your inquiry and get back to you shortly to schedule a viewing or answer any questions you may have.</p>
+                  
+                  ${portalLinkHtml}
+
+                  <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; margin: 24px 0; border: 1px solid #e2e8f0;">
+                      <p style="margin: 0; color: #1e293b; font-weight: 600;">Next Steps:</p>
+                      <ul style="margin-top: 12px; color: #475569; padding-left: 20px;">
+                          <li style="margin-bottom: 8px;">Click the link above to view your application and chat with the property owner</li>
+                          <li>Prepare any questions you might have about the property</li>
+                      </ul>
+                  </div>
+              `
         ),
       });
     } catch (e) {

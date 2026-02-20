@@ -4,6 +4,7 @@ import unitModel from '../models/unitModel.js';
 import propertyModel from '../models/propertyModel.js';
 import userModel from '../models/userModel.js';
 import leadStageHistoryModel from '../models/leadStageHistoryModel.js';
+import leadTokenModel from '../models/leadTokenModel.js';
 import emailService from '../utils/emailService.js';
 import { validateEmail, validatePhoneNumber } from '../utils/validators.js';
 
@@ -41,9 +42,14 @@ class LeadService {
             }
         }
 
+        // Check for existing user — allow if role is 'lead', reject if other role
+        let userId = null;
         const existingUser = await userModel.findByEmail(email);
         if (existingUser) {
-             throw new Error('This email is already associated with an account. Please log in or contact the property owner.');
+            if (existingUser.role !== 'lead') {
+                throw new Error('This email is already associated with an account. Please log in or contact the property owner.');
+            }
+            userId = existingUser.user_id;
         }
 
         const existingLeadId = await leadModel.findIdByEmailAndProperty(email, propertyId);
@@ -60,10 +66,23 @@ class LeadService {
             });
             message = 'Interest updated. We will contact you soon.';
         } else {
+            // Create a lightweight user row if one doesn't exist yet
+            if (!userId) {
+                userId = await userModel.create({
+                    name,
+                    email,
+                    phone,
+                    passwordHash: 'NO_LOGIN',  // Cannot be matched by bcrypt — lead cannot log in
+                    role: 'lead',
+                    is_email_verified: true,
+                    status: 'active',
+                });
+            }
+
             leadId = await leadModel.create({
                 propertyId,
                 unitId: finalUnitId,
-                interestedUnit: finalUnitId, // Alias
+                interestedUnit: finalUnitId,
                 name,
                 phone,
                 email,
@@ -71,17 +90,23 @@ class LeadService {
                 move_in_date: moveInDate,
                 occupants_count: occupantsCount,
                 status: 'interested',
-                userId: null,
+                userId: userId,
             });
             message = 'Interest registered! We will contact you soon.';
             isNew = true;
         }
 
-        // Email Notification
+        // Generate portal access token (create new or reuse existing)
+        let portalToken = await leadTokenModel.findByLeadId(leadId);
+        if (!portalToken) {
+            portalToken = await leadTokenModel.create(leadId);
+        }
+
+        // Email Notification with portal link
         try {
             const property = await propertyModel.findById(propertyId);
             const propertyName = property ? property.name : 'our property';
-            await emailService.sendWelcomeLead(email, name, propertyName); 
+            await emailService.sendWelcomeLead(email, name, propertyName, portalToken); 
         } catch (emailErr) {
             console.error('Failed to send confirmation email', emailErr);
         }
