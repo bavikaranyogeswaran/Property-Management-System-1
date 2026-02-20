@@ -6,6 +6,7 @@ import {
   LeadStageHistory,
   Visit,
 } from '@/app/context/AppContext';
+import { StickyNote, Save } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -52,6 +53,79 @@ import {
 import { ChatInterface } from '@/components/common/ChatInterface';
 import { toast } from 'sonner';
 
+// Self-contained notes editor — keeps its own state to avoid
+// re-rendering the parent (which would recreate LeadCard and lose focus)
+function InlineNotesEditor({
+  leadId,
+  initialNotes,
+  onSave,
+}: {
+  leadId: string;
+  initialNotes: string;
+  onSave: (leadId: string, notes: string) => Promise<void>;
+}) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [text, setText] = useState(initialNotes);
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await onSave(leadId, text);
+      setIsEditing(false);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (isEditing) {
+    return (
+      <div className="space-y-1">
+        <Textarea
+          autoFocus
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="Private notes about this lead..."
+          rows={2}
+          className="text-xs resize-none"
+        />
+        <div className="flex gap-1 justify-end">
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-6 text-xs"
+            onClick={() => {
+              setText(initialNotes);
+              setIsEditing(false);
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            size="sm"
+            className="h-6 text-xs"
+            onClick={handleSave}
+            disabled={saving}
+          >
+            <Save className="size-3 mr-1" />
+            Save
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      className="w-full text-left text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-50 rounded p-1.5 transition-colors"
+      onClick={() => setIsEditing(true)}
+    >
+      <StickyNote className="size-3 inline mr-1" />
+      {initialNotes || 'Add notes...'}
+    </button>
+  );
+}
+
 export function LeadsPage() {
   const navigate = useNavigate();
   const {
@@ -59,27 +133,27 @@ export function LeadsPage() {
     units,
     properties,
     visits,
-    leadFollowUps,
     leadStageHistory,
     addLead,
     updateLead,
-    addLeadFollowUp,
     convertLeadToTenant,
     updateVisitStatus,
   } = useApp();
 
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
-  const [isFollowUpDialogOpen, setIsFollowUpDialogOpen] = useState(false);
   const [isConvertDialogOpen, setIsConvertDialogOpen] = useState(false);
   const [isHistoryDialogOpen, setIsHistoryDialogOpen] = useState(false);
   const [isNegotiationDialogOpen, setIsNegotiationDialogOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'pipeline' | 'list'>('pipeline');
 
-  const [followUpData, setFollowUpData] = useState({
-    date: '',
-    notes: '',
-    nextAction: '',
-  });
+  const handleSaveNotes = async (leadId: string, notes: string) => {
+    try {
+      await updateLead(leadId, { internalNotes: notes });
+      toast.success('Notes saved');
+    } catch (error) {
+      toast.error('Failed to save notes');
+    }
+  };
 
   const [conversionData, setConversionData] = useState({
     startDate: new Date().toISOString().split('T')[0],
@@ -126,30 +200,6 @@ export function LeadsPage() {
     }
   };
 
-  const handleAddFollowUp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedLead) return;
-
-    addLeadFollowUp({
-      leadId: selectedLead.id,
-      ...followUpData,
-    });
-
-    try {
-      // Update last contacted date
-      await updateLead(selectedLead.id, { lastContactedAt: followUpData.date });
-
-      toast.success('Follow-up added successfully');
-      setIsFollowUpDialogOpen(false);
-      setFollowUpData({
-        date: '',
-        notes: '',
-        nextAction: '',
-      });
-    } catch (error) {
-      toast.error('Failed to update lead');
-    }
-  };
 
   const handleConvert = async () => {
     if (!selectedLead) return;
@@ -296,9 +346,6 @@ export function LeadsPage() {
   const LeadCard = ({ lead }: { lead: Lead }) => {
     const unit = units.find((u) => u.id === lead.interestedUnit);
     const property = properties.find((p) => p.id === lead.propertyId);
-    const leadFollowUpsCount = leadFollowUps.filter(
-      (f) => f.leadId === lead.id
-    ).length;
     const statusBadge = getStatusBadge(lead.status);
     const history = leadStageHistory.filter((h) => h.leadId === lead.id);
 
@@ -345,22 +392,24 @@ export function LeadsPage() {
           )}
         </div>
 
-        <div className="flex gap-1 items-center">
-{lead.status !== 'converted' && lead.status !== 'dropped' && (
-            <Button
-              size="sm"
-              variant="ghost"
-              className="flex-1 h-7 text-xs inline-flex items-center justify-center"
-              onClick={() => {
-                setSelectedLead(lead);
-                setIsFollowUpDialogOpen(true);
-              }}
-            >
-              <Calendar className="size-3 mr-1 flex-shrink-0" />
-              Follow-up {leadFollowUpsCount > 0 && `(${leadFollowUpsCount})`}
-            </Button>
-          )}
+        {/* Lead's notes/questions */}
+        {lead.notes && (
+          <p className="text-xs text-gray-500 italic px-1.5 mb-1">
+            <MessageSquare className="size-3 inline mr-1" />
+            {lead.notes}
+          </p>
+        )}
 
+        {/* Owner's Internal Notes */}
+        <div className="mb-2">
+          <InlineNotesEditor
+            leadId={lead.id}
+            initialNotes={lead.internalNotes || ''}
+            onSave={handleSaveNotes}
+          />
+        </div>
+
+        <div className="flex gap-1 items-center">
           <Button
             size="sm"
             variant="ghost"
@@ -530,9 +579,6 @@ export function LeadsPage() {
           {leadsData.map((lead) => {
             const unit = units.find((u) => u.id === lead.interestedUnit);
             const statusBadge = getStatusBadge(lead.status);
-            const leadFollowUpsCount = leadFollowUps.filter(
-              (f) => f.leadId === lead.id
-            ).length;
 
             return (
               <TableRow key={lead.id}>
@@ -587,25 +633,6 @@ export function LeadsPage() {
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex gap-2 justify-end">
-{lead.status !== 'converted' &&
-                      lead.status !== 'dropped' && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => {
-                            setSelectedLead(lead);
-                            setIsFollowUpDialogOpen(true);
-                          }}
-                          title="Add Follow-up"
-                        >
-                          <Calendar className="size-4" />
-                          {leadFollowUpsCount > 0 && (
-                            <span className="ml-1 text-xs">
-                              ({leadFollowUpsCount})
-                            </span>
-                          )}
-                        </Button>
-                      )}
                     <Button
                       size="sm"
                       variant="ghost"
@@ -852,109 +879,7 @@ export function LeadsPage() {
         </Card>
       )}
 
-      {/* Follow-up Dialog */}
-      <Dialog
-        open={isFollowUpDialogOpen}
-        onOpenChange={setIsFollowUpDialogOpen}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add Follow-up for {selectedLead?.name}</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleAddFollowUp} className="space-y-4 mt-4">
-            <div className="space-y-2">
-              <Label htmlFor="followup-date">Date</Label>
-              <Input
-                id="followup-date"
-                type="date"
-                value={followUpData.date}
-                onChange={(e) =>
-                  setFollowUpData({ ...followUpData, date: e.target.value })
-                }
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="followup-notes">Notes</Label>
-              <Textarea
-                id="followup-notes"
-                placeholder="What was discussed..."
-                value={followUpData.notes}
-                onChange={(e) =>
-                  setFollowUpData({ ...followUpData, notes: e.target.value })
-                }
-                rows={3}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="followup-next">Next Action</Label>
-              <Input
-                id="followup-next"
-                placeholder="e.g., Schedule viewing, Send documents"
-                value={followUpData.nextAction}
-                onChange={(e) =>
-                  setFollowUpData({
-                    ...followUpData,
-                    nextAction: e.target.value,
-                  })
-                }
-                required
-              />
-            </div>
 
-            {/* Show existing follow-ups */}
-            {selectedLead &&
-              leadFollowUps.filter((f) => f.leadId === selectedLead.id).length >
-                0 && (
-                <div className="border-t pt-4">
-                  <p className="text-sm font-medium mb-2">
-                    Previous Follow-ups:
-                  </p>
-                  <div className="space-y-2 max-h-40 overflow-y-auto">
-                    {leadFollowUps
-                      .filter((f) => f.leadId === selectedLead.id)
-                      .sort(
-                        (a, b) =>
-                          new Date(b.date).getTime() -
-                          new Date(a.date).getTime()
-                      )
-                      .map((followUp) => (
-                        <div
-                          key={followUp.id}
-                          className="text-sm p-2 bg-gray-50 rounded"
-                        >
-                          <p className="font-medium">{followUp.date}</p>
-                          <p className="text-gray-600">{followUp.notes}</p>
-                          <p className="text-xs text-gray-500 mt-1">
-                            Next: {followUp.nextAction}
-                          </p>
-                        </div>
-                      ))}
-                  </div>
-                </div>
-              )}
-
-            <div className="flex gap-2 justify-end">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setIsFollowUpDialogOpen(false);
-                  setFollowUpData({
-                    date: '',
-                    notes: '',
-                    nextAction: '',
-                  });
-                }}
-              >
-                Cancel
-              </Button>
-              <Button type="submit">Add Follow-up</Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
 
       {/* Stage History Dialog */}
       <Dialog open={isHistoryDialogOpen} onOpenChange={setIsHistoryDialogOpen}>

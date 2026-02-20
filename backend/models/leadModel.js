@@ -59,6 +59,7 @@ class LeadModel {
                 email,
                 phone,
                 notes,
+                internal_notes as internalNotes,
                 move_in_date as moveInDate,
                 occupants_count as occupantsCount,
                 status,
@@ -110,6 +111,10 @@ class LeadModel {
       fields.push('notes = ?');
       values.push(data.notes);
     }
+    if (data.internalNotes !== undefined) {
+      fields.push('internal_notes = ?');
+      values.push(data.internalNotes);
+    }
     if (data.lastContactedAt) {
       fields.push('last_contacted_at = ?');
       values.push(data.lastContactedAt);
@@ -143,6 +148,7 @@ class LeadModel {
                     l.email,
                     l.phone,
                     l.notes,
+                    l.internal_notes as internalNotes,
                     l.move_in_date as moveInDate,
                     l.occupants_count as occupantsCount,
                     l.status,
@@ -168,6 +174,7 @@ class LeadModel {
                 email,
                 phone,
                 notes,
+                internal_notes as internalNotes,
                 status,
                 created_at as createdAt,
                 last_contacted_at as lastContactedAt,
@@ -202,6 +209,7 @@ class LeadModel {
         email,
         phone,
         notes,
+        internal_notes as internalNotes,
         move_in_date as moveInDate,
         occupants_count as occupantsCount,
         status,

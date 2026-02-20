@@ -68,6 +68,7 @@ export interface Lead {
   status: 'interested' | 'converted' | 'dropped';
   createdAt: string;
   notes: string;
+  internalNotes?: string;              // Owner's private notes about this lead
   lastContactedAt?: string;
   items?: any[];
   tenantId?: string;
@@ -76,13 +77,6 @@ export interface Lead {
   occupantsCount?: number; // New field
 }
 
-export interface LeadFollowUp {
-  id: string;
-  leadId: string;
-  date: string;
-  notes: string;
-  nextAction: string;
-}
 
 export interface LeadStageHistory {
   id: string;
@@ -239,7 +233,7 @@ interface AppContextType {
   unitTypes: UnitType[];
   units: Unit[];
   leads: Lead[];
-  leadFollowUps: LeadFollowUp[];
+
   leadStageHistory: LeadStageHistory[];
   tenants: Tenant[];
   treasurers: Treasurer[];
@@ -284,7 +278,7 @@ interface AppContextType {
   // Lead operations
   addLead: (lead: Omit<Lead, 'id' | 'createdAt'>) => Promise<void>;
   updateLead: (id: string, lead: Partial<Lead>) => Promise<void>;
-  addLeadFollowUp: (followUp: Omit<LeadFollowUp, 'id'>) => void;
+
   convertLeadToTenant: (
     leadId: string,
     startDate?: string,
@@ -365,7 +359,7 @@ const INITIAL_DATA = {
   properties: [],
   units: [],
   leads: [],
-  leadFollowUps: [],
+
   leadStageHistory: [],
   tenants: [],
   treasurers: [],
@@ -386,7 +380,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [unitTypes, setUnitTypes] = useState<UnitType[]>([]);
   const [units, setUnits] = useState<Unit[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
-  const [leadFollowUps, setLeadFollowUps] = useState<LeadFollowUp[]>([]);
+
   const [leadStageHistory, setLeadStageHistory] = useState<LeadStageHistory[]>(
     []
   );
@@ -1211,13 +1205,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const addLeadFollowUp = (followUp: Omit<LeadFollowUp, 'id'>) => {
-    const newFollowUp: LeadFollowUp = {
-      ...followUp,
-      id: `followup-${Date.now()}`,
-    };
-    setLeadFollowUps([...leadFollowUps, newFollowUp]);
-  };
+
 
   const convertLeadToTenant = async (
     leadId: string,
@@ -1773,7 +1761,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         unitTypes,
         units,
         leads,
-        leadFollowUps,
+
         leadStageHistory,
         tenants,
         treasurers,
@@ -1801,7 +1789,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         deleteUnitImage,
         addLead,
         updateLead,
-        addLeadFollowUp,
+
         convertLeadToTenant,
         addTenant,
         addTreasurer,

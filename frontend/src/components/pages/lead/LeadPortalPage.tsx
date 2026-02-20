@@ -314,19 +314,6 @@ export function LeadPortalPage() {
               </p>
             </CardContent>
           </Card>
-
-          {/* Link reminder */}
-          <Card className="border-amber-200 bg-amber-50">
-            <CardContent className="pt-4 pb-4">
-              <p className="text-xs text-amber-800 flex items-start gap-2">
-                <LinkIcon className="size-4 mt-0.5 flex-shrink-0" />
-                <span>
-                  Bookmark this page to return later. This is your private
-                  access link — do not share it with others.
-                </span>
-              </p>
-            </CardContent>
-          </Card>
         </div>
 
         {/* Right Column: Chat */}
