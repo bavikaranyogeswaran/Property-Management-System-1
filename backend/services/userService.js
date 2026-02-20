@@ -255,8 +255,10 @@ class UserService {
             userId,
             nic: tenantData.nic || null,
             permanentAddress: tenantData.permanentAddress || null,
-            employerName: tenantData.employerName || null,
-            // ... map other fields
+            emergencyContactName: tenantData.emergencyContactName || null,
+            emergencyContactPhone: tenantData.emergencyContactPhone || null,
+            employmentStatus: 'Employed', // Default or passed? User said ignore details, but maybe keep status generic
+            monthlyIncome: tenantData.monthlyIncome || 0,
           },
           connection
         );

@@ -523,7 +523,7 @@ export function PublicPropertyDetailsPage() {
                             onClick={() => handleOpenInterestModal(unit.id)}
                           >
                             {unit.status === 'available'
-                              ? 'Enquire Now'
+                              ? "I'm Interested"
                               : 'Unavailable'}
                           </Button>
                         </div>
@@ -845,6 +845,41 @@ export function PublicPropertyDetailsPage() {
                       </option>
                     ))}
                 </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="lead-movein">Move-in Date</Label>
+                <Input
+                  id="lead-movein"
+                  type="date"
+                  value={interestFormData.moveInDate}
+                  onChange={(e) =>
+                    setInterestFormData({
+                      ...interestFormData,
+                      moveInDate: e.target.value,
+                    })
+                  }
+                  min={new Date().toISOString().split('T')[0]}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="lead-occupants">Number of Occupants</Label>
+                <Input
+                  id="lead-occupants"
+                  type="number"
+                  min="1"
+                  value={interestFormData.occupantsCount}
+                  onChange={(e) =>
+                    setInterestFormData({
+                      ...interestFormData,
+                      occupantsCount: e.target.value,
+                    })
+                  }
+                  required
+                />
               </div>
             </div>
 

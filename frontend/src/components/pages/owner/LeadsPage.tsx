@@ -85,6 +85,11 @@ export function LeadsPage() {
     startDate: new Date().toISOString().split('T')[0],
     endDate: '',
     unitId: '',
+    nic: '',
+    permanentAddress: '',
+    emergencyContactName: '',
+    emergencyContactPhone: '',
+    monthlyIncome: '',
   });
 
   const handleStatusChange = async (leadId: string, status: Lead['status']) => {
@@ -150,11 +155,18 @@ export function LeadsPage() {
     if (!selectedLead) return;
 
     try {
-      const tenantId = await convertLeadToTenant(
+      await convertLeadToTenant(
         selectedLead.id,
         conversionData.startDate,
         conversionData.endDate || undefined,
-        conversionData.unitId || undefined
+        {
+          unitId: conversionData.unitId || undefined,
+          nic: conversionData.nic,
+          permanentAddress: conversionData.permanentAddress,
+          emergencyContactName: conversionData.emergencyContactName,
+          emergencyContactPhone: conversionData.emergencyContactPhone,
+          monthlyIncome: conversionData.monthlyIncome,
+        }
       );
       toast.success('Lead converted to tenant successfully');
       setIsConvertDialogOpen(false);
@@ -164,6 +176,11 @@ export function LeadsPage() {
         startDate: new Date().toISOString().split('T')[0],
         endDate: '',
         unitId: '',
+        nic: '',
+        permanentAddress: '',
+        emergencyContactName: '',
+        emergencyContactPhone: '',
+        monthlyIncome: '',
       });
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to convert lead');
@@ -1060,6 +1077,88 @@ export function LeadsPage() {
                 <p className="text-[10px] text-gray-500">
                   Leave empty for 1 year default
                 </p>
+              </div>
+            </div>
+
+            <div className="space-y-4 pt-4 border-t">
+              <h4 className="font-medium text-sm">Tenant Information</h4>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="conv-nic">NIC / ID *</Label>
+                  <Input
+                    id="conv-nic"
+                    value={conversionData.nic}
+                    onChange={(e) =>
+                      setConversionData({
+                        ...conversionData,
+                        nic: e.target.value,
+                      })
+                    }
+                    placeholder="e.g. 199012345678"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="conv-income">Monthly Income</Label>
+                  <Input
+                    id="conv-income"
+                    type="number"
+                    value={conversionData.monthlyIncome}
+                    onChange={(e) =>
+                      setConversionData({
+                        ...conversionData,
+                        monthlyIncome: e.target.value,
+                      })
+                    }
+                    placeholder="LKR"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="conv-address">Permanent Address *</Label>
+                <Textarea
+                  id="conv-address"
+                  value={conversionData.permanentAddress}
+                  onChange={(e) =>
+                    setConversionData({
+                      ...conversionData,
+                      permanentAddress: e.target.value,
+                    })
+                  }
+                  placeholder="Full permanent address"
+                  rows={2}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="conv-em-name">Emergency Contact Name *</Label>
+                  <Input
+                    id="conv-em-name"
+                    value={conversionData.emergencyContactName}
+                    onChange={(e) =>
+                      setConversionData({
+                        ...conversionData,
+                        emergencyContactName: e.target.value,
+                      })
+                    }
+                    placeholder="Name"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="conv-em-phone">Emergency Phone *</Label>
+                  <Input
+                    id="conv-em-phone"
+                    value={conversionData.emergencyContactPhone}
+                    onChange={(e) =>
+                      setConversionData({
+                        ...conversionData,
+                        emergencyContactPhone: e.target.value,
+                      })
+                    }
+                    placeholder="Phone"
+                  />
+                </div>
               </div>
             </div>
 

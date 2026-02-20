@@ -13,6 +13,7 @@ class TenantModel {
     const {
       userId,
       nic,
+      permanentAddress,
       emergencyContactName,
       emergencyContactPhone,
       employmentStatus,
@@ -22,14 +23,15 @@ class TenantModel {
     // Uses the provided connection for transaction support
     const query = `
             INSERT INTO tenants 
-            (user_id, nic, emergency_contact_name, emergency_contact_phone, 
+            (user_id, nic, permanent_address, emergency_contact_name, emergency_contact_phone, 
              employment_status, monthly_income) 
-            VALUES (?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
         `;
 
     await connection.query(query, [
       userId,
       nic,
+      permanentAddress,
       emergencyContactName,
       emergencyContactPhone,
       employmentStatus,
@@ -50,7 +52,7 @@ class TenantModel {
     return {
       userId: row.user_id,
       nic: row.nic,
-      // permanentAddress removed as it's not in DB
+      permanentAddress: row.permanent_address,
       emergencyContactName: row.emergency_contact_name,
       emergencyContactPhone: row.emergency_contact_phone,
       // employerName removed

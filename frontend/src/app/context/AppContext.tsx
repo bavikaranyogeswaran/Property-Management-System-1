@@ -289,7 +289,14 @@ interface AppContextType {
     leadId: string,
     startDate?: string,
     endDate?: string,
-    unitId?: string
+    data?: string | {
+      unitId?: string;
+      nic?: string;
+      permanentAddress?: string;
+      emergencyContactName?: string;
+      emergencyContactPhone?: string;
+      monthlyIncome?: string | number;
+    }
   ) => Promise<string>;
 
   // Tenant operations
@@ -1216,14 +1223,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
     leadId: string,
     startDate?: string,
     endDate?: string,
-    unitId?: string
+    data?: string | any 
   ) => {
     try {
-      const response = await apiClient.post(`/leads/${leadId}/convert`, {
-        startDate,
-        endDate,
-        unitId,
-      });
+      const payload: any = { startDate, endDate };
+
+      if (typeof data === 'string') {
+        payload.unitId = data;
+      } else if (data) {
+        Object.assign(payload, data);
+      }
+
+      const response = await apiClient.post(`/leads/${leadId}/convert`, payload);
 
       // Since leads, tenants, units, and leases are all affected,
       // and we haven't refactored the fetch functions to be accessible here yet,

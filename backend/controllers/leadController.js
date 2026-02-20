@@ -17,7 +17,8 @@ class LeadController {
         endDate,
         nic,
         permanentAddress,
-        employerName,
+        emergencyContactName,
+        emergencyContactPhone,
         monthlyIncome,
         unitId,
       } = req.body;
@@ -25,7 +26,8 @@ class LeadController {
       const tenantData = {
         nic,
         permanentAddress,
-        employerName,
+        emergencyContactName,
+        emergencyContactPhone,
         monthlyIncome,
         unitId,
       };
