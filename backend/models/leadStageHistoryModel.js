@@ -8,14 +8,15 @@ class LeadStageHistoryModel {
    * @param {string} toStatus - New status
    * @param {string} notes - Optional notes about the transition
    */
-  async create(leadId, fromStatus, toStatus, notes = '') {
+  async create(leadId, fromStatus, toStatus, notes = '', connection = null) {
+    const dbConn = connection || db;
     try {
       // Calculate duration in previous stage if there was a previous stage
       let durationInPreviousStage = null;
 
       if (fromStatus !== null) {
         // Find the most recent history entry for this lead
-        const [previousHistory] = await db.query(
+        const [previousHistory] = await dbConn.query(
           `SELECT changed_at FROM lead_stage_history 
                      WHERE lead_id = ? 
                      ORDER BY changed_at DESC 
@@ -31,7 +32,7 @@ class LeadStageHistoryModel {
         }
       }
 
-      const [result] = await db.query(
+      const [result] = await dbConn.query(
         `INSERT INTO lead_stage_history 
                  (lead_id, from_status, to_status, changed_at, notes, duration_in_previous_stage) 
                  VALUES (?, ?, ?, NOW(), ?, ?)`,

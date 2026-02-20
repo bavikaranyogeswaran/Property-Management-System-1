@@ -74,23 +74,15 @@ class LeadModel {
 
   async update(id, data, connection = null) {
     const dbConn = connection || db;
-    // Get current lead status before updating (for history tracking)
-    // findById does not support connection yet, but reading is usually fine outside/inside lock?
-    // Ideally findById should also support connection if inside transaction.
-    // Let's update findById first? Or just use db for read (might miss uncommitted changes if repeatable read).
-    // For now, let's use the connection for the update.
     
-    // READ needs to use connection if we are in transaction to see our own changes, 
-    // but here we are usually updating based on user input.
-    // However, if we are converting lead, we might want to lock it?
-    // Let's stick to simple update for now. 
-    // We can't easily change findById without changing all calls.
-    // But `update` definitely needs connection.
-    
-    // CAUTION: If we use `this.findById` it uses `db`. 
-    // If we are in a transaction, `db` (pool) might get a different connection.
-    // Safe for READ usually (Read Committed), but if we want to fetch current status...
-    // Let's assume passed data has necessary info or we just update.
+    // Fetch current status to detect transitions for history tracking
+    let currentStatus = null;
+    if (data.status) {
+      const [rows] = await dbConn.query('SELECT status FROM leads WHERE lead_id = ?', [id]);
+      if (rows.length > 0) {
+        currentStatus = rows[0].status;
+      }
+    }
     
     const fields = [];
     const values = [];
@@ -128,10 +120,16 @@ class LeadModel {
       values
     );
      
-    // History logging (skipping connection for now or use same)
-    // leadStageHistory create uses db. 
-    // Ideally pass connection there too.
-    
+    // Log history if the status actually changed
+    if (result.affectedRows > 0 && data.status && currentStatus && currentStatus !== data.status) {
+      await leadStageHistoryModel.create(
+        id,
+        currentStatus,
+        data.status,
+        'Status updated',
+        dbConn
+      );
+    }
     return result.affectedRows > 0;
   }
 
@@ -192,12 +190,30 @@ class LeadModel {
 
   async dropLeadsForUnit(unitId, connection = null) {
     const dbConn = connection || db;
+    
+    // Find leads before updating to log history
+    const [leadsToDrop] = await dbConn.query(
+      `SELECT lead_id, status FROM leads WHERE unit_id = ? AND status = 'interested'`,
+      [unitId]
+    );
+
     await dbConn.query(
       `UPDATE leads 
              SET status = 'dropped', notes = CONCAT(COALESCE(notes, ''), ' [System: Unit Leased]') 
              WHERE unit_id = ? AND status = 'interested'`,
       [unitId]
     );
+
+    // Create history for each dropped lead
+    for (const lead of leadsToDrop) {
+      await leadStageHistoryModel.create(
+        lead.lead_id,
+        lead.status,
+        'dropped',
+        'System: Unit Leased',
+        dbConn
+      );
+    }
   }
   async findByEmail(email) {
     const [rows] = await db.query(

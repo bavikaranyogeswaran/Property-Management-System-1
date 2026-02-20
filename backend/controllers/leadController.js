@@ -113,7 +113,9 @@ class LeadController {
 
   async getLeadStageHistory(req, res) {
     try {
+      console.log('[DEBUG] getLeadStageHistory called by user:', req.user);
       const history = await leadService.getLeadStageHistory(req.user);
+      console.log('[DEBUG] stage history result size:', history.length);
       res.json(history);
     } catch (error) {
         if (error.message.includes('Access denied')) {

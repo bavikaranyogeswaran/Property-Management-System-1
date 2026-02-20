@@ -738,6 +738,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (token) {
           const response = await apiClient.get('/leads/stage-history');
           if (response.status === 200) {
+            console.log('[DEBUG] Fetched Stage History:', response.data);
             setLeadStageHistory(response.data);
           }
         }

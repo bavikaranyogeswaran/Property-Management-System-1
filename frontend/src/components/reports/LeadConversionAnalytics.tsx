@@ -85,7 +85,7 @@ export function LeadConversionAnalytics({
   const convertedLeadsHistory = leads
     .filter((l) => l.status === 'converted')
     .map((lead) => {
-      const history = leadStageHistory.filter((h) => h.leadId === lead.id);
+      const history = leadStageHistory.filter((h) => String(h.leadId) === String(lead.id));
       const totalTime = history.reduce(
         (sum, h) => sum + (h.durationInPreviousStage || 0),
         0

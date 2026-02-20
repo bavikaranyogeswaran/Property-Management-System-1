@@ -347,7 +347,7 @@ export function LeadsPage() {
     const unit = units.find((u) => u.id === lead.interestedUnit);
     const property = properties.find((p) => p.id === lead.propertyId);
     const statusBadge = getStatusBadge(lead.status);
-    const history = leadStageHistory.filter((h) => h.leadId === lead.id);
+    const history = leadStageHistory.filter((h) => String(h.leadId) === String(lead.id));
 
     // Determine unit display text
     const unitDisplay =
@@ -890,7 +890,7 @@ export function LeadsPage() {
           <div className="space-y-4 mt-4">
             {selectedLead &&
               leadStageHistory
-                .filter((h) => h.leadId === selectedLead.id)
+                .filter((h) => String(h.leadId) === String(selectedLead.id))
                 .sort(
                   (a, b) =>
                     new Date(b.changedAt).getTime() -
@@ -950,7 +950,7 @@ export function LeadsPage() {
                   </div>
                 ))}
             {selectedLead &&
-              leadStageHistory.filter((h) => h.leadId === selectedLead.id)
+              leadStageHistory.filter((h) => String(h.leadId) === String(selectedLead.id))
                 .length === 0 && (
                 <p className="text-gray-500 text-center py-8">
                   No stage history available
