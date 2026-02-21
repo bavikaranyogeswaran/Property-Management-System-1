@@ -60,7 +60,7 @@ class UserService {
 
       // Setup Token & Email (Outside transaction as side effect)
       const token = jwt.sign(
-        { id: userId, type: 'setup_password' },
+        { id: userId, type: 'setup_password', role: 'treasurer' },
         JWT_SECRET,
         { expiresIn: '48h' }
       );
@@ -238,7 +238,7 @@ class UserService {
         // We'll queue it mentally.
 
         const token = jwt.sign(
-          { id: userId, type: 'setup_password' },
+          { id: userId, type: 'setup_password', role: 'tenant' },
           JWT_SECRET,
           { expiresIn: '48h' }
         );
@@ -248,17 +248,16 @@ class UserService {
       // 3. Create Tenant Profile
       const existingTenant = await tenantModel.findByUserId(userId, connection);
       if (!existingTenant) {
-        // We use the passed tenantData alongside defaults from Lead if available?
-        // Lead doesn't have NIC/Address usually.
+        // Initialize an empty tenant profile to be filled out during password setup
         await tenantModel.create(
           {
             userId,
-            nic: tenantData.nic || null,
-            permanentAddress: tenantData.permanentAddress || null,
-            emergencyContactName: tenantData.emergencyContactName || null,
-            emergencyContactPhone: tenantData.emergencyContactPhone || null,
-            employmentStatus: 'Employed', // Default or passed? User said ignore details, but maybe keep status generic
-            monthlyIncome: tenantData.monthlyIncome || 0,
+            nic: null,
+            permanentAddress: null,
+            emergencyContactName: null,
+            emergencyContactPhone: null,
+            employmentStatus: 'Employed', // Default value
+            monthlyIncome: 0,
           },
           connection
         );

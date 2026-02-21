@@ -33,9 +33,9 @@ class AuthController {
 
   async setupPassword(req, res) {
     try {
-      const { token, password } = req.body;
+      const { token, password, tenantData } = req.body;
 
-      const result = await authService.setupPassword(token, password);
+      const result = await authService.setupPassword(token, password, tenantData);
       res.json(result);
     } catch (error) {
       res.status(400).json({ error: error.message });

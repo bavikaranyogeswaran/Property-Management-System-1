@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   Card,
@@ -13,12 +13,15 @@ import { Label } from '@/components/ui/label';
 import { Loader2, Lock, ArrowRight, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 import authService from '@/services/auth';
+import { jwtDecode } from 'jwt-decode';
 
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   resetPasswordSchema,
+  tenantSetupPasswordSchema,
   type ResetPasswordFormValues,
+  type TenantSetupPasswordFormValues,
 } from '@/schemas/authSchemas';
 import {
   Form,
@@ -28,31 +31,77 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
+import { Separator } from '@/components/ui/separator';
+
+interface TokenPayload {
+  id: number;
+  type: string;
+  role?: string;
+  iat: number;
+  exp: number;
+}
 
 export function SetupPasswordPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const token = searchParams.get('token');
 
-  const form = useForm<ResetPasswordFormValues>({
-    resolver: zodResolver(resetPasswordSchema),
-    defaultValues: {
-      password: '',
-      confirmPassword: '',
-    },
+  const [role, setRole] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (token) {
+      try {
+        const decoded = jwtDecode<TokenPayload>(token);
+        if (decoded.role) {
+          setRole(decoded.role);
+        }
+      } catch (err) {
+        console.error('Failed to decode token:', err);
+      }
+    }
+  }, [token]);
+
+  const isTenant = role === 'tenant';
+
+  // Use dynamic schema and types based on role
+  const form = useForm<any>({
+    resolver: zodResolver(
+      isTenant ? tenantSetupPasswordSchema : resetPasswordSchema
+    ),
+    defaultValues: isTenant
+      ? {
+          password: '',
+          confirmPassword: '',
+          nic: '',
+          monthlyIncome: '',
+          permanentAddress: '',
+          emergencyContactName: '',
+          emergencyContactPhone: '',
+        }
+      : {
+          password: '',
+          confirmPassword: '',
+        },
   });
 
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  const onSubmit = async (data: ResetPasswordFormValues) => {
+  const onSubmit = async (data: any) => {
     if (!token) {
       toast.error('Invalid setup token');
       return;
     }
 
     try {
-      await authService.setupPassword(token, data.password);
+      if (isTenant) {
+        // Send tenant data along with password
+        const { password, confirmPassword, ...tenantData } = data;
+        await authService.setupPassword(token, password, tenantData);
+      } else {
+        await authService.setupPassword(token, data.password);
+      }
+
       toast.success('Account setup complete! You can now login.');
       navigate('/login');
     } catch (error: any) {
@@ -81,7 +130,7 @@ export function SetupPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4 py-12">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
@@ -89,9 +138,13 @@ export function SetupPasswordPage() {
               <Lock className="size-6 text-blue-600" />
             </div>
           </div>
-          <CardTitle className="text-2xl">Set Up Your Password</CardTitle>
+          <CardTitle className="text-2xl">
+            {isTenant ? 'Set Up Your Profile' : 'Set Up Your Password'}
+          </CardTitle>
           <CardDescription>
-            Create a secure password to access your account.
+            {isTenant
+              ? 'Create a secure password and provide your profile details to finalize your account.'
+              : 'Create a secure password to access your account.'}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -102,7 +155,7 @@ export function SetupPasswordPage() {
                 name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>New Password</FormLabel>
+                    <FormLabel>New Password *</FormLabel>
                     <FormControl>
                       <div className="relative">
                         <Input
@@ -134,7 +187,7 @@ export function SetupPasswordPage() {
                 name="confirmPassword"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Confirm Password</FormLabel>
+                    <FormLabel>Confirm Password *</FormLabel>
                     <FormControl>
                       <div className="relative">
                         <Input
@@ -162,9 +215,91 @@ export function SetupPasswordPage() {
                 )}
               />
 
+              {isTenant && (
+                <>
+                  <Separator className="my-6" />
+                  <div className="space-y-4">
+                    <h3 className="font-semibold text-lg text-gray-900">
+                      Profile Details
+                    </h3>
+                    
+                    <FormField
+                      control={form.control}
+                      name="nic"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>NIC / ID Number *</FormLabel>
+                          <FormControl>
+                            <Input placeholder="e.g. 199012345678" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={form.control}
+                      name="monthlyIncome"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Monthly Income (LKR) *</FormLabel>
+                          <FormControl>
+                            <Input type="number" placeholder="0.00" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="permanentAddress"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Permanent Address *</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Full permanent address" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="emergencyContactName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Emergency Contact *</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Name" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="emergencyContactPhone"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Emergency Phone *</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Phone number" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+
               <Button
                 type="submit"
-                className="w-full"
+                className="w-full mt-6"
                 disabled={form.formState.isSubmitting}
               >
                 {form.formState.isSubmitting ? (
@@ -174,7 +309,7 @@ export function SetupPasswordPage() {
                   </>
                 ) : (
                   <>
-                    Set Password & Login
+                    Complete Setup
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </>
                 )}

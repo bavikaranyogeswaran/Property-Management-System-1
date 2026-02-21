@@ -82,10 +82,11 @@ export const authService = {
     return response.data;
   },
 
-  setupPassword: async (token: string, password: string) => {
+  setupPassword: async (token: string, password: string, tenantData?: any) => {
     const response = await apiClient.post('/auth/setup-password', {
       token,
       password,
+      tenantData,
     });
     return response.data;
   },

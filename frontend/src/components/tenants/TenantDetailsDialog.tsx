@@ -171,6 +171,35 @@ export const TenantDetailsDialog: React.FC<TenantDetailsDialogProps> = ({
                     <p className="text-gray-500">No active lease</p>
                   )}
                 </div>
+
+                {/* Tenant Background */}
+                <div className="border rounded-lg p-4 bg-gray-50 mt-6">
+                  <h4 className="font-semibold mb-3">Tenant Background</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-gray-600">NIC / ID</p>
+                      <p className="font-medium">{tenant.nic || 'Not provided'}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">Employment Status</p>
+                      <p className="font-medium">{tenant.employmentStatus || 'Not provided'}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">Monthly Income</p>
+                      <p className="font-medium">
+                        {tenant.monthlyIncome
+                          ? `LKR ${Number(tenant.monthlyIncome).toLocaleString()}`
+                          : 'Not provided'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">Permanent Address</p>
+                      <p className="font-medium text-sm line-clamp-2">
+                        {tenant.permanentAddress || 'Not provided'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {/* Score Card Column */}

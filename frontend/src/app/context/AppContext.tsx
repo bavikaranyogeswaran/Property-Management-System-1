@@ -97,6 +97,10 @@ export interface Tenant {
   createdAt: string;
   status?: string;
   behaviorScore?: number;
+  nic?: string;
+  monthlyIncome?: number | string;
+  employmentStatus?: string;
+  permanentAddress?: string;
 }
 
 export interface Treasurer {
@@ -449,6 +453,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
                 phone: u.phone,
                 createdAt: u.createdAt,
                 status: u.status,
+                nic: u.nic,
+                monthlyIncome: u.monthlyIncome,
+                employmentStatus: u.employmentStatus,
+                permanentAddress: u.permanentAddress
               }));
               setTenants(mappedTenants);
             }

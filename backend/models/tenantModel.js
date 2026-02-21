@@ -64,6 +64,36 @@ class TenantModel {
     };
   }
 
+  async updateProfile(userId, tenantData, connection = null) {
+    const db = connection || pool;
+    const {
+      nic,
+      permanentAddress,
+      emergencyContactName,
+      emergencyContactPhone,
+      monthlyIncome,
+    } = tenantData;
+
+    const query = `
+      UPDATE tenants 
+      SET nic = ?, 
+          permanent_address = ?, 
+          emergency_contact_name = ?, 
+          emergency_contact_phone = ?, 
+          monthly_income = ?
+      WHERE user_id = ?
+    `;
+
+    await db.query(query, [
+      nic || null,
+      permanentAddress || null,
+      emergencyContactName || null,
+      emergencyContactPhone || null,
+      monthlyIncome || 0,
+      userId,
+    ]);
+  }
+
   async update(userId, data) {
     // Dynamic update would be better, but for now specific fields
     // Allowing selective updates
@@ -101,6 +131,16 @@ class TenantModel {
       'UPDATE tenants SET behavior_score = behavior_score + ? WHERE user_id = ?',
       [scoreChange, userId]
     );
+  }
+
+  async getBehaviorScore(userId, connection = null) {
+    const db = connection || pool;
+    const [rows] = await db.query(
+      'SELECT behavior_score FROM tenants WHERE user_id = ?',
+      [userId]
+    );
+    if (rows.length === 0) return null;
+    return rows[0].behavior_score;
   }
 }
 

@@ -42,7 +42,18 @@ export const resetPasswordSchema = z
     path: ['confirmPassword'],
   });
 
+export const tenantSetupPasswordSchema = resetPasswordSchema.and(
+  z.object({
+    nic: z.string().min(1, 'NIC/ID is required'),
+    monthlyIncome: z.coerce.number().min(0, 'Income must be a valid number'),
+    permanentAddress: z.string().min(1, 'Permanent Address is required'),
+    emergencyContactName: z.string().min(1, 'Emergency Contact Name is required'),
+    emergencyContactPhone: z.string().min(1, 'Emergency Contact Phone is required'),
+  })
+);
+
 export type PasswordUpdateFormValues = z.infer<typeof passwordUpdateSchema>;
 export type LoginFormValues = z.infer<typeof loginSchema>;
 export type ForgotPasswordFormValues = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordFormValues = z.infer<typeof resetPasswordSchema>;
+export type TenantSetupPasswordFormValues = z.infer<typeof tenantSetupPasswordSchema>;
