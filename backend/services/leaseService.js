@@ -115,8 +115,6 @@ class LeaseService {
     if (startDate <= today) {
       await unitModel.update(unitId, { status: 'occupied' }, connection);
 
-      await unitModel.update(unitId, { status: 'occupied' }, connection);
-
       // CLEANUP: Cancel conflicting future/current visits
       await visitModel.cancelVisitsForUnit(unitId, today, connection);
 
@@ -199,7 +197,7 @@ class LeaseService {
       tenantUser &&
       (tenantUser.role === 'lead' || tenantUser.role === 'prospective')
     ) {
-      await userModel.updateRole(tenantId, 'tenant');
+      await userModel.updateRole(tenantId, 'tenant', connection);
       console.log(
         `Promoted User ${tenantId} from '${tenantUser.role}' to 'tenant'.`
       );

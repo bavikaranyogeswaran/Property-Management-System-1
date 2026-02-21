@@ -42,12 +42,13 @@ class LeadService {
             }
         }
 
-        // Check for existing user — allow if role is 'lead', reject if other role
+        // Check for existing user — allow if role is 'lead' or 'tenant', reject if other role
         let userId = null;
         const existingUser = await userModel.findByEmail(email);
         if (existingUser) {
-            if (existingUser.role !== 'lead') {
-                throw new Error('This email is already associated with an account. Please log in or contact the property owner.');
+            const allowedRoles = ['lead', 'tenant'];
+            if (!allowedRoles.includes(existingUser.role)) {
+                throw new Error('This email is already associated with a staff/owner account. Please use a different email or log in.');
             }
             userId = existingUser.user_id;
         }

@@ -201,13 +201,11 @@ class UserService {
       const existingUser = await userModel.findByEmail(lead.email);
 
       if (existingUser) {
-        // User exists (likely as a Lead)
+        // User exists (likely as a Lead or Tenant)
         userId = existingUser.user_id;
 
         // If they are a lead, upgrade them to tenant
         if (existingUser.role === 'lead') {
-          await userModel.updateRole(userId, 'tenant'); // Should support connection?
-          // Ideally we update userModel.updateRole to accept connection too.
           // No, must be in transaction.
           await userModel.updateRole(userId, 'tenant', connection);
 
@@ -216,9 +214,14 @@ class UserService {
             existingUser.email,
             existingUser.name
           );
+        } else if (existingUser.role === 'tenant') {
+          // User is already an active tenant applying for another property.
+          // They already have an account and password, so we just proceed with lease creation.
+          // No need to send confirmation or invite token since they are already set up.
+          console.log(`Lead ${leadId} is already a tenant (User ID: ${userId}). Proceeding with new lease creation.`);
         }
       } else {
-        // Create new user
+        // Create new user (should only happen if lead was created without a user ID somehow, which shouldn't happen with updated leadService, but kept for safety)
         const passwordToUse = Math.random().toString(36).slice(-8);
         const hashedPassword = await hash(passwordToUse, SALT_ROUNDS);
 
@@ -233,9 +236,6 @@ class UserService {
           },
           connection
         );
-
-        // Setup Token logic handled after commit usually, or here if we want to ensure it works.
-        // We'll queue it mentally.
 
         const token = jwt.sign(
           { id: userId, type: 'setup_password', role: 'tenant' },
