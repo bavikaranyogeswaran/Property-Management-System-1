@@ -13,36 +13,18 @@ class MessageController {
       }
 
       // Verify lead exists
-      // Verify lead exists
       const lead = await leadModel.findById(leadId);
       if (!lead) {
         return res.status(404).json({ error: 'Lead not found' });
       }
 
-      console.log(
-        `[DEBUG] sendMessage: Request by ${req.user.email} (${req.user.role}) to lead ${leadId} (Lead Email: ${lead.email})`
-      );
-
-      // Authorization
-      if (req.user.role === 'lead') {
-        const leadEmail = lead.email ? lead.email.toLowerCase() : '';
-        const userEmail = req.user.email ? req.user.email.toLowerCase() : '';
-
-        if (leadEmail !== userEmail) {
-          console.error('[DEBUG] Access denied: Lead email mismatch');
-          return res.status(403).json({
-            error: `Access denied: Email mismatch. You are '${req.user.role}' (${userEmail}). Lead is (${leadEmail}).`,
-          });
-        }
-      } else if (req.user.role !== 'owner' && req.user.role !== 'admin') {
-        console.error(
-          `[DEBUG] Access denied: Role ${req.user.role} not authorized`
-        );
+      // Authorization: Only owners and admins can send messages via JWT-protected route
+      // Leads use the portal (token-based) to send messages, not this endpoint
+      if (req.user.role !== 'owner' && req.user.role !== 'admin') {
         return res.status(403).json({ error: 'Access denied' });
       }
 
-      const messageId = await messageModel.create(leadId, senderId, content);
-      console.log(`[DEBUG] Message created with ID: ${messageId}`);
+      const messageId = await messageModel.create(leadId, senderId, content, 'user');
 
       // Update last contacted
       await leadModel.update(leadId, { lastContactedAt: new Date() });
@@ -51,6 +33,7 @@ class MessageController {
         id: messageId,
         leadId,
         senderId,
+        senderType: 'user',
         content,
         createdAt: new Date(),
         isRead: false,
@@ -67,34 +50,19 @@ class MessageController {
     try {
       const { leadId } = req.params;
 
-      // Authorization check similar to sendMessage
+      // Verify lead exists
       const lead = await leadModel.findById(leadId);
       if (!lead) {
         return res.status(404).json({ error: 'Lead not found' });
       }
 
-      if (req.user.role === 'lead') {
-        const leadEmail = lead.email ? lead.email.toLowerCase() : '';
-        const userEmail = req.user.email ? req.user.email.toLowerCase() : '';
-        if (leadEmail !== userEmail) {
-          // Check if this user is the "converted tenant" for this lead?
-          if (lead.tenantId !== req.user.id) {
-            return res.status(403).json({ error: 'Access denied' });
-          }
-        }
-      } else if (
+      // Authorization: owners, admins, and tenants can view messages
+      if (
         req.user.role !== 'owner' &&
         req.user.role !== 'admin' &&
         req.user.role !== 'tenant'
       ) {
-        // Tenants can view if they were the lead
-        if (req.user.role === 'tenant' && lead.tenantId !== req.user.id) {
-          return res.status(403).json({ error: 'Access denied' });
-        }
-        if (req.user.role !== 'tenant') {
-          // Treasurers etc shouldn't see?
-          return res.status(403).json({ error: 'Access denied' });
-        }
+        return res.status(403).json({ error: 'Access denied' });
       }
 
       const messages = await messageModel.findByLeadId(leadId);

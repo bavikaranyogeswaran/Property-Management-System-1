@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   Card,
@@ -46,18 +46,15 @@ export function SetupPasswordPage() {
   const navigate = useNavigate();
   const token = searchParams.get('token');
 
-  const [role, setRole] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (token) {
-      try {
-        const decoded = jwtDecode<TokenPayload>(token);
-        if (decoded.role) {
-          setRole(decoded.role);
-        }
-      } catch (err) {
-        console.error('Failed to decode token:', err);
-      }
+  // Decode role synchronously so the form initializes with the correct schema
+  const role = useMemo(() => {
+    if (!token) return null;
+    try {
+      const decoded = jwtDecode<TokenPayload>(token);
+      return decoded.role ?? null;
+    } catch (err) {
+      console.error('Failed to decode token:', err);
+      return null;
     }
   }, [token]);
 

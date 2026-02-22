@@ -7,7 +7,6 @@ class LeadModel {
       propertyId,
       unitId,
       interestedUnit,
-      userId,
       name,
       phone,
       email,
@@ -24,12 +23,11 @@ class LeadModel {
     }
 
     const [result] = await db.query(
-      `INSERT INTO leads (property_id, unit_id, user_id, name, phone, email, notes, move_in_date, occupants_count, status) 
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO leads (property_id, unit_id, name, phone, email, notes, move_in_date, occupants_count, status) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         propertyId,
         finalUnitId,
-        userId,
         name,
         phone,
         email,
@@ -64,8 +62,7 @@ class LeadModel {
                 occupants_count as occupantsCount,
                 status,
                 created_at as createdAt,
-                last_contacted_at as lastContactedAt,
-                user_id as userId
+                last_contacted_at as lastContactedAt
             FROM leads WHERE lead_id = ?`,
       [id]
     );
@@ -90,14 +87,6 @@ class LeadModel {
     if (data.status) {
       fields.push('status = ?');
       values.push(data.status);
-    }
-    if (data.userId) {
-      fields.push('user_id = ?');
-      values.push(data.userId);
-    }
-    if (data.tenantId) {
-      fields.push('user_id = ?');
-      values.push(data.tenantId);
     }
     if (data.notes) {
       fields.push('notes = ?');
@@ -151,8 +140,7 @@ class LeadModel {
                     l.occupants_count as occupantsCount,
                     l.status,
                     l.created_at as createdAt,
-                    l.last_contacted_at as lastContactedAt,
-                    l.user_id as userId
+                    l.last_contacted_at as lastContactedAt
                 FROM leads l
                 INNER JOIN properties p ON l.property_id = p.property_id
                 WHERE p.owner_id = ?
@@ -175,8 +163,7 @@ class LeadModel {
                 internal_notes as internalNotes,
                 status,
                 created_at as createdAt,
-                last_contacted_at as lastContactedAt,
-                user_id as userId
+                last_contacted_at as lastContactedAt
             FROM leads ORDER BY created_at DESC`);
     return rows;
   }
@@ -230,8 +217,7 @@ class LeadModel {
         occupants_count as occupantsCount,
         status,
         created_at as createdAt,
-        last_contacted_at as lastContactedAt,
-        user_id as userId
+        last_contacted_at as lastContactedAt
        FROM leads WHERE email = ? AND status != 'dropped' ORDER BY created_at DESC LIMIT 1`,
       [email]
     );

@@ -22,6 +22,13 @@ export const setupPasswordSchema = Joi.object({
       'string.pattern.base':
         'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character.',
     }),
+  tenantData: Joi.object({
+    nic: Joi.string().required(),
+    monthlyIncome: Joi.number().min(0).required(),
+    permanentAddress: Joi.string().required(),
+    emergencyContactName: Joi.string().required(),
+    emergencyContactPhone: Joi.string().required(),
+  }).optional(),
 });
 
 export const forgotPasswordSchema = Joi.object({

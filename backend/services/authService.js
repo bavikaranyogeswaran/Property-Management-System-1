@@ -15,10 +15,6 @@ class AuthService {
       throw new Error('Invalid credentials');
     }
 
-    if (user.role === 'lead' && !user.is_email_verified) {
-      throw new Error('Please verify your email address to login.');
-    }
-
     const isValid = await compare(password, user.password_hash);
 
     if (!isValid) {

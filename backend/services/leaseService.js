@@ -190,19 +190,6 @@ class LeaseService {
       connection
     );
 
-    // 5. Role Promotion (Lead -> Tenant)
-    const userModel = (await import('../models/userModel.js')).default;
-    const tenantUser = await userModel.findById(tenantId);
-    if (
-      tenantUser &&
-      (tenantUser.role === 'lead' || tenantUser.role === 'prospective')
-    ) {
-      await userModel.updateRole(tenantId, 'tenant', connection);
-      console.log(
-        `Promoted User ${tenantId} from '${tenantUser.role}' to 'tenant'.`
-      );
-    }
-
     return leaseId;
   }
   async renewLease(leaseId, newEndDate, newMonthlyRent = null) {

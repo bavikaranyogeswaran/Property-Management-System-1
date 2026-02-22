@@ -129,12 +129,14 @@ class LeadPortalController {
         return res.status(403).json({ error: 'This inquiry has been closed. You cannot send messages.' });
       }
 
-      if (!lead.userId) {
-        return res.status(500).json({ error: 'Lead account not configured. Please contact support.' });
-      }
-
-      // Use the lead's user_id as the sender
-      const messageId = await messageModel.create(tokenRecord.leadId, lead.userId, content.trim());
+      // Use the lead's own ID as the sender (leads are guests, not users)
+      const messageId = await messageModel.create(
+        tokenRecord.leadId,
+        null,              // no user sender_id
+        content.trim(),
+        'lead',            // sender_type
+        lead.id            // sender_lead_id
+      );
 
       // Update last contacted
       await leadModel.update(tokenRecord.leadId, { lastContactedAt: new Date() });
@@ -142,7 +144,8 @@ class LeadPortalController {
       res.status(201).json({
         id: messageId,
         leadId: tokenRecord.leadId,
-        senderId: lead.userId,
+        senderLeadId: lead.id,
+        senderType: 'lead',
         content: content.trim(),
         createdAt: new Date(),
         isRead: false,

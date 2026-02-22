@@ -17,7 +17,7 @@ CREATE TABLE users (
     email VARCHAR(100) UNIQUE NOT NULL,
     phone VARCHAR(20),
     password_hash VARCHAR(255) NOT NULL,
-    role ENUM('owner','tenant','treasurer','lead') NOT NULL,
+    role ENUM('owner','tenant','treasurer') NOT NULL,
     is_email_verified BOOLEAN DEFAULT FALSE,
     email_verified_at DATETIME,
     status ENUM('active','inactive','banned') DEFAULT 'active',
@@ -162,7 +162,6 @@ CREATE TABLE leads (
     lead_id INT AUTO_INCREMENT PRIMARY KEY,
     property_id INT NOT NULL,                -- [ADDED] Link to property
     unit_id INT NULL,
-    user_id INT,    -- Link to User account (Lead or Tenant role)
     name VARCHAR(100) NOT NULL,
     phone VARCHAR(20),
     email VARCHAR(100),
@@ -175,8 +174,7 @@ CREATE TABLE leads (
     last_contacted_at DATETIME,              -- [ADDED] For follow-up tracking
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (property_id) REFERENCES properties(property_id),
-    FOREIGN KEY (unit_id) REFERENCES units(unit_id),
-    FOREIGN KEY (user_id) REFERENCES users(user_id)
+    FOREIGN KEY (unit_id) REFERENCES units(unit_id)
 );
 
 CREATE TABLE lead_followups (
@@ -202,12 +200,15 @@ CREATE TABLE lead_stage_history (
 CREATE TABLE messages (
     message_id INT AUTO_INCREMENT PRIMARY KEY,
     lead_id INT NOT NULL,
-    sender_id INT NOT NULL,
+    sender_id INT NULL,                      -- Set when sender is a user (owner/tenant/treasurer)
+    sender_lead_id INT NULL,                 -- Set when sender is a lead (guest)
+    sender_type ENUM('user','lead') NOT NULL DEFAULT 'user',
     content TEXT NOT NULL,
     is_read BOOLEAN DEFAULT FALSE,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (lead_id) REFERENCES leads(lead_id) ON DELETE CASCADE,
-    FOREIGN KEY (sender_id) REFERENCES users(user_id) ON DELETE CASCADE
+    FOREIGN KEY (sender_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    FOREIGN KEY (sender_lead_id) REFERENCES leads(lead_id) ON DELETE CASCADE
 );
 
 -- =========================
