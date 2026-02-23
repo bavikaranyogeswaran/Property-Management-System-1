@@ -29,14 +29,14 @@ class UserModel {
     // So we should probably exclude users where email LIKE 'deleted_%'.
 
     const [rows] = await pool.query(
-      'SELECT user_id as id, name, email, phone, role, status, created_at as createdAt FROM users WHERE role = ? AND email NOT LIKE "deleted_%"',
+      "SELECT user_id as id, name, email, phone, role, status, created_at as createdAt FROM users WHERE role = ? AND email NOT LIKE 'deleted_%'",
       [role]
     );
     return rows;
   }
 
   async findTenantsByOwner(ownerId) {
-    // Get tenants who have leases OR were converted from leads for this owner's properties
+    // Get tenants who have leases on this owner's properties
     const [rows] = await pool.query(
       `
             SELECT DISTINCT 
@@ -48,26 +48,22 @@ class UserModel {
                 u.status, 
                 u.created_at as createdAt,
                 t.nic, 
+                t.permanent_address as permanentAddress,
                 t.employment_status as employmentStatus,
                 t.monthly_income as monthlyIncome,
                 t.behavior_score as behaviorScore
             FROM users u
             JOIN tenants t ON u.user_id = t.user_id
-            -- Join path 1: via Leases
-            LEFT JOIN leases l ON u.user_id = l.tenant_id
-            LEFT JOIN units ut ON l.unit_id = ut.unit_id
-            LEFT JOIN properties p_lease ON ut.property_id = p_lease.property_id
-            
-            -- Join path 2: via Leads (converted)
-            LEFT JOIN leads ld ON u.user_id = ld.user_id
-            LEFT JOIN properties p_lead ON ld.property_id = p_lead.property_id
+            JOIN leases l ON u.user_id = l.tenant_id
+            JOIN units ut ON l.unit_id = ut.unit_id
+            JOIN properties p ON ut.property_id = p.property_id
             
             WHERE u.role = 'tenant' 
-                AND (p_lease.owner_id = ? OR p_lead.owner_id = ?)
-                AND u.email NOT LIKE "deleted_%"
+                AND p.owner_id = ?
+                AND u.email NOT LIKE 'deleted_%'
             ORDER BY u.created_at DESC
         `,
-      [ownerId, ownerId]
+      [ownerId]
     );
     return rows;
   }
@@ -85,6 +81,7 @@ class UserModel {
                 u.status, 
                 u.created_at as createdAt,
                 t.nic, 
+                t.permanent_address as permanentAddress,
                 t.employment_status as employmentStatus,
                 t.monthly_income as monthlyIncome,
                 t.behavior_score as behaviorScore
@@ -100,7 +97,7 @@ class UserModel {
             WHERE u.role = 'tenant' 
                 AND ut.property_id = spa.property_id
                 AND l.status = 'active'
-                AND u.email NOT LIKE "deleted_%"
+                AND u.email NOT LIKE 'deleted_%'
             ORDER BY u.created_at DESC
         `,
       [treasurerId]
