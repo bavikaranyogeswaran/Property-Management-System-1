@@ -69,6 +69,28 @@ export const validatePhoneNumber = (phone) => {
 };
 
 /**
+ * NIC validation (Sri Lankan National Identity Card)
+ */
+export const validateNIC = (nic) => {
+  // Sri Lankan NIC logic:
+  // Old format: 9 digits followed by 'V' or 'X' (case insensitive)
+  // New format: 12 digits
+  const nicPattern = /^([0-9]{9}[xXvV]|[0-9]{12})$/;
+
+  if (!nic || !nicPattern.test(nic.trim())) {
+    return {
+      isValid: false,
+      error: 'Please enter a valid NIC (e.g., 123456789V or 199012345678)',
+    };
+  }
+
+  return {
+    isValid: true,
+    error: null,
+  };
+};
+
+/**
  * Email validation (more comprehensive than basic regex)
  */
 export const validateEmail = (email) => {

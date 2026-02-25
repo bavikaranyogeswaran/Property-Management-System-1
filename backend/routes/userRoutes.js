@@ -1,6 +1,12 @@
 import { Router } from 'express';
 import userController from '../controllers/userController.js';
 import authenticateToken from '../middleware/authMiddleware.js';
+import validateRequest from '../middleware/validateRequest.js';
+import {
+  createTreasurerSchema,
+  updateTreasurerSchema,
+  updateProfileSchema,
+} from '../schemas/userSchemas.js';
 
 const router = Router();
 
@@ -8,14 +14,25 @@ const router = Router();
 router.post(
   '/create-treasurer',
   authenticateToken,
+  validateRequest(createTreasurerSchema),
   userController.createTreasurer
 );
 
 // Update own profile (Specific route must come before generic /:id)
-router.put('/profile', authenticateToken, userController.updateProfile);
+router.put(
+  '/profile',
+  authenticateToken,
+  validateRequest(updateProfileSchema),
+  userController.updateProfile
+);
 
 // Treasurer update (Owner only)
-router.put('/:id', authenticateToken, userController.updateTreasurer);
+router.put(
+  '/:id',
+  authenticateToken,
+  validateRequest(updateTreasurerSchema),
+  userController.updateTreasurer
+);
 
 // Treasurer deletion (Owner only)
 router.delete('/:id', authenticateToken, userController.deleteTreasurer);

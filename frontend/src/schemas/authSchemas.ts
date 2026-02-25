@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { slNicSchema, slPhoneSchema } from './commonSchemas';
 
 export const passwordUpdateSchema = z
   .object({
@@ -44,11 +45,11 @@ export const resetPasswordSchema = z
 
 export const tenantSetupPasswordSchema = resetPasswordSchema.and(
   z.object({
-    nic: z.string().min(1, 'NIC/ID is required'),
+    nic: slNicSchema,
     monthlyIncome: z.coerce.number().min(0, 'Income must be a valid number'),
     permanentAddress: z.string().min(1, 'Permanent Address is required'),
     emergencyContactName: z.string().min(1, 'Emergency Contact Name is required'),
-    emergencyContactPhone: z.string().min(1, 'Emergency Contact Phone is required'),
+    emergencyContactPhone: slPhoneSchema,
   })
 );
 

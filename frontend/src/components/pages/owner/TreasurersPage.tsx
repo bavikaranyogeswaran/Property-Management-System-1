@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp, Treasurer } from '@/app/context/AppContext';
+import { slPhoneRegex } from '@/schemas/commonSchemas';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -90,6 +91,11 @@ export function TreasurersPage() {
       return;
     }
 
+    if (!slPhoneRegex.test(phone)) {
+      toast.error('Invalid Sri Lankan phone number. e.g., 0771234567');
+      return;
+    }
+
     try {
       // Call backend API
       const response = await apiClient.post('/users/create-treasurer', {
@@ -142,6 +148,11 @@ export function TreasurersPage() {
       treasurers.some((t) => t.email === email && t.id !== selectedTreasurer.id)
     ) {
       toast.error('A treasurer with this email already exists');
+      return;
+    }
+
+    if (!slPhoneRegex.test(phone)) {
+      toast.error('Invalid Sri Lankan phone number. e.g., 0771234567');
       return;
     }
 
