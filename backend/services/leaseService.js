@@ -101,7 +101,6 @@ class LeaseService {
       startDate,
       endDate,
       monthlyRent,
-      monthlyRent,
       securityDeposit: 0, // Held amount starts at 0. Target is in Invoice.
       status: 'active',
     };
@@ -442,6 +441,9 @@ class LeaseService {
         `Created Deduction Invoice ${invId} for Remaining Withheld: ${withheldAmount}`
       );
     }
+
+    const currentRefunded = Number(lease.refundedAmount || lease.refunded_amount || 0);
+    const newTotalRefunded = currentRefunded + Number(amount);
 
     await leaseModel.update(leaseId, {
       refunded_amount: newTotalRefunded,
