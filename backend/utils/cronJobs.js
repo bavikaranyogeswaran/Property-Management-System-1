@@ -20,7 +20,7 @@ export const generateRentInvoices = async () => {
 
   const currentYear = today.getFullYear();
   const currentMonth = today.getMonth() + 1; // 1-12
-  const dueDate = new Date(today.getFullYear(), today.getMonth(), 10); // Due on 10th? Or +X days. Let's say 10th.
+  const dueDate = new Date(today.getFullYear(), today.getMonth(), 5); // Due on 5th? Or +X days. Let's say 5th.
 
   try {
     const activeLeases = await leaseModel.findActive(); // Should return all active (and pending? no only active)
