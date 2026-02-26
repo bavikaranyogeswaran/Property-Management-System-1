@@ -62,6 +62,8 @@ class LeadService {
             await leadModel.update(leadId, {
                 lastContactedAt: new Date(),
                 notes: notes ? `${notes} (Re-inquiry)` : undefined,
+                interestedUnit: finalUnitId,
+                unitId: finalUnitId,
             });
             message = 'Interest updated. We will contact you soon.';
         } else {

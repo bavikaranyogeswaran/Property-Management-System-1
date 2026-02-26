@@ -155,9 +155,7 @@ export const generateRentInvoices = async () => {
               dueDate: dueDate.toISOString().split('T')[0],
               month: currentMonth,
               year: currentYear,
-              invoiceId: 'PENDING-ID', // We don't have the ID from create() unless we assume insertion success? create() returns void/id?
-              // invoiceModel.create logic:
-              // const [result] = await db.query(...) -> return result.insertId;
+              invoiceId: invoiceId,
             });
           }
         } catch (emailErr) {
