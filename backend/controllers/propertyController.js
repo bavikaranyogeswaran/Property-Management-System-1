@@ -83,7 +83,6 @@ class PropertyController {
   async deleteProperty(req, res) {
     try {
       const result = await propertyService.deleteProperty(req.params.id);
-      await propertyService.deleteProperty(req.params.id);
       res.json({ message: 'Property deleted successfully' });
     } catch (error) {
       console.error('Error deleting property:', error);

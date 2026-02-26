@@ -158,14 +158,17 @@ class UnitModel {
   }
 
   async delete(id) {
-    // Hard delete or soft delete? propertyModel uses soft delete 'inactive' but units schema might not have it.
-    // Schema checks: status enum('available','occupied','maintenance'). No 'inactive'.
-    // So we might default to hard delete checking constraints.
-    // Assuming cascade or restriction.
-    const [result] = await db.query('DELETE FROM units WHERE unit_id = ?', [
-      id,
-    ]);
-    return result.affectedRows > 0;
+    try {
+      const [result] = await db.query('DELETE FROM units WHERE unit_id = ?', [
+        id,
+      ]);
+      return result.affectedRows > 0;
+    } catch (error) {
+       if (error.errno === 1451) {
+         throw new Error('Cannot delete unit because it has associated historical records (e.g. leases or maintenance requests).');
+       }
+       throw error;
+    }
   }
 
   mapRows(rows) {

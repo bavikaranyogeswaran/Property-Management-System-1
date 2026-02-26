@@ -47,6 +47,10 @@ export const validatePassword = (password) => {
  * Phone number validation for Sri Lankan numbers
  */
 export const validatePhoneNumber = (phone) => {
+  if (!phone) {
+      return { isValid: false, error: 'Phone number is required' };
+  }
+
   // Sri Lankan phone number patterns:
   // +94 77 123 4567 or +94771234567 or 0771234567
   const sriLankaPattern = /^(\+94|0)?[1-9]\d{8}$/;
