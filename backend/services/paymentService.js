@@ -170,7 +170,7 @@ class PaymentService {
                     });
 
                     // Deposit Status Logic
-                    if (invoice.type === 'deposit') {
+                    if (invoice.invoice_type === 'deposit') {
                          const lease = await leaseModel.findById(invoice.lease_id);
                          const currentHeld = Number(lease.securityDeposit || 0);
                          const newHeld = currentHeld + Number(payment.amount);
@@ -234,7 +234,7 @@ class PaymentService {
                          await invoiceModel.updateStatus(invoice.invoice_id, newStatus);
                      }
 
-                     if (invoice.type === 'deposit') {
+                     if (invoice.invoice_type === 'deposit') {
                           await leaseModel.update(invoice.lease_id, {
                               deposit_status: 'pending',
                           });

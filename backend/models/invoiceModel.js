@@ -21,8 +21,8 @@ class InvoiceModel {
 
     const db = connection || pool;
     const [result] = await db.query(
-      'INSERT INTO rent_invoices (lease_id, year, month, amount, due_date, status, description) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [leaseId, year, month, amount, dueDate, 'pending', description]
+      'INSERT INTO rent_invoices (lease_id, year, month, amount, due_date, status, invoice_type, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [leaseId, year, month, amount, dueDate, 'pending', type, description]
     );
     const invoiceId = result.insertId;
 
@@ -60,10 +60,10 @@ class InvoiceModel {
       'SELECT invoice_id FROM rent_invoices WHERE lease_id = ? AND year = ? AND month = ?';
     const params = [leaseId, year, month];
 
-    // if (type) {
-    //     query += ' AND invoice_type = ?';
-    //     params.push(type);
-    // }
+    if (type) {
+        query += ' AND invoice_type = ?';
+        params.push(type);
+    }
 
     const db = connection || pool;
     const [rows] = await db.query(query, params);
@@ -155,8 +155,8 @@ class InvoiceModel {
     // Or should we link it to the original invoice?
     // For now, standalone 'Late Fee' invoice.
     const [result] = await pool.query(
-      'INSERT INTO rent_invoices (lease_id, year, month, amount, due_date, status, description) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [leaseId, year, month, amount, dueDate, 'pending', description]
+      'INSERT INTO rent_invoices (lease_id, year, month, amount, due_date, status, invoice_type, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [leaseId, year, month, amount, dueDate, 'pending', 'late_fee', description]
     );
     return result.insertId;
   }

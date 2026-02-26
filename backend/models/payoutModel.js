@@ -56,7 +56,7 @@ class PayoutModel {
             JOIN properties prop ON u.property_id = prop.property_id
             WHERE prop.owner_id = ? 
             AND p.status = 'verified'
-            AND ri.type != 'deposit'
+            AND ri.invoice_type != 'deposit'
             AND p.payment_date BETWEEN ? AND ?
         `,
       [ownerId, startDate, endDate]
