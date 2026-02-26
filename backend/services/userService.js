@@ -230,6 +230,15 @@ class UserService {
         connection
       );
 
+      // 4b. Record stage history
+      const leadStageHistoryModel = (await import('../models/leadStageHistoryModel.js')).default;
+      await leadStageHistoryModel.create({
+          leadId,
+          stage: 'converted',
+          notes: 'System: Lead formally converted into an active tenant.',
+          changedBy: null // System action
+      }, connection);
+
       // 5. Lease & Unit Logic
       // Use provided unitId (from conversion dialog) OR the lead's original interest
       const targetUnitId = tenantData.unitId || lead.interestedUnit;

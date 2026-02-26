@@ -43,6 +43,14 @@ const authLimiter = rateLimit({
 });
 app.use('/api/auth', authLimiter);
 
+// General Rate Limiter: Prevent abuse of all other endpoints
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 1000, 
+  message: 'Too many requests from this IP, please try again after 15 minutes',
+});
+app.use('/api', apiLimiter);
+
 //  File Server: Allows the frontend to see uploaded images (like receipt photos).
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
