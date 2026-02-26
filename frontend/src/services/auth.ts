@@ -44,7 +44,33 @@ export const authService = {
 
   // Check if user is authenticated
   isAuthenticated: () => {
-    return !!storage.getToken();
+    const token = storage.getToken();
+    if (!token) return false;
+
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      const expiry = payload.exp * 1000;
+      
+      if (Date.now() >= expiry) {
+        storage.clear();
+        return false;
+      }
+      return true;
+    } catch (error) {
+      storage.clear();
+      return false;
+    }
+  },
+
+  getTokenRemainingTime: () => {
+    const token = storage.getToken();
+    if (!token) return 0;
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      return Math.max(0, payload.exp * 1000 - Date.now());
+    } catch (error) {
+      return 0;
+    }
   },
 
   // Password Reset

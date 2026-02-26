@@ -126,7 +126,7 @@ function DashboardRoute() {
 }
 
 function AppContent() {
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -139,6 +139,14 @@ function AppContent() {
   const handleNavigate = (page: string) => {
     navigate(page === 'login' ? '/login' : `/${page}`);
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
 
   return (
     <Routes>
