@@ -127,14 +127,13 @@ class LeaseService {
       // We need to import invoiceModel. Circular dependency risk?
       // leaseService imports leaseModel, unitModel, tenantModel.
       // We should import invoiceModel at top or dynamically.
-      // Let's assume top-level import (added in separate step or assumes availability).
-      const invoice = await import('../models/invoiceModel.js');
-      await invoice.default.create(
+      await invoiceModel.create(
         {
           leaseId,
           amount: securityDeposit,
           dueDate: startDate, // Due on start date?
           description: 'Security Deposit',
+          type: 'deposit', // Adding type strictly for clarity
         },
         connection
       );
@@ -163,10 +162,9 @@ class LeaseService {
       );
     }
 
-    const invoice = await import('../models/invoiceModel.js');
     // Unconditionally create initial rent invoice for new lease.
     // We removed 'invoice_type' so 'exists' check would falsely match the deposit invoice we just created.
-    await invoice.default.create(
+    await invoiceModel.create(
       {
         leaseId,
         amount: initialRentAmount,
@@ -262,12 +260,12 @@ class LeaseService {
       // verifying the payment for the Top-Up Invoice will increment it.
 
       // 2. Create Invoice for Difference
-      const invoiceModel = (await import('../models/invoiceModel.js')).default;
       await invoiceModel.create({
         leaseId,
         amount: diff,
         dueDate: new Date(), // Immediate
         description: 'Security Deposit Top-Up (Rent Increase)',
+        type: 'deposit', // Keeping type explicit
       });
       // 3. Mark deposit status? Status remains 'paid' (or 'partially_paid' concept? No enum only has pending/paid).
       // This is tricky. status 'paid' implies full?
@@ -338,7 +336,6 @@ class LeaseService {
     }
 
     // Logic Check: Unpaid Debt (Smart Offset)
-    const invoiceModel = (await import('../models/invoiceModel.js')).default;
     // We no longer BLOCK on debt. We OFFSET it.
 
     let withheldAmount = lease.securityDeposit - amount;
@@ -507,7 +504,6 @@ class LeaseService {
 
     // 1. Generate Termination Fee Invoice (if applicable)
     if (terminationFee > 0) {
-      const invoiceModel = (await import('../models/invoiceModel.js')).default;
       await invoiceModel.create({
         leaseId,
         amount: terminationFee,
