@@ -61,6 +61,15 @@ class PaymentService {
 
         const { invoiceId, amount, paymentDate, referenceNumber } = data;
 
+        // Integrity Check: Is invoice already paid?
+        const invoiceCheck = await invoiceModel.findById(invoiceId);
+        if (!invoiceCheck) {
+            throw new Error('Invoice not found');
+        }
+        if (invoiceCheck.status === 'paid') {
+            throw new Error('This invoice has already been paid.');
+        }
+
         const paymentId = await paymentModel.create({
             invoiceId,
             amount,
