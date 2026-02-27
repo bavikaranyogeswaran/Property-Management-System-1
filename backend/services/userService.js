@@ -12,6 +12,7 @@ import unitModel from '../models/unitModel.js';
 import leaseModel from '../models/leaseModel.js';
 import leaseService from '../services/leaseService.js';
 import emailService from '../utils/emailService.js';
+import leadTokenModel from '../models/leadTokenModel.js';
 import pool from '../config/db.js';
 
 const SALT_ROUNDS = 10;
@@ -228,6 +229,9 @@ class UserService {
         'UPDATE leads SET status = ? WHERE lead_id = ?',
         ['converted', leadId]
       );
+
+      // 4a. Invalidate portal access tokens
+      await leadTokenModel.invalidateForLead(leadId);
 
       // 4b. Record stage history (positional args: leadId, fromStatus, toStatus, notes, connection)
       const leadStageHistoryModel = (await import('../models/leadStageHistoryModel.js')).default;
