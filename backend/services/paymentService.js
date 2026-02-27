@@ -87,11 +87,33 @@ class PaymentService {
         });
 
         const { payment: updatedPayment } = await paymentModel.updateStatus(paymentId, 'verified');
-        await invoiceModel.updateStatus(invoiceId, 'paid');
+
+        // Calculate total verified payments for this invoice (same logic as verifyPayment)
+        const allPayments = await paymentModel.findByInvoiceId(invoiceId);
+        const totalVerified = allPayments
+            .filter((p) => p.status === 'verified')
+            .reduce((sum, p) => sum + Number(p.amount), 0);
 
         const invoice = await invoiceModel.findById(invoiceId);
 
         if (invoice) {
+            if (totalVerified >= invoice.amount) {
+                await invoiceModel.updateStatus(invoiceId, 'paid');
+
+                // Overpayment Logic: Credit excess to tenant account
+                const overpayment = totalVerified - invoice.amount;
+                if (overpayment > 0) {
+                    await tenantModel.addCredit(invoice.tenant_id, overpayment);
+                    await notificationModel.create({
+                        userId: invoice.tenant_id,
+                        message: `Overpayment of ${overpayment} has been credited to your account balance.`,
+                        type: 'payment',
+                    });
+                }
+            } else if (totalVerified > 0) {
+                await invoiceModel.updateStatus(invoiceId, 'partially_paid');
+            }
+
             await receiptModel.create({
                 paymentId,
                 invoiceId,
