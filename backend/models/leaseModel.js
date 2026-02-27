@@ -66,17 +66,25 @@ class LeaseModel {
     return result.affectedRows > 0;
   }
 
-  async findAll() {
-    const [rows] = await db.query(`
+  async findAll(ownerId = null) {
+    let query = `
             SELECT l.*, 
                    u.unit_number,
                    u.property_id,
                    p.name as property_name
             FROM leases l
             JOIN units u ON l.unit_id = u.unit_id
-            JOIN properties p ON u.property_id = p.property_id
-            ORDER BY l.created_at DESC
-        `);
+            JOIN properties p ON u.property_id = p.property_id`;
+    const params = [];
+
+    if (ownerId) {
+      query += ` WHERE p.owner_id = ?`;
+      params.push(ownerId);
+    }
+
+    query += ` ORDER BY l.created_at DESC`;
+
+    const [rows] = await db.query(query, params);
     return this.mapRows(rows);
   }
 

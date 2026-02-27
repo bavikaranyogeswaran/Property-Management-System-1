@@ -556,7 +556,7 @@ class LeaseService {
 
     async getLeases(user) {
         if (user.role === 'owner') {
-             return await leaseModel.findAll();
+             return await leaseModel.findAll(user.id);
         } else if (user.role === 'treasurer') {
              const results = await leaseModel.findAll();
              // Filter by assigned
