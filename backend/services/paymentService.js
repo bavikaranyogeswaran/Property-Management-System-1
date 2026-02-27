@@ -25,6 +25,12 @@ class PaymentService {
         if (!invoice) {
             throw new Error('Invoice not found');
         }
+
+        // Authorization: Verify this invoice belongs to the requesting tenant
+        if (String(invoice.tenant_id) !== String(tenantId)) {
+            throw new Error('Access denied. This invoice does not belong to you.');
+        }
+
         if (invoice.status === 'paid') {
             throw new Error('This invoice has already been paid.');
         }

@@ -1,39 +1,72 @@
 
+import pool from '../config/db.js';
 import invoiceModel from '../models/invoiceModel.js';
 import maintenanceCostModel from '../models/maintenanceCostModel.js';
 import unitModel from '../models/unitModel.js';
 import leaseModel from '../models/leaseModel.js';
 import leadModel from '../models/leadModel.js';
-import tenantModel from '../models/tenantModel.js';
 
 class ReportService {
 
-    async getFinancialStats(year) {
-        const invoices = await invoiceModel.findAll();
-        const costs = await maintenanceCostModel.findAllWithDetails();
+    // Helper: Get property IDs accessible by a user based on role
+    async _getAccessiblePropertyIds(user) {
+        if (user.role === 'owner') {
+            const [rows] = await pool.query(
+                'SELECT property_id FROM properties WHERE owner_id = ?',
+                [user.id]
+            );
+            return rows.map(r => r.property_id);
+        }
+        if (user.role === 'treasurer') {
+            const [rows] = await pool.query(
+                'SELECT property_id FROM staff_property_assignments WHERE user_id = ?',
+                [user.id]
+            );
+            return rows.map(r => r.property_id);
+        }
+        return [];
+    }
 
-        const paidInvoices = invoices.filter(
-            (i) => i.status === 'paid' && new Date(i.due_date).getFullYear() == year
+    async getFinancialStats(year, user) {
+        const propertyIds = await this._getAccessiblePropertyIds(user);
+        if (propertyIds.length === 0) return {};
+
+        const [invoices] = await pool.query(
+            `SELECT ri.*, p.name as property_name
+             FROM rent_invoices ri
+             JOIN leases l ON ri.lease_id = l.lease_id
+             JOIN units u ON l.unit_id = u.unit_id
+             JOIN properties p ON u.property_id = p.property_id
+             WHERE ri.status = 'paid'
+             AND YEAR(ri.due_date) = ?
+             AND p.property_id IN (?)`,
+            [year, propertyIds]
         );
 
-        const yearCosts = costs.filter(
-            (c) => new Date(c.recorded_date).getFullYear() == year
+        const [costs] = await pool.query(
+            `SELECT mc.*, p.name as property_name
+             FROM maintenance_costs mc
+             JOIN maintenance_requests mr ON mc.request_id = mr.request_id
+             JOIN units u ON mr.unit_id = u.unit_id
+             JOIN properties p ON u.property_id = p.property_id
+             WHERE YEAR(mc.recorded_date) = ?
+             AND p.property_id IN (?)`,
+            [year, propertyIds]
         );
 
         const propertyStats = {};
         
-        // Helper to init
         const getStat = (name) => {
              if (!propertyStats[name]) propertyStats[name] = { income: 0, expense: 0 };
              return propertyStats[name];
         };
 
-        paidInvoices.forEach((inv) => {
+        invoices.forEach((inv) => {
             const name = inv.property_name || 'Unknown Property';
             getStat(name).income += Number(inv.amount);
         });
 
-        yearCosts.forEach((cost) => {
+        costs.forEach((cost) => {
             const name = cost.property_name || 'Unknown Property';
             getStat(name).expense += Number(cost.amount);
         });
@@ -41,12 +74,17 @@ class ReportService {
         return propertyStats;
     }
 
-    async getOccupancyStats() {
-        const units = await unitModel.findAll();
-        const propertyStats = {};
+    async getOccupancyStats(user) {
+        const propertyIds = await this._getAccessiblePropertyIds(user);
+        if (propertyIds.length === 0) return {};
 
-        for (const unit of units) {
-            const propName = unit.property_name || `Property ${unit.property_id}`;
+        const units = await unitModel.findAll();
+        // Filter to only accessible properties
+        const filteredUnits = units.filter(u => propertyIds.includes(Number(u.propertyId)));
+
+        const propertyStats = {};
+        for (const unit of filteredUnits) {
+            const propName = unit.propertyName || `Property ${unit.propertyId}`;
             if (!propertyStats[propName]) {
                 propertyStats[propName] = { total: 0, occupied: 0, vacancies: [] };
             }
@@ -55,15 +93,35 @@ class ReportService {
             if (unit.status === 'occupied') {
                 propertyStats[propName].occupied++;
             } else {
-                propertyStats[propName].vacancies.push(unit.unit_number);
+                propertyStats[propName].vacancies.push(unit.unitNumber);
             }
         }
         return propertyStats;
     }
 
-    async getTenantRiskStats() {
-        const tenants = await tenantModel.getTenantRiskProfiles();
-        // Enrich with Risk Level
+    async getTenantRiskStats(user) {
+        const propertyIds = await this._getAccessiblePropertyIds(user);
+        if (propertyIds.length === 0) return [];
+
+        // Fetch tenant risk profiles scoped to the user's properties
+        const [tenants] = await pool.query(
+            `SELECT u.name, t.behavior_score,
+                    (SELECT COUNT(*) FROM rent_invoices ri 
+                     JOIN leases l2 ON ri.lease_id = l2.lease_id 
+                     WHERE l2.tenant_id = t.user_id AND ri.status = 'overdue') as overdue_count,
+                    (SELECT COUNT(*) FROM rent_invoices ri 
+                     JOIN leases l2 ON ri.lease_id = l2.lease_id 
+                     WHERE l2.tenant_id = t.user_id AND ri.status = 'paid') as paid_count
+             FROM tenants t
+             JOIN users u ON t.user_id = u.user_id
+             JOIN leases l ON t.user_id = l.tenant_id
+             JOIN units un ON l.unit_id = un.unit_id
+             WHERE un.property_id IN (?)
+             AND l.status = 'active'
+             GROUP BY t.user_id, u.name, t.behavior_score`,
+            [propertyIds]
+        );
+
         return tenants.map(tenant => {
             let riskLevel = 'Low';
             let color = 'green';
@@ -80,8 +138,21 @@ class ReportService {
         });
     }
 
-    async getMaintenanceCategoryStats() {
-        const costs = await maintenanceCostModel.findAllWithDetails();
+    async getMaintenanceCategoryStats(user) {
+        const propertyIds = await this._getAccessiblePropertyIds(user);
+        if (propertyIds.length === 0) return { categories: {}, totalCost: 0 };
+
+        const [costs] = await pool.query(
+            `SELECT mc.*, mr.title, p.name as property_name
+             FROM maintenance_costs mc
+             JOIN maintenance_requests mr ON mc.request_id = mr.request_id
+             JOIN units u ON mr.unit_id = u.unit_id
+             JOIN properties p ON u.property_id = p.property_id
+             WHERE p.property_id IN (?)
+             ORDER BY mc.recorded_date DESC`,
+            [propertyIds]
+        );
+
         const categories = {};
         let totalCost = 0;
 
@@ -104,20 +175,35 @@ class ReportService {
         return { categories, totalCost };
     }
 
-    async getLeaseExpirationStats() {
+    async getLeaseExpirationStats(user) {
+        const propertyIds = await this._getAccessiblePropertyIds(user);
+        if (propertyIds.length === 0) return [];
+
         const activeLeases = await leaseModel.findActive();
         const now = new Date();
         const ninetyDaysFromNow = new Date();
         ninetyDaysFromNow.setDate(now.getDate() + 90);
 
         return activeLeases.filter((lease) => {
+            // Filter by accessible properties
+            if (!propertyIds.includes(Number(lease.propertyId))) return false;
             const endDate = new Date(lease.endDate);
             return endDate >= now && endDate <= ninetyDaysFromNow;
         });
     }
 
-    async getLeadConversionStats() {
-        const leads = await leadModel.findAll();
+    async getLeadConversionStats(user) {
+        // leadModel.findAll() already supports ownerId filtering for owners
+        let leads;
+        if (user.role === 'owner') {
+            leads = await leadModel.findAll(user.id);
+        } else {
+            // Treasurer — filter by assigned properties
+            const propertyIds = await this._getAccessiblePropertyIds(user);
+            const allLeads = await leadModel.findAll();
+            leads = allLeads.filter(l => propertyIds.includes(Number(l.property_id)));
+        }
+
         const stats = {
             Total: leads.length,
             Interested: 0,

@@ -7,7 +7,7 @@ class ReportController {
   async generateFinancialReport(req, res) {
     try {
       const year = req.query.year || new Date().getFullYear();
-      const propertyStats = await reportService.getFinancialStats(year);
+      const propertyStats = await reportService.getFinancialStats(year, req.user);
 
       // Create PDF (Presentation Layer)
       const doc = new PDFDocument({ margin: 50 });
@@ -64,7 +64,7 @@ class ReportController {
   //  OCCUPANCY REPORT
   async generateOccupancyReport(req, res) {
     try {
-      const propertyStats = await reportService.getOccupancyStats();
+      const propertyStats = await reportService.getOccupancyStats(req.user);
       const doc = new PDFDocument({ margin: 50 });
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `inline; filename=occupancy_report.pdf`);
@@ -103,7 +103,7 @@ class ReportController {
   //  RISK REPORT
   async generateTenantRiskReport(req, res) {
     try {
-      const tenants = await reportService.getTenantRiskStats();
+      const tenants = await reportService.getTenantRiskStats(req.user);
       const doc = new PDFDocument({ margin: 50 });
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `inline; filename=tenant_risk_report.pdf`);
@@ -139,7 +139,7 @@ class ReportController {
 
   async generateMaintenanceCategoryReport(req, res) {
     try {
-      const { categories, totalCost } = await reportService.getMaintenanceCategoryStats();
+      const { categories, totalCost } = await reportService.getMaintenanceCategoryStats(req.user);
       const doc = new PDFDocument({ margin: 50 });
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `inline; filename=maintenance_category_report.pdf`);
@@ -170,7 +170,7 @@ class ReportController {
 
   async generateLeaseExpirationReport(req, res) {
     try {
-      const expiringLeases = await reportService.getLeaseExpirationStats();
+      const expiringLeases = await reportService.getLeaseExpirationStats(req.user);
       const doc = new PDFDocument({ margin: 50 });
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `inline; filename=lease_expiration_forecast.pdf`);
@@ -213,7 +213,7 @@ class ReportController {
 
   async generateLeadConversionReport(req, res) {
     try {
-      const stats = await reportService.getLeadConversionStats();
+      const stats = await reportService.getLeadConversionStats(req.user);
       const doc = new PDFDocument({ margin: 50 });
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `inline; filename=lead_conversion_report.pdf`);
@@ -225,9 +225,9 @@ class ReportController {
       let y = 150;
       const steps = [
         { label: 'Total Leads', count: stats.Total, color: '#e0e0e0' },
-        { label: 'Visits Scheduled', count: stats.Scheduled, color: '#b3e5fc' },
-        { label: 'Applications', count: stats.Application, color: '#81c784' },
-        { label: 'Signed Leases', count: stats.Leased, color: '#4caf50' },
+        { label: 'Interested', count: stats.Interested, color: '#b3e5fc' },
+        { label: 'Converted', count: stats.Converted, color: '#4caf50' },
+        { label: 'Dropped', count: stats.Dropped, color: '#ef5350' },
       ];
 
       steps.forEach((step, index) => {
