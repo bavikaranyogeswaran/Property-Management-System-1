@@ -64,6 +64,10 @@ class LeadService {
                 notes: notes ? `${notes} (Re-inquiry)` : undefined,
                 interestedUnit: finalUnitId,
                 unitId: finalUnitId,
+                name: name,
+                phone: phone,
+                move_in_date: moveInDate,
+                occupants_count: occupantsCount
             });
             message = 'Interest updated. We will contact you soon.';
         } else {

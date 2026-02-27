@@ -84,11 +84,31 @@ class LeadModel {
     const fields = [];
     const values = [];
 
-    if (data.status) {
+    if (data.status !== undefined) {
       fields.push('status = ?');
       values.push(data.status);
     }
-    if (data.notes) {
+    if (data.unitId !== undefined) {
+      fields.push('unit_id = ?');
+      values.push(data.unitId);
+    }
+    if (data.name !== undefined) {
+      fields.push('name = ?');
+      values.push(data.name);
+    }
+    if (data.phone !== undefined) {
+      fields.push('phone = ?');
+      values.push(data.phone);
+    }
+    if (data.move_in_date !== undefined) {
+      fields.push('move_in_date = ?');
+      values.push(data.move_in_date);
+    }
+    if (data.occupants_count !== undefined) {
+      fields.push('occupants_count = ?');
+      values.push(data.occupants_count);
+    }
+    if (data.notes !== undefined) {
       fields.push('notes = ?');
       values.push(data.notes);
     }
@@ -96,7 +116,7 @@ class LeadModel {
       fields.push('internal_notes = ?');
       values.push(data.internalNotes);
     }
-    if (data.lastContactedAt) {
+    if (data.lastContactedAt !== undefined) {
       fields.push('last_contacted_at = ?');
       values.push(data.lastContactedAt);
     }
