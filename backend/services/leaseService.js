@@ -593,7 +593,7 @@ class LeaseService {
              return lease; // Simplify for checked roles
         }
         if (user.role === 'tenant') {
-             if (lease.tenantId !== user.id.toString()) {
+             if (String(lease.tenantId) !== String(user.id)) {
                  throw new Error('Access denied');
              }
              return lease;
