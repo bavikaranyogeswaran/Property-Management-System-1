@@ -181,6 +181,8 @@ class LeadModel {
                 phone,
                 notes,
                 internal_notes as internalNotes,
+                move_in_date as moveInDate,
+                occupants_count as occupantsCount,
                 status,
                 created_at as createdAt,
                 last_contacted_at as lastContactedAt
