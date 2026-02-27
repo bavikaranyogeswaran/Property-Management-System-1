@@ -12,6 +12,14 @@ class LeadController {
       }
 
       const { id } = req.params;
+
+      // Verify the lead belongs to this owner's property
+      const leadModel = (await import('../models/leadModel.js')).default;
+      const isOwner = await leadModel.verifyOwnership(id, req.user.id);
+      if (!isOwner) {
+        return res.status(403).json({ error: 'Access denied. This lead does not belong to your property.' });
+      }
+
       const {
         startDate,
         endDate,

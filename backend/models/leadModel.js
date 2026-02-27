@@ -243,6 +243,16 @@ class LeadModel {
     );
     return rows[0];
   }
+
+  async verifyOwnership(leadId, ownerId) {
+    const [rows] = await db.query(
+      `SELECT l.lead_id FROM leads l
+       INNER JOIN properties p ON l.property_id = p.property_id
+       WHERE l.lead_id = ? AND p.owner_id = ?`,
+      [leadId, ownerId]
+    );
+    return rows.length > 0;
+  }
 }
 
 export default new LeadModel();

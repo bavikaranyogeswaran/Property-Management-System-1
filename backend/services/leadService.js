@@ -121,6 +121,8 @@ class LeadService {
         if (user.role !== 'owner') {
              throw new Error('Access denied.');
         }
+        const isOwner = await leadModel.verifyOwnership(id, user.id);
+        if (!isOwner) throw new Error('Access denied. This lead does not belong to your property.');
         const success = await leadModel.update(id, data);
         if (!success) throw new Error('Lead not found');
         return success;
