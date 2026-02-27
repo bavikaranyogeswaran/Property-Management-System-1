@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import leaseModel from '../models/leaseModel.js';
 import unitModel from '../models/unitModel.js';
 import tenantModel from '../models/tenantModel.js';
@@ -157,9 +158,6 @@ class LeaseService {
       initialRentAmount =
         Math.round((monthlyRent / daysInMonth) * daysRemaining * 100) / 100;
       invoiceDescription += ` (Prorated: ${daysRemaining}/${daysInMonth} days)`;
-      console.log(
-        `Prorating Rent: ${daysRemaining} days. Amount: ${initialRentAmount}`
-      );
     }
 
     // Unconditionally create initial rent invoice for new lease.
@@ -274,9 +272,7 @@ class LeaseService {
       // Strictly -> 'pending'. because we don't hold the full new amount.
       await leaseModel.update(leaseId, { deposit_status: 'pending' }); // Reset until top-up is paid.
 
-      console.log(
-        `Lease Renewal: Rent increased. Invoiced Top-Up ${diff}. Reset Deposit Status.`
-      );
+
     }
 
     // 4. Sync Future Invoices
@@ -288,9 +284,7 @@ class LeaseService {
         newMonthlyRent,
         today
       );
-      console.log(
-        `Synced future invoices for Lease ${leaseId} to new rent ${newMonthlyRent}`
-      );
+
     }
 
     // Audit Log
@@ -381,9 +375,6 @@ class LeaseService {
             await invoiceModel.updateStatus(inv.invoice_id, 'partially_paid');
           }
 
-          console.log(
-            `Offset Pending Invoice ${inv.invoice_id} with ${toPay} from Deposit.`
-          );
 
           // 1a. Generate Receipt for Offset
           const receiptModel = (await import('../models/receiptModel.js'))
@@ -394,7 +385,7 @@ class LeaseService {
             tenantId: lease.tenantId,
             amount: toPay,
             generatedDate: new Date().toISOString(),
-            receiptNumber: `REC-OFFSET-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
+            receiptNumber: `REC-OFFSET-${randomUUID()}`,
           });
           withheldAmount -= toPay;
         }
@@ -432,11 +423,8 @@ class LeaseService {
         tenantId: lease.tenantId,
         amount: withheldAmount,
         generatedDate: new Date().toISOString(),
-        receiptNumber: `REC-DEDUCT-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
+        receiptNumber: `REC-DEDUCT-${randomUUID()}`,
       });
-      console.log(
-        `Created Deduction Invoice ${invId} for Remaining Withheld: ${withheldAmount}`
-      );
     }
 
     const currentRefunded = Number(lease.refundedAmount || lease.refunded_amount || 0);
@@ -474,7 +462,7 @@ class LeaseService {
     // If the lease is terminated BEFORE the start date, it is a cancellation.
     // We should void all pending invoices and mark lease as 'cancelled'.
     if (today < start) {
-      console.log(`Lease ${leaseId} cancelled before start date.`);
+
       // Note: We typically don't charge termination fees for pre-move-in cancellations
       // unless specified. If user passes fee here, we COULD charge it, but usually
       // we just void everything. Let's assume Fee applies to Active Leases (Post-Move-In).
@@ -510,7 +498,7 @@ class LeaseService {
         dueDate: new Date(), // Immediate
         description: 'Early Termination Fee',
       });
-      console.log(`Generated Termination Fee Invoice: ${terminationFee}`);
+
     }
 
     // 2. Update Lease Status & End Date

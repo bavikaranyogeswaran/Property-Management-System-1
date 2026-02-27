@@ -1,4 +1,5 @@
 
+import { randomUUID } from 'crypto';
 import paymentModel from '../models/paymentModel.js';
 import invoiceModel from '../models/invoiceModel.js';
 import notificationModel from '../models/notificationModel.js';
@@ -91,7 +92,7 @@ class PaymentService {
                 tenantId: invoice.tenant_id,
                 amount,
                 generatedDate: new Date().toISOString(),
-                receiptNumber: `REC-CASH-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
+                receiptNumber: `REC-CASH-${randomUUID()}`,
             });
 
             await auditLogger.log(
@@ -172,7 +173,7 @@ class PaymentService {
                         tenantId: invoice.tenant_id,
                         amount: payment.amount,
                         generatedDate: new Date().toISOString(),
-                        receiptNumber: `REC-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
+                        receiptNumber: `REC-${randomUUID()}`,
                     });
 
                     // Deposit Status Logic
