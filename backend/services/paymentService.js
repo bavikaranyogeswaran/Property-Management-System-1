@@ -79,7 +79,7 @@ class PaymentService {
             evidenceUrl: null,
         });
 
-        await paymentModel.updateStatus(paymentId, 'verified');
+        const { payment: updatedPayment } = await paymentModel.updateStatus(paymentId, 'verified');
         await invoiceModel.updateStatus(invoiceId, 'paid');
 
         const invoice = await invoiceModel.findById(invoiceId);
@@ -113,10 +113,16 @@ class PaymentService {
             throw new Error('Access denied');
         }
 
-        const updatedPayment = await paymentModel.updateStatus(paymentId, status);
+        const { payment: updatedPayment, changed } = await paymentModel.updateStatus(paymentId, status);
+
+        // Concurrency Lock: If this payment was ALREADY set to this status by another request, halt.
+        if (!changed) {
+             console.warn(`Idempotency caught duplicate status update for Payment ${paymentId}`);
+             return updatedPayment;
+        }
 
         if (status === 'verified') {
-            const payment = await paymentModel.findById(paymentId);
+            const payment = updatedPayment;
             if (payment) {
                 // Logic Check: Partial Payments
                 const allPayments = await paymentModel.findByInvoiceId(payment.invoiceId);
@@ -214,7 +220,7 @@ class PaymentService {
                  }
             }
         } else if (status === 'rejected') {
-             const payment = await paymentModel.findById(paymentId);
+             const payment = updatedPayment;
              if (payment) {
                  const invoice = await invoiceModel.findById(payment.invoiceId);
                  if (invoice) {

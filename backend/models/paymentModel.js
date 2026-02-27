@@ -126,14 +126,18 @@ class PaymentModel {
 
   async updateStatus(id, status, verifiedBy = null) {
     // verifiedBy could be stored if we add that column, for now just status
-    await pool.query('UPDATE payments SET status = ? WHERE payment_id = ?', [
+    const [result] = await pool.query('UPDATE payments SET status = ? WHERE payment_id = ? AND status != ?', [
       status,
       id,
+      status, // Prevent redundant updates taking lock success
     ]);
 
     // If approved, we might want to update the invoice status too - handled in controller transaction potentially?
     // Or simple model call.
-    return this.findById(id);
+    return {
+        payment: await this.findById(id),
+        changed: result.affectedRows > 0
+    };
   }
 }
 
