@@ -37,14 +37,23 @@ class LeaseModel {
     );
     return result.insertId;
   }
+  // Whitelist of columns that can be updated via the dynamic update method
+  static ALLOWED_UPDATE_FIELDS = [
+    'tenant_id', 'unit_id', 'start_date', 'end_date',
+    'monthly_rent', 'status', 'security_deposit',
+    'deposit_status', 'refunded_amount',
+  ];
+
   async update(id, data, connection = null) {
     const dbConn = connection || db;
-    // Build dynamic query
+    // Build dynamic query with whitelisted fields only
     const fields = [];
     const values = [];
     Object.keys(data).forEach((key) => {
-      fields.push(`${key} = ?`);
-      values.push(data[key]);
+      if (LeaseModel.ALLOWED_UPDATE_FIELDS.includes(key)) {
+        fields.push(`${key} = ?`);
+        values.push(data[key]);
+      }
     });
     values.push(id);
 
