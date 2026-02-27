@@ -6,12 +6,10 @@
 // ============================================================================
 
 import pool from '../config/db.js';
-import emailService from '../utils/emailService.js';
-import userModel from './userModel.js';
-import leaseModel from './leaseModel.js';
 
 class InvoiceModel {
   //  CREATE: Writing a new bill to the ledger.
+  // NOTE: Email notifications are handled by the caller (service/controller/cron layer).
   async create(data, connection = null) {
     const { leaseId, amount, dueDate, description, type } = data;
     // Need to determine year/month from dueDate
@@ -24,35 +22,8 @@ class InvoiceModel {
       'INSERT INTO rent_invoices (lease_id, year, month, amount, due_date, status, invoice_type, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       [leaseId, year, month, amount, dueDate, 'pending', type, description]
     );
-    const invoiceId = result.insertId;
 
-    // Notify Tenant via Email
-    try {
-      // Need tenant email. create(data) has leaseId.
-      // data might have tenantId? If not, fetch from lease.
-      let tenantId = data.tenantId;
-      if (!tenantId) {
-        const lease = await leaseModel.findById(leaseId);
-        tenantId = lease ? lease.tenantId : null;
-      }
-
-      if (tenantId) {
-        const tenant = await userModel.findById(tenantId);
-        if (tenant && tenant.email) {
-          await emailService.sendInvoiceNotification(tenant.email, {
-            amount,
-            dueDate,
-            month,
-            year,
-            invoiceId,
-          });
-        }
-      }
-    } catch (emailErr) {
-      console.error('Failed to send invoice email:', emailErr);
-    }
-
-    return invoiceId;
+    return result.insertId;
   }
 
   async exists(leaseId, year, month, type = null, connection = null) {

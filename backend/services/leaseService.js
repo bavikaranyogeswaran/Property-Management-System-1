@@ -112,7 +112,7 @@ class LeaseService {
     // 3. Update Unit Status
     // Only set to occupied if the lease is CURRENT (starts today or past)
     const today = new Date().toISOString().split('T')[0];
-    if (startDate <= today) {
+    if (new Date(startDate) <= new Date(today)) {
       await unitModel.update(unitId, { status: 'occupied' }, connection);
 
       // CLEANUP: Cancel conflicting future/current visits
@@ -230,7 +230,7 @@ class LeaseService {
     const updateData = {
       end_date: newEndDate,
     };
-    if (newMonthlyRent) {
+    if (newMonthlyRent != null) {
       updateData.monthly_rent = newMonthlyRent;
     }
 
@@ -240,7 +240,7 @@ class LeaseService {
     // If rent increased, we should increase the deposit (if policy says Deposit = 1 Month Rent).
     // Let's assume typical policy: Deposit = 1 Month Rent.
     // If newRent > currentRent, create invoice for difference.
-    if (newMonthlyRent && newMonthlyRent > lease.monthlyRent) {
+    if (newMonthlyRent != null && newMonthlyRent > lease.monthlyRent) {
       const diff = newMonthlyRent - lease.monthlyRent;
       // Update lease security_deposit value?
       // Yes, standard is to update it.
@@ -277,7 +277,7 @@ class LeaseService {
 
     // 4. Sync Future Invoices
     // If rent was updated, we must ensure any *already generated* pending invoices for future months (e.g. from Cron) are updated.
-    if (newMonthlyRent) {
+    if (newMonthlyRent != null) {
       const today = new Date().toISOString().split('T')[0];
       await invoiceModel.syncFutureRentInvoices(
         leaseId,

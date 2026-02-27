@@ -21,26 +21,7 @@ class PasswordController {
         });
       }
 
-      // Create a short-lived token specific to password reset
-      // We include the current password hash in the secret to invalidate token if password changes
-      const secret = JWT_SECRET + user.password_hash;
-      const token = jwt.sign({ id: user.user_id, email: user.email }, secret, {
-        expiresIn: '1h',
-      });
-
-      // Construct a URL-safe token that includes the user ID to help find the user later
-      // Or just send the token and payload must contain ID.
-      // Standard way: send token. When verifying, we need user ID to reconstruct the secret.
-      // THIS IS TRICKY: Verification needs user's current password hash.
-      // Better approach: Just use standard secret, but shorter expiry.
-      // Or: Encode user ID in the token payload (already done).
-
-      // To make it stateless but secure:
-      // 1. Sign payload { id, email } with JWT_SECRET.
-      // 2. But we want to invalidate if they change password.
-      //    So we can use a composite key or just rely on expiry.
-      //    Let's stick to standard JWT_SECRET for simplicity now, 1h expiry.
-
+      // Create a short-lived token for password reset (1h expiry)
       const resetToken = jwt.sign(
         { id: user.user_id, type: 'reset' },
         JWT_SECRET,

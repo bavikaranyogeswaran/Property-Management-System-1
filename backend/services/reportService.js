@@ -121,18 +121,15 @@ class ReportService {
         const stats = {
             Total: leads.length,
             Interested: 0,
-            Scheduled: 0,
-            visited: 0, 
-            Application: 0,
-            Leased: 0,
+            Converted: 0,
+            Dropped: 0,
         };
 
         leads.forEach((lead) => {
             const status = lead.status.toLowerCase();
-            if (status === 'interested' || status === 'new') stats.Interested++;
-            if (status.includes('schedule') || status.includes('visit')) stats.Scheduled++;
-            if (status.includes('application') || status === 'applied') stats.Application++;
-            if (status === 'converted' || status === 'leased' || status === 'tenant') stats.Leased++;
+            if (status === 'interested') stats.Interested++;
+            if (status === 'converted') stats.Converted++;
+            if (status === 'dropped') stats.Dropped++;
         });
         
         return stats;
