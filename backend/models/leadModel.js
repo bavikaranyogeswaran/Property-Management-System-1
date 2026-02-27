@@ -189,7 +189,7 @@ class LeadModel {
   }
   async findIdByEmailAndProperty(email, propertyId) {
     const [rows] = await db.query(
-      `SELECT lead_id FROM leads WHERE email = ? AND property_id = ? LIMIT 1`,
+      `SELECT lead_id FROM leads WHERE email = ? AND property_id = ? AND status NOT IN ('dropped', 'converted') LIMIT 1`,
       [email, propertyId]
     );
     return rows.length > 0 ? rows[0].lead_id : null;
