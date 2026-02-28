@@ -369,12 +369,61 @@ export const applyLateFees = async () => {
       const lateFeeAmount = inv.amount * LATE_FEE_PERCENTAGE;
 
       // Create Late Fee Invoice
-      await invoiceModel.createLateFeeInvoice({
+      const lateFeeInvoiceId = await invoiceModel.createLateFeeInvoice({
         leaseId: inv.lease_id,
         amount: lateFeeAmount,
         dueDate: new Date(), // Due immediately
         description: `Late Fee for Invoice #${inv.invoice_id} (${inv.year}-${inv.month})`,
       });
+
+      // Auto-Apply Credits to Late Fee (consistent with rent invoice logic)
+      const tenantModel = (await import('../models/tenantModel.js')).default;
+      const tenant = await tenantModel.findByUserId(inv.tenant_id);
+
+      if (tenant && tenant.creditBalance > 0) {
+        const amountToApply = Math.min(tenant.creditBalance, lateFeeAmount);
+
+        if (amountToApply > 0) {
+          const paymentModel = (await import('../models/paymentModel.js')).default;
+
+          // 1. Create Verified Payment
+          const payId = await paymentModel.create({
+            invoiceId: lateFeeInvoiceId,
+            amount: amountToApply,
+            paymentDate: new Date(),
+            paymentMethod: 'credit_applied',
+            referenceNumber: `CREDIT-LATEFEE-${Date.now()}`,
+            evidenceUrl: null,
+          });
+          await paymentModel.updateStatus(payId, 'verified');
+
+          // 2. Deduct Credit
+          await tenantModel.deductCredit(inv.tenant_id, amountToApply);
+
+          // 3. Update Invoice Status
+          if (amountToApply >= lateFeeAmount) {
+            await invoiceModel.updateStatus(lateFeeInvoiceId, 'paid');
+          } else {
+            await invoiceModel.updateStatus(lateFeeInvoiceId, 'partially_paid');
+          }
+
+          // 4. Generate Receipt
+          const receiptModel = (await import('../models/receiptModel.js')).default;
+          const { randomUUID } = await import('crypto');
+          await receiptModel.create({
+            paymentId: payId,
+            invoiceId: lateFeeInvoiceId,
+            tenantId: inv.tenant_id,
+            amount: amountToApply,
+            generatedDate: new Date().toISOString(),
+            receiptNumber: `REC-CREDIT-LATEFEE-${randomUUID()}`,
+          });
+
+          console.log(
+            `Auto-applied credit ${amountToApply} to Late Fee Invoice ${lateFeeInvoiceId}. Remaining Credit: ${tenant.creditBalance - amountToApply}`
+          );
+        }
+      }
 
       // Notify Tenant
       await notificationModel.create({
