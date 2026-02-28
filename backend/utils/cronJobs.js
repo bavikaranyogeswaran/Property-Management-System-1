@@ -550,6 +550,21 @@ export const syncUnitStatuses = async () => {
   }
 };
 
+// Notification Cleanup (Daily at 4:00 AM)
+// Prevents unbounded growth of the notifications table
+export const cleanupOldNotifications = async () => {
+  console.log('Running notification cleanup...');
+  try {
+    const notificationModel = (await import('../models/notificationModel.js')).default;
+
+    // Delete read notifications older than 30 days
+    const readDeleted = await notificationModel.deleteOlderThan(30);
+    console.log(`Cleaned up ${readDeleted} notifications older than 30 days.`);
+  } catch (error) {
+    console.error('Error in notification cleanup:', error);
+  }
+};
+
 const initCronJobs = () => {
   // Run every day at 0:30 AM (Expiry Warnings)
   cron.schedule('30 0 * * *', sendLeaseExpiryWarnings);
@@ -565,6 +580,9 @@ const initCronJobs = () => {
 
   // Run every day at 3:00 AM (Unit Status Sync)
   cron.schedule('0 3 * * *', syncUnitStatuses);
+
+  // Run every day at 4:00 AM (Notification Cleanup)
+  cron.schedule('0 4 * * *', cleanupOldNotifications);
 };
 
 export default initCronJobs;

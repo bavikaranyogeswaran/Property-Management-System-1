@@ -40,6 +40,30 @@ class NotificationModel {
     );
     return result.affectedRows > 0;
   }
+
+  async deleteById(notificationId, userId) {
+    const [result] = await pool.query(
+      'DELETE FROM notifications WHERE notification_id = ? AND user_id = ?',
+      [notificationId, userId]
+    );
+    return result.affectedRows > 0;
+  }
+
+  async deleteAllRead(userId) {
+    const [result] = await pool.query(
+      'DELETE FROM notifications WHERE user_id = ? AND is_read = TRUE',
+      [userId]
+    );
+    return result.affectedRows;
+  }
+
+  async deleteOlderThan(days) {
+    const [result] = await pool.query(
+      'DELETE FROM notifications WHERE created_at < DATE_SUB(NOW(), INTERVAL ? DAY)',
+      [days]
+    );
+    return result.affectedRows;
+  }
 }
 
 export default new NotificationModel();

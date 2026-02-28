@@ -30,12 +30,36 @@ class NotificationController {
   async markAllAsRead(req, res) {
     try {
       const userId = req.user.id;
-      // No success check needed, if 0 rows updated it means they were already read or no notifications exist
       await notificationModel.markAllAsRead(userId);
       res.json({ message: 'All notifications marked as read' });
     } catch (error) {
       console.error(error);
       res.status(500).json({ error: 'Failed to update notifications' });
+    }
+  }
+
+  async deleteNotification(req, res) {
+    try {
+      const { id } = req.params;
+      const success = await notificationModel.deleteById(id, req.user.id);
+      if (success) {
+        res.json({ message: 'Notification deleted' });
+      } else {
+        res.status(404).json({ error: 'Notification not found' });
+      }
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: 'Failed to delete notification' });
+    }
+  }
+
+  async clearRead(req, res) {
+    try {
+      const count = await notificationModel.deleteAllRead(req.user.id);
+      res.json({ message: `Cleared ${count} read notifications` });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: 'Failed to clear notifications' });
     }
   }
 }
