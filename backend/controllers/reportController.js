@@ -244,6 +244,21 @@ class ReportController {
       res.status(500).json({ error: 'Failed to generate report' });
     }
   }
+
+  /**
+   * GET /api/reports/ledger-summary?year=2026
+   * Returns JSON (not PDF) with revenue, liability, expense, and net operating income.
+   */
+  async getLedgerSummary(req, res) {
+    try {
+      const year = req.query.year || new Date().getFullYear();
+      const summary = await reportService.getLedgerSummary(year, req.user);
+      res.json(summary);
+    } catch (error) {
+      console.error('Error fetching ledger summary:', error);
+      res.status(500).json({ error: 'Failed to fetch ledger summary' });
+    }
+  }
 }
 
 export default new ReportController();

@@ -401,6 +401,30 @@ CREATE TABLE IF NOT EXISTS staff_property_assignments (
 );
 
 -- =========================
+-- ACCOUNTING LEDGER
+-- =========================
+CREATE TABLE accounting_ledger (
+    entry_id INT AUTO_INCREMENT PRIMARY KEY,
+    payment_id INT,
+    invoice_id INT,
+    lease_id INT NOT NULL,
+    account_type ENUM('revenue', 'liability', 'expense') NOT NULL,
+    category VARCHAR(50) NOT NULL,
+    debit DECIMAL(10,2) DEFAULT 0.00,
+    credit DECIMAL(10,2) DEFAULT 0.00,
+    description VARCHAR(255),
+    entry_date DATE NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (payment_id) REFERENCES payments(payment_id),
+    FOREIGN KEY (invoice_id) REFERENCES rent_invoices(invoice_id),
+    FOREIGN KEY (lease_id) REFERENCES leases(lease_id)
+);
+
+CREATE INDEX idx_ledger_lease ON accounting_ledger(lease_id);
+CREATE INDEX idx_ledger_account_type ON accounting_ledger(account_type);
+CREATE INDEX idx_ledger_entry_date ON accounting_ledger(entry_date);
+
+-- =========================
 -- INDEXES
 -- =========================
 CREATE INDEX idx_unit_status ON units(status);

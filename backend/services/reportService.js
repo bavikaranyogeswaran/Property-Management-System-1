@@ -5,6 +5,7 @@ import maintenanceCostModel from '../models/maintenanceCostModel.js';
 import unitModel from '../models/unitModel.js';
 import leaseModel from '../models/leaseModel.js';
 import leadModel from '../models/leadModel.js';
+import ledgerModel from '../models/ledgerModel.js';
 
 class ReportService {
 
@@ -31,6 +32,42 @@ class ReportService {
         const propertyIds = await this._getAccessiblePropertyIds(user);
         if (propertyIds.length === 0) return {};
 
+        // Try ledger-based reporting first
+        const ledgerSummary = await ledgerModel.getSummaryByProperty(propertyIds, year);
+        const hasLedgerData = Object.keys(ledgerSummary).length > 0;
+
+        if (hasLedgerData) {
+            // Ledger-based: accurate revenue vs liability vs expense
+            const propertyStats = {};
+            for (const [name, data] of Object.entries(ledgerSummary)) {
+                propertyStats[name] = {
+                    income: data.revenue,           // Only real revenue (rent + late fees)
+                    depositsHeld: data.liabilityHeld - data.liabilityRefunded,
+                    expense: data.expense,
+                };
+            }
+
+            // Also include maintenance costs not yet in ledger
+            const [costs] = await pool.query(
+                `SELECT mc.*, p.name as property_name
+                 FROM maintenance_costs mc
+                 JOIN maintenance_requests mr ON mc.request_id = mr.request_id
+                 JOIN units u ON mr.unit_id = u.unit_id
+                 JOIN properties p ON u.property_id = p.property_id
+                 WHERE YEAR(mc.recorded_date) = ?
+                 AND p.property_id IN (?)`,
+                [year, propertyIds]
+            );
+            costs.forEach((cost) => {
+                const name = cost.property_name || 'Unknown Property';
+                if (!propertyStats[name]) propertyStats[name] = { income: 0, depositsHeld: 0, expense: 0 };
+                propertyStats[name].expense += Number(cost.amount);
+            });
+
+            return propertyStats;
+        }
+
+        // Fallback: Old invoice-based approach (for data before ledger was introduced)
         const [invoices] = await pool.query(
             `SELECT ri.*, p.name as property_name
              FROM rent_invoices ri
@@ -38,12 +75,13 @@ class ReportService {
              JOIN units u ON l.unit_id = u.unit_id
              JOIN properties p ON u.property_id = p.property_id
              WHERE ri.status = 'paid'
+             AND ri.invoice_type IN ('rent', 'late_fee')
              AND YEAR(ri.due_date) = ?
              AND p.property_id IN (?)`,
             [year, propertyIds]
         );
 
-        const [costs] = await pool.query(
+        const [costs2] = await pool.query(
             `SELECT mc.*, p.name as property_name
              FROM maintenance_costs mc
              JOIN maintenance_requests mr ON mc.request_id = mr.request_id
@@ -55,7 +93,6 @@ class ReportService {
         );
 
         const propertyStats = {};
-        
         const getStat = (name) => {
              if (!propertyStats[name]) propertyStats[name] = { income: 0, expense: 0 };
              return propertyStats[name];
@@ -66,12 +103,21 @@ class ReportService {
             getStat(name).income += Number(inv.amount);
         });
 
-        costs.forEach((cost) => {
+        costs2.forEach((cost) => {
             const name = cost.property_name || 'Unknown Property';
             getStat(name).expense += Number(cost.amount);
         });
         
         return propertyStats;
+    }
+
+    /**
+     * Get a comprehensive ledger summary for a given year.
+     * Returns totals for revenue, liabilities, expenses and net operating income.
+     */
+    async getLedgerSummary(year, user) {
+        const propertyIds = await this._getAccessiblePropertyIds(user);
+        return await ledgerModel.getYearlySummary(propertyIds, year);
     }
 
     async getOccupancyStats(user) {

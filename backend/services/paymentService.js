@@ -9,6 +9,25 @@ import behaviorLogModel from '../models/behaviorLogModel.js';
 import tenantModel from '../models/tenantModel.js';
 import leaseModel from '../models/leaseModel.js';
 import auditLogger from '../utils/auditLogger.js';
+import ledgerModel from '../models/ledgerModel.js';
+
+/**
+ * Maps an invoice_type to the correct accounting ledger classification.
+ */
+function getLedgerClassification(invoiceType) {
+    switch (invoiceType) {
+        case 'deposit':
+            return { accountType: 'liability', category: 'deposit_held' };
+        case 'rent':
+            return { accountType: 'revenue', category: 'rent' };
+        case 'late_fee':
+            return { accountType: 'revenue', category: 'late_fee' };
+        case 'maintenance':
+            return { accountType: 'expense', category: 'maintenance' };
+        default:
+            return { accountType: 'revenue', category: 'other' };
+    }
+}
 
 class PaymentService {
 
@@ -130,8 +149,25 @@ class PaymentService {
                     entityId: paymentId,
                     details: { invoiceId, amount, receiptGenerated: true },
                 },
-                { user: treasurerUser } // Mock req object for audit logger if needed, or pass user
+                { user: treasurerUser }
             );
+
+            // Post Ledger Entry
+            try {
+                const { accountType, category } = getLedgerClassification(invoice.invoice_type);
+                await ledgerModel.create({
+                    paymentId,
+                    invoiceId: invoice.invoice_id,
+                    leaseId: invoice.lease_id,
+                    accountType,
+                    category,
+                    credit: Number(amount),
+                    description: `Cash payment for ${invoice.description || invoice.invoice_type}`,
+                    entryDate: new Date().toISOString().split('T')[0],
+                });
+            } catch (ledgerErr) {
+                console.error('Failed to post ledger entry (cash):', ledgerErr);
+            }
         }
 
         return paymentId;
@@ -231,6 +267,23 @@ class PaymentService {
                         entityId: paymentId,
                         details: { invoiceId: payment.invoiceId, amount: payment.amount },
                     }, { user: user });
+
+                    // Post Ledger Entry
+                    try {
+                        const { accountType, category } = getLedgerClassification(invoice.invoice_type);
+                        await ledgerModel.create({
+                            paymentId: Number(paymentId),
+                            invoiceId: invoice.invoice_id,
+                            leaseId: invoice.lease_id,
+                            accountType,
+                            category,
+                            credit: Number(payment.amount),
+                            description: `Payment verified for ${invoice.description || invoice.invoice_type}`,
+                            entryDate: new Date().toISOString().split('T')[0],
+                        });
+                    } catch (ledgerErr) {
+                        console.error('Failed to post ledger entry (verify):', ledgerErr);
+                    }
 
                     // Behavior Score
                     try {

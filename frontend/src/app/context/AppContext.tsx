@@ -232,6 +232,15 @@ export interface Notification {
   read: boolean;
 }
 
+export interface LedgerSummary {
+  totalRevenue: number;
+  totalLiabilityHeld: number;
+  totalLiabilityRefunded: number;
+  netLiability: number;
+  totalExpense: number;
+  netOperatingIncome: number;
+}
+
 interface AppContextType {
   properties: Property[];
   propertyTypes: PropertyType[];
@@ -248,6 +257,7 @@ interface AppContextType {
   receipts: Receipt[];
   maintenanceRequests: MaintenanceRequest[];
   maintenanceCosts: MaintenanceCost[];
+  fetchLedgerSummary: (year: number) => Promise<LedgerSummary>;
   notifications: Notification[];
   markNotificationAsRead: (id: string) => Promise<void>;
 
@@ -663,7 +673,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const fetchLeads = async () => {
       try {
         const currentUser = authService.getCurrentUser();
-        // Fallback to prop user if storage is slightly out of sync or just trust prop
         if (user?.role !== 'owner' && currentUser?.role !== 'owner') return;
 
         const token = localStorage.getItem('authToken');
@@ -683,7 +692,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
           }
         }
       } catch (error: any) {
-        // Suppress 403 errors if somehow we got here but shouldn't have, or just log them
         if (error.response && error.response.status === 403) {
           return;
         }
@@ -1229,7 +1237,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     leadId: string,
     startDate?: string,
     endDate?: string,
-    data?: string | any 
+    data?: string | any
   ) => {
     try {
       const payload: any = { startDate, endDate };
@@ -1372,6 +1380,36 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const msg = e.response?.data?.error || 'Failed to refund deposit';
       toast.error(msg);
       throw new Error(msg);
+    }
+  };
+
+  const fetchLedgerSummary = async (year: number): Promise<LedgerSummary> => {
+    try {
+      const { data } = await apiClient.get(`/reports/ledger-summary?year=${year}`);
+      return data;
+    } catch (error) {
+      console.error('Failed to fetch ledger summary', error);
+      throw error;
+    }
+  };
+
+  const getMyLeases = async () => {
+    try {
+      const currentUser = authService.getCurrentUser();
+      if (user?.role !== 'owner' && currentUser?.role !== 'owner') return;
+
+      const token = localStorage.getItem('authToken');
+      if (token) {
+        const response = await apiClient.get('/leases/my-leases');
+        if (response.status === 200) {
+          console.log('My Leases:', response.data);
+        }
+      }
+    } catch (error: any) {
+      if (error.response && error.response.status === 403) {
+        return;
+      }
+      console.error('Failed to fetch my leases:', error);
     }
   };
 
@@ -1806,6 +1844,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         receipts,
         maintenanceRequests,
         maintenanceCosts,
+        fetchLedgerSummary,
+
         notifications,
         addProperty,
         updateProperty,

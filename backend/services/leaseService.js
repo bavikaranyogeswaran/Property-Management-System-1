@@ -447,11 +447,26 @@ class LeaseService {
     // Audit Log
     const auditLogger = (await import('../utils/auditLogger.js')).default;
     await auditLogger.log({
-      userId: null, // System action or triggered by admin (userId not passed here currently)
+      userId: null,
       actionType: 'DEPOSIT_REFUNDED',
       entityId: leaseId,
       details: { refundedAmount: amount, status },
     });
+
+    // Post Contra-Entry to Ledger (Deposit Refund = Debit to Liability)
+    try {
+      const ledgerModel = (await import('../models/ledgerModel.js')).default;
+      await ledgerModel.create({
+        leaseId: Number(leaseId),
+        accountType: 'liability',
+        category: 'deposit_refund',
+        debit: Number(amount),
+        description: `Deposit refund of ${amount}`,
+        entryDate: new Date().toISOString().split('T')[0],
+      });
+    } catch (ledgerErr) {
+      console.error('Failed to post ledger contra-entry for deposit refund:', ledgerErr);
+    }
 
     return { status, refundedAmount: amount };
   }
