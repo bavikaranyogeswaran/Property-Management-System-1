@@ -194,7 +194,7 @@ class LeaseService {
       throw new Error('Lease not found');
     }
 
-    if (lease.status !== 'active' && lease.status !== 'expiring') {
+    if (lease.status !== 'active') {
       throw new Error('Only active leases can be renewed');
     }
 

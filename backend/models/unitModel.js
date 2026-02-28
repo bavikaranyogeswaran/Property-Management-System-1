@@ -124,23 +124,23 @@ class UnitModel {
     const fields = [];
     const values = [];
 
-    if (updates.unitNumber) {
+    if (updates.unitNumber !== undefined) {
       fields.push('unit_number = ?');
       values.push(updates.unitNumber);
     }
-    if (updates.unitTypeId) {
+    if (updates.unitTypeId !== undefined) {
       fields.push('unit_type_id = ?');
       values.push(updates.unitTypeId);
     }
-    if (updates.monthlyRent) {
+    if (updates.monthlyRent !== undefined) {
       fields.push('monthly_rent = ?');
       values.push(updates.monthlyRent);
     }
-    if (updates.status) {
+    if (updates.status !== undefined) {
       fields.push('status = ?');
       values.push(updates.status);
     }
-    if (updates.imageUrl) {
+    if (updates.imageUrl !== undefined) {
       fields.push('image_url = ?');
       values.push(updates.imageUrl);
     }

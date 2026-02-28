@@ -6,11 +6,23 @@
 // ============================================================================
 
 import unitModel from '../models/unitModel.js';
+import propertyModel from '../models/propertyModel.js';
 
 class UnitController {
   //  ADD UNIT: Adding a new room/house to the system.
   async createUnit(req, res) {
     try {
+      // Ownership check: verify the property belongs to the requesting owner
+      if (req.user.role === 'owner' && req.body.propertyId) {
+        const property = await propertyModel.findById(req.body.propertyId);
+        if (!property) {
+          return res.status(404).json({ error: 'Property not found' });
+        }
+        if (String(property.owner_id) !== String(req.user.id)) {
+          return res.status(403).json({ error: 'You do not own this property' });
+        }
+      }
+
       const unit = await unitModel.create(req.body);
       const newUnit = await unitModel.findById(unit);
       res.status(201).json(newUnit);
