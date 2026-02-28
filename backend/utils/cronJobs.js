@@ -163,7 +163,7 @@ export const generateRentInvoices = async () => {
           );
           if (userRows.length > 0) {
             await emailService.sendInvoiceNotification(userRows[0].email, {
-              amount: lease.monthlyRent,
+              amount: rentAmount,
               dueDate: dueDate.toISOString().split('T')[0],
               month: currentMonth,
               year: currentYear,
@@ -485,7 +485,7 @@ export const applyLateFees = async () => {
 
         // 2. Update Tenant Score
         await db.query(
-          'UPDATE tenants SET behavior_score = behavior_score + ? WHERE user_id = ?',
+          'UPDATE tenants SET behavior_score = LEAST(100, GREATEST(0, behavior_score + ?)) WHERE user_id = ?',
           [scoreChange, inv.tenant_id]
         );
         console.log(

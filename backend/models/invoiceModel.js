@@ -90,6 +90,23 @@ class InvoiceModel {
     return rows;
   }
 
+  async findByOwnerId(ownerId) {
+    const [rows] = await pool.query(
+      `
+            SELECT ri.*, l.tenant_id, l.unit_id, u.name as tenant_name, p.name as property_name, un.unit_number
+            FROM rent_invoices ri
+            JOIN leases l ON ri.lease_id = l.lease_id
+            JOIN users u ON l.tenant_id = u.user_id
+            JOIN units un ON l.unit_id = un.unit_id
+            JOIN properties p ON un.property_id = p.property_id
+            WHERE p.owner_id = ?
+            ORDER BY ri.due_date DESC
+        `,
+      [ownerId]
+    );
+    return rows;
+  }
+
   async findByTreasurerId(treasurerId) {
     const [rows] = await pool.query(
       `

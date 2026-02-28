@@ -293,7 +293,7 @@ class PaymentService {
          } else if (user.role === 'treasurer') {
              return await paymentModel.findByTreasurerId(user.id);
          } else if (user.role === 'owner') {
-             return await paymentModel.findAll();
+             return await paymentModel.findByOwnerId(user.id);
          } else {
              throw new Error('Access denied');
          }

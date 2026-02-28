@@ -141,7 +141,7 @@ class MaintenanceService {
          if (user.role === 'tenant') {
              return await maintenanceRequestModel.findByTenantId(user.id);
          } else if (user.role === 'owner') {
-             return await maintenanceRequestModel.findAll();
+             return await maintenanceRequestModel.findByOwnerId(user.id);
          } else if (user.role === 'treasurer') {
              const results = await maintenanceRequestModel.findAll();
              // Filter by assigned properties

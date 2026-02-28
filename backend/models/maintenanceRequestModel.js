@@ -33,6 +33,37 @@ class MaintenanceRequestModel {
     }));
   }
 
+  async findByOwnerId(ownerId) {
+    const [rows] = await pool.query(
+      `
+            SELECT mr.*, 
+            COALESCE(
+                (SELECT JSON_ARRAYAGG(JSON_OBJECT('id', mi.image_id, 'url', mi.image_url)) 
+                 FROM maintenance_images mi 
+                 WHERE mi.request_id = mr.request_id),
+                JSON_ARRAY()
+            ) as images
+            FROM maintenance_requests mr
+            JOIN units u ON mr.unit_id = u.unit_id
+            JOIN properties p ON u.property_id = p.property_id
+            WHERE p.owner_id = ?
+            ORDER BY mr.created_at DESC
+        `,
+      [ownerId]
+    );
+    return rows.map((row) => ({
+      id: row.request_id.toString(),
+      unitId: row.unit_id.toString(),
+      tenantId: row.tenant_id.toString(),
+      title: row.title,
+      description: row.description,
+      priority: row.priority,
+      status: row.status,
+      createdAt: row.created_at,
+      images: row.images,
+    }));
+  }
+
   async findById(id) {
     const [rows] = await pool.query(
       `
