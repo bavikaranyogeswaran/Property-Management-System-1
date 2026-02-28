@@ -22,6 +22,7 @@ class LeaseService {
       endDate,
       monthlyRent,
       securityDeposit,
+      documentUrl, // [ADDED] Document URL
     } = data;
 
     // Validation (runs before acquiring any connection)
@@ -100,6 +101,7 @@ class LeaseService {
         monthlyRent,
         securityDeposit: 0, // Held amount starts at 0. Target is in Invoice.
         status: 'active',
+        documentUrl: documentUrl || null, // [ADDED]
       };
 
       // 3. Create Lease

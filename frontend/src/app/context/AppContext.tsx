@@ -124,6 +124,7 @@ export interface Lease {
   securityDeposit?: number;
   depositStatus?: 'pending' | 'paid' | 'partially_refunded' | 'refunded';
   refundedAmount?: number;
+  documentUrl?: string; // [ADDED]
   createdAt: string;
 }
 
@@ -316,6 +317,7 @@ interface AppContextType {
     newMonthlyRent?: number
   ) => Promise<void>;
   refundDeposit: (id: string, amount: number) => Promise<void>;
+  updateLeaseDocument: (id: string, documentUrl: string) => Promise<void>; // [ADDED]
 
   // Invoice operations
   generateMonthlyInvoices: () => void;
@@ -493,7 +495,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
         try {
           const lRes = await apiClient.get('/leases');
           if (lRes.data) {
-            setLeases(lRes.data);
+            const mappedLeases = lRes.data.map((l: any) => ({
+              ...l,
+              id: l.id?.toString() || l.lease_id?.toString(),
+              tenantId: l.tenantId?.toString() || l.tenant_id?.toString(),
+              unitId: l.unitId?.toString() || l.unit_id?.toString(),
+              documentUrl: l.documentUrl || l.document_url,
+            }));
+            setLeases(mappedLeases);
           }
         } catch (e) {
           console.error('Failed to fetch leases', e);
@@ -1366,6 +1375,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const updateLeaseDocument = async (id: string, documentUrl: string) => {
+    try {
+      await apiClient.patch(`/leases/${id}/document`, { documentUrl });
+      // Update local state instead of full refetch for better UX
+      setLeases((prev) =>
+        prev.map((lease) =>
+          lease.id === id ? { ...lease, documentUrl } : lease
+        )
+      );
+      toast.success('Document updated successfully');
+    } catch (error: any) {
+      console.error('Failed to update lease document', error);
+      toast.error(error.response?.data?.error || 'Failed to update document');
+      throw error;
+    }
+  };
+
   // Invoice operations
   const generateMonthlyInvoices = async () => {
     try {
@@ -1808,6 +1834,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         endLease,
         renewLease,
         refundDeposit,
+        updateLeaseDocument,
         generateMonthlyInvoices,
         submitPayment,
         verifyPayment,

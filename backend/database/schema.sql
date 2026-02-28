@@ -238,6 +238,7 @@ CREATE TABLE leases (
     security_deposit DECIMAL(10, 2) DEFAULT 0.00,
     deposit_status ENUM('pending', 'paid', 'partially_refunded', 'refunded') DEFAULT 'pending',
     refunded_amount DECIMAL(10, 2) DEFAULT 0.00,
+    document_url VARCHAR(500), -- [ADDED] Lease document URL
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (tenant_id) REFERENCES users(user_id),
     FOREIGN KEY (unit_id) REFERENCES units(unit_id)

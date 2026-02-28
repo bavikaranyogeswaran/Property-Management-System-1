@@ -26,19 +26,26 @@ const storage = multer.diskStorage({
   },
 });
 
-// File filter - only images
+// File filter - images and documents
 const fileFilter = (req, file, cb) => {
-  const allowedTypes = /jpeg|jpg|png|gif|webp|svg|bmp|tiff|ico/;
+  const allowedTypes = /jpeg|jpg|png|gif|webp|svg|bmp|tiff|ico|pdf|doc|docx/;
   const extname = allowedTypes.test(
     path.extname(file.originalname).toLowerCase()
   );
-  const mimetype =
-    allowedTypes.test(file.mimetype) || file.mimetype.startsWith('image/');
+  
+  const mimetypePatterns = [
+    /^image\//,
+    /^application\/pdf$/,
+    /^application\/msword$/,
+    /^application\/vnd\.openxmlformats-officedocument\.wordprocessingml\.document$/
+  ];
+  
+  const mimetype = mimetypePatterns.some(pattern => pattern.test(file.mimetype));
 
   if (extname || mimetype) {
     cb(null, true);
   } else {
-    cb(new Error('Only image files are allowed'));
+    cb(new Error('Only image and document files are allowed'));
   }
 };
 
