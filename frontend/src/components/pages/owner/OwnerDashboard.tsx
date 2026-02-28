@@ -1,5 +1,5 @@
-import React from 'react';
-import { useApp } from '@/app/context/AppContext';
+import React, { useEffect, useState } from 'react';
+import { useApp, LedgerSummary } from '@/app/context/AppContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Building2,
@@ -30,7 +30,24 @@ export function OwnerDashboard() {
     maintenanceRequests,
     leads,
     notifications,
+    fetchLedgerSummary,
   } = useApp();
+
+  const [ledgerSummary, setLedgerSummary] = useState<LedgerSummary | null>(null);
+  const currentYear = new Date().getFullYear();
+
+  useEffect(() => {
+    const loadLedger = async () => {
+      try {
+        const data = await fetchLedgerSummary(currentYear);
+        setLedgerSummary(data);
+      } catch (err) {
+        console.error('Failed to load ledger summary', err);
+      }
+    };
+    loadLedger();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentYear]);
 
   // Logic Fix: Calculate Balance for each invoice to support Partial Payments (Context: "is there any logics i have missed?")
   const getInvoiceBalance = (invoiceId: string, totalAmount: number) => {
@@ -190,6 +207,45 @@ export function OwnerDashboard() {
           );
         })}
       </div>
+
+      {/* Ledger Financial Summary */}
+      {ledgerSummary && (
+        <Card className="bg-gradient-to-br from-indigo-50 to-blue-50 border-indigo-100">
+          <CardHeader>
+            <CardTitle className="text-indigo-900">
+              LEDGER SUMMARY ({currentYear})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-white p-4 rounded-lg shadow-sm border border-indigo-50">
+                <p className="text-sm text-gray-500 font-medium">Net Operating Income</p>
+                <p className="text-2xl font-bold text-indigo-700">
+                  LKR {ledgerSummary.netOperatingIncome.toLocaleString()}
+                </p>
+              </div>
+              <div className="bg-white p-4 rounded-lg shadow-sm border border-indigo-50">
+                <p className="text-sm text-gray-500 font-medium">True Revenue</p>
+                <p className="text-xl font-semibold text-emerald-600">
+                  LKR {ledgerSummary.totalRevenue.toLocaleString()}
+                </p>
+              </div>
+              <div className="bg-white p-4 rounded-lg shadow-sm border border-indigo-50">
+                <p className="text-sm text-gray-500 font-medium">Deposits Held (Liability)</p>
+                <p className="text-xl font-semibold text-blue-600">
+                  LKR {ledgerSummary.totalLiabilityHeld.toLocaleString()}
+                </p>
+              </div>
+              <div className="bg-white p-4 rounded-lg shadow-sm border border-indigo-50">
+                <p className="text-sm text-gray-500 font-medium">Expenses (Maintenance)</p>
+                <p className="text-xl font-semibold text-red-600">
+                  LKR {ledgerSummary.totalExpense.toLocaleString()}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Alerts & Notifications */}
       <div>
