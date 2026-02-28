@@ -242,9 +242,13 @@ class PaymentService {
 
                     // Deposit Status Logic
                     if (invoice.invoice_type === 'deposit') {
+                         const previousTotal = totalVerified - Number(payment.amount);
+                         const remainingDue = Math.max(0, Number(invoice.amount) - previousTotal);
+                         const amountUsed = Math.min(Number(payment.amount), remainingDue);
+                         
                          const lease = await leaseModel.findById(invoice.lease_id);
                          const currentHeld = Number(lease.securityDeposit || 0);
-                         const newHeld = currentHeld + Number(payment.amount);
+                         const newHeld = currentHeld + amountUsed;
                          
                          const finalStatus = (await invoiceModel.findById(payment.invoiceId)).status === 'paid' ? 'paid' : 'pending';
                          
