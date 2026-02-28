@@ -118,6 +118,18 @@ export const generateRentInvoices = async () => {
               await invoiceModel.updateStatus(invoiceId, 'partially_paid');
             }
 
+            // 4. Generate Receipt for the credit-applied payment
+            const receiptModel = (await import('../models/receiptModel.js')).default;
+            const { randomUUID } = await import('crypto');
+            await receiptModel.create({
+              paymentId: payId,
+              invoiceId,
+              tenantId: lease.tenantId,
+              amount: amountToApply,
+              generatedDate: new Date().toISOString(),
+              receiptNumber: `REC-CREDIT-${randomUUID()}`,
+            });
+
             console.log(
               `Auto-applied credit ${amountToApply} to Invoice ${invoiceId}. Remaining Credit: ${tenant.creditBalance - amountToApply}`
             );
