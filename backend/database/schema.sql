@@ -331,7 +331,7 @@ CREATE TABLE notifications (
     notification_id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT,
     message TEXT NOT NULL,
-    type ENUM('invoice','lease','maintenance') NOT NULL,
+    type ENUM('invoice','lease','maintenance','payment','visit','system') NOT NULL,
     is_read BOOLEAN DEFAULT FALSE,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(user_id)
