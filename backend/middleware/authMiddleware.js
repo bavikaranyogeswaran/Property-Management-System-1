@@ -12,7 +12,7 @@ const authenticateToken = (req, res, next) => {
   verify(token, process.env.JWT_SECRET || 'secret', (err, user) => {
     if (err) {
       console.log('[Auth] Token verification failed:', err.message);
-      return res.status(403).json({ error: 'Invalid token' });
+      return res.status(401).json({ error: 'Invalid or expired token' });
     }
     req.user = user;
     next();
@@ -48,7 +48,7 @@ export const authorizeRoles = (...roles) => {
     console.log('[Auth] Checking roles:', roles, 'User role:', req.user?.role);
     if (!req.user || !roles.includes(req.user.role)) {
       console.log('[Auth] Access denied. User:', req.user);
-      return res.status(403).json({ error: 'Access denied' });
+      return res.status(403).json({ error: `Access denied. Required role: ${roles.join(' or ')}` });
     }
     next();
   };

@@ -1,6 +1,7 @@
 import propertyImageModel from '../models/propertyImageModel.js';
 import propertyModel from '../models/propertyModel.js';
 import unitModel from '../models/unitModel.js';
+import unitImageModel from '../models/unitImageModel.js';
 
 class ImageController {
   // Property Images

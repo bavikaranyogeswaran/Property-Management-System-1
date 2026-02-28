@@ -76,7 +76,7 @@ class PropertyController {
       if (!property) {
         return res.status(404).json({ error: 'Property not found' });
       }
-      if (req.user.role === 'owner' && String(property.owner_id) !== String(req.user.id)) {
+      if (req.user.role === 'owner' && String(property.ownerId) !== String(req.user.id)) {
         return res.status(403).json({ error: 'You do not own this property' });
       }
 
@@ -97,7 +97,7 @@ class PropertyController {
       if (!property) {
         return res.status(404).json({ error: 'Property not found' });
       }
-      if (req.user.role === 'owner' && String(property.owner_id) !== String(req.user.id)) {
+      if (req.user.role === 'owner' && String(property.ownerId) !== String(req.user.id)) {
         return res.status(403).json({ error: 'You do not own this property' });
       }
 

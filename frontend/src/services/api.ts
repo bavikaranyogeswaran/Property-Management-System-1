@@ -42,13 +42,14 @@ apiClient.interceptors.response.use(
 
       if (!isLoginRequest) {
         // Clear token if invalid/expired for non-login requests
-        console.warn('Authentication failed (401), clearing token.');
+        console.warn('Authentication failed (401), clearing token and redirecting to login.');
         localStorage.removeItem('authToken');
         localStorage.removeItem('user');
         // Redirect to login
         window.location.href = '/login';
       }
     }
+    // 403 = valid token but insufficient role permissions — let component handle it
     return Promise.reject(error);
   }
 );
