@@ -120,7 +120,7 @@ export interface Lease {
   startDate: string;
   endDate: string;
   monthlyRent: number;
-  status: 'active' | 'ended' | 'terminated';
+  status: 'active' | 'ended' | 'cancelled';
   securityDeposit?: number;
   depositStatus?: 'pending' | 'paid' | 'partially_refunded' | 'refunded';
   refundedAmount?: number;
@@ -136,7 +136,7 @@ export interface RentInvoice {
   amount: number;
   amountPaid?: number;
   dueDate: string;
-  status: 'pending' | 'partially_paid' | 'paid' | 'overdue';
+  status: 'pending' | 'partially_paid' | 'paid' | 'overdue' | 'void';
   description?: string;
   generatedDate: string;
   tenantName?: string;
@@ -181,7 +181,7 @@ export interface MaintenanceRequest {
   title: string;
   description: string;
   priority: 'low' | 'medium' | 'high' | 'urgent';
-  status: 'submitted' | 'in_progress' | 'completed' | 'cancelled';
+  status: 'submitted' | 'in_progress' | 'completed';
   submittedDate: string;
   completedDate?: string;
   images?: string[];
@@ -215,11 +215,7 @@ export interface Visit {
 
 export interface Notification {
   id: string;
-  type:
-    | 'lease_expiring'
-    | 'lease_expired'
-    | 'invoice_overdue'
-    | 'maintenance_urgent';
+  type: 'invoice' | 'lease' | 'maintenance' | 'payment' | 'visit' | 'system';
   title: string;
   message: string;
   targetRole: 'owner' | 'tenant' | 'both';
@@ -827,7 +823,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const existingNotification = notifications.find(
           (n) =>
             n.leaseId === lease.id &&
-            n.type === 'lease_expiring' &&
+            n.type === 'lease' &&
             Math.abs((n.daysUntilExpiry || 0) - daysUntilExpiry) < 2
         );
 
@@ -843,7 +839,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
           generatedNotifications.push({
             id: `notif-${lease.id}-${daysUntilExpiry}`,
-            type: 'lease_expiring',
+            type: 'lease',
             title:
               daysUntilExpiry <= 7
                 ? `⚠️ Urgent: Lease Expiring Soon`
@@ -872,7 +868,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const filtered = prev.filter(
           (n) =>
             !generatedNotifications.some(
-              (gn) => gn.leaseId === n.leaseId && n.type === 'lease_expiring'
+              (gn) => gn.leaseId === n.leaseId && n.type === 'lease'
             )
         );
         return [...filtered, ...generatedNotifications];
