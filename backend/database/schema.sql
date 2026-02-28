@@ -32,6 +32,7 @@ CREATE TABLE users (
 CREATE TABLE tenants (
     user_id INT PRIMARY KEY,
     nic VARCHAR(20) UNIQUE,              -- NIC (Old or New format)
+    permanent_address VARCHAR(255),      -- Tenant's permanent address
     emergency_contact_name VARCHAR(100),
     emergency_contact_phone VARCHAR(20),
     employment_status ENUM('employed', 'self-employed', 'student', 'unemployed'),
