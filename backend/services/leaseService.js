@@ -311,8 +311,13 @@ class LeaseService {
     const lease = await leaseModel.findById(leaseId);
     if (!lease) throw new Error('Lease not found');
 
+    // Note: securityDeposit starts at 0 on lease creation and is incremented
+    // when the deposit invoice is verified via payment. If it's still 0,
+    // the deposit invoice has not been paid yet.
     if (lease.securityDeposit <= 0) {
-      throw new Error('No security deposit to refund');
+      throw new Error(
+        'No security deposit available to refund. The deposit invoice may not have been paid yet.'
+      );
     }
 
     // Logic Check: Idempotency
