@@ -214,7 +214,8 @@ class LeaseService {
     const hasOverlap = await leaseModel.checkOverlap(
       lease.unitId,
       extensionStartDate.toISOString().split('T')[0],
-      nextEndDate.toISOString().split('T')[0]
+      nextEndDate.toISOString().split('T')[0],
+      leaseId
     );
 
     if (hasOverlap) {

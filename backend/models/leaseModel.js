@@ -137,17 +137,21 @@ class LeaseModel {
     return this.mapRows(rows);
   }
 
-  async checkOverlap(unitId, startDate, endDate) {
-    const [rows] = await db.query(
-      `
+  async checkOverlap(unitId, startDate, endDate, excludeLeaseId = null) {
+    let query = `
             SELECT lease_id FROM leases 
             WHERE unit_id = ? 
             AND status IN ('active', 'pending')
             AND start_date <= ? 
-            AND end_date >= ?
-        `,
-      [unitId, endDate, startDate]
-    );
+            AND end_date >= ?`;
+    const params = [unitId, endDate, startDate];
+
+    if (excludeLeaseId) {
+      query += ` AND lease_id != ?`;
+      params.push(excludeLeaseId);
+    }
+
+    const [rows] = await db.query(query, params);
     return rows.length > 0;
   }
 
