@@ -92,6 +92,7 @@ export interface Invoice {
   leaseId: string;
   tenantId: string;
   amount: number;
+  amountPaid?: number;
   dueDate: string;
   status: 'pending' | 'paid' | 'overdue';
   description: string;

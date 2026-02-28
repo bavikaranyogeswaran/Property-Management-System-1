@@ -134,6 +134,7 @@ export interface RentInvoice {
   tenantId: string;
   unitId: string;
   amount: number;
+  amountPaid?: number;
   dueDate: string;
   status: 'pending' | 'partially_paid' | 'paid' | 'overdue';
   description?: string;
@@ -570,6 +571,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
               tenantId: i.tenant_id.toString(),
               unitId: i.unit_id ? i.unit_id.toString() : '',
               amount: parseFloat(i.amount),
+              amountPaid: typeof i.amount_paid !== 'undefined' ? parseFloat(i.amount_paid) : 0,
               tenantName: i.tenant_name,
               propertyName: i.property_name,
               unitNumber: i.unit_number,

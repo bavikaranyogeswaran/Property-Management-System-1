@@ -53,7 +53,8 @@ class InvoiceModel {
     // Join with leases to get tenant_id for scoring hooks
     const [rows] = await pool.query(
       `
-            SELECT ri.*, l.tenant_id 
+            SELECT ri.*, l.tenant_id,
+                   COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id = ri.invoice_id AND status = 'verified'), 0) AS amount_paid
             FROM rent_invoices ri 
             JOIN leases l ON ri.lease_id = l.lease_id 
             WHERE ri.invoice_id = ?
@@ -66,7 +67,8 @@ class InvoiceModel {
   async findByTenantId(tenantId) {
     const [rows] = await pool.query(
       `
-            SELECT ri.*, l.tenant_id 
+            SELECT ri.*, l.tenant_id,
+                   COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id = ri.invoice_id AND status = 'verified'), 0) AS amount_paid
             FROM rent_invoices ri
             JOIN leases l ON ri.lease_id = l.lease_id
             WHERE l.tenant_id = ? 
@@ -79,7 +81,8 @@ class InvoiceModel {
 
   async findAll() {
     const [rows] = await pool.query(`
-            SELECT ri.*, l.tenant_id, l.unit_id, u.name as tenant_name, p.name as property_name, un.unit_number
+            SELECT ri.*, l.tenant_id, l.unit_id, u.name as tenant_name, p.name as property_name, un.unit_number,
+                   COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id = ri.invoice_id AND status = 'verified'), 0) AS amount_paid
             FROM rent_invoices ri
             JOIN leases l ON ri.lease_id = l.lease_id
             JOIN users u ON l.tenant_id = u.user_id
@@ -93,7 +96,8 @@ class InvoiceModel {
   async findByOwnerId(ownerId) {
     const [rows] = await pool.query(
       `
-            SELECT ri.*, l.tenant_id, l.unit_id, u.name as tenant_name, p.name as property_name, un.unit_number
+            SELECT ri.*, l.tenant_id, l.unit_id, u.name as tenant_name, p.name as property_name, un.unit_number,
+                   COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id = ri.invoice_id AND status = 'verified'), 0) AS amount_paid
             FROM rent_invoices ri
             JOIN leases l ON ri.lease_id = l.lease_id
             JOIN users u ON l.tenant_id = u.user_id
@@ -110,7 +114,8 @@ class InvoiceModel {
   async findByTreasurerId(treasurerId) {
     const [rows] = await pool.query(
       `
-            SELECT ri.*, l.tenant_id, l.unit_id, u.name as tenant_name, p.name as property_name, un.unit_number
+            SELECT ri.*, l.tenant_id, l.unit_id, u.name as tenant_name, p.name as property_name, un.unit_number,
+                   COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id = ri.invoice_id AND status = 'verified'), 0) AS amount_paid
             FROM rent_invoices ri
             JOIN leases l ON ri.lease_id = l.lease_id
             JOIN users u ON l.tenant_id = u.user_id
@@ -156,7 +161,8 @@ class InvoiceModel {
     // const [rows] = await pool.query(`SELECT ri.*, l.monthly_rent...`) -> ri.amount is what we want.
     const [rows] = await pool.query(
       `
-            SELECT ri.*, l.tenant_id
+            SELECT ri.*, l.tenant_id,
+                   COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id = ri.invoice_id AND status = 'verified'), 0) AS amount_paid
             FROM rent_invoices ri
             JOIN leases l ON ri.lease_id = l.lease_id
             WHERE ri.status IN ('pending', 'partially_paid')
@@ -206,7 +212,7 @@ class InvoiceModel {
   }
   async findPendingDebts(leaseId) {
     const [rows] = await pool.query(
-      `SELECT * FROM rent_invoices WHERE lease_id = ? AND status IN ('pending', 'partially_paid') ORDER BY due_date ASC`,
+      `SELECT *, COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id = rent_invoices.invoice_id AND status = 'verified'), 0) AS amount_paid FROM rent_invoices WHERE lease_id = ? AND status IN ('pending', 'partially_paid') ORDER BY due_date ASC`,
       [leaseId]
     );
     return rows;

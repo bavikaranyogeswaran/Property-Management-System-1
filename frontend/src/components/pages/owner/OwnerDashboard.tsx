@@ -50,7 +50,10 @@ export function OwnerDashboard() {
   }, [currentYear]);
 
   // Logic Fix: Calculate Balance for each invoice to support Partial Payments (Context: "is there any logics i have missed?")
-  const getInvoiceBalance = (invoiceId: string, totalAmount: number) => {
+  const getInvoiceBalance = (invoiceId: string, totalAmount: number, amountPaid?: number) => {
+    if (amountPaid !== undefined) {
+      return Math.max(0, totalAmount - amountPaid);
+    }
     const verifiedPayments = payments
       .filter((p) => p.invoiceId === invoiceId && p.status === 'verified')
       .reduce((sum, p) => sum + Number(p.amount), 0);
@@ -67,13 +70,13 @@ export function OwnerDashboard() {
   const pendingInvoices = invoices.filter((i) => {
     // Include 'partially_paid' and 'overdue' in the pending bucket if they have balance
     if (i.status === 'paid') return false;
-    const balance = getInvoiceBalance(i.id, i.amount);
+    const balance = getInvoiceBalance(i.id, i.amount, i.amountPaid);
     return balance > 0;
   });
 
   const overdueInvoices = invoices.filter((i) => {
     // Dynamic Overdue Check
-    const balance = getInvoiceBalance(i.id, i.amount);
+    const balance = getInvoiceBalance(i.id, i.amount, i.amountPaid);
     if (balance > 0 && new Date(i.dueDate) < new Date()) {
       return true;
     }
@@ -84,11 +87,11 @@ export function OwnerDashboard() {
 
   // Calculate actual pending money (not just full invoice amounts)
   const pendingPayments = pendingInvoices.reduce(
-    (sum, inv) => sum + getInvoiceBalance(inv.id, inv.amount),
+    (sum, inv) => sum + getInvoiceBalance(inv.id, inv.amount, inv.amountPaid),
     0
   );
   const overdueAmount = overdueInvoices.reduce(
-    (sum, inv) => sum + getInvoiceBalance(inv.id, inv.amount),
+    (sum, inv) => sum + getInvoiceBalance(inv.id, inv.amount, inv.amountPaid),
     0
   );
 
@@ -382,7 +385,7 @@ export function OwnerDashboard() {
                   const tenant = tenants.find((t) => t.id === invoice.tenantId);
                   const unit = units.find((u) => u.id === invoice.unitId);
                   const isOverdue = new Date(invoice.dueDate) < new Date();
-                  const balance = getInvoiceBalance(invoice.id, invoice.amount);
+                  const balance = getInvoiceBalance(invoice.id, invoice.amount, invoice.amountPaid);
                   const isPartial = balance < invoice.amount;
 
                   return (
