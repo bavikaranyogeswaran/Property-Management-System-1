@@ -59,7 +59,9 @@ interface PortalData {
 interface ChatMessage {
   id: number;
   leadId: number;
-  senderId: number;
+  senderId: number | null;
+  senderLeadId?: number | null;
+  senderType?: 'user' | 'lead';
   senderName?: string;
   senderRole?: string;
   content: string;
@@ -339,9 +341,7 @@ export function LeadPortalPage() {
                     </div>
                   ) : (
                     messages.map((msg) => {
-                      const isMe =
-                        msg.senderRole === 'lead' &&
-                        String(msg.senderId) !== '0';
+                      const isMe = msg.senderRole === 'lead';
                       // Messages from owner will have senderRole 'owner'
                       const isOwner = msg.senderRole === 'owner';
 

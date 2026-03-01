@@ -3,6 +3,7 @@ import React, {
   useContext,
   useState,
   useEffect,
+  useRef,
   ReactNode,
 } from 'react';
 import authService from '../../services/auth';
@@ -22,6 +23,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
   isAuthenticated: boolean;
+  isLoading: boolean;
   updateProfile: (data: Partial<User>) => Promise<void>;
   changePassword: (data: any) => Promise<void>;
 }
@@ -30,19 +32,61 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const logoutTimerRef = useRef<number | null>(null);
+
+  const clearLogoutTimer = () => {
+    if (logoutTimerRef.current) {
+      window.clearTimeout(logoutTimerRef.current);
+      logoutTimerRef.current = null;
+    }
+  };
+
+  const scheduleLogout = (remainingTime: number) => {
+    clearLogoutTimer();
+    if (remainingTime > 0) {
+      logoutTimerRef.current = window.setTimeout(() => {
+        console.warn('Session expired. Logging out automatically.');
+        logout();
+      }, remainingTime);
+    }
+  };
+
+  const logout = () => {
+    clearLogoutTimer();
+    authService.logout();
+    setUser(null);
+  };
 
   useEffect(() => {
-    // Check for stored user session
-    const storedUser = authService.getCurrentUser();
-    if (storedUser) {
-      setUser(storedUser);
-    }
+    const initAuth = () => {
+      const storedUser = authService.getCurrentUser();
+      const isAuth = authService.isAuthenticated();
+
+      if (storedUser && isAuth) {
+        setUser(storedUser);
+        const remainingTime = authService.getTokenRemainingTime();
+        scheduleLogout(remainingTime);
+      } else {
+        if (storedUser) {
+          authService.logout();
+          setUser(null);
+        }
+      }
+      setIsLoading(false);
+    };
+
+    initAuth();
+
+    return () => clearLogoutTimer();
   }, []);
 
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
       const { user } = await authService.login({ email, password });
       setUser(user);
+      const remainingTime = authService.getTokenRemainingTime();
+      scheduleLogout(remainingTime);
       return true;
     } catch (error) {
       console.error('Login failed', error);
@@ -69,11 +113,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const logout = () => {
-    authService.logout();
-    setUser(null);
-  };
-
   return (
     <AuthContext.Provider
       value={{
@@ -81,6 +120,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         logout,
         isAuthenticated: !!user,
+        isLoading,
         updateProfile,
         changePassword,
       }}

@@ -43,6 +43,14 @@ const authLimiter = rateLimit({
 });
 app.use('/api/auth', authLimiter);
 
+// General Rate Limiter: Prevent abuse of all other endpoints
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 1000, 
+  message: 'Too many requests from this IP, please try again after 15 minutes',
+});
+app.use('/api', apiLimiter);
+
 //  File Server: Allows the frontend to see uploaded images (like receipt photos).
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
@@ -66,10 +74,16 @@ import maintenanceCostRoutes from './routes/maintenanceCostRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
 import invoiceRoutes from './routes/invoiceRoutes.js';
 import receiptRoutes from './routes/receiptRoutes.js';
-
-// ...
-app.use('/api/receipts', receiptRoutes);
 import behaviorRoutes from './routes/behaviorRoutes.js';
+import leadPortalRoutes from './routes/leadPortalRoutes.js';
+import visitRoutes from './routes/visitRoutes.js';
+import notificationRoutes from './routes/notificationRoutes.js';
+import reportRoutes from './routes/reportRoutes.js';
+import payoutRoutes from './routes/payoutRoutes.js';
+import messageRoutes from './routes/messageRoutes.js';
+
+// Lead Portal (public, no auth) — MUST be mounted before imageRoutes
+app.use('/api/lead-portal', leadPortalRoutes);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
@@ -83,22 +97,14 @@ app.use('/api/maintenance-requests', maintenanceRequestRoutes);
 app.use('/api/maintenance-costs', maintenanceCostRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/invoices', invoiceRoutes);
+app.use('/api/receipts', receiptRoutes);
 app.use('/api/behavior', behaviorRoutes);
-
-// Lead Portal (public, no auth) — MUST be mounted before imageRoutes
-// because imageRoutes is on '/api' with a broad auth middleware
-import leadPortalRoutes from './routes/leadPortalRoutes.js';
-app.use('/api/lead-portal', leadPortalRoutes);
-
-app.use('/api', imageRoutes);
-import visitRoutes from './routes/visitRoutes.js';
 app.use('/api/visits', visitRoutes);
-import notificationRoutes from './routes/notificationRoutes.js';
 app.use('/api/notifications', notificationRoutes);
-import reportRoutes from './routes/reportRoutes.js';
 app.use('/api/reports', reportRoutes);
-import payoutRoutes from './routes/payoutRoutes.js';
 app.use('/api/payouts', payoutRoutes);
+app.use('/api/messages', messageRoutes);
+app.use('/api', imageRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'PMS Backend is running' });

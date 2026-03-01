@@ -47,6 +47,10 @@ export const validatePassword = (password) => {
  * Phone number validation for Sri Lankan numbers
  */
 export const validatePhoneNumber = (phone) => {
+  if (!phone) {
+      return { isValid: false, error: 'Phone number is required' };
+  }
+
   // Sri Lankan phone number patterns:
   // +94 77 123 4567 or +94771234567 or 0771234567
   const sriLankaPattern = /^(\+94|0)?[1-9]\d{8}$/;
@@ -59,6 +63,28 @@ export const validatePhoneNumber = (phone) => {
       isValid: false,
       error:
         'Please enter a valid Sri Lankan phone number (e.g., +94 77 123 4567 or 0771234567)',
+    };
+  }
+
+  return {
+    isValid: true,
+    error: null,
+  };
+};
+
+/**
+ * NIC validation (Sri Lankan National Identity Card)
+ */
+export const validateNIC = (nic) => {
+  // Sri Lankan NIC logic:
+  // Old format: 9 digits followed by 'V' or 'X' (case insensitive)
+  // New format: 12 digits
+  const nicPattern = /^([0-9]{9}[xXvV]|[0-9]{12})$/;
+
+  if (!nic || !nicPattern.test(nic.trim())) {
+    return {
+      isValid: false,
+      error: 'Please enter a valid NIC (e.g., 123456789V or 199012345678)',
     };
   }
 

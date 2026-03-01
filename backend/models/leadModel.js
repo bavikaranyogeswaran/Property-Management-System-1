@@ -7,7 +7,6 @@ class LeadModel {
       propertyId,
       unitId,
       interestedUnit,
-      userId,
       name,
       phone,
       email,
@@ -24,12 +23,11 @@ class LeadModel {
     }
 
     const [result] = await db.query(
-      `INSERT INTO leads (property_id, unit_id, user_id, name, phone, email, notes, move_in_date, occupants_count, status) 
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO leads (property_id, unit_id, name, phone, email, notes, move_in_date, occupants_count, status) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         propertyId,
         finalUnitId,
-        userId,
         name,
         phone,
         email,
@@ -64,8 +62,7 @@ class LeadModel {
                 occupants_count as occupantsCount,
                 status,
                 created_at as createdAt,
-                last_contacted_at as lastContactedAt,
-                user_id as userId
+                last_contacted_at as lastContactedAt
             FROM leads WHERE lead_id = ?`,
       [id]
     );
@@ -87,19 +84,31 @@ class LeadModel {
     const fields = [];
     const values = [];
 
-    if (data.status) {
+    if (data.status !== undefined) {
       fields.push('status = ?');
       values.push(data.status);
     }
-    if (data.userId) {
-      fields.push('user_id = ?');
-      values.push(data.userId);
+    if (data.unitId !== undefined) {
+      fields.push('unit_id = ?');
+      values.push(data.unitId);
     }
-    if (data.tenantId) {
-      fields.push('user_id = ?');
-      values.push(data.tenantId);
+    if (data.name !== undefined) {
+      fields.push('name = ?');
+      values.push(data.name);
     }
-    if (data.notes) {
+    if (data.phone !== undefined) {
+      fields.push('phone = ?');
+      values.push(data.phone);
+    }
+    if (data.move_in_date !== undefined) {
+      fields.push('move_in_date = ?');
+      values.push(data.move_in_date);
+    }
+    if (data.occupants_count !== undefined) {
+      fields.push('occupants_count = ?');
+      values.push(data.occupants_count);
+    }
+    if (data.notes !== undefined) {
       fields.push('notes = ?');
       values.push(data.notes);
     }
@@ -107,7 +116,7 @@ class LeadModel {
       fields.push('internal_notes = ?');
       values.push(data.internalNotes);
     }
-    if (data.lastContactedAt) {
+    if (data.lastContactedAt !== undefined) {
       fields.push('last_contacted_at = ?');
       values.push(data.lastContactedAt);
     }
@@ -151,8 +160,7 @@ class LeadModel {
                     l.occupants_count as occupantsCount,
                     l.status,
                     l.created_at as createdAt,
-                    l.last_contacted_at as lastContactedAt,
-                    l.user_id as userId
+                    l.last_contacted_at as lastContactedAt
                 FROM leads l
                 INNER JOIN properties p ON l.property_id = p.property_id
                 WHERE p.owner_id = ?
@@ -173,16 +181,17 @@ class LeadModel {
                 phone,
                 notes,
                 internal_notes as internalNotes,
+                move_in_date as moveInDate,
+                occupants_count as occupantsCount,
                 status,
                 created_at as createdAt,
-                last_contacted_at as lastContactedAt,
-                user_id as userId
+                last_contacted_at as lastContactedAt
             FROM leads ORDER BY created_at DESC`);
     return rows;
   }
   async findIdByEmailAndProperty(email, propertyId) {
     const [rows] = await db.query(
-      `SELECT lead_id FROM leads WHERE email = ? AND property_id = ? LIMIT 1`,
+      `SELECT lead_id FROM leads WHERE email = ? AND property_id = ? AND status NOT IN ('dropped', 'converted') LIMIT 1`,
       [email, propertyId]
     );
     return rows.length > 0 ? rows[0].lead_id : null;
@@ -230,10 +239,35 @@ class LeadModel {
         occupants_count as occupantsCount,
         status,
         created_at as createdAt,
-        last_contacted_at as lastContactedAt,
-        user_id as userId
+        last_contacted_at as lastContactedAt
        FROM leads WHERE email = ? AND status != 'dropped' ORDER BY created_at DESC LIMIT 1`,
       [email]
+    );
+    return rows[0];
+  }
+
+  async verifyOwnership(leadId, ownerId) {
+    const [rows] = await db.query(
+      `SELECT l.lead_id FROM leads l
+       INNER JOIN properties p ON l.property_id = p.property_id
+       WHERE l.lead_id = ? AND p.owner_id = ?`,
+      [leadId, ownerId]
+    );
+    return rows.length > 0;
+  }
+
+  // Analytics optimized query to avoid O(N) memory buildup
+  async getLeadConversionStats() {
+    const [rows] = await db.query(
+      `
+      SELECT 
+        COUNT(*) AS Total,
+        SUM(CASE WHEN status IN ('interested', 'new') THEN 1 ELSE 0 END) AS Interested,
+        SUM(CASE WHEN status LIKE '%schedule%' OR status LIKE '%visit%' THEN 1 ELSE 0 END) AS Scheduled,
+        SUM(CASE WHEN status LIKE '%application%' OR status = 'applied' THEN 1 ELSE 0 END) AS Application,
+        SUM(CASE WHEN status IN ('converted', 'leased', 'tenant') THEN 1 ELSE 0 END) AS Leased
+      FROM leads
+      `
     );
     return rows[0];
   }

@@ -12,6 +12,14 @@ class LeadController {
       }
 
       const { id } = req.params;
+
+      // Verify the lead belongs to this owner's property
+      const leadModel = (await import('../models/leadModel.js')).default;
+      const isOwner = await leadModel.verifyOwnership(id, req.user.id);
+      if (!isOwner) {
+        return res.status(403).json({ error: 'Access denied. This lead does not belong to your property.' });
+      }
+
       const {
         startDate,
         endDate,
@@ -113,9 +121,7 @@ class LeadController {
 
   async getLeadStageHistory(req, res) {
     try {
-      console.log('[DEBUG] getLeadStageHistory called by user:', req.user);
       const history = await leadService.getLeadStageHistory(req.user);
-      console.log('[DEBUG] stage history result size:', history.length);
       res.json(history);
     } catch (error) {
         if (error.message.includes('Access denied')) {

@@ -120,10 +120,11 @@ export interface Lease {
   startDate: string;
   endDate: string;
   monthlyRent: number;
-  status: 'active' | 'ended' | 'terminated';
+  status: 'active' | 'ended' | 'cancelled';
   securityDeposit?: number;
   depositStatus?: 'pending' | 'paid' | 'partially_refunded' | 'refunded';
   refundedAmount?: number;
+  documentUrl?: string; // [ADDED]
   createdAt: string;
 }
 
@@ -133,8 +134,9 @@ export interface RentInvoice {
   tenantId: string;
   unitId: string;
   amount: number;
+  amountPaid?: number;
   dueDate: string;
-  status: 'pending' | 'partially_paid' | 'paid' | 'overdue';
+  status: 'pending' | 'partially_paid' | 'paid' | 'overdue' | 'void';
   description?: string;
   generatedDate: string;
   tenantName?: string;
@@ -179,7 +181,7 @@ export interface MaintenanceRequest {
   title: string;
   description: string;
   priority: 'low' | 'medium' | 'high' | 'urgent';
-  status: 'submitted' | 'in_progress' | 'completed' | 'cancelled';
+  status: 'submitted' | 'in_progress' | 'completed';
   submittedDate: string;
   completedDate?: string;
   images?: string[];
@@ -213,11 +215,7 @@ export interface Visit {
 
 export interface Notification {
   id: string;
-  type:
-    | 'lease_expiring'
-    | 'lease_expired'
-    | 'invoice_overdue'
-    | 'maintenance_urgent';
+  type: 'invoice' | 'lease' | 'maintenance' | 'payment' | 'visit' | 'system';
   title: string;
   message: string;
   targetRole: 'owner' | 'tenant' | 'both';
@@ -229,6 +227,15 @@ export interface Notification {
   expiresAt?: string; // When lease expires
   daysUntilExpiry?: number;
   read: boolean;
+}
+
+export interface LedgerSummary {
+  totalRevenue: number;
+  totalLiabilityHeld: number;
+  totalLiabilityRefunded: number;
+  netLiability: number;
+  totalExpense: number;
+  netOperatingIncome: number;
 }
 
 interface AppContextType {
@@ -247,6 +254,7 @@ interface AppContextType {
   receipts: Receipt[];
   maintenanceRequests: MaintenanceRequest[];
   maintenanceCosts: MaintenanceCost[];
+  fetchLedgerSummary: (year: number) => Promise<LedgerSummary>;
   notifications: Notification[];
   markNotificationAsRead: (id: string) => Promise<void>;
 
@@ -316,6 +324,7 @@ interface AppContextType {
     newMonthlyRent?: number
   ) => Promise<void>;
   refundDeposit: (id: string, amount: number) => Promise<void>;
+  updateLeaseDocument: (id: string, documentUrl: string) => Promise<void>; // [ADDED]
 
   // Invoice operations
   generateMonthlyInvoices: () => void;
@@ -493,7 +502,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
         try {
           const lRes = await apiClient.get('/leases');
           if (lRes.data) {
-            setLeases(lRes.data);
+            const mappedLeases = lRes.data.map((l: any) => ({
+              ...l,
+              id: l.id?.toString() || l.lease_id?.toString(),
+              tenantId: l.tenantId?.toString() || l.tenant_id?.toString(),
+              unitId: l.unitId?.toString() || l.unit_id?.toString(),
+              documentUrl: l.documentUrl || l.document_url,
+            }));
+            setLeases(mappedLeases);
           }
         } catch (e) {
           console.error('Failed to fetch leases', e);
@@ -551,6 +567,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
               tenantId: i.tenant_id.toString(),
               unitId: i.unit_id ? i.unit_id.toString() : '',
               amount: parseFloat(i.amount),
+              amountPaid: typeof i.amount_paid !== 'undefined' ? parseFloat(i.amount_paid) : 0,
               tenantName: i.tenant_name,
               propertyName: i.property_name,
               unitNumber: i.unit_number,
@@ -654,7 +671,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const fetchLeads = async () => {
       try {
         const currentUser = authService.getCurrentUser();
-        // Fallback to prop user if storage is slightly out of sync or just trust prop
         if (user?.role !== 'owner' && currentUser?.role !== 'owner') return;
 
         const token = localStorage.getItem('authToken');
@@ -674,7 +690,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
           }
         }
       } catch (error: any) {
-        // Suppress 403 errors if somehow we got here but shouldn't have, or just log them
         if (error.response && error.response.status === 403) {
           return;
         }
@@ -808,7 +823,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const existingNotification = notifications.find(
           (n) =>
             n.leaseId === lease.id &&
-            n.type === 'lease_expiring' &&
+            n.type === 'lease' &&
             Math.abs((n.daysUntilExpiry || 0) - daysUntilExpiry) < 2
         );
 
@@ -824,7 +839,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
           generatedNotifications.push({
             id: `notif-${lease.id}-${daysUntilExpiry}`,
-            type: 'lease_expiring',
+            type: 'lease',
             title:
               daysUntilExpiry <= 7
                 ? `⚠️ Urgent: Lease Expiring Soon`
@@ -853,7 +868,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const filtered = prev.filter(
           (n) =>
             !generatedNotifications.some(
-              (gn) => gn.leaseId === n.leaseId && n.type === 'lease_expiring'
+              (gn) => gn.leaseId === n.leaseId && n.type === 'lease'
             )
         );
         return [...filtered, ...generatedNotifications];
@@ -1220,7 +1235,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     leadId: string,
     startDate?: string,
     endDate?: string,
-    data?: string | any 
+    data?: string | any
   ) => {
     try {
       const payload: any = { startDate, endDate };
@@ -1363,6 +1378,53 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const msg = e.response?.data?.error || 'Failed to refund deposit';
       toast.error(msg);
       throw new Error(msg);
+    }
+  };
+
+  const fetchLedgerSummary = async (year: number): Promise<LedgerSummary> => {
+    try {
+      const { data } = await apiClient.get(`/reports/ledger-summary?year=${year}`);
+      return data;
+    } catch (error) {
+      console.error('Failed to fetch ledger summary', error);
+      throw error;
+    }
+  };
+
+  const getMyLeases = async () => {
+    try {
+      const currentUser = authService.getCurrentUser();
+      if (user?.role !== 'owner' && currentUser?.role !== 'owner') return;
+
+      const token = localStorage.getItem('authToken');
+      if (token) {
+        const response = await apiClient.get('/leases/my-leases');
+        if (response.status === 200) {
+          console.log('My Leases:', response.data);
+        }
+      }
+    } catch (error: any) {
+      if (error.response && error.response.status === 403) {
+        return;
+      }
+      console.error('Failed to fetch my leases:', error);
+    }
+  };
+
+  const updateLeaseDocument = async (id: string, documentUrl: string) => {
+    try {
+      await apiClient.patch(`/leases/${id}/document`, { documentUrl });
+      // Update local state instead of full refetch for better UX
+      setLeases((prev) =>
+        prev.map((lease) =>
+          lease.id === id ? { ...lease, documentUrl } : lease
+        )
+      );
+      toast.success('Document updated successfully');
+    } catch (error: any) {
+      console.error('Failed to update lease document', error);
+      toast.error(error.response?.data?.error || 'Failed to update document');
+      throw error;
     }
   };
 
@@ -1780,6 +1842,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         receipts,
         maintenanceRequests,
         maintenanceCosts,
+        fetchLedgerSummary,
+
         notifications,
         addProperty,
         updateProperty,
@@ -1808,6 +1872,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         endLease,
         renewLease,
         refundDeposit,
+        updateLeaseDocument,
         generateMonthlyInvoices,
         submitPayment,
         verifyPayment,

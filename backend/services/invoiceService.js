@@ -14,7 +14,7 @@ class InvoiceService {
         } else if (user.role === 'treasurer') {
             return await invoiceModel.findByTreasurerId(user.id);
         } else if (user.role === 'owner') {
-            return await invoiceModel.findAll();
+            return await invoiceModel.findByOwnerId(user.id);
         } else {
             throw new Error('Access denied');
         }

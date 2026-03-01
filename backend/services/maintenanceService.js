@@ -140,8 +140,30 @@ class MaintenanceService {
     async getRequests(user) {
          if (user.role === 'tenant') {
              return await maintenanceRequestModel.findByTenantId(user.id);
-         } else if (user.role === 'owner' || user.role === 'treasurer') {
-             return await maintenanceRequestModel.findAll();
+         } else if (user.role === 'owner') {
+             return await maintenanceRequestModel.findByOwnerId(user.id);
+         } else if (user.role === 'treasurer') {
+             const results = await maintenanceRequestModel.findAll();
+             // Filter by assigned properties
+             const staffModel = (await import('../models/staffModel.js')).default;
+             const assigned = await staffModel.getAssignedProperties(user.id);
+             const assignedPropertyIds = assigned.map((p) => p.property_id.toString());
+             
+             // Extract unique unit IDs from the requests
+             const unitIds = [...new Set(results.map(r => r.unit_id))];
+             
+             // Find properties for these units
+             if (unitIds.length === 0) return [];
+             const units = await Promise.all(unitIds.map(id => unitModel.findById(id)));
+             const unitIdToPropertyId = {};
+             units.forEach(u => {
+                 if(u) unitIdToPropertyId[u.unit_id] = u.propertyId.toString();
+             });
+             
+             return results.filter((r) => {
+                 const propId = unitIdToPropertyId[r.unit_id];
+                 return assignedPropertyIds.includes(propId);
+             });
          } else {
              throw new Error('Access denied');
          }

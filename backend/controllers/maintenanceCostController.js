@@ -20,67 +20,76 @@ class MaintenanceCostController {
 
       // Logic Check: Billable Maintenance
       // If flagged, generate an Invoice for the tenant.
+      let billingSuccess = null;
+      let billingError = null;
       if (billToTenant) {
-        // Get request details to find tenant/unit/lease?
-        // maintenanceRequestModel has tenantId and unitId.
-        // We need ACTIVE lease to bill against.
-        const maintenanceRequestModel = (
-          await import('../models/maintenanceRequestModel.js')
-        ).default;
-        const request = await maintenanceRequestModel.findById(requestId); // Ensure this exists
+        try {
+          // Get request details to find tenant/unit/lease?
+          // maintenanceRequestModel has tenantId and unitId.
+          // We need ACTIVE lease to bill against.
+          const maintenanceRequestModel = (
+            await import('../models/maintenanceRequestModel.js')
+          ).default;
+          const request = await maintenanceRequestModel.findById(requestId); // Ensure this exists
 
-        if (request && request.tenant_id) {
-          // Find active lease for this tenant/unit?
-          // invoiceModel needs leaseId.
-          const leaseModel = (await import('../models/leaseModel.js')).default;
-          // We need to find the lease associated with this request.
-          // Usually maintenance is on a unit occupied by tenant.
-          // Assuming 'tenant_id' on request is the current tenant.
-          // Let's find ACTIVE lease for this tenant and unit.
+          if (request && request.tenant_id) {
+            // Find active lease for this tenant/unit?
+            // invoiceModel needs leaseId.
+            const leaseModel = (await import('../models/leaseModel.js')).default;
 
-          // Logic Fix: Correct Method Name & Data Handling
-          const leases = await leaseModel.findByTenantId(request.tenant_id);
-          // findByTenantId returns an array of mapped objects (id, unitId, etc.)
+            const leases = await leaseModel.findByTenantId(request.tenant_id);
 
-          // Find active lease for this unit
-          const activeLease = leases.find(
-            (l) =>
-              String(l.unitId) === String(request.unit_id) &&
-              l.status === 'active'
-          );
-
-          if (activeLease) {
-            const invoiceModel = (await import('../models/invoiceModel.js'))
-              .default;
-            await invoiceModel.create({
-              leaseId: activeLease.id, // Mapped model uses 'id'
-              amount: amount,
-              dueDate: new Date(), // Immediate
-              description: `Maintenance Charge: ${description || 'Repair Costs'}`,
-              type: 'maintenance', // Logic Fix: Correct Type
-            });
-
-            // Logic Fix: In-App Notification
-            const notificationModel = (
-              await import('../models/notificationModel.js')
-            ).default;
-            await notificationModel.create({
-              userId: request.tenant_id,
-              message: `A new maintenance charge of ${amount} has been added to your account.`,
-              type: 'invoice',
-              severity: 'warning',
-            });
-
-            console.log(`Billed Maintenance Cost to Lease ${activeLease.id}`);
-          } else {
-            console.warn(
-              'Cannot bill maintenance: No active lease found for this unit/tenant.'
+            // Find active lease for this unit
+            const activeLease = leases.find(
+              (l) =>
+                String(l.unitId) === String(request.unit_id) &&
+                l.status === 'active'
             );
+
+            if (activeLease) {
+              const invoiceModel = (await import('../models/invoiceModel.js'))
+                .default;
+              await invoiceModel.create({
+                leaseId: activeLease.id, // Mapped model uses 'id'
+                amount: amount,
+                dueDate: new Date(), // Immediate
+                description: `Maintenance Charge: ${description || 'Repair Costs'}`,
+                type: 'maintenance',
+              });
+
+              // In-App Notification
+              const notificationModel = (
+                await import('../models/notificationModel.js')
+              ).default;
+              await notificationModel.create({
+                userId: request.tenant_id,
+                message: `A new maintenance charge of ${amount} has been added to your account.`,
+                type: 'invoice',
+                severity: 'warning',
+              });
+
+              billingSuccess = true;
+            } else {
+              billingSuccess = false;
+              billingError = 'No active lease found for this unit/tenant. Tenant was not billed.';
+            }
+          } else {
+            billingSuccess = false;
+            billingError = 'Maintenance request or tenant not found. Tenant was not billed.';
           }
+        } catch (billingErr) {
+            console.error('Failed to bill tenant for maintenance cost:', billingErr);
+            billingSuccess = false;
+            billingError = 'An error occurred while generating the tenant invoice. Tenant was not billed.';
         }
       }
 
-      res.status(201).json({ message: 'Cost recorded', costId });
+      const response = { message: 'Cost recorded', costId };
+      if (billToTenant) {
+        response.billingSuccess = billingSuccess;
+        if (billingError) response.billingError = billingError;
+      }
+      res.status(201).json(response);
     } catch (error) {
       console.error(error);
       res.status(500).json({ error: 'Failed to record cost' });

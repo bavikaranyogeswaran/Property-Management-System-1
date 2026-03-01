@@ -94,22 +94,36 @@ class TenantModel {
     ]);
   }
 
+  // Whitelist of allowed fields: camelCase key -> snake_case column
+  static ALLOWED_UPDATE_FIELDS = {
+    nic: 'nic',
+    permanentAddress: 'permanent_address',
+    emergencyContactName: 'emergency_contact_name',
+    emergencyContactPhone: 'emergency_contact_phone',
+    employmentStatus: 'employment_status',
+    monthlyIncome: 'monthly_income',
+  };
+
   async update(userId, data) {
-    // Dynamic update would be better, but for now specific fields
-    // Allowing selective updates
     const fields = [];
     const values = [];
 
     Object.keys(data).forEach((key) => {
-      // Map camelCase to snake_case if necessary, or just use snake_case in data object
-      // Assuming data keys match column names or we map them.
-      // Let's assume the service passes snake_case or we map manually.
-      // Ideally we map manually for safety.
+      const column = TenantModel.ALLOWED_UPDATE_FIELDS[key];
+      if (column && data[key] !== undefined) {
+        fields.push(`${column} = ?`);
+        values.push(data[key]);
+      }
     });
 
-    // Needed for profile updates
-    // For MVP, we might not implementation full profile update yet.
-    return true;
+    if (fields.length === 0) return false;
+
+    values.push(userId);
+    const [result] = await pool.query(
+      `UPDATE tenants SET ${fields.join(', ')} WHERE user_id = ?`,
+      values
+    );
+    return result.affectedRows > 0;
   }
 
   async addCredit(userId, amount) {
@@ -128,7 +142,7 @@ class TenantModel {
   async incrementBehaviorScore(userId, scoreChange, connection = null) {
     const db = connection || pool;
     await db.query(
-      'UPDATE tenants SET behavior_score = behavior_score + ? WHERE user_id = ?',
+      'UPDATE tenants SET behavior_score = LEAST(100, GREATEST(0, behavior_score + ?)) WHERE user_id = ?',
       [scoreChange, userId]
     );
   }

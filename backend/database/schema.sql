@@ -17,7 +17,7 @@ CREATE TABLE users (
     email VARCHAR(100) UNIQUE NOT NULL,
     phone VARCHAR(20),
     password_hash VARCHAR(255) NOT NULL,
-    role ENUM('owner','tenant','treasurer','lead') NOT NULL,
+    role ENUM('owner','tenant','treasurer') NOT NULL,
     is_email_verified BOOLEAN DEFAULT FALSE,
     email_verified_at DATETIME,
     status ENUM('active','inactive','banned') DEFAULT 'active',
@@ -32,6 +32,7 @@ CREATE TABLE users (
 CREATE TABLE tenants (
     user_id INT PRIMARY KEY,
     nic VARCHAR(20) UNIQUE,              -- NIC (Old or New format)
+    permanent_address VARCHAR(255),      -- Tenant's permanent address
     emergency_contact_name VARCHAR(100),
     emergency_contact_phone VARCHAR(20),
     employment_status ENUM('employed', 'self-employed', 'student', 'unemployed'),
@@ -162,7 +163,6 @@ CREATE TABLE leads (
     lead_id INT AUTO_INCREMENT PRIMARY KEY,
     property_id INT NOT NULL,                -- [ADDED] Link to property
     unit_id INT NULL,
-    user_id INT,    -- Link to User account (Lead or Tenant role)
     name VARCHAR(100) NOT NULL,
     phone VARCHAR(20),
     email VARCHAR(100),
@@ -175,8 +175,7 @@ CREATE TABLE leads (
     last_contacted_at DATETIME,              -- [ADDED] For follow-up tracking
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (property_id) REFERENCES properties(property_id),
-    FOREIGN KEY (unit_id) REFERENCES units(unit_id),
-    FOREIGN KEY (user_id) REFERENCES users(user_id)
+    FOREIGN KEY (unit_id) REFERENCES units(unit_id)
 );
 
 CREATE TABLE lead_followups (
@@ -202,12 +201,15 @@ CREATE TABLE lead_stage_history (
 CREATE TABLE messages (
     message_id INT AUTO_INCREMENT PRIMARY KEY,
     lead_id INT NOT NULL,
-    sender_id INT NOT NULL,
+    sender_id INT NULL,                      -- Set when sender is a user (owner/tenant/treasurer)
+    sender_lead_id INT NULL,                 -- Set when sender is a lead (guest)
+    sender_type ENUM('user','lead') NOT NULL DEFAULT 'user',
     content TEXT NOT NULL,
     is_read BOOLEAN DEFAULT FALSE,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (lead_id) REFERENCES leads(lead_id) ON DELETE CASCADE,
-    FOREIGN KEY (sender_id) REFERENCES users(user_id) ON DELETE CASCADE
+    FOREIGN KEY (sender_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    FOREIGN KEY (sender_lead_id) REFERENCES leads(lead_id) ON DELETE CASCADE
 );
 
 -- =========================
@@ -236,6 +238,7 @@ CREATE TABLE leases (
     security_deposit DECIMAL(10, 2) DEFAULT 0.00,
     deposit_status ENUM('pending', 'paid', 'partially_refunded', 'refunded') DEFAULT 'pending',
     refunded_amount DECIMAL(10, 2) DEFAULT 0.00,
+    document_url VARCHAR(500), -- [ADDED] Lease document URL
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (tenant_id) REFERENCES users(user_id),
     FOREIGN KEY (unit_id) REFERENCES units(unit_id)
@@ -329,7 +332,7 @@ CREATE TABLE notifications (
     notification_id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT,
     message TEXT NOT NULL,
-    type ENUM('invoice','lease','maintenance') NOT NULL,
+    type ENUM('invoice','lease','maintenance','payment','visit','system') NOT NULL,
     is_read BOOLEAN DEFAULT FALSE,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(user_id)
@@ -396,6 +399,30 @@ CREATE TABLE IF NOT EXISTS staff_property_assignments (
     FOREIGN KEY (property_id) REFERENCES properties(property_id) ON DELETE CASCADE,
     UNIQUE KEY unique_assignment (user_id, property_id)
 );
+
+-- =========================
+-- ACCOUNTING LEDGER
+-- =========================
+CREATE TABLE accounting_ledger (
+    entry_id INT AUTO_INCREMENT PRIMARY KEY,
+    payment_id INT,
+    invoice_id INT,
+    lease_id INT NOT NULL,
+    account_type ENUM('revenue', 'liability', 'expense') NOT NULL,
+    category VARCHAR(50) NOT NULL,
+    debit DECIMAL(10,2) DEFAULT 0.00,
+    credit DECIMAL(10,2) DEFAULT 0.00,
+    description VARCHAR(255),
+    entry_date DATE NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (payment_id) REFERENCES payments(payment_id),
+    FOREIGN KEY (invoice_id) REFERENCES rent_invoices(invoice_id),
+    FOREIGN KEY (lease_id) REFERENCES leases(lease_id)
+);
+
+CREATE INDEX idx_ledger_lease ON accounting_ledger(lease_id);
+CREATE INDEX idx_ledger_account_type ON accounting_ledger(account_type);
+CREATE INDEX idx_ledger_entry_date ON accounting_ledger(entry_date);
 
 -- =========================
 -- INDEXES

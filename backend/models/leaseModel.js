@@ -22,8 +22,8 @@ class LeaseModel {
     } = data;
     const dbConn = connection || db;
     const [result] = await dbConn.query(
-      `INSERT INTO leases (tenant_id, unit_id, start_date, end_date, monthly_rent, status, security_deposit, deposit_status)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO leases (tenant_id, unit_id, start_date, end_date, monthly_rent, status, security_deposit, deposit_status, document_url)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         tenantId,
         unitId,
@@ -33,18 +33,28 @@ class LeaseModel {
         status || 'active',
         securityDeposit || 0.0,
         depositStatus || 'pending',
+        data.documentUrl || null,
       ]
     );
     return result.insertId;
   }
+  // Whitelist of columns that can be updated via the dynamic update method
+  static ALLOWED_UPDATE_FIELDS = [
+    'tenant_id', 'unit_id', 'start_date', 'end_date',
+    'monthly_rent', 'status', 'security_deposit',
+    'deposit_status', 'refunded_amount', 'document_url',
+  ];
+
   async update(id, data, connection = null) {
     const dbConn = connection || db;
-    // Build dynamic query
+    // Build dynamic query with whitelisted fields only
     const fields = [];
     const values = [];
     Object.keys(data).forEach((key) => {
-      fields.push(`${key} = ?`);
-      values.push(data[key]);
+      if (LeaseModel.ALLOWED_UPDATE_FIELDS.includes(key)) {
+        fields.push(`${key} = ?`);
+        values.push(data[key]);
+      }
     });
     values.push(id);
 
@@ -57,17 +67,25 @@ class LeaseModel {
     return result.affectedRows > 0;
   }
 
-  async findAll() {
-    const [rows] = await db.query(`
+  async findAll(ownerId = null) {
+    let query = `
             SELECT l.*, 
                    u.unit_number,
                    u.property_id,
                    p.name as property_name
             FROM leases l
             JOIN units u ON l.unit_id = u.unit_id
-            JOIN properties p ON u.property_id = p.property_id
-            ORDER BY l.created_at DESC
-        `);
+            JOIN properties p ON u.property_id = p.property_id`;
+    const params = [];
+
+    if (ownerId) {
+      query += ` WHERE p.owner_id = ?`;
+      params.push(ownerId);
+    }
+
+    query += ` ORDER BY l.created_at DESC`;
+
+    const [rows] = await db.query(query, params);
     return this.mapRows(rows);
   }
 
@@ -120,17 +138,21 @@ class LeaseModel {
     return this.mapRows(rows);
   }
 
-  async checkOverlap(unitId, startDate, endDate) {
-    const [rows] = await db.query(
-      `
+  async checkOverlap(unitId, startDate, endDate, excludeLeaseId = null) {
+    let query = `
             SELECT lease_id FROM leases 
             WHERE unit_id = ? 
             AND status IN ('active', 'pending')
             AND start_date <= ? 
-            AND end_date >= ?
-        `,
-      [unitId, endDate, startDate]
-    );
+            AND end_date >= ?`;
+    const params = [unitId, endDate, startDate];
+
+    if (excludeLeaseId) {
+      query += ` AND lease_id != ?`;
+      params.push(excludeLeaseId);
+    }
+
+    const [rows] = await db.query(query, params);
     return rows.length > 0;
   }
 
@@ -146,6 +168,7 @@ class LeaseModel {
       securityDeposit: parseFloat(row.security_deposit || 0),
       depositStatus: row.deposit_status,
       refundedAmount: parseFloat(row.refunded_amount || 0),
+      documentUrl: row.document_url,
       createdAt: row.created_at,
       // Extra info useful for frontend listing
       unitNumber: row.unit_number,

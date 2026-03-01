@@ -42,15 +42,13 @@ class LeadService {
             }
         }
 
-        // Check for existing user — allow if role is 'lead' or 'tenant', reject if other role
-        let userId = null;
+        // Check if email belongs to a staff/owner — reject if so
         const existingUser = await userModel.findByEmail(email);
         if (existingUser) {
-            const allowedRoles = ['lead', 'tenant'];
+            const allowedRoles = ['tenant'];
             if (!allowedRoles.includes(existingUser.role)) {
                 throw new Error('This email is already associated with a staff/owner account. Please use a different email or log in.');
             }
-            userId = existingUser.user_id;
         }
 
         const existingLeadId = await leadModel.findIdByEmailAndProperty(email, propertyId);
@@ -64,22 +62,16 @@ class LeadService {
             await leadModel.update(leadId, {
                 lastContactedAt: new Date(),
                 notes: notes ? `${notes} (Re-inquiry)` : undefined,
+                interestedUnit: finalUnitId,
+                unitId: finalUnitId,
+                name: name,
+                phone: phone,
+                move_in_date: moveInDate,
+                occupants_count: occupantsCount
             });
             message = 'Interest updated. We will contact you soon.';
         } else {
-            // Create a lightweight user row if one doesn't exist yet
-            if (!userId) {
-                userId = await userModel.create({
-                    name,
-                    email,
-                    phone,
-                    passwordHash: 'NO_LOGIN',  // Cannot be matched by bcrypt — lead cannot log in
-                    role: 'lead',
-                    is_email_verified: true,
-                    status: 'active',
-                });
-            }
-
+            // No user row is created — leads are guests, not system users
             leadId = await leadModel.create({
                 propertyId,
                 unitId: finalUnitId,
@@ -91,7 +83,6 @@ class LeadService {
                 move_in_date: moveInDate,
                 occupants_count: occupantsCount,
                 status: 'interested',
-                userId: userId,
             });
             message = 'Interest registered! We will contact you soon.';
             isNew = true;
@@ -130,6 +121,8 @@ class LeadService {
         if (user.role !== 'owner') {
              throw new Error('Access denied.');
         }
+        const isOwner = await leadModel.verifyOwnership(id, user.id);
+        if (!isOwner) throw new Error('Access denied. This lead does not belong to your property.');
         const success = await leadModel.update(id, data);
         if (!success) throw new Error('Lead not found');
         return success;

@@ -91,15 +91,32 @@ class MaintenanceCostModel {
   async findByIdWithDetails(costId) {
     const [rows] = await pool.query(
       `
-            SELECT mc.*, u.property_id
-            FROM maintenance_costs mc
-            JOIN maintenance_requests mr ON mc.request_id = mr.request_id
-            JOIN units u ON mr.unit_id = u.unit_id
-            WHERE mc.cost_id = ?
-        `,
+      SELECT mc.*, u.property_id
+      FROM maintenance_costs mc
+      JOIN maintenance_requests mr ON mc.request_id = mr.request_id
+      JOIN units u ON mr.unit_id = u.unit_id
+      WHERE mc.cost_id = ?
+      `,
       [costId]
     );
     return rows[0];
+  }
+
+  // Analytics optimized query to avoid O(N) memory buildup
+  async getFinancialStatsByYear(year) {
+    const [rows] = await pool.query(
+      `
+      SELECT p.name AS property_name, SUM(mc.amount) AS total_expense
+      FROM maintenance_costs mc
+      JOIN maintenance_requests mr ON mc.request_id = mr.request_id
+      JOIN units u ON mr.unit_id = u.unit_id
+      JOIN properties p ON u.property_id = p.property_id
+      WHERE YEAR(mc.recorded_date) = ?
+      GROUP BY p.property_id
+      `,
+      [year]
+    );
+    return rows;
   }
 }
 

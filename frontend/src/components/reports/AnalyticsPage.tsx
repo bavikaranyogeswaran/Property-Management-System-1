@@ -104,13 +104,43 @@ export function AnalyticsPage() {
     { name: 'Maintenance', value: maintenanceUnits, color: '#ef4444' },
   ];
 
+  // Optimize data fetching for O(N) complexity using Hash Maps for O(1) lookups
+  // 1. Group units by propertyId
+  const unitsByProperty = new Map<string, typeof units>();
+  units.forEach(u => {
+    if (!unitsByProperty.has(u.propertyId)) unitsByProperty.set(u.propertyId, []);
+    unitsByProperty.get(u.propertyId)!.push(u);
+  });
+
+  // 2. Group active leases by unitId
+  const activeLeasesByUnit = new Map<string, typeof leases>();
+  leases.filter(l => l.status === 'active').forEach(l => {
+    if (!activeLeasesByUnit.has(l.unitId)) activeLeasesByUnit.set(l.unitId, []);
+    activeLeasesByUnit.get(l.unitId)!.push(l);
+  });
+
+  // 3. Group maintenance requests by unitId
+  const maintenanceRequestsByUnit = new Map<string, typeof maintenanceRequests>();
+  maintenanceRequests.forEach(r => {
+    if (!maintenanceRequestsByUnit.has(r.unitId)) maintenanceRequestsByUnit.set(r.unitId, []);
+    maintenanceRequestsByUnit.get(r.unitId)!.push(r);
+  });
+
+  // 4. Group maintenance costs by requestId
+  const costsByRequest = new Map<string, typeof maintenanceCosts>();
+  maintenanceCosts.forEach(c => {
+    if (!costsByRequest.has(c.requestId)) costsByRequest.set(c.requestId, []);
+    costsByRequest.get(c.requestId)!.push(c);
+  });
+
+  // Calculate property revenue using O(1) lookups
   const propertyRevenueData = properties.map((property) => {
-    const propertyUnits = units.filter((u) => u.propertyId === property.id);
-    const propertyLeases = leases.filter(
-      (l) =>
-        propertyUnits.some((u) => u.id === l.unitId) && l.status === 'active'
-    );
-    const revenue = propertyLeases.reduce((sum, l) => sum + l.monthlyRent, 0);
+    const propertyUnits = unitsByProperty.get(property.id) || [];
+    
+    const revenue = propertyUnits.reduce((sum, u) => {
+      const unitLeases = activeLeasesByUnit.get(u.id) || [];
+      return sum + unitLeases.reduce((leaseSum, l) => leaseSum + l.monthlyRent, 0);
+    }, 0);
 
     return {
       name: property.name,
@@ -120,14 +150,16 @@ export function AnalyticsPage() {
     };
   });
 
+  // Calculate property maintenance using O(1) lookups
   const maintenanceCostByProperty = properties.map((property) => {
-    const propertyUnits = units.filter((u) => u.propertyId === property.id);
-    const propertyRequests = maintenanceRequests.filter((r) =>
-      propertyUnits.some((u) => u.id === r.unitId)
-    );
-    const totalCost = propertyRequests.reduce((sum, r) => {
-      const costs = maintenanceCosts.filter((c) => c.requestId === r.id);
-      return sum + costs.reduce((s, c) => s + c.amount, 0);
+    const propertyUnits = unitsByProperty.get(property.id) || [];
+    
+    const totalCost = propertyUnits.reduce((sum, u) => {
+      const unitRequests = maintenanceRequestsByUnit.get(u.id) || [];
+      return sum + unitRequests.reduce((reqSum, r) => {
+        const costs = costsByRequest.get(r.id) || [];
+        return reqSum + costs.reduce((s, c) => s + c.amount, 0);
+      }, 0);
     }, 0);
 
     return {
@@ -733,9 +765,7 @@ export function AnalyticsPage() {
             <CardContent>
               <div className="space-y-4">
                 {properties.map((property) => {
-                  const propUnits = units.filter(
-                    (u) => u.propertyId === property.id
-                  );
+                  const propUnits = unitsByProperty.get(property.id) || [];
                   const propOccupied = propUnits.filter(
                     (u) => u.status === 'occupied'
                   ).length;
@@ -807,19 +837,15 @@ export function AnalyticsPage() {
                   </thead>
                   <tbody>
                     {properties.map((property) => {
-                      const propUnits = units.filter(
-                        (u) => u.propertyId === property.id
-                      );
-                      const propRequests = maintenanceRequests.filter((r) =>
-                        propUnits.some((u) => u.id === r.unitId)
-                      );
+                      const propUnits = unitsByProperty.get(property.id) || [];
+                      const propRequests = propUnits.flatMap(u => maintenanceRequestsByUnit.get(u.id) || []);
+                      
                       const propCompleted = propRequests.filter(
                         (r) => r.status === 'completed'
                       ).length;
+                      
                       const propCost = propRequests.reduce((sum, r) => {
-                        const costs = maintenanceCosts.filter(
-                          (c) => c.requestId === r.id
-                        );
+                        const costs = costsByRequest.get(r.id) || [];
                         return sum + costs.reduce((s, c) => s + c.amount, 0);
                       }, 0);
                       const propAvg =
@@ -956,21 +982,32 @@ export function AnalyticsPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {tenants.map((tenant) => {
-                      const tenantInvoices = invoices.filter(
-                        (i) => i.tenantId === tenant.id
-                      );
-                      const tenantPaid = tenantInvoices.filter(
-                        (i) => i.status === 'paid'
-                      ).length;
-                      const tenantPending = tenantInvoices.filter(
-                        (i) => i.status === 'pending'
-                      ).length;
-                      const tenantTotal = receipts
-                        .filter((r) => r.tenantId === tenant.id)
-                        .reduce((sum, r) => sum + r.amount, 0);
+                    {(() => {
+                      // Pre-compute maps for O(1) lookups during tenant mapping
+                      const invoicesByTenant = new Map<string, typeof invoices>();
+                      invoices.forEach(i => {
+                        if (!invoicesByTenant.has(i.tenantId)) invoicesByTenant.set(i.tenantId, []);
+                        invoicesByTenant.get(i.tenantId)!.push(i);
+                      });
 
-                      return (
+                      const receiptsByTenant = new Map<string, typeof receipts>();
+                      receipts.forEach(r => {
+                        if (!receiptsByTenant.has(r.tenantId)) receiptsByTenant.set(r.tenantId, []);
+                        receiptsByTenant.get(r.tenantId)!.push(r);
+                      });
+
+                      return tenants.map((tenant) => {
+                        const tenantInvoices = invoicesByTenant.get(tenant.id) || [];
+                        const tenantPaid = tenantInvoices.filter(
+                          (i) => i.status === 'paid'
+                        ).length;
+                        const tenantPending = tenantInvoices.filter(
+                          (i) => i.status === 'pending'
+                        ).length;
+                        const tenantTotal = (receiptsByTenant.get(tenant.id) || [])
+                          .reduce((sum, r) => sum + r.amount, 0);
+
+                        return (
                         <tr key={tenant.id} className="border-b last:border-0">
                           <td className="py-3 font-medium">{tenant.name}</td>
                           <td className="py-3">{tenantInvoices.length}</td>
@@ -985,7 +1022,8 @@ export function AnalyticsPage() {
                           </td>
                         </tr>
                       );
-                    })}
+                      });
+                    })()}
                   </tbody>
                 </table>
               </div>

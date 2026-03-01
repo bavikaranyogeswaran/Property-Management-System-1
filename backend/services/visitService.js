@@ -99,13 +99,8 @@ class VisitService {
         if (status === 'completed' || status === 'confirmed') {
              const visit = await visitModel.findById(id);
              if (visit && visit.lead_id) {
-                 const lead = await leadModel.findById(visit.lead_id);
-                 const updateData = { lastContactedAt: new Date() };
-                 
-                 if (status === 'completed' && lead && lead.status === 'interested') {
-                     updateData.status = 'visited';
-                 }
-                 await leadModel.update(visit.lead_id, updateData);
+                 // Update last contacted timestamp (lead stays 'interested' — no 'visited' ENUM value)
+                 await leadModel.update(visit.lead_id, { lastContactedAt: new Date() });
              }
         }
 

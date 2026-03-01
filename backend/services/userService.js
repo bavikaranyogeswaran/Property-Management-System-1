@@ -12,6 +12,7 @@ import unitModel from '../models/unitModel.js';
 import leaseModel from '../models/leaseModel.js';
 import leaseService from '../services/leaseService.js';
 import emailService from '../utils/emailService.js';
+import leadTokenModel from '../models/leadTokenModel.js';
 import pool from '../config/db.js';
 
 const SALT_ROUNDS = 10;
@@ -75,34 +76,6 @@ class UserService {
     }
   }
 
-  async createLeadUser(name, email, phone, password) {
-    // Validation handled in Controller or here (DAL checks duplicate email)
-    const existingUser = await userModel.findByEmail(email);
-    if (existingUser) {
-      throw new Error('Email already in use');
-    }
-
-    const hashedPassword = await hash(password, SALT_ROUNDS);
-
-    const userId = await userModel.create({
-      name,
-      email,
-      phone,
-      passwordHash: hashedPassword,
-      role: 'lead',
-      status: 'active',
-    });
-
-    // Generate Verification Token
-    const token = jwt.sign({ id: userId, type: 'verify_email' }, JWT_SECRET, {
-      expiresIn: '24h',
-    });
-
-    // Send Verification Email
-    await emailService.sendVerificationEmail(email, token);
-
-    return userId;
-  }
 
   async updateTreasurer(id, data) {
     const { name, email, phone, status } = data;
@@ -196,32 +169,21 @@ class UserService {
         throw new Error('Lead is already converted');
       }
 
-      // 2. Check if user already exists
+      // 2. Check if a user with this email already exists
       let userId;
       const existingUser = await userModel.findByEmail(lead.email);
 
       if (existingUser) {
-        // User exists (likely as a Lead or Tenant)
-        userId = existingUser.user_id;
-
-        // If they are a lead, upgrade them to tenant
-        if (existingUser.role === 'lead') {
-          // No, must be in transaction.
-          await userModel.updateRole(userId, 'tenant', connection);
-
-          // Send confirmation
-          await emailService.sendTenantConfirmation(
-            existingUser.email,
-            existingUser.name
-          );
-        } else if (existingUser.role === 'tenant') {
+        if (existingUser.role === 'tenant') {
           // User is already an active tenant applying for another property.
           // They already have an account and password, so we just proceed with lease creation.
-          // No need to send confirmation or invite token since they are already set up.
+          userId = existingUser.user_id;
           console.log(`Lead ${leadId} is already a tenant (User ID: ${userId}). Proceeding with new lease creation.`);
+        } else {
+          throw new Error(`Email ${lead.email} is already associated with a ${existingUser.role} account. Cannot convert to tenant.`);
         }
       } else {
-        // Create new user (should only happen if lead was created without a user ID somehow, which shouldn't happen with updated leadService, but kept for safety)
+        // Create new user account for the tenant
         const passwordToUse = Math.random().toString(36).slice(-8);
         const hashedPassword = await hash(passwordToUse, SALT_ROUNDS);
 
@@ -248,29 +210,37 @@ class UserService {
       // 3. Create Tenant Profile
       const existingTenant = await tenantModel.findByUserId(userId, connection);
       if (!existingTenant) {
-        // Initialize an empty tenant profile to be filled out during password setup
         await tenantModel.create(
           {
             userId,
-            nic: null,
-            permanentAddress: null,
-            emergencyContactName: null,
-            emergencyContactPhone: null,
-            employmentStatus: 'Employed', // Default value
-            monthlyIncome: 0,
+            nic: tenantData.nic || null,
+            permanentAddress: tenantData.permanentAddress || null,
+            emergencyContactName: tenantData.emergencyContactName || null,
+            emergencyContactPhone: tenantData.emergencyContactPhone || null,
+            employmentStatus: 'Employed',
+            monthlyIncome: tenantData.monthlyIncome || 0,
           },
           connection
         );
       }
 
-      // 4. Update lead status
-      // leadModel.update doesn't support connection?
-      // Need to support it or use raw query.
-      // user_id is likely already set if they were created as a lead, but we ensure it's linked to the converted user.
-      await leadModel.update(
-        leadId,
-        { status: 'converted', userId },
-        connection
+      // 4. Update lead status (direct SQL to avoid duplicate history from leadModel.update)
+      await connection.query(
+        'UPDATE leads SET status = ? WHERE lead_id = ?',
+        ['converted', leadId]
+      );
+
+      // 4a. Invalidate portal access tokens
+      await leadTokenModel.invalidateForLead(leadId);
+
+      // 4b. Record stage history (positional args: leadId, fromStatus, toStatus, notes, connection)
+      const leadStageHistoryModel = (await import('../models/leadStageHistoryModel.js')).default;
+      await leadStageHistoryModel.create(
+          leadId,
+          lead.status,        // fromStatus — captured before the update above
+          'converted',        // toStatus
+          'System: Lead formally converted into an active tenant.',
+          connection
       );
 
       // 5. Lease & Unit Logic

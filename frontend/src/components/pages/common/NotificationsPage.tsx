@@ -31,7 +31,7 @@ export function NotificationsPage() {
         return Wrench;
       case 'invoice_overdue':
         return CreditCard;
-      case 'lease_expiring':
+      case 'lease':
         return FileText;
       default:
         return Bell;

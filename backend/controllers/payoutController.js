@@ -91,6 +91,33 @@ class PayoutController {
       res.status(500).json({ error: 'Failed to fetch history' });
     }
   }
+
+  async processPayout(req, res) {
+    try {
+      if (req.user.role !== 'owner') {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+
+      const { id } = req.params;
+
+      // Verify payout belongs to the requesting owner
+      const payouts = await payoutModel.findByOwnerId(req.user.id);
+      const payout = payouts.find((p) => String(p.payout_id) === String(id));
+      if (!payout) {
+        return res.status(404).json({ error: 'Payout not found' });
+      }
+
+      if (payout.status === 'processed') {
+        return res.status(400).json({ error: 'Payout already processed' });
+      }
+
+      await payoutModel.markAsProcessed(id);
+      res.json({ message: 'Payout marked as processed' });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: 'Failed to process payout' });
+    }
+  }
 }
 
 export default new PayoutController();

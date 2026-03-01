@@ -124,23 +124,23 @@ class UnitModel {
     const fields = [];
     const values = [];
 
-    if (updates.unitNumber) {
+    if (updates.unitNumber !== undefined) {
       fields.push('unit_number = ?');
       values.push(updates.unitNumber);
     }
-    if (updates.unitTypeId) {
+    if (updates.unitTypeId !== undefined) {
       fields.push('unit_type_id = ?');
       values.push(updates.unitTypeId);
     }
-    if (updates.monthlyRent) {
+    if (updates.monthlyRent !== undefined) {
       fields.push('monthly_rent = ?');
       values.push(updates.monthlyRent);
     }
-    if (updates.status) {
+    if (updates.status !== undefined) {
       fields.push('status = ?');
       values.push(updates.status);
     }
-    if (updates.imageUrl) {
+    if (updates.imageUrl !== undefined) {
       fields.push('image_url = ?');
       values.push(updates.imageUrl);
     }
@@ -158,14 +158,17 @@ class UnitModel {
   }
 
   async delete(id) {
-    // Hard delete or soft delete? propertyModel uses soft delete 'inactive' but units schema might not have it.
-    // Schema checks: status enum('available','occupied','maintenance'). No 'inactive'.
-    // So we might default to hard delete checking constraints.
-    // Assuming cascade or restriction.
-    const [result] = await db.query('DELETE FROM units WHERE unit_id = ?', [
-      id,
-    ]);
-    return result.affectedRows > 0;
+    try {
+      const [result] = await db.query('DELETE FROM units WHERE unit_id = ?', [
+        id,
+      ]);
+      return result.affectedRows > 0;
+    } catch (error) {
+       if (error.errno === 1451) {
+         throw new Error('Cannot delete unit because it has associated historical records (e.g. leases or maintenance requests).');
+       }
+       throw error;
+    }
   }
 
   mapRows(rows) {
@@ -213,6 +216,34 @@ class UnitModel {
       [propertyId]
     );
     return rows[0].count;
+  }
+
+  // Analytics optimized query to avoid O(N) memory buildup
+  async getOccupancyStats() {
+    const [rows] = await db.query(
+      `
+      SELECT 
+        COALESCE(p.name, CONCAT('Property ', u.property_id)) AS property_name,
+        COUNT(u.unit_id) AS total,
+        SUM(CASE WHEN u.status = 'occupied' THEN 1 ELSE 0 END) AS occupied,
+        GROUP_CONCAT(CASE WHEN u.status != 'occupied' THEN u.unit_number ELSE NULL END) AS vacancies
+      FROM units u
+      LEFT JOIN properties p ON u.property_id = p.property_id
+      GROUP BY u.property_id
+      `
+    );
+
+    // Transform string vacancies back into array mapping Report Service expectations
+    const propertyStats = {};
+    rows.forEach(row => {
+      propertyStats[row.property_name] = {
+        total: row.total,
+        occupied: row.occupied,
+        vacancies: row.vacancies ? row.vacancies.split(',') : []
+      }
+    });
+    
+    return propertyStats;
   }
 }
 

@@ -31,7 +31,7 @@ export interface Unit {
   bedrooms: number;
   bathrooms: number;
   rent: number;
-  status: 'vacant' | 'occupied' | 'maintenance';
+  status: 'available' | 'occupied' | 'maintenance';
   createdAt?: string;
 }
 
@@ -57,7 +57,7 @@ export interface Lease {
   startDate: string;
   endDate: string;
   monthlyRent: number;
-  status: 'active' | 'expired' | 'terminated';
+  status: 'active' | 'ended' | 'cancelled';
   createdAt?: string;
 }
 
@@ -92,8 +92,9 @@ export interface Invoice {
   leaseId: string;
   tenantId: string;
   amount: number;
+  amountPaid?: number;
   dueDate: string;
-  status: 'pending' | 'paid' | 'overdue';
+  status: 'pending' | 'partially_paid' | 'paid' | 'overdue' | 'void';
   description: string;
   createdAt?: string;
 }
@@ -105,7 +106,7 @@ export interface MaintenanceRequest {
   title: string;
   description: string;
   priority: 'low' | 'medium' | 'high' | 'urgent';
-  status: 'open' | 'in_progress' | 'completed' | 'closed';
+  status: 'submitted' | 'in_progress' | 'completed';
   createdAt?: string;
   closedAt?: string;
 }
