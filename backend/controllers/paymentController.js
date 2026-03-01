@@ -51,7 +51,6 @@ class PaymentController {
 
   //  VERIFY PAYMENT: Treasurer looks at bank statement and says "Yes, money is here".
   async verifyPayment(req, res) {
-    console.log('--- verifyPayment CALLED ---');
     try {
       const { id } = req.params;
       const { status } = req.body; // 'verified' or 'rejected'

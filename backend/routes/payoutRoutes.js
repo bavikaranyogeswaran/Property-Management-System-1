@@ -13,4 +13,7 @@ router.post('/create', authenticateToken, payoutController.createPayout);
 // Get Payout History (Owner only)
 router.get('/history', authenticateToken, payoutController.getHistory);
 
+// Mark Payout as Processed (Owner only)
+router.put('/:id/process', authenticateToken, payoutController.processPayout);
+
 export default router;

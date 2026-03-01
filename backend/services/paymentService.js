@@ -1,4 +1,5 @@
 
+import { randomUUID } from 'crypto';
 import paymentModel from '../models/paymentModel.js';
 import invoiceModel from '../models/invoiceModel.js';
 import notificationModel from '../models/notificationModel.js';
@@ -8,6 +9,25 @@ import behaviorLogModel from '../models/behaviorLogModel.js';
 import tenantModel from '../models/tenantModel.js';
 import leaseModel from '../models/leaseModel.js';
 import auditLogger from '../utils/auditLogger.js';
+import ledgerModel from '../models/ledgerModel.js';
+
+/**
+ * Maps an invoice_type to the correct accounting ledger classification.
+ */
+function getLedgerClassification(invoiceType) {
+    switch (invoiceType) {
+        case 'deposit':
+            return { accountType: 'liability', category: 'deposit_held' };
+        case 'rent':
+            return { accountType: 'revenue', category: 'rent' };
+        case 'late_fee':
+            return { accountType: 'revenue', category: 'late_fee' };
+        case 'maintenance':
+            return { accountType: 'expense', category: 'maintenance' };
+        default:
+            return { accountType: 'revenue', category: 'other' };
+    }
+}
 
 class PaymentService {
 
@@ -24,6 +44,12 @@ class PaymentService {
         if (!invoice) {
             throw new Error('Invoice not found');
         }
+
+        // Authorization: Verify this invoice belongs to the requesting tenant
+        if (String(invoice.tenant_id) !== String(tenantId)) {
+            throw new Error('Access denied. This invoice does not belong to you.');
+        }
+
         if (invoice.status === 'paid') {
             throw new Error('This invoice has already been paid.');
         }
@@ -80,18 +106,40 @@ class PaymentService {
         });
 
         const { payment: updatedPayment } = await paymentModel.updateStatus(paymentId, 'verified');
-        await invoiceModel.updateStatus(invoiceId, 'paid');
+
+        // Calculate total verified payments for this invoice (same logic as verifyPayment)
+        const allPayments = await paymentModel.findByInvoiceId(invoiceId);
+        const totalVerified = allPayments
+            .filter((p) => p.status === 'verified')
+            .reduce((sum, p) => sum + Number(p.amount), 0);
 
         const invoice = await invoiceModel.findById(invoiceId);
 
         if (invoice) {
+            if (totalVerified >= invoice.amount) {
+                await invoiceModel.updateStatus(invoiceId, 'paid');
+
+                // Overpayment Logic: Credit excess to tenant account
+                const overpayment = totalVerified - invoice.amount;
+                if (overpayment > 0) {
+                    await tenantModel.addCredit(invoice.tenant_id, overpayment);
+                    await notificationModel.create({
+                        userId: invoice.tenant_id,
+                        message: `Overpayment of ${overpayment} has been credited to your account balance.`,
+                        type: 'payment',
+                    });
+                }
+            } else if (totalVerified > 0) {
+                await invoiceModel.updateStatus(invoiceId, 'partially_paid');
+            }
+
             await receiptModel.create({
                 paymentId,
                 invoiceId,
                 tenantId: invoice.tenant_id,
                 amount,
                 generatedDate: new Date().toISOString(),
-                receiptNumber: `REC-CASH-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
+                receiptNumber: `REC-CASH-${randomUUID()}`,
             });
 
             await auditLogger.log(
@@ -101,8 +149,25 @@ class PaymentService {
                     entityId: paymentId,
                     details: { invoiceId, amount, receiptGenerated: true },
                 },
-                { user: treasurerUser } // Mock req object for audit logger if needed, or pass user
+                { user: treasurerUser }
             );
+
+            // Post Ledger Entry
+            try {
+                const { accountType, category } = getLedgerClassification(invoice.invoice_type);
+                await ledgerModel.create({
+                    paymentId,
+                    invoiceId: invoice.invoice_id,
+                    leaseId: invoice.lease_id,
+                    accountType,
+                    category,
+                    credit: Number(amount),
+                    description: `Cash payment for ${invoice.description || invoice.invoice_type}`,
+                    entryDate: new Date().toISOString().split('T')[0],
+                });
+            } catch (ledgerErr) {
+                console.error('Failed to post ledger entry (cash):', ledgerErr);
+            }
         }
 
         return paymentId;
@@ -172,14 +237,18 @@ class PaymentService {
                         tenantId: invoice.tenant_id,
                         amount: payment.amount,
                         generatedDate: new Date().toISOString(),
-                        receiptNumber: `REC-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
+                        receiptNumber: `REC-${randomUUID()}`,
                     });
 
                     // Deposit Status Logic
                     if (invoice.invoice_type === 'deposit') {
+                         const previousTotal = totalVerified - Number(payment.amount);
+                         const remainingDue = Math.max(0, Number(invoice.amount) - previousTotal);
+                         const amountUsed = Math.min(Number(payment.amount), remainingDue);
+                         
                          const lease = await leaseModel.findById(invoice.lease_id);
                          const currentHeld = Number(lease.securityDeposit || 0);
-                         const newHeld = currentHeld + Number(payment.amount);
+                         const newHeld = currentHeld + amountUsed;
                          
                          const finalStatus = (await invoiceModel.findById(payment.invoiceId)).status === 'paid' ? 'paid' : 'pending';
                          
@@ -202,6 +271,23 @@ class PaymentService {
                         entityId: paymentId,
                         details: { invoiceId: payment.invoiceId, amount: payment.amount },
                     }, { user: user });
+
+                    // Post Ledger Entry
+                    try {
+                        const { accountType, category } = getLedgerClassification(invoice.invoice_type);
+                        await ledgerModel.create({
+                            paymentId: Number(paymentId),
+                            invoiceId: invoice.invoice_id,
+                            leaseId: invoice.lease_id,
+                            accountType,
+                            category,
+                            credit: Number(payment.amount),
+                            description: `Payment verified for ${invoice.description || invoice.invoice_type}`,
+                            entryDate: new Date().toISOString().split('T')[0],
+                        });
+                    } catch (ledgerErr) {
+                        console.error('Failed to post ledger entry (verify):', ledgerErr);
+                    }
 
                     // Behavior Score
                     try {
@@ -264,7 +350,7 @@ class PaymentService {
          } else if (user.role === 'treasurer') {
              return await paymentModel.findByTreasurerId(user.id);
          } else if (user.role === 'owner') {
-             return await paymentModel.findAll();
+             return await paymentModel.findByOwnerId(user.id);
          } else {
              throw new Error('Access denied');
          }

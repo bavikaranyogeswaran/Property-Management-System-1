@@ -152,9 +152,6 @@ class UserController {
       if (req.user.role !== 'owner' && req.user.role !== 'treasurer') {
         return res.status(403).json({ error: 'Access denied.' });
       }
-      console.log(
-        `[DEBUG] getTenants called by ${req.user.role} ${req.user.id}`
-      );
 
       let result;
       if (req.user.role === 'owner') {
@@ -163,7 +160,6 @@ class UserController {
         result = await userService.getTenants(null, req.user.id);
       }
 
-      console.log(`[DEBUG] getTenants found ${result.length} tenants.`);
       res.json(result);
     } catch (error) {
       res.status(500).json({ error: error.message });
@@ -235,14 +231,10 @@ class UserController {
         return res.status(403).json({ error: 'Access denied.' });
       }
 
-      console.log(`[DEBUG] Fetching assignments for user ${userId}`);
       const properties = await staffModel.getAssignedProperties(userId);
-      console.log(
-        `[DEBUG] Found ${properties.length} assignments for user ${userId}`
-      );
       res.json(properties);
     } catch (error) {
-      console.error('[DEBUG] Error fetching assignments:', error);
+      console.error('Error fetching assignments:', error);
       res.status(500).json({ error: error.message });
     }
   }

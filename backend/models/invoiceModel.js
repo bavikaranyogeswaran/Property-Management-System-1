@@ -6,12 +6,10 @@
 // ============================================================================
 
 import pool from '../config/db.js';
-import emailService from '../utils/emailService.js';
-import userModel from './userModel.js';
-import leaseModel from './leaseModel.js';
 
 class InvoiceModel {
   //  CREATE: Writing a new bill to the ledger.
+  // NOTE: Email notifications are handled by the caller (service/controller/cron layer).
   async create(data, connection = null) {
     const { leaseId, amount, dueDate, description, type } = data;
     // Need to determine year/month from dueDate
@@ -24,35 +22,8 @@ class InvoiceModel {
       'INSERT INTO rent_invoices (lease_id, year, month, amount, due_date, status, invoice_type, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       [leaseId, year, month, amount, dueDate, 'pending', type, description]
     );
-    const invoiceId = result.insertId;
 
-    // Notify Tenant via Email
-    try {
-      // Need tenant email. create(data) has leaseId.
-      // data might have tenantId? If not, fetch from lease.
-      let tenantId = data.tenantId;
-      if (!tenantId) {
-        const lease = await leaseModel.findById(leaseId);
-        tenantId = lease ? lease.tenantId : null;
-      }
-
-      if (tenantId) {
-        const tenant = await userModel.findById(tenantId);
-        if (tenant && tenant.email) {
-          await emailService.sendInvoiceNotification(tenant.email, {
-            amount,
-            dueDate,
-            month,
-            year,
-            invoiceId,
-          });
-        }
-      }
-    } catch (emailErr) {
-      console.error('Failed to send invoice email:', emailErr);
-    }
-
-    return invoiceId;
+    return result.insertId;
   }
 
   async exists(leaseId, year, month, type = null, connection = null) {
@@ -82,7 +53,8 @@ class InvoiceModel {
     // Join with leases to get tenant_id for scoring hooks
     const [rows] = await pool.query(
       `
-            SELECT ri.*, l.tenant_id 
+            SELECT ri.*, l.tenant_id,
+                   COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id = ri.invoice_id AND status = 'verified'), 0) AS amount_paid
             FROM rent_invoices ri 
             JOIN leases l ON ri.lease_id = l.lease_id 
             WHERE ri.invoice_id = ?
@@ -95,7 +67,8 @@ class InvoiceModel {
   async findByTenantId(tenantId) {
     const [rows] = await pool.query(
       `
-            SELECT ri.*, l.tenant_id 
+            SELECT ri.*, l.tenant_id,
+                   COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id = ri.invoice_id AND status = 'verified'), 0) AS amount_paid
             FROM rent_invoices ri
             JOIN leases l ON ri.lease_id = l.lease_id
             WHERE l.tenant_id = ? 
@@ -108,7 +81,8 @@ class InvoiceModel {
 
   async findAll() {
     const [rows] = await pool.query(`
-            SELECT ri.*, l.tenant_id, l.unit_id, u.name as tenant_name, p.name as property_name, un.unit_number
+            SELECT ri.*, l.tenant_id, l.unit_id, u.name as tenant_name, p.name as property_name, un.unit_number,
+                   COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id = ri.invoice_id AND status = 'verified'), 0) AS amount_paid
             FROM rent_invoices ri
             JOIN leases l ON ri.lease_id = l.lease_id
             JOIN users u ON l.tenant_id = u.user_id
@@ -119,10 +93,29 @@ class InvoiceModel {
     return rows;
   }
 
+  async findByOwnerId(ownerId) {
+    const [rows] = await pool.query(
+      `
+            SELECT ri.*, l.tenant_id, l.unit_id, u.name as tenant_name, p.name as property_name, un.unit_number,
+                   COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id = ri.invoice_id AND status = 'verified'), 0) AS amount_paid
+            FROM rent_invoices ri
+            JOIN leases l ON ri.lease_id = l.lease_id
+            JOIN users u ON l.tenant_id = u.user_id
+            JOIN units un ON l.unit_id = un.unit_id
+            JOIN properties p ON un.property_id = p.property_id
+            WHERE p.owner_id = ?
+            ORDER BY ri.due_date DESC
+        `,
+      [ownerId]
+    );
+    return rows;
+  }
+
   async findByTreasurerId(treasurerId) {
     const [rows] = await pool.query(
       `
-            SELECT ri.*, l.tenant_id, l.unit_id, u.name as tenant_name, p.name as property_name, un.unit_number
+            SELECT ri.*, l.tenant_id, l.unit_id, u.name as tenant_name, p.name as property_name, un.unit_number,
+                   COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id = ri.invoice_id AND status = 'verified'), 0) AS amount_paid
             FROM rent_invoices ri
             JOIN leases l ON ri.lease_id = l.lease_id
             JOIN users u ON l.tenant_id = u.user_id
@@ -168,7 +161,8 @@ class InvoiceModel {
     // const [rows] = await pool.query(`SELECT ri.*, l.monthly_rent...`) -> ri.amount is what we want.
     const [rows] = await pool.query(
       `
-            SELECT ri.*, l.tenant_id
+            SELECT ri.*, l.tenant_id,
+                   COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id = ri.invoice_id AND status = 'verified'), 0) AS amount_paid
             FROM rent_invoices ri
             JOIN leases l ON ri.lease_id = l.lease_id
             WHERE ri.status IN ('pending', 'partially_paid')
@@ -218,8 +212,25 @@ class InvoiceModel {
   }
   async findPendingDebts(leaseId) {
     const [rows] = await pool.query(
-      `SELECT * FROM rent_invoices WHERE lease_id = ? AND status IN ('pending', 'partially_paid') ORDER BY due_date ASC`,
+      `SELECT *, COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id = rent_invoices.invoice_id AND status = 'verified'), 0) AS amount_paid FROM rent_invoices WHERE lease_id = ? AND status IN ('pending', 'partially_paid') ORDER BY due_date ASC`,
       [leaseId]
+    );
+    return rows;
+  }
+
+  // Analytics optimized query to avoid O(N) memory buildup
+  async getFinancialStatsByYear(year) {
+    const [rows] = await pool.query(
+      `
+      SELECT p.name AS property_name, SUM(ri.amount) AS total_income
+      FROM rent_invoices ri
+      JOIN leases l ON ri.lease_id = l.lease_id
+      JOIN units un ON l.unit_id = un.unit_id
+      JOIN properties p ON un.property_id = p.property_id
+      WHERE ri.status = 'paid' AND YEAR(ri.due_date) = ?
+      GROUP BY p.property_id
+      `,
+      [year]
     );
     return rows;
   }

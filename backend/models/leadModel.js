@@ -181,6 +181,8 @@ class LeadModel {
                 phone,
                 notes,
                 internal_notes as internalNotes,
+                move_in_date as moveInDate,
+                occupants_count as occupantsCount,
                 status,
                 created_at as createdAt,
                 last_contacted_at as lastContactedAt
@@ -189,7 +191,7 @@ class LeadModel {
   }
   async findIdByEmailAndProperty(email, propertyId) {
     const [rows] = await db.query(
-      `SELECT lead_id FROM leads WHERE email = ? AND property_id = ? LIMIT 1`,
+      `SELECT lead_id FROM leads WHERE email = ? AND property_id = ? AND status NOT IN ('dropped', 'converted') LIMIT 1`,
       [email, propertyId]
     );
     return rows.length > 0 ? rows[0].lead_id : null;
@@ -240,6 +242,32 @@ class LeadModel {
         last_contacted_at as lastContactedAt
        FROM leads WHERE email = ? AND status != 'dropped' ORDER BY created_at DESC LIMIT 1`,
       [email]
+    );
+    return rows[0];
+  }
+
+  async verifyOwnership(leadId, ownerId) {
+    const [rows] = await db.query(
+      `SELECT l.lead_id FROM leads l
+       INNER JOIN properties p ON l.property_id = p.property_id
+       WHERE l.lead_id = ? AND p.owner_id = ?`,
+      [leadId, ownerId]
+    );
+    return rows.length > 0;
+  }
+
+  // Analytics optimized query to avoid O(N) memory buildup
+  async getLeadConversionStats() {
+    const [rows] = await db.query(
+      `
+      SELECT 
+        COUNT(*) AS Total,
+        SUM(CASE WHEN status IN ('interested', 'new') THEN 1 ELSE 0 END) AS Interested,
+        SUM(CASE WHEN status LIKE '%schedule%' OR status LIKE '%visit%' THEN 1 ELSE 0 END) AS Scheduled,
+        SUM(CASE WHEN status LIKE '%application%' OR status = 'applied' THEN 1 ELSE 0 END) AS Application,
+        SUM(CASE WHEN status IN ('converted', 'leased', 'tenant') THEN 1 ELSE 0 END) AS Leased
+      FROM leads
+      `
     );
     return rows[0];
   }

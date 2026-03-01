@@ -113,7 +113,7 @@ class VisitModel {
     await dbConn.query(
       `UPDATE property_visits 
              SET status = 'cancelled', notes = CONCAT(COALESCE(notes, ''), ' [System: Unit Leased]') 
-             WHERE unit_id = ? AND status = 'scheduled' AND scheduled_date >= ?`,
+             WHERE unit_id = ? AND status IN ('pending', 'confirmed') AND scheduled_date >= ?`,
       [unitId, date]
     );
   }

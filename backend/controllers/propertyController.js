@@ -6,6 +6,7 @@
 // ============================================================================
 
 import propertyService from '../services/propertyService.js';
+import propertyModel from '../models/propertyModel.js';
 
 class PropertyController {
   //  ADD PROPERTY: Owner registers a new building into the system.
@@ -70,11 +71,20 @@ class PropertyController {
 
   async updateProperty(req, res) {
     try {
-      const property = await propertyService.updateProperty(
+      // Ownership check
+      const property = await propertyModel.findById(req.params.id);
+      if (!property) {
+        return res.status(404).json({ error: 'Property not found' });
+      }
+      if (req.user.role === 'owner' && String(property.ownerId) !== String(req.user.id)) {
+        return res.status(403).json({ error: 'You do not own this property' });
+      }
+
+      const updated = await propertyService.updateProperty(
         req.params.id,
         req.body
       );
-      res.json(property);
+      res.json(updated);
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
@@ -82,7 +92,16 @@ class PropertyController {
 
   async deleteProperty(req, res) {
     try {
-      const result = await propertyService.deleteProperty(req.params.id);
+      // Ownership check
+      const property = await propertyModel.findById(req.params.id);
+      if (!property) {
+        return res.status(404).json({ error: 'Property not found' });
+      }
+      if (req.user.role === 'owner' && String(property.ownerId) !== String(req.user.id)) {
+        return res.status(403).json({ error: 'You do not own this property' });
+      }
+
+      await propertyService.deleteProperty(req.params.id);
       res.json({ message: 'Property deleted successfully' });
     } catch (error) {
       console.error('Error deleting property:', error);

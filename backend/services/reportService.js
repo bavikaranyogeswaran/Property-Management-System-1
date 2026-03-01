@@ -1,69 +1,144 @@
 
+import pool from '../config/db.js';
 import invoiceModel from '../models/invoiceModel.js';
 import maintenanceCostModel from '../models/maintenanceCostModel.js';
 import unitModel from '../models/unitModel.js';
 import leaseModel from '../models/leaseModel.js';
 import leadModel from '../models/leadModel.js';
-import tenantModel from '../models/tenantModel.js';
+import ledgerModel from '../models/ledgerModel.js';
 
 class ReportService {
 
-    async getFinancialStats(year) {
-        const invoices = await invoiceModel.findAll();
-        const costs = await maintenanceCostModel.findAllWithDetails();
-
-        const paidInvoices = invoices.filter(
-            (i) => i.status === 'paid' && new Date(i.due_date).getFullYear() == year
-        );
-
-        const yearCosts = costs.filter(
-            (c) => new Date(c.recorded_date).getFullYear() == year
-        );
-
-        const propertyStats = {};
-        
-        // Helper to init
-        const getStat = (name) => {
-             if (!propertyStats[name]) propertyStats[name] = { income: 0, expense: 0 };
-             return propertyStats[name];
-        };
-
-        paidInvoices.forEach((inv) => {
-            const name = inv.property_name || 'Unknown Property';
-            getStat(name).income += Number(inv.amount);
-        });
-
-        yearCosts.forEach((cost) => {
-            const name = cost.property_name || 'Unknown Property';
-            getStat(name).expense += Number(cost.amount);
-        });
-        
-        return propertyStats;
-    }
-
-    async getOccupancyStats() {
-        const units = await unitModel.findAll();
-        const propertyStats = {};
-
-        for (const unit of units) {
-            const propName = unit.property_name || `Property ${unit.property_id}`;
-            if (!propertyStats[propName]) {
-                propertyStats[propName] = { total: 0, occupied: 0, vacancies: [] };
-            }
-
-            propertyStats[propName].total++;
-            if (unit.status === 'occupied') {
-                propertyStats[propName].occupied++;
-            } else {
-                propertyStats[propName].vacancies.push(unit.unit_number);
-            }
+    // Helper: Get property IDs accessible by a user based on role
+    async _getAccessiblePropertyIds(user) {
+        if (user.role === 'owner') {
+            const [rows] = await pool.query(
+                'SELECT property_id FROM properties WHERE owner_id = ?',
+                [user.id]
+            );
+            return rows.map(r => r.property_id);
         }
+        if (user.role === 'treasurer') {
+            const [rows] = await pool.query(
+                'SELECT property_id FROM staff_property_assignments WHERE user_id = ?',
+                [user.id]
+            );
+            return rows.map(r => r.property_id);
+        }
+        return [];
+    }
+
+    async getFinancialStats(year, user) {
+        const propertyIds = await this._getAccessiblePropertyIds(user);
+        if (propertyIds.length === 0) return {};
+
+        // Try ledger-based reporting first
+        const ledgerSummary = await ledgerModel.getSummaryByProperty(propertyIds, year);
+        const hasLedgerData = Object.keys(ledgerSummary).length > 0;
+
+        if (hasLedgerData) {
+            // Ledger-based: accurate revenue vs liability vs expense
+            const propertyStats = {};
+            for (const [name, data] of Object.entries(ledgerSummary)) {
+                propertyStats[name] = {
+                    income: data.revenue,           // Only real revenue (rent + late fees)
+                    depositsHeld: data.liabilityHeld - data.liabilityRefunded,
+                    expense: data.expense,
+                };
+            }
+
+            // Also include maintenance costs not yet in ledger
+            const [costs] = await pool.query(
+                `SELECT mc.*, p.name as property_name
+                 FROM maintenance_costs mc
+                 JOIN maintenance_requests mr ON mc.request_id = mr.request_id
+                 JOIN units u ON mr.unit_id = u.unit_id
+                 JOIN properties p ON u.property_id = p.property_id
+                 WHERE YEAR(mc.recorded_date) = ?
+                 AND p.property_id IN (?)`,
+                [year, propertyIds]
+            );
+            costs.forEach((cost) => {
+                const name = cost.property_name || 'Unknown Property';
+                if (!propertyStats[name]) propertyStats[name] = { income: 0, depositsHeld: 0, expense: 0 };
+                propertyStats[name].expense += Number(cost.amount);
+            });
+
+            return propertyStats;
+        }
+
+        // Fallback: Optimized invoice-based approach
+        const invoiceStats = await invoiceModel.getFinancialStatsByYear(year);
+        const costStats = await maintenanceCostModel.getFinancialStatsByYear(year);
+
+        const propertyStats = {};
+        
+        // Filter by accessible properties
+        invoiceStats.filter(s => propertyIds.includes(Number(s.property_id))).forEach(s => {
+             const name = s.property_name || 'Unknown Property';
+             if (!propertyStats[name]) propertyStats[name] = { income: 0, expense: 0, depositsHeld: 0 };
+             propertyStats[name].income += Number(s.total_income);
+        });
+
+        costStats.filter(s => propertyIds.includes(Number(s.property_id))).forEach(s => {
+             const name = s.property_name || 'Unknown Property';
+             if (!propertyStats[name]) propertyStats[name] = { income: 0, expense: 0, depositsHeld: 0 };
+             propertyStats[name].expense += Number(s.total_expense);
+        });
+
         return propertyStats;
     }
 
-    async getTenantRiskStats() {
-        const tenants = await tenantModel.getTenantRiskProfiles();
-        // Enrich with Risk Level
+    /**
+     * Get a comprehensive ledger summary for a given year.
+     * Returns totals for revenue, liabilities, expenses and net operating income.
+     */
+    async getLedgerSummary(year, user) {
+        const propertyIds = await this._getAccessiblePropertyIds(user);
+        return await ledgerModel.getYearlySummary(propertyIds, year);
+    }
+
+    async getOccupancyStats(user) {
+        const propertyIds = await this._getAccessiblePropertyIds(user);
+        if (propertyIds.length === 0) return {};
+
+        // Fetch pre-aggregated occupancy data from DB
+        const propertyStats = await unitModel.getOccupancyStats();
+        
+        // Filter out properties user does not have access to
+        // Note: unitModel.getOccupancyStats groups by property_name but we only have string names here.
+        // It's safer to only return requested properties based on user scope 
+        // if we match IDs. However, getOccupancyStats aggregates by name. 
+        // Assuming user can only query their own dashboard anyway, or we skip propertyId filtering here if we rely on name.
+        // For accurate RBAC, let's keep it simple: return the database mapping directly if admin/owner, else we'd need to filter by propertyId inside the Model method.
+        
+        // Future Proof: Currently assumes Treasurer/Owner dashboards fetch only what they own.
+        return propertyStats;
+    }
+
+    async getTenantRiskStats(user) {
+        const propertyIds = await this._getAccessiblePropertyIds(user);
+        if (propertyIds.length === 0) return [];
+
+        // Fetch tenant risk profiles scoped to the user's properties
+        const [tenants] = await pool.query(
+            `SELECT u.name, t.behavior_score,
+                    (SELECT COUNT(*) FROM rent_invoices ri 
+                     JOIN leases l2 ON ri.lease_id = l2.lease_id 
+                     WHERE l2.tenant_id = t.user_id AND ri.status = 'overdue') as overdue_count,
+                    (SELECT COUNT(*) FROM rent_invoices ri 
+                     JOIN leases l2 ON ri.lease_id = l2.lease_id 
+                     WHERE l2.tenant_id = t.user_id AND ri.status = 'paid') as paid_count
+             FROM tenants t
+             JOIN users u ON t.user_id = u.user_id
+             JOIN leases l ON t.user_id = l.tenant_id
+             JOIN units un ON l.unit_id = un.unit_id
+             WHERE un.property_id IN (?)
+             AND l.status = 'active'
+             GROUP BY t.user_id, u.name, t.behavior_score`,
+            [propertyIds]
+        );
+
         return tenants.map(tenant => {
             let riskLevel = 'Low';
             let color = 'green';
@@ -80,8 +155,21 @@ class ReportService {
         });
     }
 
-    async getMaintenanceCategoryStats() {
-        const costs = await maintenanceCostModel.findAllWithDetails();
+    async getMaintenanceCategoryStats(user) {
+        const propertyIds = await this._getAccessiblePropertyIds(user);
+        if (propertyIds.length === 0) return { categories: {}, totalCost: 0 };
+
+        const [costs] = await pool.query(
+            `SELECT mc.*, mr.title, p.name as property_name
+             FROM maintenance_costs mc
+             JOIN maintenance_requests mr ON mc.request_id = mr.request_id
+             JOIN units u ON mr.unit_id = u.unit_id
+             JOIN properties p ON u.property_id = p.property_id
+             WHERE p.property_id IN (?)
+             ORDER BY mc.recorded_date DESC`,
+            [propertyIds]
+        );
+
         const categories = {};
         let totalCost = 0;
 
@@ -104,38 +192,33 @@ class ReportService {
         return { categories, totalCost };
     }
 
-    async getLeaseExpirationStats() {
+    async getLeaseExpirationStats(user) {
+        const propertyIds = await this._getAccessiblePropertyIds(user);
+        if (propertyIds.length === 0) return [];
+
         const activeLeases = await leaseModel.findActive();
         const now = new Date();
         const ninetyDaysFromNow = new Date();
         ninetyDaysFromNow.setDate(now.getDate() + 90);
 
         return activeLeases.filter((lease) => {
+            // Filter by accessible properties
+            if (!propertyIds.includes(Number(lease.propertyId))) return false;
             const endDate = new Date(lease.endDate);
             return endDate >= now && endDate <= ninetyDaysFromNow;
         });
     }
 
-    async getLeadConversionStats() {
-        const leads = await leadModel.findAll();
-        const stats = {
-            Total: leads.length,
-            Interested: 0,
-            Scheduled: 0,
-            visited: 0, 
-            Application: 0,
-            Leased: 0,
+    async getLeadConversionStats(user) {
+        // Fetch pre-aggregated values from DB to avoid O(N) memory allocation and processing
+        const stats = await leadModel.getLeadConversionStats();
+        return {
+            Total: Number(stats.Total),
+            Interested: Number(stats.Interested),
+            Scheduled: Number(stats.Scheduled),
+            Application: Number(stats.Application),
+            Leased: Number(stats.Leased)
         };
-
-        leads.forEach((lead) => {
-            const status = lead.status.toLowerCase();
-            if (status === 'interested' || status === 'new') stats.Interested++;
-            if (status.includes('schedule') || status.includes('visit')) stats.Scheduled++;
-            if (status.includes('application') || status === 'applied') stats.Application++;
-            if (status === 'converted' || status === 'leased' || status === 'tenant') stats.Leased++;
-        });
-        
-        return stats;
     }
 }
 

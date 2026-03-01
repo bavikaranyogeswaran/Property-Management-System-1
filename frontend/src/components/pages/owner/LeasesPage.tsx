@@ -53,6 +53,7 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
+import apiClient from '@/services/api';
 
 // ============================================================================
 //  LEASES PAGE (The Contract Filing Cabinet)
@@ -71,6 +72,7 @@ export function LeasesPage() {
     endLease,
     renewLease,
     refundDeposit,
+    updateLeaseDocument,
   } = useApp();
   const [isAddLeaseDialogOpen, setIsAddLeaseDialogOpen] = useState(false);
   const [selectedLease, setSelectedLease] = useState<Lease | null>(null);
@@ -94,9 +96,23 @@ export function LeasesPage() {
     }
 
     try {
+      let documentUrl = values.documentUrl;
+      const fileInput = document.getElementById('lease-document') as HTMLInputElement;
+      if (fileInput && fileInput.files && fileInput.files[0]) {
+        const formData = new FormData();
+        formData.append('file', fileInput.files[0]);
+        const uploadRes = await apiClient.post('/upload', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        });
+        documentUrl = uploadRes.data.url;
+      }
+
       await addLease({
         ...values,
         monthlyRent: values.monthlyRent,
+        documentUrl,
         status: 'active',
       });
 
@@ -105,6 +121,33 @@ export function LeasesPage() {
       leaseForm.reset();
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to create lease');
+    }
+  };
+
+  const handleDocumentUpdate = async (leaseId: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    try {
+      if (!e.target.files || !e.target.files[0]) return;
+      
+      const loadingToastId = toast.loading("Uploading document...");
+      
+      const formData = new FormData();
+      formData.append('file', e.target.files[0]);
+      
+      const uploadRes = await apiClient.post('/upload', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      
+      await updateLeaseDocument(leaseId, uploadRes.data.url);
+      
+      // Update selected lease state so modal reflects it directly without closing
+      setSelectedLease((prev) => prev ? { ...prev, documentUrl: uploadRes.data.url } : null);
+      
+      toast.dismiss(loadingToastId);
+    } catch(err) {
+      toast.dismiss();
+      toast.error('Failed to upload document');
     }
   };
 
@@ -373,7 +416,56 @@ export function LeasesPage() {
                 onSubmit={leaseForm.handleSubmit(onSubmit)}
                 className="space-y-4 mt-4"
               >
-                {/* ... existing fields ... */}
+                  <FormField
+                    control={leaseForm.control}
+                    name="monthlyRent"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Monthly Rent (LKR)</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            {...field}
+                            onChange={(e) =>
+                              field.onChange(
+                                e.target.value === ''
+                                  ? ''
+                                  : Number(e.target.value)
+                              )
+                            }
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* Lease Document Upload */}
+                  <FormItem>
+                    <FormLabel>Lease Document (PDF)</FormLabel>
+                    <FormControl>
+                      <Input
+                        id="lease-document"
+                        type="file"
+                        accept=".pdf,.doc,.docx"
+                      />
+                    </FormControl>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Upload the signed lease agreement (optional).
+                    </p>
+                  </FormItem>
+
+                  <div className="flex justify-end gap-2 pt-4">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setIsAddLeaseDialogOpen(false)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button type="submit">Create Lease</Button>
+                  </div>
                 {/* I need to make sure I don't delete the form content. 
                      Since I am checking LeasesPage content, it controls the DialogContent.
                      Wait, replace_file_content replaces the whole block. 
@@ -647,6 +739,45 @@ export function LeasesPage() {
                         </p>
                       </div>
                     </div>
+                  </div>
+
+                  {/* Document View */}
+                  <div className="border rounded-lg p-4 flex flex-col gap-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-sm font-medium">
+                        <FileText className={`size-4 ${selectedLease.documentUrl ? 'text-blue-600' : 'text-gray-400'}`} />
+                        {selectedLease.documentUrl ? 'Lease Document Attached' : 'No Lease Document Attached'}
+                      </div>
+                      
+                      {selectedLease.documentUrl && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            window.open(
+                              `http://localhost:3000${selectedLease.documentUrl}`,
+                              '_blank'
+                            )
+                          }
+                        >
+                          View Document
+                        </Button>
+                      )}
+                    </div>
+
+                    {selectedLease.status === 'active' && (
+                      <div className="pt-2 border-t">
+                        <label className="flex items-center justify-center w-full px-4 py-2 bg-white text-blue-500 hover:text-blue-600 border border-blue-200 hover:border-blue-300 rounded-md shadow-sm text-sm font-medium cursor-pointer transition-colors">
+                          <input
+                            type="file"
+                            accept=".pdf,.doc,.docx"
+                            className="hidden"
+                            onChange={(e) => handleDocumentUpdate(selectedLease.id, e)}
+                          />
+                          {selectedLease.documentUrl ? 'Update Document' : 'Upload Document'}
+                        </label>
+                      </div>
+                    )}
                   </div>
 
                   {/* Actions */}

@@ -12,6 +12,7 @@ import unitModel from '../models/unitModel.js';
 import leaseModel from '../models/leaseModel.js';
 import leaseService from '../services/leaseService.js';
 import emailService from '../utils/emailService.js';
+import leadTokenModel from '../models/leadTokenModel.js';
 import pool from '../config/db.js';
 
 const SALT_ROUNDS = 10;
@@ -223,21 +224,24 @@ class UserService {
         );
       }
 
-      // 4. Update lead status
-      await leadModel.update(
-        leadId,
-        { status: 'converted' },
-        connection
+      // 4. Update lead status (direct SQL to avoid duplicate history from leadModel.update)
+      await connection.query(
+        'UPDATE leads SET status = ? WHERE lead_id = ?',
+        ['converted', leadId]
       );
 
-      // 4b. Record stage history
+      // 4a. Invalidate portal access tokens
+      await leadTokenModel.invalidateForLead(leadId);
+
+      // 4b. Record stage history (positional args: leadId, fromStatus, toStatus, notes, connection)
       const leadStageHistoryModel = (await import('../models/leadStageHistoryModel.js')).default;
-      await leadStageHistoryModel.create({
+      await leadStageHistoryModel.create(
           leadId,
-          stage: 'converted',
-          notes: 'System: Lead formally converted into an active tenant.',
-          changedBy: null // System action
-      }, connection);
+          lead.status,        // fromStatus — captured before the update above
+          'converted',        // toStatus
+          'System: Lead formally converted into an active tenant.',
+          connection
+      );
 
       // 5. Lease & Unit Logic
       // Use provided unitId (from conversion dialog) OR the lead's original interest

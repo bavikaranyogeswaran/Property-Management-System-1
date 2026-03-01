@@ -1,7 +1,8 @@
+import { randomUUID } from 'crypto';
 import leaseModel from '../models/leaseModel.js';
 import unitModel from '../models/unitModel.js';
 import tenantModel from '../models/tenantModel.js';
-// Removed direct pool import
+import pool from '../config/db.js';
 import invoiceModel from '../models/invoiceModel.js';
 import visitModel from '../models/visitModel.js';
 import leadModel from '../models/leadModel.js';
@@ -21,10 +22,10 @@ class LeaseService {
       endDate,
       monthlyRent,
       securityDeposit,
+      documentUrl, // [ADDED] Document URL
     } = data;
 
-    // Validation
-    // Validation: Check required fields (allow 0 for rent here, caught later)
+    // Validation (runs before acquiring any connection)
     if (
       !tenantId ||
       !unitId ||
@@ -51,143 +52,143 @@ class LeaseService {
       throw new Error('Monthly rent must be greater than 0');
     }
 
-    const tenant = await tenantModel.findByUserId(tenantId, connection);
-    if (!tenant) {
-      throw new Error('Tenant not found');
-    }
+    // If no connection provided, create our own transaction.
+    // If connection IS provided (e.g. from lead conversion), the caller manages commit/rollback.
+    const isOwnTransaction = !connection;
+    const conn = connection || await pool.getConnection();
 
-    // Use provided connection or get a new one (for read operations checking availability)
-    // If connection is provided, we assume the caller handles commit/rollback.
-    // For reads, we can use the same connection to see "uncommitted" changes if within same transaction?
-    // Note: unitModel.findById might not support connection param yet.
-    // If we really need strict transaction safety for checking 'occupied', we should support connection in unitModel.read.
-    // For now, we'll try to use the connection if available for updates, but reads might be on pool if model doesn't support it.
-    // CRITICAL: If 'unitModel.findById' doesn't support connection, we might read stale data or miss locks.
-    // Let's assume standard behavior for now: optimistic check.
+    try {
+      if (isOwnTransaction) {
+        await conn.beginTransaction();
+      }
 
-    // 1. Check if unit is available (and LOCK it)
-    const unit = await unitModel.findByIdForUpdate(unitId, connection); // Uses SELECT ... FOR UPDATE
-    if (!unit) {
-      throw new Error('Unit not found');
-    }
+      const tenant = await tenantModel.findByUserId(tenantId, conn);
+      if (!tenant) {
+        throw new Error('Tenant not found');
+      }
 
-    // Now strict check status within the lock
-    if (unit.status === 'occupied') {
-      // Strict check: If occupied, we only proceed if we are booking a FUTURE date range that relies on overlap check.
-      // But if start date is today, and it's occupied, we block?
-      // Actually, existing logic relied on overlap check.
-      // We will keep relying on overlap check, but the Lock ensures no one else changes status or leases in parallel.
-    }
+      // 1. Check if unit is available (and LOCK it)
+      const unit = await unitModel.findByIdForUpdate(unitId, conn);
+      if (!unit) {
+        throw new Error('Unit not found');
+      }
 
-    if (unit.status === 'maintenance') {
-      throw new Error(
-        'Unit is currently under maintenance and cannot be leased.'
+      if (unit.status === 'occupied') {
+        // Rely on overlap check below; the lock ensures no parallel changes.
+      }
+
+      if (unit.status === 'maintenance') {
+        throw new Error(
+          'Unit is currently under maintenance and cannot be leased.'
+        );
+      }
+
+      // 2. Check for Date Overlaps
+      const hasOverlap = await leaseModel.checkOverlap(
+        unitId,
+        startDate,
+        endDate
       );
-    }
+      if (hasOverlap) {
+        throw new Error('Unit is already leased for the selected dates.');
+      }
 
-    // 2. Check for Date Overlaps
-    const hasOverlap = await leaseModel.checkOverlap(
-      unitId,
-      startDate,
-      endDate
-    );
-    if (hasOverlap) {
-      throw new Error('Unit is already leased for the selected dates.');
-    }
+      const leaseParams = {
+        tenantId,
+        unitId,
+        startDate,
+        endDate,
+        monthlyRent,
+        securityDeposit: 0, // Held amount starts at 0. Target is in Invoice.
+        status: 'active',
+        documentUrl: documentUrl || null, // [ADDED]
+      };
 
-    const leaseParams = {
-      tenantId,
-      unitId,
-      startDate,
-      endDate,
-      monthlyRent,
-      securityDeposit: 0, // Held amount starts at 0. Target is in Invoice.
-      status: 'active',
-    };
+      // 3. Create Lease
+      const leaseId = await leaseModel.create(leaseParams, conn);
 
-    // 2. Create Lease
-    const leaseId = await leaseModel.create(leaseParams, connection);
+      // 4. Update Unit Status
+      const today = new Date().toISOString().split('T')[0];
+      if (new Date(startDate) <= new Date(today)) {
+        await unitModel.update(unitId, { status: 'occupied' }, conn);
 
-    // 3. Update Unit Status
-    // Only set to occupied if the lease is CURRENT (starts today or past)
-    const today = new Date().toISOString().split('T')[0];
-    if (startDate <= today) {
-      await unitModel.update(unitId, { status: 'occupied' }, connection);
+        // CLEANUP: Cancel conflicting future/current visits
+        await visitModel.cancelVisitsForUnit(unitId, today, conn);
 
-      // CLEANUP: Cancel conflicting future/current visits
-      await visitModel.cancelVisitsForUnit(unitId, today, connection);
+        // CLEANUP: Mark specific-unit leads as dropped
+        await leadModel.dropLeadsForUnit(unitId, conn);
+      }
 
-      // CLEANUP: Mark specific-unit leads as dropped
-      await leadModel.dropLeadsForUnit(unitId, connection);
-    }
+      // 5. Generate Initial Invoices
+      // A. Security Deposit Invoice
+      if (securityDeposit > 0) {
+        await invoiceModel.create(
+          {
+            leaseId,
+            amount: securityDeposit,
+            dueDate: startDate,
+            description: 'Security Deposit',
+            type: 'deposit',
+          },
+          conn
+        );
+      }
 
-    // 4. Generate Initial Invoices (Logic Check: Missed Item)
-    // A. Security Deposit Invoice
-    if (securityDeposit > 0) {
-      // We need to import invoiceModel. Circular dependency risk?
-      // leaseService imports leaseModel, unitModel, tenantModel.
-      // We should import invoiceModel at top or dynamically.
+      // B. First Month Rent (with proration if mid-month start)
+      const start = new Date(startDate);
+      const year = start.getFullYear();
+      const month = start.getMonth() + 1;
+      const daysInMonth = new Date(year, month, 0).getDate();
+      const startDay = start.getDate();
+
+      let initialRentAmount = monthlyRent;
+      let invoiceDescription = `Rent for ${year}-${month}`;
+
+      if (startDay > 1) {
+        const daysRemaining = daysInMonth - startDay + 1;
+        initialRentAmount =
+          Math.round((monthlyRent / daysInMonth) * daysRemaining * 100) / 100;
+        invoiceDescription += ` (Prorated: ${daysRemaining}/${daysInMonth} days)`;
+      }
+
       await invoiceModel.create(
         {
           leaseId,
-          amount: securityDeposit,
-          dueDate: startDate, // Due on start date?
-          description: 'Security Deposit',
-          type: 'deposit', // Adding type strictly for clarity
+          amount: initialRentAmount,
+          dueDate: startDate,
+          description: invoiceDescription,
         },
-        connection
+        conn
       );
-    }
 
-    // B. First Month Rent (Logic Check: PRORATION)
-    // If lease starts on 1st, full rent. If mid-month, prorate.
-    // Formula: (MonthlyRent / DaysInMonth) * DaysRemaining
-    const start = new Date(startDate);
-    const year = start.getFullYear();
-    const month = start.getMonth() + 1; // 1-12
-    const daysInMonth = new Date(year, month, 0).getDate();
-    const startDay = start.getDate();
-
-    let initialRentAmount = monthlyRent;
-    let invoiceDescription = `Rent for ${year}-${month}`;
-
-    if (startDay > 1) {
-      const daysRemaining = daysInMonth - startDay + 1;
-      // Round to 2 decimals
-      initialRentAmount =
-        Math.round((monthlyRent / daysInMonth) * daysRemaining * 100) / 100;
-      invoiceDescription += ` (Prorated: ${daysRemaining}/${daysInMonth} days)`;
-      console.log(
-        `Prorating Rent: ${daysRemaining} days. Amount: ${initialRentAmount}`
+      // Audit Log
+      const auditLogger = (await import('../utils/auditLogger.js')).default;
+      await auditLogger.log(
+        {
+          userId: null,
+          actionType: 'LEASE_CREATED',
+          entityId: leaseId,
+          details: { tenantId, unitId, startDate, endDate, monthlyRent },
+        },
+        null,
+        conn
       );
+
+      if (isOwnTransaction) {
+        await conn.commit();
+      }
+
+      return leaseId;
+    } catch (error) {
+      if (isOwnTransaction) {
+        await conn.rollback();
+      }
+      throw error;
+    } finally {
+      if (isOwnTransaction) {
+        conn.release();
+      }
     }
-
-    // Unconditionally create initial rent invoice for new lease.
-    // We removed 'invoice_type' so 'exists' check would falsely match the deposit invoice we just created.
-    await invoiceModel.create(
-      {
-        leaseId,
-        amount: initialRentAmount,
-        dueDate: startDate,
-        description: invoiceDescription,
-      },
-      connection
-    );
-
-    // Audit Log
-    const auditLogger = (await import('../utils/auditLogger.js')).default;
-    await auditLogger.log(
-      {
-        userId: null, // Usually triggered by owner/admin, typically we'd pass userId but service signature doesn't have it yet.
-        actionType: 'LEASE_CREATED',
-        entityId: leaseId,
-        details: { tenantId, unitId, startDate, endDate, monthlyRent },
-      },
-      null,
-      connection
-    );
-
-    return leaseId;
   }
   async renewLease(leaseId, newEndDate, newMonthlyRent = null) {
     const lease = await leaseModel.findById(leaseId);
@@ -195,7 +196,7 @@ class LeaseService {
       throw new Error('Lease not found');
     }
 
-    if (lease.status !== 'active' && lease.status !== 'expiring') {
+    if (lease.status !== 'active') {
       throw new Error('Only active leases can be renewed');
     }
 
@@ -215,7 +216,8 @@ class LeaseService {
     const hasOverlap = await leaseModel.checkOverlap(
       lease.unitId,
       extensionStartDate.toISOString().split('T')[0],
-      nextEndDate.toISOString().split('T')[0]
+      nextEndDate.toISOString().split('T')[0],
+      leaseId
     );
 
     if (hasOverlap) {
@@ -232,7 +234,7 @@ class LeaseService {
     const updateData = {
       end_date: newEndDate,
     };
-    if (newMonthlyRent) {
+    if (newMonthlyRent != null) {
       updateData.monthly_rent = newMonthlyRent;
     }
 
@@ -242,7 +244,7 @@ class LeaseService {
     // If rent increased, we should increase the deposit (if policy says Deposit = 1 Month Rent).
     // Let's assume typical policy: Deposit = 1 Month Rent.
     // If newRent > currentRent, create invoice for difference.
-    if (newMonthlyRent && newMonthlyRent > lease.monthlyRent) {
+    if (newMonthlyRent != null && newMonthlyRent > lease.monthlyRent) {
       const diff = newMonthlyRent - lease.monthlyRent;
       // Update lease security_deposit value?
       // Yes, standard is to update it.
@@ -274,23 +276,19 @@ class LeaseService {
       // Strictly -> 'pending'. because we don't hold the full new amount.
       await leaseModel.update(leaseId, { deposit_status: 'pending' }); // Reset until top-up is paid.
 
-      console.log(
-        `Lease Renewal: Rent increased. Invoiced Top-Up ${diff}. Reset Deposit Status.`
-      );
+
     }
 
     // 4. Sync Future Invoices
     // If rent was updated, we must ensure any *already generated* pending invoices for future months (e.g. from Cron) are updated.
-    if (newMonthlyRent) {
+    if (newMonthlyRent != null) {
       const today = new Date().toISOString().split('T')[0];
       await invoiceModel.syncFutureRentInvoices(
         leaseId,
         newMonthlyRent,
         today
       );
-      console.log(
-        `Synced future invoices for Lease ${leaseId} to new rent ${newMonthlyRent}`
-      );
+
     }
 
     // Audit Log
@@ -315,8 +313,13 @@ class LeaseService {
     const lease = await leaseModel.findById(leaseId);
     if (!lease) throw new Error('Lease not found');
 
+    // Note: securityDeposit starts at 0 on lease creation and is incremented
+    // when the deposit invoice is verified via payment. If it's still 0,
+    // the deposit invoice has not been paid yet.
     if (lease.securityDeposit <= 0) {
-      throw new Error('No security deposit to refund');
+      throw new Error(
+        'No security deposit available to refund. The deposit invoice may not have been paid yet.'
+      );
     }
 
     // Logic Check: Idempotency
@@ -347,14 +350,22 @@ class LeaseService {
       // Fetch pending invoices
       const pendingInvoices = await invoiceModel.findPendingDebts(leaseId);
 
+      // O(1) Batch fetch all payments for these invoices to prevent N+1 query problem
+      const invoiceIds = pendingInvoices.map(inv => inv.invoice_id);
+      const allPayments = await paymentModel.findByInvoiceIds(invoiceIds);
+      
+      // Map payments by invoice_id for O(1) lookup
+      const paymentsMap = new Map();
+      allPayments.forEach(p => {
+          if (!paymentsMap.has(p.invoice_id)) paymentsMap.set(p.invoice_id, []);
+          paymentsMap.get(p.invoice_id).push(p);
+      });
+
       for (const inv of pendingInvoices) {
         if (withheldAmount <= 0) break;
 
         // Calculate outstanding for this invoice
-        // We need to know how much is already paid?
-        // We can fetch payments or rely on 'pending' status?
-        // Safer: Get payments sum.
-        const payments = await paymentModel.findByInvoiceId(inv.invoice_id);
+        const payments = paymentsMap.get(inv.invoice_id) || [];
         const paidAlready = payments
           .filter((p) => p.status === 'verified')
           .reduce((sum, p) => sum + Number(p.amount), 0);
@@ -381,9 +392,6 @@ class LeaseService {
             await invoiceModel.updateStatus(inv.invoice_id, 'partially_paid');
           }
 
-          console.log(
-            `Offset Pending Invoice ${inv.invoice_id} with ${toPay} from Deposit.`
-          );
 
           // 1a. Generate Receipt for Offset
           const receiptModel = (await import('../models/receiptModel.js'))
@@ -394,7 +402,7 @@ class LeaseService {
             tenantId: lease.tenantId,
             amount: toPay,
             generatedDate: new Date().toISOString(),
-            receiptNumber: `REC-OFFSET-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
+            receiptNumber: `REC-OFFSET-${randomUUID()}`,
           });
           withheldAmount -= toPay;
         }
@@ -432,11 +440,8 @@ class LeaseService {
         tenantId: lease.tenantId,
         amount: withheldAmount,
         generatedDate: new Date().toISOString(),
-        receiptNumber: `REC-DEDUCT-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
+        receiptNumber: `REC-DEDUCT-${randomUUID()}`,
       });
-      console.log(
-        `Created Deduction Invoice ${invId} for Remaining Withheld: ${withheldAmount}`
-      );
     }
 
     const currentRefunded = Number(lease.refundedAmount || lease.refunded_amount || 0);
@@ -450,11 +455,26 @@ class LeaseService {
     // Audit Log
     const auditLogger = (await import('../utils/auditLogger.js')).default;
     await auditLogger.log({
-      userId: null, // System action or triggered by admin (userId not passed here currently)
+      userId: null,
       actionType: 'DEPOSIT_REFUNDED',
       entityId: leaseId,
       details: { refundedAmount: amount, status },
     });
+
+    // Post Contra-Entry to Ledger (Deposit Refund = Debit to Liability)
+    try {
+      const ledgerModel = (await import('../models/ledgerModel.js')).default;
+      await ledgerModel.create({
+        leaseId: Number(leaseId),
+        accountType: 'liability',
+        category: 'deposit_refund',
+        debit: Number(amount),
+        description: `Deposit refund of ${amount}`,
+        entryDate: new Date().toISOString().split('T')[0],
+      });
+    } catch (ledgerErr) {
+      console.error('Failed to post ledger contra-entry for deposit refund:', ledgerErr);
+    }
 
     return { status, refundedAmount: amount };
   }
@@ -474,7 +494,7 @@ class LeaseService {
     // If the lease is terminated BEFORE the start date, it is a cancellation.
     // We should void all pending invoices and mark lease as 'cancelled'.
     if (today < start) {
-      console.log(`Lease ${leaseId} cancelled before start date.`);
+
       // Note: We typically don't charge termination fees for pre-move-in cancellations
       // unless specified. If user passes fee here, we COULD charge it, but usually
       // we just void everything. Let's assume Fee applies to Active Leases (Post-Move-In).
@@ -510,7 +530,7 @@ class LeaseService {
         dueDate: new Date(), // Immediate
         description: 'Early Termination Fee',
       });
-      console.log(`Generated Termination Fee Invoice: ${terminationFee}`);
+
     }
 
     // 2. Update Lease Status & End Date
@@ -568,7 +588,7 @@ class LeaseService {
 
     async getLeases(user) {
         if (user.role === 'owner') {
-             return await leaseModel.findAll();
+             return await leaseModel.findAll(user.id);
         } else if (user.role === 'treasurer') {
              const results = await leaseModel.findAll();
              // Filter by assigned
@@ -605,7 +625,7 @@ class LeaseService {
              return lease; // Simplify for checked roles
         }
         if (user.role === 'tenant') {
-             if (lease.tenantId !== user.id.toString()) {
+             if (String(lease.tenantId) !== String(user.id)) {
                  throw new Error('Access denied');
              }
              return lease;

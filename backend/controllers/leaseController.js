@@ -1,33 +1,6 @@
 
 import leaseService from '../services/leaseService.js';
-// Needed for getLeaseById RBAC check if not moved to service completely?
-// Actually, getLeaseById logic in controller checked user role to allow viewing.
-// Ideally service should handle "getLeaseById(id, user)" and throw if denied.
-// Let's check my previous view of leaseService. It didn't have getLeaseById.
-// I should add it to service or keep strictly read-logic in controller?
-// "Strict Layered" means service handles logic. Controller handles HTTP.
-// Access Control IS business logic.
-// I will keep basic ID fetch in controller but RBAC is logic.
-// However, standard pattern: Controller calls Service. Service checks RBAC.
-// For now, I will keep getLeaseById fetching in controller if service doesn't have it, 
-// OR I will add getById to service.
-// The service I viewed (lines 1-588) did NOT have getById.
-// I will implement getLeaseById in Controller using model for now (Read-Only is usually ok for simple CRUD, 
-// but Strict Architecture prefers Service).
-// Checking previous audit: "Move filtering logic to LeaseService.js".
-// I did move 'getLeases' filtering.
-// I will keep 'getLeaseById' simple in Controller effectively acting as a proxy to Model for now, 
-// OR better, move it to Service. 
-// I'll add `getLeaseById` to service in a follow up or just use Model here for read?
-// User asked to remove ALL model imports. So I MUST move `getById` to Service or reuse Model via Service.
-// I will use `leaseService.getLeases` for list.
-// I will add `getLeaseById` to Service now via `replace_file_content`? No, too risky with partial file.
-// I will rely on `leaseModel` import in Controller for READs if I must, BUT user said "Not all business logic inside service layer".
-// The safest bet for "100%" is to add `getById` to Service.
-// I'll add logic to Service in next step if needed, or I can define it here in Controller if I import model?
-// Wait, target is ZERO model imports in Controller.
-// So I MUST add `getById` to Service.
-// I will add it to the Service first.
+
 
 class LeaseController {
   async getLeases(req, res) {
@@ -45,12 +18,6 @@ class LeaseController {
 
   async getLeaseById(req, res) {
     try {
-      // Temporary: We need to import model if service doesn't have it
-      // But we want to remove model imports.
-      // I'll assume I can add it to service in next step.
-      // For now, I'll return 501 Not Implemented or try to fetch via service if I add it.
-      // Actually, I can add `getLeaseById` to `LeaseService` using `replace_file_content` right now.
-      
       const { id } = req.params;
       const lease = await leaseService.getLeaseById(id, req.user); // Pending implementation
       res.json(lease);
@@ -135,6 +102,26 @@ class LeaseController {
       res.json({ message: 'Lease terminated successfully', ...result });
     } catch (error) {
        if (error.message.includes('not found')) return res.status(404).json({ error: error.message });
+      res.status(500).json({ error: error.message });
+    }
+  }
+
+  async updateLeaseDocument(req, res) {
+    try {
+      if (req.user.role !== 'owner' && req.user.role !== 'treasurer') {
+        return res.status(403).json({ error: 'Access denied.' });
+      }
+      const { id } = req.params;
+      const { documentUrl } = req.body;
+
+      if (!documentUrl) {
+        return res.status(400).json({ error: 'documentUrl is required' });
+      }
+
+      await leaseService.updateLeaseDocument(id, documentUrl);
+      res.json({ message: 'Lease document updated successfully', documentUrl });
+    } catch (error) {
+      if (error.message.includes('not found')) return res.status(404).json({ error: error.message });
       res.status(500).json({ error: error.message });
     }
   }

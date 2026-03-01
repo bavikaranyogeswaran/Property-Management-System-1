@@ -44,5 +44,11 @@ router.get(
   authorizeRoles('owner', 'treasurer'),
   reportController.generateLeadConversionReport
 );
+router.get(
+  '/ledger-summary',
+  authenticateToken,
+  authorizeRoles('owner', 'treasurer'),
+  reportController.getLedgerSummary
+);
 
 export default router;
