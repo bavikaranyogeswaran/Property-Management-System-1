@@ -255,6 +255,22 @@ class LeadModel {
     );
     return rows.length > 0;
   }
+
+  // Analytics optimized query to avoid O(N) memory buildup
+  async getLeadConversionStats() {
+    const [rows] = await db.query(
+      `
+      SELECT 
+        COUNT(*) AS Total,
+        SUM(CASE WHEN status IN ('interested', 'new') THEN 1 ELSE 0 END) AS Interested,
+        SUM(CASE WHEN status LIKE '%schedule%' OR status LIKE '%visit%' THEN 1 ELSE 0 END) AS Scheduled,
+        SUM(CASE WHEN status LIKE '%application%' OR status = 'applied' THEN 1 ELSE 0 END) AS Application,
+        SUM(CASE WHEN status IN ('converted', 'leased', 'tenant') THEN 1 ELSE 0 END) AS Leased
+      FROM leads
+      `
+    );
+    return rows[0];
+  }
 }
 
 export default new LeadModel();

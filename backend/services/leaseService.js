@@ -350,14 +350,22 @@ class LeaseService {
       // Fetch pending invoices
       const pendingInvoices = await invoiceModel.findPendingDebts(leaseId);
 
+      // O(1) Batch fetch all payments for these invoices to prevent N+1 query problem
+      const invoiceIds = pendingInvoices.map(inv => inv.invoice_id);
+      const allPayments = await paymentModel.findByInvoiceIds(invoiceIds);
+      
+      // Map payments by invoice_id for O(1) lookup
+      const paymentsMap = new Map();
+      allPayments.forEach(p => {
+          if (!paymentsMap.has(p.invoice_id)) paymentsMap.set(p.invoice_id, []);
+          paymentsMap.get(p.invoice_id).push(p);
+      });
+
       for (const inv of pendingInvoices) {
         if (withheldAmount <= 0) break;
 
         // Calculate outstanding for this invoice
-        // We need to know how much is already paid?
-        // We can fetch payments or rely on 'pending' status?
-        // Safer: Get payments sum.
-        const payments = await paymentModel.findByInvoiceId(inv.invoice_id);
+        const payments = paymentsMap.get(inv.invoice_id) || [];
         const paidAlready = payments
           .filter((p) => p.status === 'verified')
           .reduce((sum, p) => sum + Number(p.amount), 0);

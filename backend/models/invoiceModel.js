@@ -217,6 +217,23 @@ class InvoiceModel {
     );
     return rows;
   }
+
+  // Analytics optimized query to avoid O(N) memory buildup
+  async getFinancialStatsByYear(year) {
+    const [rows] = await pool.query(
+      `
+      SELECT p.name AS property_name, SUM(ri.amount) AS total_income
+      FROM rent_invoices ri
+      JOIN leases l ON ri.lease_id = l.lease_id
+      JOIN units un ON l.unit_id = un.unit_id
+      JOIN properties p ON un.property_id = p.property_id
+      WHERE ri.status = 'paid' AND YEAR(ri.due_date) = ?
+      GROUP BY p.property_id
+      `,
+      [year]
+    );
+    return rows;
+  }
 }
 
 export default new InvoiceModel();

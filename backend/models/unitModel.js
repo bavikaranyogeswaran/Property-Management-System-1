@@ -217,6 +217,34 @@ class UnitModel {
     );
     return rows[0].count;
   }
+
+  // Analytics optimized query to avoid O(N) memory buildup
+  async getOccupancyStats() {
+    const [rows] = await db.query(
+      `
+      SELECT 
+        COALESCE(p.name, CONCAT('Property ', u.property_id)) AS property_name,
+        COUNT(u.unit_id) AS total,
+        SUM(CASE WHEN u.status = 'occupied' THEN 1 ELSE 0 END) AS occupied,
+        GROUP_CONCAT(CASE WHEN u.status != 'occupied' THEN u.unit_number ELSE NULL END) AS vacancies
+      FROM units u
+      LEFT JOIN properties p ON u.property_id = p.property_id
+      GROUP BY u.property_id
+      `
+    );
+
+    // Transform string vacancies back into array mapping Report Service expectations
+    const propertyStats = {};
+    rows.forEach(row => {
+      propertyStats[row.property_name] = {
+        total: row.total,
+        occupied: row.occupied,
+        vacancies: row.vacancies ? row.vacancies.split(',') : []
+      }
+    });
+    
+    return propertyStats;
+  }
 }
 
 export default new UnitModel();

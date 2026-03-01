@@ -141,6 +141,15 @@ class PaymentModel {
     return rows;
   }
 
+  async findByInvoiceIds(invoiceIds) {
+    if (!invoiceIds || invoiceIds.length === 0) return [];
+    const [rows] = await pool.query(
+      'SELECT * FROM payments WHERE invoice_id IN (?)',
+      [invoiceIds]
+    );
+    return rows;
+  }
+
   async findByTenantId(tenantId) {
     const [rows] = await pool.query(
       `
