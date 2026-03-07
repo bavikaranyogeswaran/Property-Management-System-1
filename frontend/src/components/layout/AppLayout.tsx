@@ -69,6 +69,7 @@ export function AppLayout({ children }: AppLayoutProps) {
     { path: '/receipts', label: 'Receipts', icon: Receipt },
     { path: '/reports', label: 'Reports', icon: BarChart3 },
     { path: '/maintenance', label: 'Maintenance', icon: Wrench },
+    { path: '/payouts', label: 'Payouts', icon: DollarSign },
     { path: '/analytics', label: 'Analytics', icon: BarChart3 },
   ];
 
