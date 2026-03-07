@@ -123,10 +123,11 @@ class ReportController {
       doc.font('Helvetica');
 
       for (const tenant of tenants) {
-        doc.fillColor('black').text(tenant.name, 50, y);
+        doc.font('Helvetica').fillColor('black').text(tenant.name, 50, y);
         doc.text(tenant.behavior_score.toString(), 200, y);
         doc.text(`${tenant.overdue_count} / ${tenant.paid_count}`, 300, y);
         doc.fillColor(tenant.color).font('Helvetica-Bold').text(tenant.riskLevel, 450, y);
+        doc.font('Helvetica').fillColor('black');
         y += 20;
         if (y > 700) { doc.addPage(); y = 50; }
       }
@@ -149,18 +150,24 @@ class ReportController {
       doc.moveDown();
 
       let y = 150;
-      const sorted = Object.entries(categories).sort((a, b) => b[1] - a[1]);
 
-      for (const [cat, amount] of sorted) {
-        const percent = ((amount / totalCost) * 100).toFixed(1);
-        doc.text(cat, 50, y);
-        doc.text(amount.toLocaleString(), 250, y);
-        doc.text(`${percent}%`, 400, y);
-        doc.rect(460, y, Number(percent) * 2, 10).fill('blue');
-        doc.fillColor('black');
-        y += 20;
+      if (totalCost === 0) {
+        doc.text('No maintenance costs recorded.', 50, y);
+      } else {
+        const sorted = Object.entries(categories).sort((a, b) => b[1] - a[1]);
+
+        for (const [cat, amount] of sorted) {
+          const percent = ((amount / totalCost) * 100).toFixed(1);
+          doc.text(cat, 50, y);
+          doc.text(amount.toLocaleString(), 250, y);
+          doc.text(`${percent}%`, 400, y);
+          doc.rect(460, y, Number(percent) * 2, 10).fill('blue');
+          doc.fillColor('black');
+          y += 20;
+          if (y > 700) { doc.addPage(); y = 50; }
+        }
+        doc.text(`Total Maintenance Spend: ${totalCost.toLocaleString()}`, 50, y + 20);
       }
-      doc.text(`Total Maintenance Spend: ${totalCost.toLocaleString()}`, 50, y + 20);
       doc.end();
     } catch (error) {
       console.error('Error generating maintenance report:', error);
@@ -202,6 +209,7 @@ class ReportController {
           doc.text(lease.endDate, 300, y);
           doc.text(`${diffDays} days`, 450, y);
           y += 20;
+          if (y > 700) { doc.addPage(); y = 50; }
         });
       }
       doc.end();

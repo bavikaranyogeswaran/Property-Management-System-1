@@ -10,7 +10,7 @@ import axios from 'axios';
 const API_URL = 'http://localhost:3000/api/reports';
 
 const getAuthHeader = () => {
-  const token = localStorage.getItem('token');
+  const token = localStorage.getItem('authToken');
   return { Authorization: `Bearer ${token}` };
 };
 
