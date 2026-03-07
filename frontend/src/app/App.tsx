@@ -103,7 +103,9 @@ import { MaintenanceExpensesPage } from '@/components/pages/treasurer/Maintenanc
 // Shared Pages
 import { AnalyticsPage } from '@/components/reports/AnalyticsPage';
 import { SettingsPage } from '@/components/pages/common/SettingsPage';
+import { NotificationsPage } from '@/components/pages/common/NotificationsPage';
 import { ReceiptsPage } from '@/components/pages/common/ReceiptsPage';
+import OwnerPayoutsPage from '@/components/pages/OwnerPayoutsPage';
 import { PublicListingPage } from '@/components/pages/public/PublicListingPage';
 import { PublicPropertyDetailsPage } from '@/components/pages/public/PublicPropertyDetailsPage';
 
@@ -222,6 +224,14 @@ function AppContent() {
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/notifications"
+        element={
+          <ProtectedRoute>
+            <NotificationsPage />
+          </ProtectedRoute>
+        }
+      />
 
       {/* ======================================================================= */}
       {/*  OWNER ROUTES (Landlord Area) */}
@@ -318,6 +328,14 @@ function AppContent() {
             element={
               <ProtectedRoute>
                 <ReceiptsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/payouts"
+            element={
+              <ProtectedRoute>
+                <OwnerPayoutsPage />
               </ProtectedRoute>
             }
           />
