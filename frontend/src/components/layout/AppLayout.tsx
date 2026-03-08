@@ -26,6 +26,7 @@ import {
   Receipt,
   Bell,
   Calendar,
+  Wallet,
 } from 'lucide-react';
 
 import { Link, useLocation } from 'react-router-dom';
@@ -67,6 +68,7 @@ export function AppLayout({ children }: AppLayoutProps) {
     { path: '/leases', label: 'Leases', icon: FileText },
     { path: '/invoices', label: 'Invoices', icon: CreditCard },
     { path: '/receipts', label: 'Receipts', icon: Receipt },
+    { path: '/payouts', label: 'Payouts', icon: Wallet },
     { path: '/reports', label: 'Reports', icon: BarChart3 },
     { path: '/maintenance', label: 'Maintenance', icon: Wrench },
     { path: '/analytics', label: 'Analytics', icon: BarChart3 },
