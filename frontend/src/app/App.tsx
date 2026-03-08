@@ -327,14 +327,6 @@ function AppContent() {
             }
           />
           <Route
-            path="/receipts"
-            element={
-              <ProtectedRoute>
-                <ReceiptsPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
             path="/payouts"
             element={
               <ProtectedRoute>
