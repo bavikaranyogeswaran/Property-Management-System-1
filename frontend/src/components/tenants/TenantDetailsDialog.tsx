@@ -100,8 +100,8 @@ export const TenantDetailsDialog: React.FC<TenantDetailsDialogProps> = ({
   return (
     <>
       <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-        {/* Force a wider modal manually */}
-        <DialogContent className="max-w-[1000px] w-[95vw] max-h-[90vh] overflow-y-auto">
+        {/* Force a wider modal manually overriding the sm:max-w-lg default */}
+        <DialogContent className="sm:max-w-[1000px] w-full max-h-[90vh] overflow-y-auto overflow-x-hidden">
           <DialogHeader>
             <DialogTitle>Tenant Profile</DialogTitle>
           </DialogHeader>
