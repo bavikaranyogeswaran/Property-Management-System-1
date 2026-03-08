@@ -87,8 +87,10 @@ export function AppLayout({ children }: AppLayoutProps) {
 
   const tenantMenu = [
     { path: '/dashboard', label: 'Dashboard', icon: Home },
+    { path: '/my-lease', label: 'My Lease', icon: FileText },
     { path: '/invoices', label: 'My Invoices', icon: FileText },
     { path: '/payments', label: 'My Payments', icon: CreditCard },
+    { path: '/payment-summary', label: 'Payment Summary', icon: BarChart3 },
     { path: '/receipts', label: 'My Receipts', icon: Receipt },
     { path: '/maintenance', label: 'Maintenance Requests', icon: Wrench },
   ];

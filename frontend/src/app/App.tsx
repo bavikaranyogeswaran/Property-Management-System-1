@@ -95,6 +95,8 @@ import { TenantDashboard } from '@/components/pages/tenant/TenantDashboard';
 import { TenantInvoicesPage } from '@/components/pages/tenant/TenantInvoicesPage';
 import { TenantMaintenancePage } from '@/components/pages/tenant/TenantMaintenancePage';
 import { TenantPaymentsPage } from '@/components/pages/tenant/TenantPaymentsPage';
+import { TenantLeasePage } from '@/components/pages/tenant/TenantLeasePage';
+import { TenantPaymentSummaryPage } from '@/components/pages/tenant/TenantPaymentSummaryPage';
 
 // Treasurer Pages
 import { TreasurerDashboard } from '@/components/pages/treasurer/TreasurerDashboard';
@@ -378,6 +380,22 @@ function AppContent() {
             element={
               <ProtectedRoute>
                 <ReceiptsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/my-lease"
+            element={
+              <ProtectedRoute>
+                <TenantLeasePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/payment-summary"
+            element={
+              <ProtectedRoute>
+                <TenantPaymentSummaryPage />
               </ProtectedRoute>
             }
           />
