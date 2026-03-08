@@ -67,7 +67,7 @@ class InvoiceModel {
   async findByTenantId(tenantId) {
     const [rows] = await pool.query(
       `
-            SELECT ri.*, l.tenant_id,
+            SELECT ri.*, l.tenant_id, l.unit_id,
                    COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id = ri.invoice_id AND status = 'verified'), 0) AS amount_paid
             FROM rent_invoices ri
             JOIN leases l ON ri.lease_id = l.lease_id
