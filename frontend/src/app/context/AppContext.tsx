@@ -181,7 +181,7 @@ export interface MaintenanceRequest {
   title: string;
   description: string;
   priority: 'low' | 'medium' | 'high' | 'urgent';
-  status: 'submitted' | 'in_progress' | 'completed';
+  status: 'submitted' | 'in_progress' | 'completed' | 'cancelled';
   submittedDate: string;
   completedDate?: string;
   images?: string[];
