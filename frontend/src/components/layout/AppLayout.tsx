@@ -67,6 +67,7 @@ export function AppLayout({ children }: AppLayoutProps) {
     { path: '/treasurers', label: 'Treasurers', icon: Shield },
     { path: '/leases', label: 'Leases', icon: FileText },
     { path: '/invoices', label: 'Invoices', icon: CreditCard },
+    { path: '/payments', label: 'Payments', icon: DollarSign },
     { path: '/receipts', label: 'Receipts', icon: Receipt },
     { path: '/payouts', label: 'Payouts', icon: Wallet },
     { path: '/reports', label: 'Reports', icon: BarChart3 },

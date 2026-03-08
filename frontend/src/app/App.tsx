@@ -89,6 +89,7 @@ import { OwnerMaintenancePage } from '@/components/pages/owner/OwnerMaintenanceP
 import { OwnerReportsPage } from '@/components/pages/owner/OwnerReportsPage';
 import { VisitsPage } from '@/components/pages/owner/VisitsPage';
 import OwnerPayoutsPage from '@/components/pages/OwnerPayoutsPage';
+import { OwnerPaymentsPage } from '@/components/pages/owner/OwnerPaymentsPage';
 
 // Tenant Pages
 import { TenantDashboard } from '@/components/pages/tenant/TenantDashboard';
@@ -338,6 +339,14 @@ function AppContent() {
             element={
               <ProtectedRoute>
                 <OwnerPayoutsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/payments"
+            element={
+              <ProtectedRoute>
+                <OwnerPaymentsPage />
               </ProtectedRoute>
             }
           />
