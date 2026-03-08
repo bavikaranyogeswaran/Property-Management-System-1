@@ -104,6 +104,7 @@ import { MaintenanceExpensesPage } from '@/components/pages/treasurer/Maintenanc
 import { AnalyticsPage } from '@/components/reports/AnalyticsPage';
 import { SettingsPage } from '@/components/pages/common/SettingsPage';
 import { ReceiptsPage } from '@/components/pages/common/ReceiptsPage';
+import { NotificationsPage } from '@/components/pages/common/NotificationsPage';
 import { PublicListingPage } from '@/components/pages/public/PublicListingPage';
 import { PublicPropertyDetailsPage } from '@/components/pages/public/PublicPropertyDetailsPage';
 
@@ -219,6 +220,14 @@ function AppContent() {
         element={
           <ProtectedRoute>
             <SettingsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/notifications"
+        element={
+          <ProtectedRoute>
+            <NotificationsPage />
           </ProtectedRoute>
         }
       />
