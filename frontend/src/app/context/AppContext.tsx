@@ -567,25 +567,32 @@ export function AppProvider({ children }: { children: ReactNode }) {
         try {
           const invRes = await invoiceApi.getInvoices();
           if (invRes.data) {
-            const mappedInvoices = invRes.data.map((i: any) => ({
-              id: i.invoice_id.toString(),
-              leaseId: i.lease_id.toString(),
-              tenantId: i.tenant_id.toString(),
-              unitId: i.unit_id ? i.unit_id.toString() : '',
-              amount: parseFloat(i.amount),
-              amountPaid: typeof i.amount_paid !== 'undefined' ? parseFloat(i.amount_paid) : 0,
-              tenantName: i.tenant_name,
-              propertyName: i.property_name,
-              unitNumber: i.unit_number,
-              dueDate: i.due_date
-                ? new Date(i.due_date).toLocaleDateString('en-CA')
-                : '',
-              status: i.status,
-              description: i.description,
-              generatedDate: i.created_at
-                ? new Date(i.created_at).toLocaleDateString('en-CA')
-                : '',
-            }));
+            const mappedInvoices = invRes.data.map((i: any) => {
+              const invId = i.invoice_id || i.id || i.invoiceId;
+              const lsId = i.lease_id || i.leaseId;
+              const tenId = i.tenant_id || i.tenantId;
+              const unId = i.unit_id || i.unitId;
+              
+              return {
+                id: invId ? invId.toString() : '',
+                leaseId: lsId ? lsId.toString() : '',
+                tenantId: tenId ? tenId.toString() : '',
+                unitId: unId ? unId.toString() : '',
+                amount: parseFloat(i.amount),
+                amountPaid: typeof i.amount_paid !== 'undefined' ? parseFloat(i.amount_paid) : (typeof i.amountPaid !== 'undefined' ? parseFloat(i.amountPaid) : 0),
+                tenantName: i.tenant_name || i.tenantName,
+                propertyName: i.property_name || i.propertyName,
+                unitNumber: i.unit_number || i.unitNumber,
+                dueDate: i.due_date || i.dueDate
+                  ? new Date(i.due_date || i.dueDate).toLocaleDateString('en-CA')
+                  : '',
+                status: i.status,
+                description: i.description,
+                generatedDate: i.created_at || i.createdAt
+                  ? new Date(i.created_at || i.createdAt).toLocaleDateString('en-CA')
+                  : '',
+              };
+            });
             setInvoices(mappedInvoices);
           }
         } catch (e) {
