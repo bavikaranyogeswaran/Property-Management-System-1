@@ -434,6 +434,14 @@ function AppContent() {
             }
           />
           <Route
+            path="/maintenance"
+            element={
+              <ProtectedRoute>
+                <OwnerMaintenancePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/analytics"
             element={
               <ProtectedRoute>
