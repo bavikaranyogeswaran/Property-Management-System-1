@@ -519,17 +519,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
         try {
           const mRes = await maintenanceApi.getRequests();
           if (mRes.data) {
-            const mappedRequests = mRes.data.map((r: any) => ({
-              id: r.request_id.toString(),
-              tenantId: r.tenant_id.toString(),
-              unitId: r.unit_id.toString(),
-              title: r.title,
-              description: r.description,
-              priority: r.priority,
-              status: r.status,
-              submittedDate: r.created_at ? r.created_at.split('T')[0] : '',
-              images: r.images,
-            }));
+            const mappedRequests = mRes.data.map((r: any) => {
+              const reqId = r.request_id || r.id;
+              const tenId = r.tenant_id || r.tenantId;
+              const unId = r.unit_id || r.unitId;
+              const createdDate = r.created_at || r.createdAt;
+              return {
+                id: reqId ? reqId.toString() : '',
+                tenantId: tenId ? tenId.toString() : '',
+                unitId: unId ? unId.toString() : '',
+                title: r.title,
+                description: r.description,
+                priority: r.priority,
+                status: r.status,
+                submittedDate: createdDate ? String(createdDate).split('T')[0] : '',
+                images: r.images,
+              };
+            });
             setMaintenanceRequests(mappedRequests);
           }
         } catch (e) {
