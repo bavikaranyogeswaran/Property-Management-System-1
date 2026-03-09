@@ -82,7 +82,7 @@ export function TenantLeasePage() {
       </div>
 
       {/* No Active Lease */}
-      {!currentLease && (
+      {activeLeases.length === 0 && (
         <Card className="border-yellow-200 bg-yellow-50">
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
@@ -101,20 +101,20 @@ export function TenantLeasePage() {
         </Card>
       )}
 
-      {/* Current Lease Details */}
-      {currentLease && (() => {
+      {/* Active Leases Details */}
+      {activeLeases.map((currentLease) => {
         const { unit, property } = getLeaseDetails(currentLease);
         const { progress, daysRemaining, totalDays } = getLeaseProgress(currentLease);
 
         return (
-          <>
+          <div key={currentLease.id} className="space-y-6 pt-6 border-t first:pt-0 first:border-0 border-gray-200">
             {/* Lease Timeline Card */}
             <Card>
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
                   <CardTitle className="flex items-center gap-2">
                     <Clock className="size-5 text-blue-600" />
-                    Lease Timeline
+                    Lease Timeline ({unit?.unitNumber || 'Unknown Unit'})
                   </CardTitle>
                   <Badge className={statusColors[currentLease.status] || 'bg-gray-100 text-gray-800'}>
                     {currentLease.status.charAt(0).toUpperCase() + currentLease.status.slice(1)}
@@ -336,9 +336,9 @@ export function TenantLeasePage() {
                 )}
               </CardContent>
             </Card>
-          </>
+          </div>
         );
-      })()}
+      })}
 
       {/* Past Leases */}
       {pastLeases.length > 0 && (
