@@ -166,7 +166,6 @@ export function TenantsPage() {
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Contact</TableHead>
-                  <TableHead>Current Residence</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Joined</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -175,8 +174,6 @@ export function TenantsPage() {
               <TableBody>
                 {filteredTenants.map((tenant) => {
                   const lease = getTenantLease(tenant.id);
-                  const unit = getTenantUnit(tenant.id);
-                  const property = getTenantProperty(tenant.id);
 
                   return (
                     <TableRow key={tenant.id}>
@@ -200,23 +197,7 @@ export function TenantsPage() {
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell>
-                        {unit && property ? (
-                          <div className="flex items-center gap-2">
-                            <Home className="size-4 text-gray-400" />
-                            <div className="text-sm">
-                              <div className="font-medium">{property.name}</div>
-                              <div className="text-gray-500">
-                                Unit {unit.unitNumber}
-                              </div>
-                            </div>
-                          </div>
-                        ) : (
-                          <span className="text-gray-400 text-sm">
-                            No active lease
-                          </span>
-                        )}
-                      </TableCell>
+
                       <TableCell>
                         {lease ? (
                           <Badge
