@@ -11,8 +11,12 @@ const router = Router();
 router.get('/properties/:propertyId/images', imageController.getPropertyImages);
 router.get('/units/:unitId/images', imageController.getUnitImages);
 
+// General purpose file upload route (Protected)
+router.use(authenticateToken);
+router.post('/upload', upload.single('file'), imageController.uploadGeneralFile);
+
 // Protected Routes (Owner Only)
-router.use(authenticateToken, authorizeRoles('owner'));
+router.use(authorizeRoles('owner'));
 
 // Property Images (Write)
 router.post(

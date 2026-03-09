@@ -4,6 +4,18 @@ import unitModel from '../models/unitModel.js';
 import unitImageModel from '../models/unitImageModel.js';
 
 class ImageController {
+  // General File Upload
+  async uploadGeneralFile(req, res) {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: 'No file uploaded' });
+      }
+      res.status(201).json({ url: `/uploads/${req.file.filename}` });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+
   // Property Images
   async uploadPropertyImages(req, res) {
     try {
