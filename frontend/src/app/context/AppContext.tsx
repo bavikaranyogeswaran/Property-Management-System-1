@@ -599,21 +599,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
           console.error('Failed to fetch invoices', e);
         }
 
-        // Fetch Payments (NEW)
         try {
           const payRes = await paymentApi.getPayments();
           if (payRes.data) {
             const mappedPayments = payRes.data.map((p: any) => ({
-              id: p.payment_id?.toString() || '', // Safe access
-              invoiceId: p.invoice_id?.toString() || '',
-              tenantId: p.tenant_id?.toString() || '',
+              id: p.id || p.payment_id?.toString() || '',
+              invoiceId: p.invoiceId || p.invoice_id?.toString() || '',
+              tenantId: p.tenantId || p.tenant_id?.toString() || '',
               amount: parseFloat(p.amount),
-              paymentDate: p.payment_date ? p.payment_date.split('T')[0] : '',
-              paymentMethod: p.payment_method,
-              referenceNumber: p.reference_number,
+              paymentDate: p.paymentDate
+                ? p.paymentDate.split('T')[0]
+                : p.payment_date
+                ? p.payment_date.split('T')[0]
+                : '',
+              paymentMethod: p.paymentMethod || p.payment_method,
+              referenceNumber: p.referenceNumber || p.reference_number,
               status: p.status,
-              submittedAt: p.created_at || '',
-              proofUrl: p.evidence_url,
+              submittedAt: p.createdAt || p.created_at || '',
+              proofUrl: p.receiptUrl || p.evidence_url || p.proof_url,
             }));
             setPayments(mappedPayments);
           }
