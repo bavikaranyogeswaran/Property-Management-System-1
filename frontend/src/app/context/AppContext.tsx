@@ -1332,7 +1332,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const endLease = async (id: string) => {
     try {
-      await apiClient.put(`/leases/${id}/end`);
+      await apiClient.post(`/leases/${id}/terminate`);
       setLeases((prev) =>
         prev.map((l) => (l.id === id ? { ...l, status: 'ended' } : l))
       );
@@ -1345,6 +1345,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       console.error('Failed to end lease', e);
       toast.error('Failed to end lease');
+      throw e;
     }
   };
 

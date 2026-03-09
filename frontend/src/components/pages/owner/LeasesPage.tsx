@@ -335,12 +335,15 @@ export function LeasesPage() {
     setEndLeaseId(leaseId);
   };
 
-  const confirmEndLease = () => {
+  const confirmEndLease = async () => {
     if (endLeaseId) {
-      endLease(endLeaseId);
-      toast.success('Lease ended successfully');
-      setSelectedLease(null);
-      setEndLeaseId(null);
+      try {
+        await endLease(endLeaseId);
+        setSelectedLease(null);
+        setEndLeaseId(null);
+      } catch (e) {
+        // Error toast is handled by context
+      }
     }
   };
 
