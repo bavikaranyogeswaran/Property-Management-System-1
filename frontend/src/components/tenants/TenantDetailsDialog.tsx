@@ -144,29 +144,7 @@ export const TenantDetailsDialog: React.FC<TenantDetailsDialogProps> = ({
                   )}
                 </div>
 
-                {/* Current Residence */}
-                <div className="border rounded-lg p-4 bg-gray-50">
-                  <h4 className="font-semibold mb-3">Current Residence</h4>
-                  {lease && unit && property ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <p className="text-sm text-gray-600">Property</p>
-                        <p className="font-medium">{property.name}</p>
-                        <p className="text-sm text-gray-500">
-                          {property.propertyNo} {property.street},{' '}
-                          {property.city}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-600">Unit</p>
-                        <p className="font-medium">Unit {unit.unitNumber}</p>
-                        <p className="text-sm text-gray-500">{unit.type}</p>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-gray-500">No active lease</p>
-                  )}
-                </div>
+
 
                 {/* Tenant Background */}
                 <div className="border rounded-lg p-4 bg-gray-50">
