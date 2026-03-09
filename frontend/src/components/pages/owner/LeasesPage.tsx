@@ -326,25 +326,26 @@ export function LeasesPage() {
     );
   };
 
-  // Helper for End Lease (keep outside or inside, reusing existing)
+  // Helper for End Lease - Trigger Dialog
   const handleEndLease = (leaseId: string) => {
-    if (
-      confirm(
-        'Are you sure you want to end this lease? This action will mark the lease as ended and free up the unit.'
-      )
-    ) {
-      endLease(leaseId);
+    setEndLeaseId(leaseId);
+  };
+
+  const onEndLeaseClick = (leaseId: string) => {
+    setEndLeaseId(leaseId);
+  };
+
+  const confirmEndLease = () => {
+    if (endLeaseId) {
+      endLease(endLeaseId);
       toast.success('Lease ended successfully');
       setSelectedLease(null);
+      setEndLeaseId(null);
     }
   };
 
-  // Rename handleEndLease to avoid conflict or just reuse
-  const onEndLeaseClick = (leaseId: string) => {
-    if (confirm('Are you sure you want to end this lease?')) {
-      endLease(leaseId);
-    }
-  };
+  // End Lease State
+  const [endLeaseId, setEndLeaseId] = useState<string | null>(null);
 
   // Renewal State
   const [renewLeaseId, setRenewLeaseId] = useState<string | null>(null);
@@ -838,6 +839,38 @@ export function LeasesPage() {
               <Button type="submit">Renew Lease</Button>
             </div>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* End Lease Confirmation Dialog */}
+      <Dialog
+        open={!!endLeaseId}
+        onOpenChange={(open) => !open && setEndLeaseId(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>End Lease</DialogTitle>
+            <p className="text-sm text-gray-500 mt-2">
+              Are you sure you want to end this lease? This action will mark the
+              lease as ended and free up the unit.
+            </p>
+          </DialogHeader>
+          <div className="flex justify-end gap-2 mt-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setEndLeaseId(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={confirmEndLease}
+            >
+              End Lease
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 
