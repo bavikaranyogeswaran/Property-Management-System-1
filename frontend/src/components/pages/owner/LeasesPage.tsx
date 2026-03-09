@@ -430,6 +430,7 @@ export function LeasesPage() {
                           <Input
                             type="number"
                             step="0.01"
+                            min="0"
                             {...field}
                             onChange={(e) =>
                               field.onChange(
@@ -812,7 +813,7 @@ export function LeasesPage() {
             <DialogTitle>Renew Lease</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleRenew} className="space-y-4">
-            <div>
+            <div className="space-y-2">
               <Label>New End Date</Label>
               <Input
                 type="date"
@@ -821,11 +822,12 @@ export function LeasesPage() {
                 required
               />
             </div>
-            <div>
+            <div className="space-y-2">
               <Label>New Monthly Rent (LKR) (Optional)</Label>
               <Input
                 type="number"
                 step="0.01"
+                min="0"
                 value={renewRent}
                 onChange={(e) => setRenewRent(e.target.value)}
                 placeholder="Leave empty to keep current rent"
@@ -887,11 +889,12 @@ export function LeasesPage() {
             <DialogTitle>Refund Security Deposit</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleRefund} className="space-y-4">
-            <div>
+            <div className="space-y-2">
               <Label>Refund Amount (LKR)</Label>
               <Input
                 type="number"
                 step="0.01"
+                min="0"
                 value={refundAmount}
                 onChange={(e) => setRefundAmount(e.target.value)}
                 required
