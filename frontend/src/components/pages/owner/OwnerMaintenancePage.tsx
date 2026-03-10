@@ -1,15 +1,46 @@
 import React, { useState } from 'react';
-import { useApp, MaintenanceRequest, MaintenanceCost } from '@/app/context/AppContext';
+import {
+  useApp,
+  MaintenanceRequest,
+  MaintenanceCost,
+} from '@/app/context/AppContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Wrench, DollarSign, Clock, CheckCircle, AlertCircle, Edit, Eye } from 'lucide-react';
+import {
+  Wrench,
+  DollarSign,
+  Clock,
+  CheckCircle,
+  AlertCircle,
+  Edit,
+  Eye,
+  Trash2,
+} from 'lucide-react';
 import { toast } from 'sonner';
 
 export function OwnerMaintenancePage() {
@@ -21,24 +52,45 @@ export function OwnerMaintenancePage() {
     properties,
     updateMaintenanceRequest,
     addMaintenanceCost,
+    deleteMaintenanceCost,
+    createMaintenanceInvoice,
   } = useApp();
 
-  const [selectedRequest, setSelectedRequest] = useState<MaintenanceRequest | null>(null);
+  const [selectedRequest, setSelectedRequest] =
+    useState<MaintenanceRequest | null>(null);
   const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false);
   const [isCostDialogOpen, setIsCostDialogOpen] = useState(false);
+  const [isBillDialogOpen, setIsBillDialogOpen] = useState(false);
   const [costFormData, setCostFormData] = useState({
     amount: '',
     description: '',
   });
+  const [billFormData, setBillFormData] = useState({
+    amount: '',
+    description: '',
+    dueDate: '',
+  });
 
-  const submittedRequests = maintenanceRequests.filter(r => r.status === 'submitted');
-  const inProgressRequests = maintenanceRequests.filter(r => r.status === 'in_progress');
-  const completedRequests = maintenanceRequests.filter(r => r.status === 'completed');
+  const submittedRequests = maintenanceRequests.filter(
+    (r) => r.status === 'submitted'
+  );
+  const inProgressRequests = maintenanceRequests.filter(
+    (r) => r.status === 'in_progress'
+  );
+  const completedRequests = maintenanceRequests.filter(
+    (r) => r.status === 'completed'
+  );
 
-  const handleUpdateStatus = (request: MaintenanceRequest, newStatus: MaintenanceRequest['status']) => {
+  const handleUpdateStatus = (
+    request: MaintenanceRequest,
+    newStatus: MaintenanceRequest['status']
+  ) => {
     updateMaintenanceRequest(request.id, {
       status: newStatus,
-      completedDate: newStatus === 'completed' ? new Date().toISOString().split('T')[0] : undefined,
+      completedDate:
+        newStatus === 'completed'
+          ? new Date().toISOString().split('T')[0]
+          : undefined,
     });
     toast.success('Request status updated');
     setIsStatusDialogOpen(false);
@@ -64,8 +116,27 @@ export function OwnerMaintenancePage() {
     });
   };
 
+  const handleBillTenant = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedRequest) return;
+
+    try {
+      await createMaintenanceInvoice(
+        selectedRequest.id,
+        parseFloat(billFormData.amount),
+        billFormData.description,
+        billFormData.dueDate
+      );
+      setIsBillDialogOpen(false);
+      setSelectedRequest(null);
+      setBillFormData({ amount: '', description: '', dueDate: '' });
+    } catch (error) {
+      // Error handling done in context
+    }
+  };
+
   const getRequestCosts = (requestId: string) => {
-    return maintenanceCosts.filter(c => c.requestId === requestId);
+    return maintenanceCosts.filter((c) => c.requestId === requestId);
   };
 
   const getTotalCost = (requestId: string) => {
@@ -74,7 +145,10 @@ export function OwnerMaintenancePage() {
   };
 
   const getStatusBadge = (status: MaintenanceRequest['status']) => {
-    const variants: Record<MaintenanceRequest['status'], { variant: any, label: string }> = {
+    const variants: Record<
+      MaintenanceRequest['status'],
+      { variant: any; label: string }
+    > = {
       submitted: { variant: 'secondary', label: 'Submitted' },
       in_progress: { variant: 'default', label: 'In Progress' },
       completed: { variant: 'outline', label: 'Completed' },
@@ -93,7 +167,10 @@ export function OwnerMaintenancePage() {
     return colors[priority];
   };
 
-  const totalMaintenanceCost = maintenanceCosts.reduce((sum, c) => sum + c.amount, 0);
+  const totalMaintenanceCost = maintenanceCosts.reduce(
+    (sum, c) => sum + c.amount,
+    0
+  );
 
   const stats = [
     {
@@ -139,9 +216,11 @@ export function OwnerMaintenancePage() {
         </TableHeader>
         <TableBody>
           {requests.map((request) => {
-            const tenant = tenants.find(t => t.id === request.tenantId);
-            const unit = units.find(u => u.id === request.unitId);
-            const property = unit ? properties.find(p => p.id === unit.propertyId) : null;
+            const tenant = tenants.find((t) => t.id === request.tenantId);
+            const unit = units.find((u) => u.id === request.unitId);
+            const property = unit
+              ? properties.find((p) => p.id === unit.propertyId)
+              : null;
             const costs = getRequestCosts(request.id);
             const totalCost = getTotalCost(request.id);
             const statusBadge = getStatusBadge(request.status);
@@ -151,7 +230,9 @@ export function OwnerMaintenancePage() {
                 <TableCell>{request.submittedDate}</TableCell>
                 <TableCell className="font-medium max-w-xs">
                   <div>{request.title}</div>
-                  <div className="text-xs text-gray-500 truncate">{request.description}</div>
+                  <div className="text-xs text-gray-500 truncate">
+                    {request.description}
+                  </div>
                 </TableCell>
                 <TableCell>{tenant?.name}</TableCell>
                 <TableCell>
@@ -161,18 +242,25 @@ export function OwnerMaintenancePage() {
                   </div>
                 </TableCell>
                 <TableCell>
-                  <span className={`font-medium ${getPriorityColor(request.priority)}`}>
-                    {request.priority.charAt(0).toUpperCase() + request.priority.slice(1)}
+                  <span
+                    className={`font-medium ${getPriorityColor(request.priority)}`}
+                  >
+                    {request.priority.charAt(0).toUpperCase() +
+                      request.priority.slice(1)}
                   </span>
                 </TableCell>
                 <TableCell>
-                  <Badge variant={statusBadge.variant}>{statusBadge.label}</Badge>
+                  <Badge variant={statusBadge.variant}>
+                    {statusBadge.label}
+                  </Badge>
                 </TableCell>
                 <TableCell>
                   {costs.length > 0 ? (
                     <div>
                       <span className="font-semibold">LKR {totalCost}</span>
-                      <span className="text-xs text-gray-500 ml-1">({costs.length})</span>
+                      <span className="text-xs text-gray-500 ml-1">
+                        ({costs.length})
+                      </span>
                     </div>
                   ) : (
                     <span className="text-gray-400">-</span>
@@ -220,22 +308,24 @@ export function OwnerMaintenancePage() {
           })}
         </TableBody>
       </Table>
-      {
-        requests.length === 0 && (
-          <div className="py-12 text-center">
-            <Wrench className="size-12 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-600">No requests found</p>
-          </div>
-        )
-      }
-    </div >
+      {requests.length === 0 && (
+        <div className="py-12 text-center">
+          <Wrench className="size-12 text-gray-400 mx-auto mb-4" />
+          <p className="text-gray-600">No requests found</p>
+        </div>
+      )}
+    </div>
   );
 
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-semibold text-gray-900">Maintenance Management</h2>
-        <p className="text-sm text-gray-500 mt-1">Track and manage maintenance requests</p>
+        <h2 className="text-2xl font-semibold text-gray-900">
+          Maintenance Management
+        </h2>
+        <p className="text-sm text-gray-500 mt-1">
+          Track and manage maintenance requests
+        </p>
       </div>
 
       {/* Stats */}
@@ -248,7 +338,9 @@ export function OwnerMaintenancePage() {
                 <div className="flex items-start justify-between">
                   <div>
                     <p className="text-xs text-gray-600">{stat.label}</p>
-                    <p className={`text-2xl font-semibold mt-1 ${stat.color.split(' ')[1]}`}>
+                    <p
+                      className={`text-2xl font-semibold mt-1 ${stat.color.split(' ')[1]}`}
+                    >
                       {stat.value}
                     </p>
                   </div>
@@ -308,7 +400,9 @@ export function OwnerMaintenancePage() {
             <div className="space-y-4 mt-4">
               <div className="p-4 bg-gray-50 rounded-lg">
                 <p className="font-medium">{selectedRequest.title}</p>
-                <p className="text-sm text-gray-600 mt-1">{selectedRequest.description}</p>
+                <p className="text-sm text-gray-600 mt-1">
+                  {selectedRequest.description}
+                </p>
               </div>
               <div className="space-y-2">
                 <Label>Current Status</Label>
@@ -320,16 +414,28 @@ export function OwnerMaintenancePage() {
                 <Label>Update Status To</Label>
                 <div className="flex flex-col gap-2">
                   <Button
-                    variant={selectedRequest.status === 'in_progress' ? 'secondary' : 'outline'}
-                    onClick={() => handleUpdateStatus(selectedRequest, 'in_progress')}
+                    variant={
+                      selectedRequest.status === 'in_progress'
+                        ? 'secondary'
+                        : 'outline'
+                    }
+                    onClick={() =>
+                      handleUpdateStatus(selectedRequest, 'in_progress')
+                    }
                     disabled={selectedRequest.status === 'in_progress'}
                   >
                     <Wrench className="size-4 mr-2" />
                     Mark as In Progress
                   </Button>
                   <Button
-                    variant={selectedRequest.status === 'completed' ? 'secondary' : 'outline'}
-                    onClick={() => handleUpdateStatus(selectedRequest, 'completed')}
+                    variant={
+                      selectedRequest.status === 'completed'
+                        ? 'secondary'
+                        : 'outline'
+                    }
+                    onClick={() =>
+                      handleUpdateStatus(selectedRequest, 'completed')
+                    }
                     disabled={selectedRequest.status === 'completed'}
                   >
                     <CheckCircle className="size-4 mr-2" />
@@ -337,7 +443,9 @@ export function OwnerMaintenancePage() {
                   </Button>
                   <Button
                     variant="destructive"
-                    onClick={() => handleUpdateStatus(selectedRequest, 'cancelled')}
+                    onClick={() =>
+                      handleUpdateStatus(selectedRequest, 'cancelled')
+                    }
                     disabled={selectedRequest.status === 'cancelled'}
                   >
                     Cancel Request
@@ -359,7 +467,9 @@ export function OwnerMaintenancePage() {
             <form onSubmit={handleAddCost} className="space-y-4 mt-4">
               <div className="p-4 bg-gray-50 rounded-lg">
                 <p className="font-medium">{selectedRequest.title}</p>
-                <p className="text-sm text-gray-600 mt-1">{selectedRequest.description}</p>
+                <p className="text-sm text-gray-600 mt-1">
+                  {selectedRequest.description}
+                </p>
               </div>
 
               {/* Show existing costs */}
@@ -368,9 +478,39 @@ export function OwnerMaintenancePage() {
                   <p className="text-sm font-medium mb-2">Existing Costs:</p>
                   <div className="space-y-2">
                     {getRequestCosts(selectedRequest.id).map((cost) => (
-                      <div key={cost.id} className="flex justify-between text-sm">
-                        <span className="text-gray-600">{cost.description}</span>
-                        <span className="font-semibold">LKR {cost.amount}</span>
+                      <div
+                        key={cost.id}
+                        className="flex justify-between text-sm group items-center"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="text-gray-600">
+                            {cost.description}
+                          </span>
+                          <span className="text-gray-400 text-xs">
+                            ({cost.recordedDate})
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="font-semibold">
+                            LKR {cost.amount}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (
+                                confirm(
+                                  'Are you sure you want to delete this cost?'
+                                )
+                              ) {
+                                deleteMaintenanceCost(cost.id);
+                              }
+                            }}
+                            className="text-red-500 hover:text-red-700 opacity-0 group-hover:opacity-100 transition-opacity"
+                            title="Delete Cost"
+                          >
+                            <Trash2 className="size-3.5" />
+                          </button>
+                        </div>
                       </div>
                     ))}
                     <div className="pt-2 border-t flex justify-between font-semibold">
@@ -389,7 +529,9 @@ export function OwnerMaintenancePage() {
                   step="0.01"
                   placeholder="e.g., 150.00"
                   value={costFormData.amount}
-                  onChange={(e) => setCostFormData({ ...costFormData, amount: e.target.value })}
+                  onChange={(e) =>
+                    setCostFormData({ ...costFormData, amount: e.target.value })
+                  }
                   required
                 />
               </div>
@@ -399,7 +541,12 @@ export function OwnerMaintenancePage() {
                   id="cost-description"
                   placeholder="e.g., Parts and labor"
                   value={costFormData.description}
-                  onChange={(e) => setCostFormData({ ...costFormData, description: e.target.value })}
+                  onChange={(e) =>
+                    setCostFormData({
+                      ...costFormData,
+                      description: e.target.value,
+                    })
+                  }
                   required
                 />
               </div>
@@ -425,7 +572,10 @@ export function OwnerMaintenancePage() {
         </DialogContent>
       </Dialog>
       {/* View Details Dialog */}
-      <Dialog open={!!selectedRequest && !isStatusDialogOpen && !isCostDialogOpen} onOpenChange={(open) => !open && setSelectedRequest(null)}>
+      <Dialog
+        open={!!selectedRequest && !isStatusDialogOpen && !isCostDialogOpen}
+        onOpenChange={(open) => !open && setSelectedRequest(null)}
+      >
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Request Details</DialogTitle>
@@ -434,62 +584,95 @@ export function OwnerMaintenancePage() {
             <div className="space-y-6 mt-4">
               <div className="flex gap-4 items-start">
                 <div className="flex-1">
-                  <h3 className="text-xl font-semibold">{selectedRequest.title}</h3>
+                  <h3 className="text-xl font-semibold">
+                    {selectedRequest.title}
+                  </h3>
                   <div className="flex items-center gap-2 mt-2">
-                    <Badge variant={getStatusBadge(selectedRequest.status).variant}>
+                    <Badge
+                      variant={getStatusBadge(selectedRequest.status).variant}
+                    >
                       {getStatusBadge(selectedRequest.status).label}
                     </Badge>
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${selectedRequest.priority === 'urgent' ? 'bg-red-50 text-red-700 border-red-200' :
-                      selectedRequest.priority === 'high' ? 'bg-orange-50 text-orange-700 border-orange-200' :
-                        selectedRequest.priority === 'medium' ? 'bg-blue-50 text-blue-700 border-blue-200' :
-                          'bg-gray-50 text-gray-700 border-gray-200'
-                      }`}>
-                      {selectedRequest.priority.charAt(0).toUpperCase() + selectedRequest.priority.slice(1)} Priority
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-xs font-medium border ${
+                        selectedRequest.priority === 'urgent'
+                          ? 'bg-red-50 text-red-700 border-red-200'
+                          : selectedRequest.priority === 'high'
+                            ? 'bg-orange-50 text-orange-700 border-orange-200'
+                            : selectedRequest.priority === 'medium'
+                              ? 'bg-blue-50 text-blue-700 border-blue-200'
+                              : 'bg-gray-50 text-gray-700 border-gray-200'
+                      }`}
+                    >
+                      {selectedRequest.priority.charAt(0).toUpperCase() +
+                        selectedRequest.priority.slice(1)}{' '}
+                      Priority
                     </span>
                   </div>
                 </div>
                 <div className="text-right text-sm text-gray-500">
                   <p>Submitted: {selectedRequest.submittedDate}</p>
-                  {selectedRequest.completedDate && <p>Completed: {selectedRequest.completedDate}</p>}
+                  {selectedRequest.completedDate && (
+                    <p>Completed: {selectedRequest.completedDate}</p>
+                  )}
                 </div>
               </div>
 
               <div className="space-y-4">
                 <div>
-                  <h4 className="text-sm font-medium text-gray-900">Description</h4>
-                  <p className="text-sm text-gray-600 mt-1 p-3 bg-gray-50 rounded-md">{selectedRequest.description}</p>
+                  <h4 className="text-sm font-medium text-gray-900">
+                    Description
+                  </h4>
+                  <p className="text-sm text-gray-600 mt-1 p-3 bg-gray-50 rounded-md">
+                    {selectedRequest.description}
+                  </p>
                 </div>
 
                 {/* Images Section */}
-                {selectedRequest.images && selectedRequest.images.length > 0 && (
-                  <div>
-                    <h4 className="text-sm font-medium text-gray-900 mb-2">Attached Images ({selectedRequest.images.length})</h4>
-                    <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
-                      {selectedRequest.images.map((img, idx) => (
-                        <div key={idx} className="relative aspect-square rounded-md overflow-hidden bg-gray-100 border">
-                          <img
-                            src={img}
-                            alt={`Attachment ${idx + 1}`}
-                            className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
-                            onClick={() => window.open(img, '_blank')}
-                          />
-                        </div>
-                      ))}
+                {selectedRequest.images &&
+                  selectedRequest.images.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-900 mb-2">
+                        Attached Images ({selectedRequest.images.length})
+                      </h4>
+                      <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
+                        {selectedRequest.images.map((img, idx) => (
+                          <div
+                            key={idx}
+                            className="relative aspect-square rounded-md overflow-hidden bg-gray-100 border"
+                          >
+                            <img
+                              src={img}
+                              alt={`Attachment ${idx + 1}`}
+                              className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                              onClick={() => window.open(img, '_blank')}
+                            />
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="border rounded-lg p-3">
                   <h4 className="text-sm font-medium mb-1">Property Info</h4>
                   {(() => {
-                    const unit = units.find(u => u.id === selectedRequest.unitId);
-                    const property = unit ? properties.find(p => p.id === unit.propertyId) : null;
+                    const unit = units.find(
+                      (u) => u.id === selectedRequest.unitId
+                    );
+                    const property = unit
+                      ? properties.find((p) => p.id === unit.propertyId)
+                      : null;
                     return (
                       <div className="text-sm text-gray-600">
-                        <p className="font-medium text-gray-900">{property?.name}</p>
-                        <p>{property?.address}</p>
+                        <p className="font-medium text-gray-900">
+                          {property?.name}
+                        </p>
+                        <p>
+                          {property?.propertyNo} {property?.street},{' '}
+                          {property?.city} {property?.district}
+                        </p>
                         <p className="mt-1">Unit: {unit?.unitNumber}</p>
                       </div>
                     );
@@ -498,10 +681,14 @@ export function OwnerMaintenancePage() {
                 <div className="border rounded-lg p-3">
                   <h4 className="text-sm font-medium mb-1">Tenant Info</h4>
                   {(() => {
-                    const tenant = tenants.find(t => t.id === selectedRequest.tenantId);
+                    const tenant = tenants.find(
+                      (t) => t.id === selectedRequest.tenantId
+                    );
                     return (
                       <div className="text-sm text-gray-600">
-                        <p className="font-medium text-gray-900">{tenant?.name}</p>
+                        <p className="font-medium text-gray-900">
+                          {tenant?.name}
+                        </p>
                         <p>{tenant?.email}</p>
                       </div>
                     );
@@ -513,36 +700,53 @@ export function OwnerMaintenancePage() {
               <div className="border-t pt-4">
                 <div className="flex justify-between items-center mb-2">
                   <h4 className="font-medium">Maintenance Costs</h4>
-                  <span className="font-semibold">LKR {getTotalCost(selectedRequest.id)}</span>
+                  <span className="font-semibold">
+                    LKR {getTotalCost(selectedRequest.id)}
+                  </span>
                 </div>
                 {getRequestCosts(selectedRequest.id).length > 0 ? (
                   <div className="space-y-2 bg-gray-50 p-3 rounded-lg">
                     {getRequestCosts(selectedRequest.id).map((cost) => (
-                      <div key={cost.id} className="flex justify-between text-sm">
-                        <span className="text-gray-600">{cost.description}</span>
+                      <div
+                        key={cost.id}
+                        className="flex justify-between text-sm"
+                      >
+                        <span className="text-gray-600">
+                          {cost.description}
+                        </span>
                         <span className="font-medium">LKR {cost.amount}</span>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-sm text-gray-500 italic">No costs recorded yet.</p>
+                  <p className="text-sm text-gray-500 italic">
+                    No costs recorded yet.
+                  </p>
                 )}
               </div>
 
               <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setSelectedRequest(null)}>Close</Button>
-                {selectedRequest.status !== 'completed' && selectedRequest.status !== 'cancelled' && (
-                  <Button onClick={() => {
-                    // Convert view mode to edit mode by ensuring other flags are clear or setting a specific edit flag? 
-                    // Currently setSelectedRequest(null) closes everything. 
-                    // To switch to update status dialog, we keep selectedRequest but set isStatusDialogOpen to true.
-                    // But the main dialog 'open' condition is `!!selectedRequest && !isStatusDialogOpen && !isCostDialogOpen`.
-                    // So setting isStatusDialogOpen to true will hide this one and show the status one.
-                    setIsStatusDialogOpen(true);
-                  }}>
-                    Update Status
-                  </Button>
-                )}
+                <Button
+                  variant="outline"
+                  onClick={() => setSelectedRequest(null)}
+                >
+                  Close
+                </Button>
+                {selectedRequest.status !== 'completed' &&
+                  selectedRequest.status !== 'cancelled' && (
+                    <Button
+                      onClick={() => {
+                        // Convert view mode to edit mode by ensuring other flags are clear or setting a specific edit flag?
+                        // Currently setSelectedRequest(null) closes everything.
+                        // To switch to update status dialog, we keep selectedRequest but set isStatusDialogOpen to true.
+                        // But the main dialog 'open' condition is `!!selectedRequest && !isStatusDialogOpen && !isCostDialogOpen`.
+                        // So setting isStatusDialogOpen to true will hide this one and show the status one.
+                        setIsStatusDialogOpen(true);
+                      }}
+                    >
+                      Update Status
+                    </Button>
+                  )}
               </div>
             </div>
           )}

@@ -2,6 +2,8 @@ import React, { useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Download, Printer, CheckCircle } from 'lucide-react';
 import { Receipt } from '@/app/context/AppContext';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
 
 interface ReceiptViewerProps {
   receipt: Receipt | null;
@@ -11,6 +13,7 @@ interface ReceiptViewerProps {
   unitNumber: string;
   paymentMethod: string;
   paymentDate: string;
+  description: string;
   onClose?: () => void;
 }
 
@@ -22,13 +25,52 @@ export function ReceiptViewer({
   unitNumber,
   paymentMethod,
   paymentDate,
+  description,
   onClose,
 }: ReceiptViewerProps) {
   const receiptRef = useRef<HTMLDivElement>(null);
 
   if (!receipt) return null;
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
+    console.log('Download button clicked');
+    if (!receiptRef.current) {
+      console.error('Receipt ref is null');
+      return;
+    }
+
+    try {
+      console.log('Starting html2canvas capture...');
+      const canvas = await html2canvas(receiptRef.current, {
+        scale: 2, // Improve quality
+        logging: true, // Enable logging for html2canvas
+        useCORS: true,
+        backgroundColor: '#ffffff',
+      });
+      console.log('Canvas captured successfully');
+
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
+      });
+
+      const imgWidth = 210; // A4 width in mm
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+      pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+      pdf.save(`receipt-${receipt.receiptNumber}.pdf`);
+      console.log('PDF saved');
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert(
+        `Failed to generate PDF: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  };
+
+  const handlePrint = () => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
 
@@ -139,10 +181,6 @@ export function ReceiptViewer({
     }, 250);
   };
 
-  const handlePrint = () => {
-    handleDownload();
-  };
-
   return (
     <div className="max-w-3xl max-h-[90vh] overflow-y-auto">
       <div className="flex items-center justify-between">
@@ -159,13 +197,25 @@ export function ReceiptViewer({
         </div>
       </div>
 
-      <div ref={receiptRef} className="mt-4">
-        <div className="border-2 border-gray-900 p-8">
+      <div
+        ref={receiptRef}
+        className="mt-4 bg-white"
+        style={{ color: '#000000' }}
+      >
+        <div className="border-2 p-8" style={{ borderColor: '#111827' }}>
           {/* Header */}
-          <div className="text-center border-b-2 border-gray-900 pb-6 mb-8">
+          <div
+            className="text-center border-b-2 pb-6 mb-8"
+            style={{ borderColor: '#111827' }}
+          >
             <h1 className="text-3xl font-bold mb-2">PAYMENT RECEIPT</h1>
-            <div className="text-lg text-gray-600 mb-3">{receipt.receiptNumber}</div>
-            <div className="inline-flex items-center gap-2 bg-green-100 text-green-700 px-4 py-2 rounded-lg font-semibold">
+            <div className="text-lg mb-3" style={{ color: '#4b5563' }}>
+              {receipt.receiptNumber}
+            </div>
+            <div
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-semibold"
+              style={{ backgroundColor: '#d1fae5', color: '#047857' }}
+            >
               <CheckCircle className="size-5" />
               PAID
             </div>
@@ -174,33 +224,75 @@ export function ReceiptViewer({
           {/* Receipt Details */}
           <div className="grid grid-cols-2 gap-8 mb-8">
             <div>
-              <div className="text-xs font-semibold text-gray-600 uppercase mb-3">Receipt Information</div>
+              <div
+                className="text-xs font-semibold uppercase mb-3"
+                style={{ color: '#4b5563' }}
+              >
+                Receipt Information
+              </div>
               <div className="space-y-2 text-sm">
-                <div className="flex justify-between border-b border-gray-200 pb-2">
-                  <span className="text-gray-600">Receipt Date:</span>
-                  <span className="font-semibold text-right">{receipt.generatedDate}</span>
+                <div
+                  className="flex justify-between border-b pb-2"
+                  style={{ borderColor: '#e5e7eb' }}
+                >
+                  <span style={{ color: '#4b5563' }}>Receipt Date:</span>
+                  <span className="font-semibold text-right">
+                    {receipt.generatedDate}
+                  </span>
                 </div>
-                <div className="flex justify-between border-b border-gray-200 pb-2">
-                  <span className="text-gray-600">Payment Date:</span>
-                  <span className="font-semibold text-right">{paymentDate}</span>
+                <div
+                  className="flex justify-between border-b pb-2"
+                  style={{ borderColor: '#e5e7eb' }}
+                >
+                  <span style={{ color: '#4b5563' }}>Payment Date:</span>
+                  <span className="font-semibold text-right">
+                    {paymentDate}
+                  </span>
                 </div>
-                <div className="flex justify-between border-b border-gray-200 pb-2">
-                  <span className="text-gray-600">Payment Method:</span>
-                  <span className="font-semibold text-right">{paymentMethod}</span>
+                <div
+                  className="flex justify-between border-b pb-2"
+                  style={{ borderColor: '#e5e7eb' }}
+                >
+                  <span style={{ color: '#4b5563' }}>Payment Method:</span>
+                  <span className="font-semibold text-right">
+                    {paymentMethod}
+                  </span>
+                </div>
+                <div
+                  className="flex justify-between border-b pb-2"
+                  style={{ borderColor: '#e5e7eb' }}
+                >
+                  <span style={{ color: '#4b5563' }}>Payment For:</span>
+                  <span className="font-semibold text-right">
+                    {description}
+                  </span>
                 </div>
               </div>
             </div>
 
             <div>
-              <div className="text-xs font-semibold text-gray-600 uppercase mb-3">Tenant Information</div>
+              <div
+                className="text-xs font-semibold uppercase mb-3"
+                style={{ color: '#4b5563' }}
+              >
+                Tenant Information
+              </div>
               <div className="space-y-2 text-sm">
-                <div className="flex justify-between border-b border-gray-200 pb-2">
-                  <span className="text-gray-600">Name:</span>
+                <div
+                  className="flex justify-between border-b pb-2"
+                  style={{ borderColor: '#e5e7eb' }}
+                >
+                  <span style={{ color: '#4b5563' }}>Name:</span>
                   <span className="font-semibold text-right">{tenantName}</span>
                 </div>
-                <div className="flex justify-between border-b border-gray-200 pb-2">
-                  <span className="text-gray-600">Email:</span>
-                  <span className="font-semibold text-right">{tenantEmail}</span>
+                <div
+                  className="flex justify-between border-b pb-2"
+                  style={{ borderColor: '#e5e7eb' }}
+                >
+                  <span style={{ color: '#4b5563' }}>Email:</span>
+                  <span className="font-semibold text-right">
+                    {tenantEmail}
+                  </span>
                 </div>
               </div>
             </div>
@@ -208,31 +300,54 @@ export function ReceiptViewer({
 
           {/* Property Information */}
           <div className="mb-8">
-            <div className="text-xs font-semibold text-gray-600 uppercase mb-3">Property Information</div>
+            <div
+              className="text-xs font-semibold uppercase mb-3"
+              style={{ color: '#4b5563' }}
+            >
+              Property Information
+            </div>
             <div className="grid grid-cols-2 gap-4 text-sm">
-              <div className="flex justify-between border-b border-gray-200 pb-2">
-                <span className="text-gray-600">Property:</span>
+              <div
+                className="flex justify-between border-b pb-2"
+                style={{ borderColor: '#e5e7eb' }}
+              >
+                <span style={{ color: '#4b5563' }}>Property:</span>
                 <span className="font-semibold text-right">{propertyName}</span>
               </div>
-              <div className="flex justify-between border-b border-gray-200 pb-2">
-                <span className="text-gray-600">Unit Number:</span>
+              <div
+                className="flex justify-between border-b pb-2"
+                style={{ borderColor: '#e5e7eb' }}
+              >
+                <span style={{ color: '#4b5563' }}>Unit Number:</span>
                 <span className="font-semibold text-right">{unitNumber}</span>
               </div>
             </div>
           </div>
 
           {/* Amount Section */}
-          <div className="bg-gray-50 p-6 rounded-lg my-8">
+          <div
+            className="p-6 rounded-lg my-8"
+            style={{ backgroundColor: '#f9fafb' }}
+          >
             <div className="text-center">
-              <div className="text-sm text-gray-600 mb-2">Total Amount Paid</div>
-              <div className="text-4xl font-bold">LKR {receipt.amount.toLocaleString()}</div>
+              <div className="text-sm mb-2" style={{ color: '#4b5563' }}>
+                Total Amount Paid
+              </div>
+              <div className="text-4xl font-bold">
+                LKR {receipt.amount.toLocaleString()}
+              </div>
             </div>
           </div>
 
           {/* Footer */}
-          <div className="border-t-2 border-gray-900 pt-6 mt-8 text-center text-gray-600 text-xs">
+          <div
+            className="border-t-2 pt-6 mt-8 text-center text-xs"
+            style={{ borderColor: '#111827', color: '#4b5563' }}
+          >
             <p className="mb-2">This is an official payment receipt.</p>
-            <p>For any inquiries, please contact the property management office.</p>
+            <p>
+              For any inquiries, please contact the property management office.
+            </p>
             <p className="mt-4 font-semibold">Thank you for your payment!</p>
           </div>
         </div>
