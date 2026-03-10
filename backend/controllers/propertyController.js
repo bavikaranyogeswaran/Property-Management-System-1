@@ -44,11 +44,11 @@ class PropertyController {
         // Treasurer sees only assigned properties (unless browsing public)
         const staffModel = (await import('../models/staffModel.js')).default;
         properties = await staffModel.getAssignedProperties(req.user.id);
-      } else if (!isPublic && userId) {
-        // Owner (or other logged in user seeking "My Properties")
+      } else if (!isPublic && req.user && req.user.role === 'owner') {
+        // Owner sees only their own properties
         properties = await propertyService.getProperties(userId);
       } else {
-        // Public view or Guest
+        // Public view, Guest, or Tenant (tenants need to see all properties to look up their unit's info)
         properties = await propertyService.getProperties(null);
       }
 

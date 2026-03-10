@@ -88,12 +88,16 @@ import { OwnerInvoicesPage } from '@/components/pages/owner/OwnerInvoicesPage';
 import { OwnerMaintenancePage } from '@/components/pages/owner/OwnerMaintenancePage';
 import { OwnerReportsPage } from '@/components/pages/owner/OwnerReportsPage';
 import { VisitsPage } from '@/components/pages/owner/VisitsPage';
+import OwnerPayoutsPage from '@/components/pages/OwnerPayoutsPage';
+import { OwnerPaymentsPage } from '@/components/pages/owner/OwnerPaymentsPage';
 
 // Tenant Pages
 import { TenantDashboard } from '@/components/pages/tenant/TenantDashboard';
 import { TenantInvoicesPage } from '@/components/pages/tenant/TenantInvoicesPage';
 import { TenantMaintenancePage } from '@/components/pages/tenant/TenantMaintenancePage';
 import { TenantPaymentsPage } from '@/components/pages/tenant/TenantPaymentsPage';
+import { TenantLeasePage } from '@/components/pages/tenant/TenantLeasePage';
+import { TenantPaymentSummaryPage } from '@/components/pages/tenant/TenantPaymentSummaryPage';
 
 // Treasurer Pages
 import { TreasurerDashboard } from '@/components/pages/treasurer/TreasurerDashboard';
@@ -105,6 +109,7 @@ import { AnalyticsPage } from '@/components/reports/AnalyticsPage';
 import { SettingsPage } from '@/components/pages/common/SettingsPage';
 import { NotificationsPage } from '@/components/pages/common/NotificationsPage';
 import { ReceiptsPage } from '@/components/pages/common/ReceiptsPage';
+import { NotificationsPage } from '@/components/pages/common/NotificationsPage';
 import OwnerPayoutsPage from '@/components/pages/OwnerPayoutsPage';
 import { PublicListingPage } from '@/components/pages/public/PublicListingPage';
 import { PublicPropertyDetailsPage } from '@/components/pages/public/PublicPropertyDetailsPage';
@@ -324,10 +329,18 @@ function AppContent() {
             }
           />
           <Route
-            path="/receipts"
+            path="/payouts"
             element={
               <ProtectedRoute>
-                <ReceiptsPage />
+                <OwnerPayoutsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/payments"
+            element={
+              <ProtectedRoute>
+                <OwnerPaymentsPage />
               </ProtectedRoute>
             }
           />
@@ -381,6 +394,22 @@ function AppContent() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/my-lease"
+            element={
+              <ProtectedRoute>
+                <TenantLeasePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/payment-summary"
+            element={
+              <ProtectedRoute>
+                <TenantPaymentSummaryPage />
+              </ProtectedRoute>
+            }
+          />
         </>
       )}
 
@@ -412,6 +441,14 @@ function AppContent() {
             element={
               <ProtectedRoute>
                 <MaintenanceExpensesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/maintenance"
+            element={
+              <ProtectedRoute>
+                <OwnerMaintenancePage />
               </ProtectedRoute>
             }
           />

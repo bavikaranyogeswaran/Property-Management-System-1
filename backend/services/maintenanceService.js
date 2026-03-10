@@ -150,18 +150,22 @@ class MaintenanceService {
              const assignedPropertyIds = assigned.map((p) => p.property_id.toString());
              
              // Extract unique unit IDs from the requests
-             const unitIds = [...new Set(results.map(r => r.unit_id))];
+             const unitIds = [...new Set(results.map(r => r.unitId))];
              
              // Find properties for these units
              if (unitIds.length === 0) return [];
              const units = await Promise.all(unitIds.map(id => unitModel.findById(id)));
              const unitIdToPropertyId = {};
              units.forEach(u => {
-                 if(u) unitIdToPropertyId[u.unit_id] = u.propertyId.toString();
+                 if (u) unitIdToPropertyId[u.id] = u.propertyId.toString();
              });
              
+             console.log('Treasurer assignedPropertyIds:', assignedPropertyIds);
+             console.log('Treasurer unitIdToPropertyId:', unitIdToPropertyId);
+
              return results.filter((r) => {
-                 const propId = unitIdToPropertyId[r.unit_id];
+                 const propId = unitIdToPropertyId[r.unitId];
+                 console.log(`Checking request ${r.id} for unit ${r.unitId} -> propId: ${propId}`);
                  return assignedPropertyIds.includes(propId);
              });
          } else {

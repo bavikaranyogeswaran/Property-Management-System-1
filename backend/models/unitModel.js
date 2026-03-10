@@ -219,7 +219,9 @@ class UnitModel {
   }
 
   // Analytics optimized query to avoid O(N) memory buildup
-  async getOccupancyStats() {
+  async getOccupancyStats(propertyIds = []) {
+    if (!propertyIds || propertyIds.length === 0) return {};
+
     const [rows] = await db.query(
       `
       SELECT 
@@ -229,8 +231,10 @@ class UnitModel {
         GROUP_CONCAT(CASE WHEN u.status != 'occupied' THEN u.unit_number ELSE NULL END) AS vacancies
       FROM units u
       LEFT JOIN properties p ON u.property_id = p.property_id
+      WHERE u.property_id IN (?)
       GROUP BY u.property_id
-      `
+      `,
+      [propertyIds]
     );
 
     // Transform string vacancies back into array mapping Report Service expectations

@@ -34,15 +34,15 @@ export const TenantScoreCard: React.FC<TenantScoreCardProps> = ({ score }) => {
   };
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">
+    <Card className="h-full flex flex-col justify-center">
+      <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <CardTitle className="text-sm font-medium text-gray-700">
           Tenant Behavior Score
         </CardTitle>
         {getIcon(score)}
       </CardHeader>
       <CardContent>
-        <div className="text-2xl font-bold flex items-center gap-2">
+        <div className="text-3xl font-bold flex items-baseline gap-2">
           <span className={getStatusColor(score)}>{score}</span>
           <span className="text-muted-foreground text-sm font-normal">
             / 100

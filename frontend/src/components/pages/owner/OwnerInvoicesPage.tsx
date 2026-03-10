@@ -180,7 +180,11 @@ export function OwnerInvoicesPage() {
             <TableHead>Due Date</TableHead>
             <TableHead>Generated</TableHead>
             <TableHead>Status</TableHead>
-            <TableHead className="text-right">Actions</TableHead>
+            {/* Only show the Actions header if the user is a treasurer (who can use Cash Pay) 
+                or if we are exclusively viewing paid invoices (the Paid tab) */}
+            {(user?.role === 'treasurer' || (invoicesList.length > 0 && invoicesList.every(i => i.status === 'paid'))) && (
+              <TableHead className="text-right">Actions</TableHead>
+            )}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -264,64 +268,67 @@ export function OwnerInvoicesPage() {
                     )}
                   </div>
                 </TableCell>
-                <TableCell className="text-right flex items-center justify-end gap-2">
-                  {/* Cash Payment Button for Treasurer */}
-                  {user?.role === 'treasurer' && invoice.status !== 'paid' && (
-                    <Dialog>
-                      <DialogTrigger asChild>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="text-green-600 border-green-200 hover:bg-green-50"
-                        >
-                          <DollarSign className="size-3 mr-1" />
-                          Cash Pay
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent>
-                        <DialogHeader>
-                          <DialogTitle>Record Cash Payment</DialogTitle>
-                        </DialogHeader>
-                        <RecordCashPaymentForm
-                          invoice={invoice}
-                          tenantName={tenant?.name}
-                        />
-                      </DialogContent>
-                    </Dialog>
-                  )}
+                
+                {(user?.role === 'treasurer' || (invoicesList.length > 0 && invoicesList.every(i => i.status === 'paid'))) && (
+                  <TableCell className="text-right flex items-center justify-end gap-2">
+                    {/* Cash Payment Button for Treasurer */}
+                    {user?.role === 'treasurer' && invoice.status !== 'paid' && (
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-green-600 border-green-200 hover:bg-green-50"
+                          >
+                            <DollarSign className="size-3 mr-1" />
+                            Cash Pay
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Record Cash Payment</DialogTitle>
+                          </DialogHeader>
+                          <RecordCashPaymentForm
+                            invoice={invoice}
+                            tenantName={tenant?.name}
+                          />
+                        </DialogContent>
+                      </Dialog>
+                    )}
 
-                  {invoice.status === 'paid' &&
-                    receipt &&
-                    (() => {
-                      const receiptPayment = payments.find(
-                        (p) => p.id === receipt.paymentId
-                      );
-                      if (!receiptPayment || !tenant || !unit || !property)
-                        return null;
+                    {invoice.status === 'paid' &&
+                      receipt &&
+                      (() => {
+                        const receiptPayment = payments.find(
+                          (p) => p.id === receipt.paymentId
+                        );
+                        if (!receiptPayment || !tenant || !unit || !property)
+                          return null;
 
-                      return (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            setSelectedReceipt({
-                              receipt,
-                              tenantName: tenant.name,
-                              tenantEmail: tenant.email,
-                              propertyName: property.name,
-                              unitNumber: unit.unitNumber,
-                              paymentMethod: receiptPayment.paymentMethod,
-                              paymentDate: receiptPayment.paymentDate,
-                              description: invoice.description || 'Rent Payment',
-                            });
-                          }}
-                        >
-                          <Download className="size-4 mr-2" />
-                          Receipt
-                        </Button>
-                      );
-                    })()}
-                </TableCell>
+                        return (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setSelectedReceipt({
+                                receipt,
+                                tenantName: tenant.name,
+                                tenantEmail: tenant.email,
+                                propertyName: property.name,
+                                unitNumber: unit.unitNumber,
+                                paymentMethod: receiptPayment.paymentMethod,
+                                paymentDate: receiptPayment.paymentDate,
+                                description: invoice.description || 'Rent Payment',
+                              });
+                            }}
+                          >
+                            <Download className="size-4 mr-2" />
+                            Receipt
+                          </Button>
+                        );
+                      })()}
+                  </TableCell>
+                )}
               </TableRow>
             );
           })}

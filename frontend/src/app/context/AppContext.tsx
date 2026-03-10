@@ -181,7 +181,7 @@ export interface MaintenanceRequest {
   title: string;
   description: string;
   priority: 'low' | 'medium' | 'high' | 'urgent';
-  status: 'submitted' | 'in_progress' | 'completed';
+  status: 'submitted' | 'in_progress' | 'completed' | 'cancelled';
   submittedDate: string;
   completedDate?: string;
   images?: string[];
@@ -517,17 +517,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
         try {
           const mRes = await maintenanceApi.getRequests();
           if (mRes.data) {
-            const mappedRequests = mRes.data.map((r: any) => ({
-              id: r.request_id.toString(),
-              tenantId: r.tenant_id.toString(),
-              unitId: r.unit_id.toString(),
-              title: r.title,
-              description: r.description,
-              priority: r.priority,
-              status: r.status,
-              submittedDate: r.created_at ? r.created_at.split('T')[0] : '',
-              images: r.images,
-            }));
+            const mappedRequests = mRes.data.map((r: any) => {
+              const reqId = r.request_id || r.id;
+              const tenId = r.tenant_id || r.tenantId;
+              const unId = r.unit_id || r.unitId;
+              const createdDate = r.created_at || r.createdAt;
+              return {
+                id: reqId ? reqId.toString() : '',
+                tenantId: tenId ? tenId.toString() : '',
+                unitId: unId ? unId.toString() : '',
+                title: r.title,
+                description: r.description,
+                priority: r.priority,
+                status: r.status,
+                submittedDate: createdDate ? String(createdDate).split('T')[0] : '',
+                images: r.images,
+              };
+            });
             setMaintenanceRequests(mappedRequests);
           }
         } catch (e) {
@@ -559,46 +565,56 @@ export function AppProvider({ children }: { children: ReactNode }) {
         try {
           const invRes = await invoiceApi.getInvoices();
           if (invRes.data) {
-            const mappedInvoices = invRes.data.map((i: any) => ({
-              id: i.invoice_id.toString(),
-              leaseId: i.lease_id.toString(),
-              tenantId: i.tenant_id.toString(),
-              unitId: i.unit_id ? i.unit_id.toString() : '',
-              amount: parseFloat(i.amount),
-              amountPaid: typeof i.amount_paid !== 'undefined' ? parseFloat(i.amount_paid) : 0,
-              tenantName: i.tenant_name,
-              propertyName: i.property_name,
-              unitNumber: i.unit_number,
-              dueDate: i.due_date
-                ? new Date(i.due_date).toLocaleDateString('en-CA')
-                : '',
-              status: i.status,
-              description: i.description,
-              generatedDate: i.created_at
-                ? new Date(i.created_at).toLocaleDateString('en-CA')
-                : '',
-            }));
+            const mappedInvoices = invRes.data.map((i: any) => {
+              const invId = i.invoice_id || i.id || i.invoiceId;
+              const lsId = i.lease_id || i.leaseId;
+              const tenId = i.tenant_id || i.tenantId;
+              const unId = i.unit_id || i.unitId;
+              
+              return {
+                id: invId ? invId.toString() : '',
+                leaseId: lsId ? lsId.toString() : '',
+                tenantId: tenId ? tenId.toString() : '',
+                unitId: unId ? unId.toString() : '',
+                amount: parseFloat(i.amount),
+                amountPaid: typeof i.amount_paid !== 'undefined' ? parseFloat(i.amount_paid) : (typeof i.amountPaid !== 'undefined' ? parseFloat(i.amountPaid) : 0),
+                tenantName: i.tenant_name || i.tenantName,
+                propertyName: i.property_name || i.propertyName,
+                unitNumber: i.unit_number || i.unitNumber,
+                dueDate: i.due_date || i.dueDate
+                  ? new Date(i.due_date || i.dueDate).toLocaleDateString('en-CA')
+                  : '',
+                status: i.status,
+                description: i.description,
+                generatedDate: i.created_at || i.createdAt
+                  ? new Date(i.created_at || i.createdAt).toLocaleDateString('en-CA')
+                  : '',
+              };
+            });
             setInvoices(mappedInvoices);
           }
         } catch (e) {
           console.error('Failed to fetch invoices', e);
         }
 
-        // Fetch Payments (NEW)
         try {
           const payRes = await paymentApi.getPayments();
           if (payRes.data) {
             const mappedPayments = payRes.data.map((p: any) => ({
-              id: p.payment_id?.toString() || '', // Safe access
-              invoiceId: p.invoice_id?.toString() || '',
-              tenantId: p.tenant_id?.toString() || '',
+              id: p.id || p.payment_id?.toString() || '',
+              invoiceId: p.invoiceId || p.invoice_id?.toString() || '',
+              tenantId: p.tenantId || p.tenant_id?.toString() || '',
               amount: parseFloat(p.amount),
-              paymentDate: p.payment_date ? p.payment_date.split('T')[0] : '',
-              paymentMethod: p.payment_method,
-              referenceNumber: p.reference_number,
+              paymentDate: p.paymentDate
+                ? p.paymentDate.split('T')[0]
+                : p.payment_date
+                ? p.payment_date.split('T')[0]
+                : '',
+              paymentMethod: p.paymentMethod || p.payment_method,
+              referenceNumber: p.referenceNumber || p.reference_number,
               status: p.status,
-              submittedAt: p.created_at || '',
-              proofUrl: p.evidence_url,
+              submittedAt: p.createdAt || p.created_at || '',
+              proofUrl: p.receiptUrl || p.evidence_url || p.proof_url,
             }));
             setPayments(mappedPayments);
           }
@@ -1317,7 +1333,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const endLease = async (id: string) => {
     try {
-      await apiClient.put(`/leases/${id}/end`);
+      await apiClient.post(`/leases/${id}/terminate`);
       setLeases((prev) =>
         prev.map((l) => (l.id === id ? { ...l, status: 'ended' } : l))
       );
@@ -1330,6 +1346,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       console.error('Failed to end lease', e);
       toast.error('Failed to end lease');
+      throw e;
     }
   };
 
