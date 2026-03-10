@@ -2,89 +2,33 @@ import React from 'react';
 import { useApp } from '@/app/context/AppContext';
 import { useAuth } from '@/app/context/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Home,
-  FileText,
-  CreditCard,
-  Wrench,
-  AlertCircle,
-  CheckCircle,
-  MessageSquare,
-  History,
-} from 'lucide-react';
+import { Home, FileText, CreditCard, Wrench, AlertCircle, CheckCircle } from 'lucide-react';
 import { NotificationBanner } from '@/components/common/NotificationBanner';
-import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { ChatInterface } from '@/components/common/ChatInterface';
-import apiClient from '@/services/api';
 
 export function TenantDashboard() {
   const { user } = useAuth();
-  const {
-    units,
-    leases,
-    invoices,
-    payments,
-    receipts,
-    maintenanceRequests,
-    tenants,
-    notifications,
-  } = useApp();
-  const [leadHistory, setLeadHistory] = React.useState<any>(null);
-  const [isHistoryOpen, setIsHistoryOpen] = React.useState(false);
-
-  React.useEffect(() => {
-    // Fetch lead history
-    apiClient
-      .get('/leads/my-profile')
-      .then((res) => {
-        setLeadHistory(res.data);
-      })
-      .catch((err) => {
-        // Ignore if no history found
-        console.log('No application history found');
-      });
-  }, []);
+  const { units, leases, invoices, payments, receipts, maintenanceRequests, tenants, notifications } = useApp();
 
   // Find tenant's data - in real app, user.id would match tenant.id
-  const tenantLeases = leases.filter((l) => l.status === 'active');
+  const tenantLeases = leases.filter(l => l.status === 'active');
   const currentLease = tenantLeases[0]; // Simplified: assuming one active lease
 
   const tenantInvoices = invoices;
-  const pendingInvoices = tenantInvoices.filter((i) => i.status === 'pending');
-  const paidInvoices = tenantInvoices.filter((i) => i.status === 'paid');
+  const pendingInvoices = tenantInvoices.filter(i => i.status === 'pending');
+  const paidInvoices = tenantInvoices.filter(i => i.status === 'paid');
 
   const tenantPayments = payments;
-  const pendingPayments = tenantPayments.filter((p) => p.status === 'pending');
-  const verifiedPayments = tenantPayments.filter(
-    (p) => p.status === 'verified'
-  );
+  const pendingPayments = tenantPayments.filter(p => p.status === 'pending');
+  const verifiedPayments = tenantPayments.filter(p => p.status === 'verified');
 
   const tenantMaintenanceRequests = maintenanceRequests;
   const openRequests = tenantMaintenanceRequests.filter(
-    (r) => r.status === 'submitted' || r.status === 'in_progress'
+    r => r.status === 'submitted' || r.status === 'in_progress'
   );
 
-  const currentUnit = currentLease
-    ? units.find((u) => u.id === currentLease.unitId)
-    : null;
+  const currentUnit = currentLease ? units.find(u => u.id === currentLease.unitId) : null;
 
-  // Fix: Compare dates strictly (YYYY-MM-DD string comparison works if format is ISO)
-  // Use local date to avoid UTC shifts marking today's invoices as overdue
-  const d = new Date();
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  const todayStr = `${year}-${month}-${day}`;
-
-  const overdueInvoices = pendingInvoices.filter(
-    (inv) => inv.dueDate < todayStr
-  );
+  const overdueInvoices = pendingInvoices.filter(inv => new Date(inv.dueDate) < new Date());
   const totalDue = pendingInvoices.reduce((sum, inv) => sum + inv.amount, 0);
 
   const stats = [
@@ -125,24 +69,8 @@ export function TenantDashboard() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-semibold text-gray-900">
-          Tenant Dashboard
-        </h2>
-        <div className="flex justify-between items-center">
-          <p className="text-sm text-gray-500 mt-1">
-            Welcome back, {user?.name}
-          </p>
-          {leadHistory && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setIsHistoryOpen(true)}
-            >
-              <MessageSquare className="size-4 mr-2" />
-              Chat with Owner
-            </Button>
-          )}
-        </div>
+        <h2 className="text-2xl font-semibold text-gray-900">Tenant Dashboard</h2>
+        <p className="text-sm text-gray-500 mt-1">Welcome back, {user?.name}</p>
       </div>
 
       {/* Current Lease Info */}
@@ -155,9 +83,7 @@ export function TenantDashboard() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div>
                 <p className="text-sm text-gray-600">Unit Number</p>
-                <p className="text-lg font-semibold mt-1">
-                  {currentUnit.unitNumber}
-                </p>
+                <p className="text-lg font-semibold mt-1">{currentUnit.unitNumber}</p>
               </div>
               <div>
                 <p className="text-sm text-gray-600">Unit Type</p>
@@ -171,9 +97,7 @@ export function TenantDashboard() {
               </div>
               <div>
                 <p className="text-sm text-gray-600">Monthly Rent</p>
-                <p className="text-lg font-semibold mt-1">
-                  LKR {currentLease.monthlyRent}
-                </p>
+                <p className="text-lg font-semibold mt-1">LKR {currentLease.monthlyRent}</p>
               </div>
             </div>
           </CardContent>
@@ -192,9 +116,7 @@ export function TenantDashboard() {
                     <p className="text-sm text-gray-600">{stat.title}</p>
                     <p className="text-2xl font-semibold mt-2">{stat.value}</p>
                     {stat.subtitle && (
-                      <p className="text-xs text-gray-500 mt-1">
-                        {stat.subtitle}
-                      </p>
+                      <p className="text-xs text-gray-500 mt-1">{stat.subtitle}</p>
                     )}
                   </div>
                   <div className={`${stat.bgColor} p-3 rounded-lg`}>
@@ -222,12 +144,10 @@ export function TenantDashboard() {
               <AlertCircle className="size-5 text-red-600" />
               <div>
                 <p className="font-medium text-red-900">
-                  You have {overdueInvoices.length} overdue invoice
-                  {overdueInvoices.length > 1 ? 's' : ''}
+                  You have {overdueInvoices.length} overdue invoice{overdueInvoices.length > 1 ? 's' : ''}
                 </p>
                 <p className="text-sm text-red-700">
-                  Total amount: LKR{' '}
-                  {overdueInvoices.reduce((sum, inv) => sum + inv.amount, 0)}
+                  Total amount: LKR {overdueInvoices.reduce((sum, inv) => sum + inv.amount, 0)}
                 </p>
               </div>
             </div>
@@ -245,46 +165,28 @@ export function TenantDashboard() {
             {tenantInvoices.slice(0, 5).length > 0 ? (
               <div className="space-y-3">
                 {tenantInvoices.slice(0, 5).map((invoice) => {
-                  const unit = units.find((u) => u.id === invoice.unitId);
+                  const unit = units.find(u => u.id === invoice.unitId);
                   const isPaid = invoice.status === 'paid';
-                  // Fix: Compare dates only
-                  const isOverdue =
-                    invoice.status === 'pending' && invoice.dueDate < todayStr;
+                  const isOverdue = invoice.status === 'pending' && new Date(invoice.dueDate) < new Date();
                   return (
-                    <div
-                      key={invoice.id}
-                      className="flex justify-between items-center py-2 border-b last:border-0"
-                    >
+                    <div key={invoice.id} className="flex justify-between items-center py-2 border-b last:border-0">
                       <div className="flex items-center gap-3">
                         {isPaid ? (
                           <CheckCircle className="size-4 text-green-600" />
                         ) : (
-                          <AlertCircle
-                            className={`size-4 ${isOverdue ? 'text-red-600' : 'text-orange-600'}`}
-                          />
+                          <AlertCircle className={`size-4 ${isOverdue ? 'text-red-600' : 'text-orange-600'}`} />
                         )}
                         <div>
-                          <p className="text-sm font-medium">
-                            {invoice.description || `Unit ${unit?.unitNumber}`}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            Due: {invoice.dueDate}
-                          </p>
+                          <p className="text-sm font-medium">Unit {unit?.unitNumber}</p>
+                          <p className="text-xs text-gray-500">Due: {invoice.dueDate}</p>
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="text-sm font-semibold">
-                          LKR {invoice.amount}
-                        </p>
-                        <p
-                          className={`text-xs ${
-                            isPaid
-                              ? 'text-green-600'
-                              : isOverdue
-                                ? 'text-red-600'
-                                : 'text-orange-600'
-                          }`}
-                        >
+                        <p className="text-sm font-semibold">LKR {invoice.amount}</p>
+                        <p className={`text-xs ${isPaid ? 'text-green-600' :
+                            isOverdue ? 'text-red-600' :
+                              'text-orange-600'
+                          }`}>
                           {isPaid ? 'Paid' : isOverdue ? 'Overdue' : 'Pending'}
                         </p>
                       </div>
@@ -309,24 +211,16 @@ export function TenantDashboard() {
                   <div key={request.id} className="py-2 border-b last:border-0">
                     <div className="flex justify-between items-start mb-1">
                       <p className="text-sm font-medium">{request.title}</p>
-                      <span
-                        className={`text-xs px-2 py-1 rounded-full ${
-                          request.status === 'submitted'
-                            ? 'bg-yellow-100 text-yellow-800'
-                            : request.status === 'in_progress'
-                              ? 'bg-blue-100 text-blue-800'
-                              : request.status === 'completed'
-                                ? 'bg-green-100 text-green-800'
-                                : 'bg-gray-100 text-gray-800'
-                        }`}
-                      >
+                      <span className={`text-xs px-2 py-1 rounded-full ${request.status === 'submitted' ? 'bg-yellow-100 text-yellow-800' :
+                          request.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
+                            request.status === 'completed' ? 'bg-green-100 text-green-800' :
+                              'bg-gray-100 text-gray-800'
+                        }`}>
                         {request.status.replace('_', ' ')}
                       </span>
                     </div>
                     <p className="text-xs text-gray-500">
-                      {request.priority.charAt(0).toUpperCase() +
-                        request.priority.slice(1)}{' '}
-                      Priority - {request.submittedDate}
+                      {request.priority.charAt(0).toUpperCase() + request.priority.slice(1)} Priority - {request.submittedDate}
                     </p>
                   </div>
                 ))}
@@ -337,19 +231,6 @@ export function TenantDashboard() {
           </CardContent>
         </Card>
       </div>
-
-      <Dialog open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
-        <DialogContent className="max-w-3xl h-[80vh] flex flex-col p-6">
-          <DialogHeader>
-            <DialogTitle>Chat with Property Owner</DialogTitle>
-          </DialogHeader>
-          {leadHistory && (
-            <ChatInterface
-              leadId={leadHistory.id}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

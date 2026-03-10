@@ -2,38 +2,19 @@ import React, { useState } from 'react';
 import { useApp } from '@/app/context/AppContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import {
-  CheckCircle,
-  XCircle,
-  Eye,
-  CreditCard,
-  ExternalLink,
-} from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { CheckCircle, XCircle, Eye, CreditCard, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
 
 export function PaymentVerificationPage() {
-  const { payments, invoices, tenants, units, properties, verifyPayment } =
-    useApp();
+  const { payments, invoices, tenants, units, properties, verifyPayment } = useApp();
   const [selectedPayment, setSelectedPayment] = useState<string | null>(null);
 
-  const pendingPayments = payments.filter((p) => p.status === 'pending');
-  const verifiedPayments = payments.filter((p) => p.status === 'verified');
-  const rejectedPayments = payments.filter((p) => p.status === 'rejected');
+  const pendingPayments = payments.filter(p => p.status === 'pending');
+  const verifiedPayments = payments.filter(p => p.status === 'verified');
+  const rejectedPayments = payments.filter(p => p.status === 'rejected');
 
   const handleVerify = (paymentId: string, approved: boolean) => {
     verifyPayment(paymentId, approved);
@@ -54,9 +35,7 @@ export function PaymentVerificationPage() {
     },
     {
       label: 'Verified Today',
-      value: verifiedPayments.filter((p) =>
-        p.submittedAt.startsWith(new Date().toISOString().split('T')[0])
-      ).length,
+      value: verifiedPayments.filter(p => p.submittedAt.startsWith(new Date().toISOString().split('T')[0])).length,
       color: 'bg-green-50 text-green-700',
     },
     {
@@ -73,21 +52,16 @@ export function PaymentVerificationPage() {
   ];
 
   const PaymentDetailsDialog = () => {
-    const payment = payments.find((p) => p.id === selectedPayment);
+    const payment = payments.find(p => p.id === selectedPayment);
     if (!payment) return null;
 
-    const invoice = invoices.find((i) => i.id === payment.invoiceId);
-    const tenant = tenants.find((t) => t.id === payment.tenantId);
-    const unit = invoice ? units.find((u) => u.id === invoice.unitId) : null;
-    const property = unit
-      ? properties.find((p) => p.id === unit.propertyId)
-      : null;
+    const invoice = invoices.find(i => i.id === payment.invoiceId);
+    const tenant = tenants.find(t => t.id === payment.tenantId);
+    const unit = invoice ? units.find(u => u.id === invoice.unitId) : null;
+    const property = unit ? properties.find(p => p.id === unit.propertyId) : null;
 
     return (
-      <Dialog
-        open={!!selectedPayment}
-        onOpenChange={(open) => !open && setSelectedPayment(null)}
-      >
+      <Dialog open={!!selectedPayment} onOpenChange={(open) => !open && setSelectedPayment(null)}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Payment Details</DialogTitle>
@@ -95,9 +69,7 @@ export function PaymentVerificationPage() {
           <div className="space-y-6 mt-4">
             {/* Payment Information */}
             <div>
-              <h3 className="font-medium text-sm text-gray-700 mb-3">
-                Payment Information
-              </h3>
+              <h3 className="font-medium text-sm text-gray-700 mb-3">Payment Information</h3>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-gray-600">Payment ID</p>
@@ -128,9 +100,7 @@ export function PaymentVerificationPage() {
               {/* Payment Proof */}
               {payment.proofUrl && (
                 <div className="mt-4 p-3 bg-blue-50 border border-blue-100 rounded-md">
-                  <p className="text-xs font-medium text-blue-800 mb-2 uppercase tracking-wide">
-                    Payment Proof
-                  </p>
+                  <p className="text-xs font-medium text-blue-800 mb-2 uppercase tracking-wide">Payment Proof</p>
                   <Button
                     variant="outline"
                     className="w-full bg-white hover:bg-blue-50 text-blue-700 border-blue-200"
@@ -148,9 +118,7 @@ export function PaymentVerificationPage() {
 
             {/* Tenant Information */}
             <div className="border-t pt-4">
-              <h3 className="font-medium text-sm text-gray-700 mb-3">
-                Tenant Information
-              </h3>
+              <h3 className="font-medium text-sm text-gray-700 mb-3">Tenant Information</h3>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-gray-600">Name</p>
@@ -170,9 +138,7 @@ export function PaymentVerificationPage() {
             {/* Property Information */}
             {property && unit && (
               <div className="border-t pt-4">
-                <h3 className="font-medium text-sm text-gray-700 mb-3">
-                  Property Information
-                </h3>
+                <h3 className="font-medium text-sm text-gray-700 mb-3">Property Information</h3>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-gray-600">Property</p>
@@ -189,9 +155,7 @@ export function PaymentVerificationPage() {
             {/* Invoice Information */}
             {invoice && (
               <div className="border-t pt-4">
-                <h3 className="font-medium text-sm text-gray-700 mb-3">
-                  Invoice Information
-                </h3>
+                <h3 className="font-medium text-sm text-gray-700 mb-3">Invoice Information</h3>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-gray-600">Invoice ID</p>
@@ -207,11 +171,7 @@ export function PaymentVerificationPage() {
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">Invoice Status</p>
-                    <Badge
-                      variant={
-                        invoice.status === 'paid' ? 'default' : 'secondary'
-                      }
-                    >
+                    <Badge variant={invoice.status === 'paid' ? 'default' : 'secondary'}>
                       {invoice.status}
                     </Badge>
                   </div>
@@ -229,7 +189,9 @@ export function PaymentVerificationPage() {
                   <XCircle className="size-4 mr-2" />
                   Reject Payment
                 </Button>
-                <Button onClick={() => handleVerify(payment.id, true)}>
+                <Button
+                  onClick={() => handleVerify(payment.id, true)}
+                >
                   <CheckCircle className="size-4 mr-2" />
                   Approve Payment
                 </Button>
@@ -244,12 +206,8 @@ export function PaymentVerificationPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-semibold text-gray-900">
-          Payment Verification
-        </h2>
-        <p className="text-sm text-gray-500 mt-1">
-          Review and verify tenant payments
-        </p>
+        <h2 className="text-2xl font-semibold text-gray-900">Payment Verification</h2>
+        <p className="text-sm text-gray-500 mt-1">Review and verify tenant payments</p>
       </div>
 
       {/* Stats */}
@@ -258,9 +216,7 @@ export function PaymentVerificationPage() {
           <Card key={index}>
             <CardContent className="p-4">
               <p className="text-xs text-gray-600">{stat.label}</p>
-              <p
-                className={`text-2xl font-semibold mt-1 ${stat.color.split(' ')[1]}`}
-              >
+              <p className={`text-2xl font-semibold mt-1 ${stat.color.split(' ')[1]}`}>
                 {stat.value}
               </p>
               {stat.subtitle && (
@@ -295,40 +251,24 @@ export function PaymentVerificationPage() {
               </TableHeader>
               <TableBody>
                 {pendingPayments.map((payment) => {
-                  const tenant = tenants.find((t) => t.id === payment.tenantId);
-                  const invoice = invoices.find(
-                    (i) => i.id === payment.invoiceId
-                  );
-                  const unit = invoice
-                    ? units.find((u) => u.id === invoice.unitId)
-                    : null;
-                  const property = unit
-                    ? properties.find((p) => p.id === unit.propertyId)
-                    : null;
+                  const tenant = tenants.find(t => t.id === payment.tenantId);
+                  const invoice = invoices.find(i => i.id === payment.invoiceId);
+                  const unit = invoice ? units.find(u => u.id === invoice.unitId) : null;
+                  const property = unit ? properties.find(p => p.id === unit.propertyId) : null;
 
                   return (
                     <TableRow key={payment.id}>
-                      <TableCell>
-                        {new Date(payment.submittedAt).toLocaleDateString()}
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        {tenant?.name}
-                      </TableCell>
+                      <TableCell>{new Date(payment.submittedAt).toLocaleDateString()}</TableCell>
+                      <TableCell className="font-medium">{tenant?.name}</TableCell>
                       <TableCell>
                         <div className="text-sm">
                           <div>{property?.name}</div>
-                          <div className="text-gray-500">
-                            Unit {unit?.unitNumber}
-                          </div>
+                          <div className="text-gray-500">Unit {unit?.unitNumber}</div>
                         </div>
                       </TableCell>
-                      <TableCell className="font-semibold">
-                        LKR {payment.amount}
-                      </TableCell>
+                      <TableCell className="font-semibold">LKR {payment.amount}</TableCell>
                       <TableCell>{payment.paymentMethod}</TableCell>
-                      <TableCell className="font-mono text-sm">
-                        {payment.referenceNumber}
-                      </TableCell>
+                      <TableCell className="font-mono text-sm">{payment.referenceNumber}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex gap-2 justify-end">
                           <Button
@@ -362,9 +302,7 @@ export function PaymentVerificationPage() {
               <div className="py-12 text-center">
                 <CreditCard className="size-12 text-gray-400 mx-auto mb-4" />
                 <p className="text-gray-600">No pending payments</p>
-                <p className="text-sm text-gray-500 mt-1">
-                  All payments have been processed
-                </p>
+                <p className="text-sm text-gray-500 mt-1">All payments have been processed</p>
               </div>
             )}
           </div>
@@ -381,25 +319,16 @@ export function PaymentVerificationPage() {
             {verifiedPayments.slice(0, 5).length > 0 ? (
               <div className="space-y-3">
                 {verifiedPayments.slice(0, 5).map((payment) => {
-                  const tenant = tenants.find((t) => t.id === payment.tenantId);
+                  const tenant = tenants.find(t => t.id === payment.tenantId);
                   return (
-                    <div
-                      key={payment.id}
-                      className="flex justify-between items-center py-2 border-b last:border-0"
-                    >
+                    <div key={payment.id} className="flex justify-between items-center py-2 border-b last:border-0">
                       <div>
                         <p className="text-sm font-medium">{tenant?.name}</p>
-                        <p className="text-xs text-gray-500">
-                          {payment.paymentMethod}
-                        </p>
+                        <p className="text-xs text-gray-500">{payment.paymentMethod}</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-sm font-semibold">
-                          LKR {payment.amount}
-                        </p>
-                        <Badge variant="default" className="text-xs">
-                          Verified
-                        </Badge>
+                        <p className="text-sm font-semibold">LKR {payment.amount}</p>
+                        <Badge variant="default" className="text-xs">Verified</Badge>
                       </div>
                     </div>
                   );
@@ -419,25 +348,16 @@ export function PaymentVerificationPage() {
             {rejectedPayments.slice(0, 5).length > 0 ? (
               <div className="space-y-3">
                 {rejectedPayments.slice(0, 5).map((payment) => {
-                  const tenant = tenants.find((t) => t.id === payment.tenantId);
+                  const tenant = tenants.find(t => t.id === payment.tenantId);
                   return (
-                    <div
-                      key={payment.id}
-                      className="flex justify-between items-center py-2 border-b last:border-0"
-                    >
+                    <div key={payment.id} className="flex justify-between items-center py-2 border-b last:border-0">
                       <div>
                         <p className="text-sm font-medium">{tenant?.name}</p>
-                        <p className="text-xs text-gray-500">
-                          {payment.paymentMethod}
-                        </p>
+                        <p className="text-xs text-gray-500">{payment.paymentMethod}</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-sm font-semibold">
-                          LKR {payment.amount}
-                        </p>
-                        <Badge variant="destructive" className="text-xs">
-                          Rejected
-                        </Badge>
+                        <p className="text-sm font-semibold">LKR {payment.amount}</p>
+                        <Badge variant="destructive" className="text-xs">Rejected</Badge>
                       </div>
                     </div>
                   );

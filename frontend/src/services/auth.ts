@@ -1,121 +1,80 @@
+// Authentication service
+// Handles login, registration, and authentication state
+
 import storage from './storage';
-import { apiClient } from './api';
 
 export interface LoginCredentials {
-  email: string;
-  password: string;
+    email: string;
+    password: string;
 }
 
-// ============================================================================
-//  AUTH SERVICE (The Login Helper)
-// ============================================================================
-//  This file handles the actual Login process.
-//  It sends the Email/Password to the server and saves the "Key" (Token) if valid.
-// ============================================================================
+export interface RegisterData {
+    email: string;
+    password: string;
+    name: string;
+    role: 'owner' | 'tenant' | 'treasurer';
+}
 
 export const authService = {
-  // Real login with backend
-  login: async (credentials: LoginCredentials) => {
-    try {
-      const response = await apiClient.post('/auth/login', credentials);
-      const { token, user } = response.data;
+    // Mock login - will be replaced with real API calls
+    login: async (credentials: LoginCredentials) => {
+        // Simulate API call
+        await new Promise((resolve) => setTimeout(resolve, 500));
 
-      if (token && user) {
-        storage.setToken(token);
-        storage.setUser(user);
-        return { token, user };
-      }
-      throw new Error('Invalid response from server');
-    } catch (error) {
-      console.error('Login error:', error);
-      throw error;
-    }
-  },
+        // Mock user data based on email
+        const mockUser = {
+            id: '1',
+            email: credentials.email,
+            name: credentials.email.split('@')[0],
+            role: credentials.email.includes('owner')
+                ? 'owner'
+                : credentials.email.includes('tenant')
+                    ? 'tenant'
+                    : 'treasurer',
+        };
 
-  // Logout
-  logout: () => {
-    storage.clear();
-  },
+        const mockToken = 'mock-jwt-token-' + Date.now();
 
-  // Get current user from storage
-  getCurrentUser: () => {
-    return storage.getUser();
-  },
+        storage.setToken(mockToken);
+        storage.setUser(mockUser);
 
-  // Check if user is authenticated
-  isAuthenticated: () => {
-    const token = storage.getToken();
-    if (!token) return false;
+        return { user: mockUser, token: mockToken };
+    },
 
-    try {
-      const payload = JSON.parse(atob(token.split('.')[1]));
-      const expiry = payload.exp * 1000;
-      
-      if (Date.now() >= expiry) {
+    // Mock registration
+    register: async (data: RegisterData) => {
+        // Simulate API call
+        await new Promise((resolve) => setTimeout(resolve, 500));
+
+        const mockUser = {
+            id: Date.now().toString(),
+            email: data.email,
+            name: data.name,
+            role: data.role,
+        };
+
+        const mockToken = 'mock-jwt-token-' + Date.now();
+
+        storage.setToken(mockToken);
+        storage.setUser(mockUser);
+
+        return { user: mockUser, token: mockToken };
+    },
+
+    // Logout
+    logout: () => {
         storage.clear();
-        return false;
-      }
-      return true;
-    } catch (error) {
-      storage.clear();
-      return false;
-    }
-  },
+    },
 
-  getTokenRemainingTime: () => {
-    const token = storage.getToken();
-    if (!token) return 0;
-    try {
-      const payload = JSON.parse(atob(token.split('.')[1]));
-      return Math.max(0, payload.exp * 1000 - Date.now());
-    } catch (error) {
-      return 0;
-    }
-  },
+    // Get current user from storage
+    getCurrentUser: () => {
+        return storage.getUser();
+    },
 
-  // Password Reset
-  forgotPassword: async (email: string) => {
-    const response = await apiClient.post('/auth/forgot-password', { email });
-    return response.data;
-  },
-
-  resetPassword: async (token: string, newPassword: string) => {
-    const response = await apiClient.post('/auth/reset-password', {
-      token,
-      newPassword,
-    });
-    return response.data;
-  },
-
-  updateProfile: async (data: any) => {
-    const response = await apiClient.put('/users/profile', data);
-    // Update local storage if user details changed
-    const currentUser = storage.getUser();
-    if (currentUser) {
-      const updatedUser = { ...currentUser, ...response.data };
-      storage.setUser(updatedUser);
-    }
-    return response.data;
-  },
-
-  changePassword: async (data: any) => {
-    const response = await apiClient.post('/auth/change-password', data);
-    return response.data;
-  },
-
-  verifyEmail: async (token: string) => {
-    const response = await apiClient.post('/auth/verify-email', { token });
-    return response.data;
-  },
-
-  setupPassword: async (token: string, password: string, tenantData?: any) => {
-    const response = await apiClient.post('/auth/setup-password', {
-      token,
-      password,
-      tenantData,
-    });
-    return response.data;
-  },
+    // Check if user is authenticated
+    isAuthenticated: () => {
+        return !!storage.getToken();
+    },
 };
 
 export default authService;

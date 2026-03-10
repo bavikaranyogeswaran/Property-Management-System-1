@@ -1,36 +1,13 @@
 import React, { useState } from 'react';
-import {
-  useApp,
-  Payment,
-  Receipt as ReceiptType,
-} from '@/app/context/AppContext';
+import { useApp, Payment, Receipt as ReceiptType } from '@/app/context/AppContext';
 import { useAuth } from '@/app/context/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  CreditCard,
-  CheckCircle,
-  Clock,
-  XCircle,
-  Download,
-  FileText,
-} from 'lucide-react';
+import { CreditCard, CheckCircle, Clock, XCircle, Download, FileText } from 'lucide-react';
 import { ReceiptViewer } from '@/components/common/ReceiptViewer';
 
 export function TenantPaymentsPage() {
@@ -44,19 +21,14 @@ export function TenantPaymentsPage() {
     unitNumber: string;
     paymentMethod: string;
     paymentDate: string;
-    description: string;
   } | null>(null);
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
 
   // In a real app, filter by actual tenant ID
   const tenantPayments = payments;
-  const verifiedPayments = tenantPayments.filter(
-    (p) => p.status === 'verified'
-  );
-  const pendingPayments = tenantPayments.filter((p) => p.status === 'pending');
-  const rejectedPayments = tenantPayments.filter(
-    (p) => p.status === 'rejected'
-  );
+  const verifiedPayments = tenantPayments.filter(p => p.status === 'verified');
+  const pendingPayments = tenantPayments.filter(p => p.status === 'pending');
+  const rejectedPayments = tenantPayments.filter(p => p.status === 'rejected');
 
   const totalPaid = verifiedPayments.reduce((sum, p) => sum + p.amount, 0);
 
@@ -89,77 +61,59 @@ export function TenantPaymentsPage() {
   ];
 
   const getPaymentInvoice = (paymentId: string) => {
-    const payment = payments.find((p) => p.id === paymentId);
-    return payment ? invoices.find((i) => i.id === payment.invoiceId) : null;
+    const payment = payments.find(p => p.id === paymentId);
+    return payment ? invoices.find(i => i.id === payment.invoiceId) : null;
   };
 
   const getPaymentReceipt = (paymentId: string) => {
-    return receipts.find((r) => r.paymentId === paymentId);
+    return receipts.find(r => r.paymentId === paymentId);
   };
 
   const PaymentRow = ({ payment }: { payment: Payment }) => {
     const invoice = getPaymentInvoice(payment.id);
-    const unit = invoice ? units.find((u) => u.id === invoice.unitId) : null;
-    const property = unit
-      ? properties.find((p) => p.id === unit.propertyId)
-      : null;
+    const unit = invoice ? units.find(u => u.id === invoice.unitId) : null;
+    const property = unit ? properties.find(p => p.id === unit.propertyId) : null;
     const receipt = getPaymentReceipt(payment.id);
-    const tenant = tenants.find((t) => t.id === payment.tenantId);
+    const tenant = tenants.find(t => t.id === payment.tenantId);
 
     return (
       <TableRow>
         <TableCell>
           <div className="font-medium">{payment.paymentDate}</div>
-          <div className="text-xs text-gray-500">
-            Submitted: {payment.submittedAt}
-          </div>
+          <div className="text-xs text-gray-500">Submitted: {payment.submittedAt}</div>
         </TableCell>
         <TableCell>
           <div className="text-sm">
             <div className="font-medium">{property?.name || 'N/A'}</div>
-            <div className="text-gray-500">
-              Unit {unit?.unitNumber || 'N/A'}
-            </div>
+            <div className="text-gray-500">Unit {unit?.unitNumber || 'N/A'}</div>
           </div>
         </TableCell>
         <TableCell className="font-semibold">LKR {payment.amount}</TableCell>
         <TableCell>
           <div className="text-sm">
             <div className="font-medium">{payment.paymentMethod}</div>
-            <div className="text-gray-500 text-xs">
-              Ref: {payment.referenceNumber}
-            </div>
+            <div className="text-gray-500 text-xs">Ref: {payment.referenceNumber}</div>
           </div>
         </TableCell>
         <TableCell>
           <Badge
             variant={
-              payment.status === 'verified'
-                ? 'default'
-                : payment.status === 'pending'
-                  ? 'secondary'
-                  : 'destructive'
+              payment.status === 'verified' ? 'default' :
+                payment.status === 'pending' ? 'secondary' :
+                  'destructive'
             }
             className={
-              payment.status === 'verified'
-                ? 'bg-green-100 text-green-700'
-                : payment.status === 'pending'
-                  ? 'bg-orange-100 text-orange-700'
-                  : 'bg-red-100 text-red-700'
+              payment.status === 'verified' ? 'bg-green-100 text-green-700' :
+                payment.status === 'pending' ? 'bg-orange-100 text-orange-700' :
+                  'bg-red-100 text-red-700'
             }
           >
             {payment.status === 'verified' ? (
-              <>
-                <CheckCircle className="size-3 mr-1" /> Verified
-              </>
+              <><CheckCircle className="size-3 mr-1" /> Verified</>
             ) : payment.status === 'pending' ? (
-              <>
-                <Clock className="size-3 mr-1" /> Pending
-              </>
+              <><Clock className="size-3 mr-1" /> Pending</>
             ) : (
-              <>
-                <XCircle className="size-3 mr-1" /> Rejected
-              </>
+              <><XCircle className="size-3 mr-1" /> Rejected</>
             )}
           </Badge>
         </TableCell>
@@ -172,31 +126,26 @@ export function TenantPaymentsPage() {
             >
               View Details
             </Button>
-            {payment.status === 'verified' &&
-              receipt &&
-              tenant &&
-              unit &&
-              property && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    setSelectedReceipt({
-                      receipt,
-                      tenantName: tenant.name,
-                      tenantEmail: tenant.email,
-                      propertyName: property.name,
-                      unitNumber: unit.unitNumber,
-                      paymentMethod: payment.paymentMethod,
-                      paymentDate: payment.paymentDate,
-                      description: invoice?.description || 'Rent Payment',
-                    });
-                  }}
-                >
-                  <Download className="size-4 mr-2" />
-                  Receipt
-                </Button>
-              )}
+            {payment.status === 'verified' && receipt && tenant && unit && property && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setSelectedReceipt({
+                    receipt,
+                    tenantName: tenant.name,
+                    tenantEmail: tenant.email,
+                    propertyName: property.name,
+                    unitNumber: unit.unitNumber,
+                    paymentMethod: payment.paymentMethod,
+                    paymentDate: payment.paymentDate,
+                  });
+                }}
+              >
+                <Download className="size-4 mr-2" />
+                Receipt
+              </Button>
+            )}
           </div>
         </TableCell>
       </TableRow>
@@ -207,9 +156,7 @@ export function TenantPaymentsPage() {
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-semibold text-gray-900">My Payments</h2>
-        <p className="text-sm text-gray-500 mt-1">
-          View your payment history and status
-        </p>
+        <p className="text-sm text-gray-500 mt-1">View your payment history and status</p>
       </div>
 
       {/* Stats */}
@@ -222,20 +169,14 @@ export function TenantPaymentsPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs text-gray-600">{stat.label}</p>
-                    <p
-                      className={`text-2xl font-semibold mt-1 ${stat.color.split(' ')[1]}`}
-                    >
+                    <p className={`text-2xl font-semibold mt-1 ${stat.color.split(' ')[1]}`}>
                       {stat.value}
                     </p>
                     {stat.subtitle && (
-                      <p className="text-xs text-gray-500 mt-1">
-                        {stat.subtitle}
-                      </p>
+                      <p className="text-xs text-gray-500 mt-1">{stat.subtitle}</p>
                     )}
                   </div>
-                  <Icon
-                    className={`size-8 ${stat.color.split(' ')[1]} opacity-20`}
-                  />
+                  <Icon className={`size-8 ${stat.color.split(' ')[1]} opacity-20`} />
                 </div>
               </CardContent>
             </Card>
@@ -251,12 +192,10 @@ export function TenantPaymentsPage() {
               <Clock className="size-5 text-orange-600" />
               <div>
                 <p className="font-medium text-orange-900">
-                  You have {pendingPayments.length} payment
-                  {pendingPayments.length > 1 ? 's' : ''} awaiting verification
+                  You have {pendingPayments.length} payment{pendingPayments.length > 1 ? 's' : ''} awaiting verification
                 </p>
                 <p className="text-sm text-orange-700 mt-1">
-                  Your payments are being reviewed by the treasurer and will be
-                  verified soon.
+                  Your payments are being reviewed by the treasurer and will be verified soon.
                 </p>
               </div>
             </div>
@@ -314,9 +253,7 @@ export function TenantPaymentsPage() {
                   <div className="py-12 text-center">
                     <CreditCard className="size-12 text-gray-400 mx-auto mb-4" />
                     <p className="text-gray-600">No payments yet</p>
-                    <p className="text-sm text-gray-500 mt-1">
-                      Your payment history will appear here
-                    </p>
+                    <p className="text-sm text-gray-500 mt-1">Your payment history will appear here</p>
                   </div>
                 )}
               </div>
@@ -409,132 +346,101 @@ export function TenantPaymentsPage() {
       </Card>
 
       {/* Payment Details Dialog */}
-      <Dialog
-        open={!!selectedPayment}
-        onOpenChange={(open) => !open && setSelectedPayment(null)}
-      >
+      <Dialog open={!!selectedPayment} onOpenChange={(open) => !open && setSelectedPayment(null)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Payment Details</DialogTitle>
           </DialogHeader>
-          {selectedPayment &&
-            (() => {
-              const invoice = getPaymentInvoice(selectedPayment.id);
-              const unit = invoice
-                ? units.find((u) => u.id === invoice.unitId)
-                : null;
-              const property = unit
-                ? properties.find((p) => p.id === unit.propertyId)
-                : null;
-              const receipt = getPaymentReceipt(selectedPayment.id);
+          {selectedPayment && (() => {
+            const invoice = getPaymentInvoice(selectedPayment.id);
+            const unit = invoice ? units.find(u => u.id === invoice.unitId) : null;
+            const property = unit ? properties.find(p => p.id === unit.propertyId) : null;
+            const receipt = getPaymentReceipt(selectedPayment.id);
 
-              return (
-                <div className="space-y-4 mt-4">
-                  {/* Status */}
-                  <div className="p-4 bg-gray-50 rounded-lg">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600">
-                        Payment Status
-                      </span>
-                      <Badge
-                        variant={
-                          selectedPayment.status === 'verified'
-                            ? 'default'
-                            : selectedPayment.status === 'pending'
-                              ? 'secondary'
-                              : 'destructive'
-                        }
-                        className={
-                          selectedPayment.status === 'verified'
-                            ? 'bg-green-100 text-green-700'
-                            : selectedPayment.status === 'pending'
-                              ? 'bg-orange-100 text-orange-700'
-                              : 'bg-red-100 text-red-700'
-                        }
-                      >
-                        {selectedPayment.status}
-                      </Badge>
-                    </div>
+            return (
+              <div className="space-y-4 mt-4">
+                {/* Status */}
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600">Payment Status</span>
+                    <Badge
+                      variant={
+                        selectedPayment.status === 'verified' ? 'default' :
+                          selectedPayment.status === 'pending' ? 'secondary' :
+                            'destructive'
+                      }
+                      className={
+                        selectedPayment.status === 'verified' ? 'bg-green-100 text-green-700' :
+                          selectedPayment.status === 'pending' ? 'bg-orange-100 text-orange-700' :
+                            'bg-red-100 text-red-700'
+                      }
+                    >
+                      {selectedPayment.status}
+                    </Badge>
                   </div>
-
-                  {/* Payment Information */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-sm text-gray-600">Amount</p>
-                      <p className="font-semibold text-lg">
-                        LKR {selectedPayment.amount}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-600">Payment Date</p>
-                      <p className="font-medium">
-                        {selectedPayment.paymentDate}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-600">Payment Method</p>
-                      <p className="font-medium">
-                        {selectedPayment.paymentMethod}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-600">Reference Number</p>
-                      <p className="font-medium font-mono text-sm">
-                        {selectedPayment.referenceNumber}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-600">Submitted At</p>
-                      <p className="font-medium">
-                        {selectedPayment.submittedAt}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Property Information */}
-                  {property && unit && (
-                    <div className="border-t pt-4">
-                      <h4 className="font-semibold mb-3">
-                        Property Information
-                      </h4>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <p className="text-sm text-gray-600">Property</p>
-                          <p className="font-medium">{property.name}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-gray-600">Unit</p>
-                          <p className="font-medium">Unit {unit.unitNumber}</p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Receipt Info */}
-                  {receipt && (
-                    <div className="border-t pt-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm text-gray-600">
-                            Receipt Number
-                          </p>
-                          <p className="font-medium">{receipt.receiptNumber}</p>
-                        </div>
-                        <CheckCircle className="size-5 text-green-600" />
-                      </div>
-                    </div>
-                  )}
                 </div>
-              );
-            })()}
+
+                {/* Payment Information */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-gray-600">Amount</p>
+                    <p className="font-semibold text-lg">LKR {selectedPayment.amount}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Payment Date</p>
+                    <p className="font-medium">{selectedPayment.paymentDate}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Payment Method</p>
+                    <p className="font-medium">{selectedPayment.paymentMethod}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Reference Number</p>
+                    <p className="font-medium font-mono text-sm">{selectedPayment.referenceNumber}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Submitted At</p>
+                    <p className="font-medium">{selectedPayment.submittedAt}</p>
+                  </div>
+                </div>
+
+                {/* Property Information */}
+                {property && unit && (
+                  <div className="border-t pt-4">
+                    <h4 className="font-semibold mb-3">Property Information</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-sm text-gray-600">Property</p>
+                        <p className="font-medium">{property.name}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600">Unit</p>
+                        <p className="font-medium">Unit {unit.unitNumber}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Receipt Info */}
+                {receipt && (
+                  <div className="border-t pt-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-gray-600">Receipt Number</p>
+                        <p className="font-medium">{receipt.receiptNumber}</p>
+                      </div>
+                      <CheckCircle className="size-5 text-green-600" />
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </DialogContent>
       </Dialog>
 
       {/* Receipt Viewer Dialog */}
-      <Dialog
-        open={selectedReceipt !== null}
-        onOpenChange={() => setSelectedReceipt(null)}
-      >
+      <Dialog open={selectedReceipt !== null} onOpenChange={() => setSelectedReceipt(null)}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>
             <DialogTitle className="sr-only">Payment Receipt</DialogTitle>
@@ -548,7 +454,6 @@ export function TenantPaymentsPage() {
               unitNumber={selectedReceipt.unitNumber}
               paymentMethod={selectedReceipt.paymentMethod}
               paymentDate={selectedReceipt.paymentDate}
-              description={selectedReceipt.description}
               onClose={() => setSelectedReceipt(null)}
             />
           )}
