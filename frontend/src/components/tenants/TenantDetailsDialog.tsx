@@ -100,85 +100,59 @@ export const TenantDetailsDialog: React.FC<TenantDetailsDialogProps> = ({
   return (
     <>
       <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        {/* Force a wider modal manually overriding the sm:max-w-lg default */}
+        <DialogContent className="sm:max-w-[1000px] w-full max-h-[90vh] overflow-y-auto overflow-x-hidden">
           <DialogHeader>
             <DialogTitle>Tenant Profile</DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-6 mt-4">
+          <div className="space-y-6 mt-4 pb-4">
             {/* Header Section with ScoreCard */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="md:col-span-2 space-y-6">
-                {/* Tenant Info */}
-                <div className="flex items-start gap-4">
-                  <div className="size-16 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-semibold text-2xl">
+            <div className="flex flex-col md:flex-row gap-6">
+              
+              {/* Tenant Info - Takes up remaining space */}
+              <div className="flex-1 flex flex-col gap-6 min-w-[300px]">
+                <div className="flex flex-col sm:flex-row items-start gap-4">
+                  <div className="size-16 shrink-0 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-semibold text-2xl">
                     {tenant.name.charAt(0).toUpperCase()}
                   </div>
                   <div className="flex-1">
                     <h3 className="text-xl font-semibold">{tenant.name}</h3>
                     <div className="space-y-1 mt-2">
                       <div className="flex items-center gap-2 text-sm text-gray-600">
-                        <Mail className="size-4" />
-                        {tenant.email}
+                        <Mail className="size-4 shrink-0" />
+                        <span className="truncate">{tenant.email}</span>
                       </div>
                       <div className="flex items-center gap-2 text-sm text-gray-600">
-                        <Phone className="size-4" />
-                        {tenant.phone}
+                        <Phone className="size-4 shrink-0" />
+                        <span className="whitespace-nowrap">{tenant.phone}</span>
                       </div>
                       <div className="flex items-center gap-2 text-sm text-gray-600">
-                        <Calendar className="size-4" />
-                        Member since{' '}
-                        {tenant.createdAt
-                          ? new Date(tenant.createdAt).toLocaleDateString()
-                          : 'N/A'}
+                        <Calendar className="size-4 shrink-0" />
+                        <span>Member since {tenant.createdAt ? new Date(tenant.createdAt).toLocaleDateString() : 'N/A'}</span>
                       </div>
                     </div>
                   </div>
                   {lease ? (
-                    <Badge
-                      variant="secondary"
-                      className="bg-green-100 text-green-700"
-                    >
+                    <Badge variant="secondary" className="bg-green-100 text-green-700 whitespace-nowrap">
                       Active Tenant
                     </Badge>
                   ) : (
-                    <Badge variant="outline" className="text-gray-500">
+                    <Badge variant="outline" className="text-gray-500 whitespace-nowrap">
                       Inactive
                     </Badge>
                   )}
                 </div>
 
-                {/* Current Residence */}
-                <div className="border rounded-lg p-4 bg-gray-50">
-                  <h4 className="font-semibold mb-3">Current Residence</h4>
-                  {lease && unit && property ? (
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <p className="text-sm text-gray-600">Property</p>
-                        <p className="font-medium">{property.name}</p>
-                        <p className="text-sm text-gray-500">
-                          {property.propertyNo} {property.street},{' '}
-                          {property.city}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-600">Unit</p>
-                        <p className="font-medium">Unit {unit.unitNumber}</p>
-                        <p className="text-sm text-gray-500">{unit.type}</p>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-gray-500">No active lease</p>
-                  )}
-                </div>
+
 
                 {/* Tenant Background */}
-                <div className="border rounded-lg p-4 bg-gray-50 mt-6">
+                <div className="border rounded-lg p-4 bg-gray-50">
                   <h4 className="font-semibold mb-3">Tenant Background</h4>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <p className="text-sm text-gray-600">NIC / ID</p>
-                      <p className="font-medium">{tenant.nic || 'Not provided'}</p>
+                      <p className="font-medium break-all">{tenant.nic || 'Not provided'}</p>
                     </div>
                     <div>
                       <p className="text-sm text-gray-600">Employment Status</p>
@@ -202,8 +176,8 @@ export const TenantDetailsDialog: React.FC<TenantDetailsDialogProps> = ({
                 </div>
               </div>
 
-              {/* Score Card Column */}
-              <div>
+              {/* Score Card Column - strictly fixed width so it doesn't crush the rest */}
+              <div className="w-full md:w-[280px] shrink-0 flex flex-col h-full">
                 <TenantScoreCard score={score} />
               </div>
             </div>

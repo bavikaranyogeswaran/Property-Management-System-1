@@ -26,6 +26,7 @@ import {
   Receipt,
   Bell,
   Calendar,
+  Wallet,
 } from 'lucide-react';
 
 import { Link, useLocation } from 'react-router-dom';
@@ -66,7 +67,8 @@ export function AppLayout({ children }: AppLayoutProps) {
     { path: '/treasurers', label: 'Treasurers', icon: Shield },
     { path: '/leases', label: 'Leases', icon: FileText },
     { path: '/invoices', label: 'Invoices', icon: CreditCard },
-    { path: '/receipts', label: 'Receipts', icon: Receipt },
+    { path: '/payments', label: 'Payments', icon: DollarSign },
+    { path: '/payouts', label: 'Payouts', icon: Wallet },
     { path: '/reports', label: 'Reports', icon: BarChart3 },
     { path: '/maintenance', label: 'Maintenance', icon: Wrench },
     { path: '/payouts', label: 'Payouts', icon: DollarSign },
@@ -81,13 +83,16 @@ export function AppLayout({ children }: AppLayoutProps) {
     { path: '/payments', label: 'Payment Verification', icon: CreditCard },
     { path: '/receipts', label: 'Receipts', icon: Receipt },
     { path: '/expenses', label: 'Expenses', icon: DollarSign },
+    { path: '/maintenance', label: 'Maintenance', icon: Wrench },
     { path: '/analytics', label: 'Financial Reports', icon: BarChart3 },
   ];
 
   const tenantMenu = [
     { path: '/dashboard', label: 'Dashboard', icon: Home },
+    { path: '/my-lease', label: 'My Lease', icon: FileText },
     { path: '/invoices', label: 'My Invoices', icon: FileText },
     { path: '/payments', label: 'My Payments', icon: CreditCard },
+    { path: '/payment-summary', label: 'Payment Summary', icon: BarChart3 },
     { path: '/receipts', label: 'My Receipts', icon: Receipt },
     { path: '/maintenance', label: 'Maintenance Requests', icon: Wrench },
   ];

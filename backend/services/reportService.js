@@ -102,17 +102,8 @@ class ReportService {
         const propertyIds = await this._getAccessiblePropertyIds(user);
         if (propertyIds.length === 0) return {};
 
-        // Fetch pre-aggregated occupancy data from DB
-        const propertyStats = await unitModel.getOccupancyStats();
-        
-        // Filter out properties user does not have access to
-        // Note: unitModel.getOccupancyStats groups by property_name but we only have string names here.
-        // It's safer to only return requested properties based on user scope 
-        // if we match IDs. However, getOccupancyStats aggregates by name. 
-        // Assuming user can only query their own dashboard anyway, or we skip propertyId filtering here if we rely on name.
-        // For accurate RBAC, let's keep it simple: return the database mapping directly if admin/owner, else we'd need to filter by propertyId inside the Model method.
-        
-        // Future Proof: Currently assumes Treasurer/Owner dashboards fetch only what they own.
+        // Fetch pre-aggregated occupancy data from DB, scoped to accessible properties
+        const propertyStats = await unitModel.getOccupancyStats(propertyIds);
         return propertyStats;
     }
 
@@ -215,9 +206,8 @@ class ReportService {
         return {
             Total: Number(stats.Total),
             Interested: Number(stats.Interested),
-            Scheduled: Number(stats.Scheduled),
-            Application: Number(stats.Application),
-            Leased: Number(stats.Leased)
+            Converted: Number(stats.Converted),
+            Dropped: Number(stats.Dropped)
         };
     }
 }

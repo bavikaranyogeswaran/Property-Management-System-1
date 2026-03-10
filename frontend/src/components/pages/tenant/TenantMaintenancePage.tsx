@@ -352,23 +352,10 @@ export function TenantMaintenancePage() {
                       <div className="flex items-center gap-4 text-sm text-gray-500">
                         <span>Unit: {unit?.unitNumber}</span>
                         <span>•</span>
-                        <span
-                          className={`px-2 py-1 rounded-full text-xs font-medium ${getPriorityBadge(request.priority)}`}
-                        >
+                        <span className="font-medium text-gray-700">
                           {request.priority.charAt(0).toUpperCase() +
                             request.priority.slice(1)}{' '}
                           Priority
-                        </span>
-                        <span>•</span>
-                        <span className="font-medium text-gray-700">
-                          {(() => {
-                            const totalCost = maintenanceCosts
-                              .filter((c) => c.requestId === request.id)
-                              .reduce((sum, c) => sum + c.amount, 0);
-                            return totalCost > 0
-                              ? `Cost: LKR ${totalCost.toLocaleString()}`
-                              : 'Cost: -';
-                          })()}
                         </span>
                         <span>•</span>
                         <span>Submitted: {request.submittedDate}</span>

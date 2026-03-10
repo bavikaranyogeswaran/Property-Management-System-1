@@ -257,15 +257,15 @@ class LeadModel {
   }
 
   // Analytics optimized query to avoid O(N) memory buildup
+  // DB enum: 'interested', 'converted', 'dropped'
   async getLeadConversionStats() {
     const [rows] = await db.query(
       `
       SELECT 
         COUNT(*) AS Total,
-        SUM(CASE WHEN status IN ('interested', 'new') THEN 1 ELSE 0 END) AS Interested,
-        SUM(CASE WHEN status LIKE '%schedule%' OR status LIKE '%visit%' THEN 1 ELSE 0 END) AS Scheduled,
-        SUM(CASE WHEN status LIKE '%application%' OR status = 'applied' THEN 1 ELSE 0 END) AS Application,
-        SUM(CASE WHEN status IN ('converted', 'leased', 'tenant') THEN 1 ELSE 0 END) AS Leased
+        SUM(CASE WHEN status = 'interested' THEN 1 ELSE 0 END) AS Interested,
+        SUM(CASE WHEN status = 'converted' THEN 1 ELSE 0 END) AS Converted,
+        SUM(CASE WHEN status = 'dropped' THEN 1 ELSE 0 END) AS Dropped
       FROM leads
       `
     );
