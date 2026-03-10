@@ -138,8 +138,8 @@ export function TenantDashboard() {
               size="sm"
               onClick={() => setIsHistoryOpen(true)}
             >
-              <History className="size-4 mr-2" />
-              Application Chat
+              <MessageSquare className="size-4 mr-2" />
+              Chat with Owner
             </Button>
           )}
         </div>
@@ -341,13 +341,11 @@ export function TenantDashboard() {
       <Dialog open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
         <DialogContent className="max-w-3xl h-[80vh] flex flex-col p-6">
           <DialogHeader>
-            <DialogTitle>Application Chat History</DialogTitle>
+            <DialogTitle>Chat with Property Owner</DialogTitle>
           </DialogHeader>
           {leadHistory && (
             <ChatInterface
               leadId={leadHistory.id}
-              readOnly={true}
-              title="Archived Chat"
             />
           )}
         </DialogContent>
