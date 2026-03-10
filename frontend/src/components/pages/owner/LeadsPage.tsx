@@ -363,24 +363,30 @@ export function LeadsPage() {
                   </div>
                 </TableCell>
                 <TableCell>
-                  <Select
-                    value={lead.status}
-                    onValueChange={(value: Lead['status']) =>
-                      handleStatusChange(lead.id, value)
-                    }
-                    disabled={
-                      lead.status === 'converted' || lead.status === 'dropped'
-                    }
-                  >
-                    <SelectTrigger className="w-[140px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="interested">Interested</SelectItem>
-                      <SelectItem value="converted">Converted</SelectItem>
-                      <SelectItem value="dropped">Dropped</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  {lead.status === 'converted' || lead.status === 'dropped' ? (
+                    <Badge
+                      variant={statusBadge.variant}
+                      className={statusBadge.color}
+                    >
+                      {statusBadge.label}
+                    </Badge>
+                  ) : (
+                    <Select
+                      value={lead.status}
+                      onValueChange={(value: Lead['status']) =>
+                        handleStatusChange(lead.id, value)
+                      }
+                    >
+                      <SelectTrigger className="w-[140px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="interested">Interested</SelectItem>
+                        <SelectItem value="converted">Converted</SelectItem>
+                        <SelectItem value="dropped">Dropped</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
                 </TableCell>
                 <TableCell>
                   <span className="text-sm text-gray-600">
