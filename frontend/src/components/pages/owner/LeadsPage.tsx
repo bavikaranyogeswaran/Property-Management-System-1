@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import {
   useApp,
   Lead,
-  LeadStageHistory,
   Visit,
 } from '@/app/context/AppContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -40,7 +39,6 @@ import {
   Calendar,
   CheckCircle,
   ArrowRight,
-  Clock,
   TrendingUp,
   MessageSquare,
   Check,
@@ -56,7 +54,6 @@ export function LeadsPage() {
     units,
     properties,
     visits,
-    leadStageHistory,
     addLead,
     updateLead,
     convertLeadToTenant,
@@ -65,7 +62,6 @@ export function LeadsPage() {
 
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [isConvertDialogOpen, setIsConvertDialogOpen] = useState(false);
-  const [isHistoryDialogOpen, setIsHistoryDialogOpen] = useState(false);
   const [isNegotiationDialogOpen, setIsNegotiationDialogOpen] = useState(false);
 
   const [conversionData, setConversionData] = useState({
@@ -408,17 +404,6 @@ export function LeadsPage() {
                     >
                       <MessageSquare className="size-4 text-blue-600" />
                     </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => {
-                        setSelectedLead(lead);
-                        setIsHistoryDialogOpen(true);
-                      }}
-                      title="View Stage History"
-                    >
-                      <Clock className="size-4" />
-                    </Button>
                     {lead.status !== 'converted' &&
                       lead.status !== 'dropped' && (
                         <Button
@@ -536,85 +521,6 @@ export function LeadsPage() {
           </Tabs>
         </CardContent>
       </Card>
-
-      {/* Stage History Dialog */}
-      <Dialog open={isHistoryDialogOpen} onOpenChange={setIsHistoryDialogOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Stage History for {selectedLead?.name}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 mt-4">
-            {selectedLead &&
-              leadStageHistory
-                .filter((h) => String(h.leadId) === String(selectedLead.id))
-                .sort(
-                  (a, b) =>
-                    new Date(b.changedAt).getTime() -
-                    new Date(a.changedAt).getTime()
-                )
-                .map((history, index, arr) => (
-                  <div key={history.id} className="flex gap-4">
-                    <div className="flex flex-col items-center">
-                      <div
-                        className={`size-8 rounded-full flex items-center justify-center ${
-                          getStatusBadge(history.toStatus).color
-                        }`}
-                      >
-                        {index === 0 ? (
-                          <Clock className="size-4" />
-                        ) : (
-                          <CheckCircle className="size-4" />
-                        )}
-                      </div>
-                      {index < arr.length - 1 && (
-                        <div className="w-0.5 h-12 bg-gray-200 my-1"></div>
-                      )}
-                    </div>
-                    <div className="flex-1 pb-4">
-                      <div className="flex items-start justify-between mb-1">
-                        <div>
-                          <p className="font-medium text-sm">
-                            {history.fromStatus ? (
-                              <>
-                                {getStatusLabel(history.fromStatus)} →{' '}
-                                {getStatusLabel(history.toStatus)}
-                              </>
-                            ) : (
-                              <>
-                                Lead created as{' '}
-                                {getStatusLabel(history.toStatus)}
-                              </>
-                            )}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            {new Date(history.changedAt).toLocaleString()}
-                          </p>
-                        </div>
-                        {history.durationInPreviousStage !== undefined &&
-                          history.durationInPreviousStage > 0 && (
-                            <Badge variant="outline" className="text-xs">
-                              {history.durationInPreviousStage} days
-                            </Badge>
-                          )}
-                      </div>
-                      {history.notes && (
-                        <p className="text-sm text-gray-600 mt-1">
-                          {history.notes}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                ))}
-            {selectedLead &&
-              leadStageHistory.filter((h) => String(h.leadId) === String(selectedLead.id))
-                .length === 0 && (
-                <p className="text-gray-500 text-center py-8">
-                  No stage history available
-                </p>
-              )}
-          </div>
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={isConvertDialogOpen} onOpenChange={setIsConvertDialogOpen}>
         <DialogContent>
