@@ -342,6 +342,14 @@ function AppContent() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/payouts"
+            element={
+              <ProtectedRoute>
+                <OwnerPayoutsPage />
+              </ProtectedRoute>
+            }
+          />
         </>
       )}
 
