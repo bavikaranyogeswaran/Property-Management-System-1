@@ -213,33 +213,33 @@ export function OwnerDashboard() {
 
       {/* Ledger Financial Summary */}
       {ledgerSummary && (
-        <Card className="bg-gradient-to-br from-indigo-50 to-blue-50 border-indigo-100">
+        <Card>
           <CardHeader>
-            <CardTitle className="text-indigo-900">
-              LEDGER SUMMARY ({currentYear})
+            <CardTitle>
+              LEDGER SUMMARY
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="bg-white p-4 rounded-lg shadow-sm border border-indigo-50">
+              <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
                 <p className="text-sm text-gray-500 font-medium">Net Operating Income</p>
                 <p className="text-2xl font-bold text-indigo-700">
                   LKR {ledgerSummary.netOperatingIncome.toLocaleString()}
                 </p>
               </div>
-              <div className="bg-white p-4 rounded-lg shadow-sm border border-indigo-50">
+              <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
                 <p className="text-sm text-gray-500 font-medium">True Revenue</p>
                 <p className="text-xl font-semibold text-emerald-600">
                   LKR {ledgerSummary.totalRevenue.toLocaleString()}
                 </p>
               </div>
-              <div className="bg-white p-4 rounded-lg shadow-sm border border-indigo-50">
+              <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
                 <p className="text-sm text-gray-500 font-medium">Deposits Held (Liability)</p>
                 <p className="text-xl font-semibold text-blue-600">
                   LKR {ledgerSummary.totalLiabilityHeld.toLocaleString()}
                 </p>
               </div>
-              <div className="bg-white p-4 rounded-lg shadow-sm border border-indigo-50">
+              <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
                 <p className="text-sm text-gray-500 font-medium">Expenses (Maintenance)</p>
                 <p className="text-xl font-semibold text-red-600">
                   LKR {ledgerSummary.totalExpense.toLocaleString()}

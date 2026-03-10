@@ -71,6 +71,7 @@ export function AppLayout({ children }: AppLayoutProps) {
     { path: '/payouts', label: 'Payouts', icon: Wallet },
     { path: '/reports', label: 'Reports', icon: BarChart3 },
     { path: '/maintenance', label: 'Maintenance', icon: Wrench },
+    { path: '/payouts', label: 'Payouts', icon: DollarSign },
     { path: '/analytics', label: 'Analytics', icon: BarChart3 },
   ];
 
