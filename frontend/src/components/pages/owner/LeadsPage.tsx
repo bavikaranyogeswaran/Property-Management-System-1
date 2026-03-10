@@ -6,7 +6,6 @@ import {
   LeadStageHistory,
   Visit,
 } from '@/app/context/AppContext';
-import { StickyNote, Save } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -43,88 +42,12 @@ import {
   ArrowRight,
   Clock,
   TrendingUp,
-  LayoutGrid,
-  List,
-  XCircle,
   MessageSquare,
   Check,
   X,
 } from 'lucide-react';
 import { ChatInterface } from '@/components/common/ChatInterface';
 import { toast } from 'sonner';
-
-// Self-contained notes editor — keeps its own state to avoid
-// re-rendering the parent (which would recreate LeadCard and lose focus)
-function InlineNotesEditor({
-  leadId,
-  initialNotes,
-  onSave,
-}: {
-  leadId: string;
-  initialNotes: string;
-  onSave: (leadId: string, notes: string) => Promise<void>;
-}) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [text, setText] = useState(initialNotes);
-  const [saving, setSaving] = useState(false);
-
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      await onSave(leadId, text);
-      setIsEditing(false);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  if (isEditing) {
-    return (
-      <div className="space-y-1">
-        <Textarea
-          autoFocus
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder="Private notes about this lead..."
-          rows={2}
-          className="text-xs resize-none"
-        />
-        <div className="flex gap-1 justify-end">
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-6 text-xs"
-            onClick={() => {
-              setText(initialNotes);
-              setIsEditing(false);
-            }}
-          >
-            Cancel
-          </Button>
-          <Button
-            size="sm"
-            className="h-6 text-xs"
-            onClick={handleSave}
-            disabled={saving}
-          >
-            <Save className="size-3 mr-1" />
-            Save
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <button
-      className="w-full text-left text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-50 rounded p-1.5 transition-colors"
-      onClick={() => setIsEditing(true)}
-    >
-      <StickyNote className="size-3 inline mr-1" />
-      {initialNotes || 'Add notes...'}
-    </button>
-  );
-}
 
 export function LeadsPage() {
   const navigate = useNavigate();
@@ -144,16 +67,6 @@ export function LeadsPage() {
   const [isConvertDialogOpen, setIsConvertDialogOpen] = useState(false);
   const [isHistoryDialogOpen, setIsHistoryDialogOpen] = useState(false);
   const [isNegotiationDialogOpen, setIsNegotiationDialogOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<'pipeline' | 'list'>('pipeline');
-
-  const handleSaveNotes = async (leadId: string, notes: string) => {
-    try {
-      await updateLead(leadId, { internalNotes: notes });
-      toast.success('Notes saved');
-    } catch (error) {
-      toast.error('Failed to save notes');
-    }
-  };
 
   const [conversionData, setConversionData] = useState({
     startDate: new Date().toISOString().split('T')[0],
@@ -309,146 +222,6 @@ export function LeadsPage() {
   );
   const convertedLeadsList = leads.filter((l) => l.status === 'converted');
   const droppedLeads = leads.filter((l) => l.status === 'dropped');
-
-  // Pipeline view data
-  const pipelineStages: Array<{
-    status: Lead['status'];
-    label: string;
-    color: string;
-  }> = [
-    {
-      status: 'interested',
-      label: 'Interested',
-      color: 'border-blue-200 bg-blue-50',
-    },
-    {
-      status: 'converted',
-      label: 'Converted',
-      color: 'border-green-200 bg-green-50',
-    },
-  ];
-
-  const LeadCard = ({ lead }: { lead: Lead }) => {
-    const unit = units.find((u) => u.id === lead.interestedUnit);
-    const property = properties.find((p) => p.id === lead.propertyId);
-    const statusBadge = getStatusBadge(lead.status);
-    const history = leadStageHistory.filter((h) => String(h.leadId) === String(lead.id));
-
-    // Determine unit display text
-    const unitDisplay =
-      unit?.unitNumber ||
-      (property?.name ? `${property.name} (General)` : 'N/A');
-
-    return (
-      <div className="p-3 bg-white rounded-lg border shadow-sm hover:shadow-md transition-shadow">
-        <div className="flex items-start justify-between mb-2">
-          <div className="flex-1">
-            <h4 className="font-medium text-sm">{lead.name}</h4>
-            <p className="text-xs text-gray-500">{lead.email}</p>
-            <p className="text-xs text-gray-500">{lead.phone}</p>
-          </div>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-7 w-7 p-0 inline-flex items-center justify-center flex-shrink-0"
-            onClick={() => {
-              setSelectedLead(lead);
-              setIsHistoryDialogOpen(true);
-            }}
-            title="View Stage History"
-          >
-            <Clock className="size-3.5" />
-          </Button>
-        </div>
-
-        <div className="space-y-1 mb-3">
-          <p className="text-xs text-gray-600">
-            <span className="font-medium">Unit:</span> {unitDisplay}
-          </p>
-          <p className="text-xs text-gray-600">
-            <span className="font-medium">Created:</span>{' '}
-            {new Date(lead.createdAt).toLocaleString()}
-          </p>
-          {lead.lastContactedAt && (
-            <p className="text-xs text-gray-600">
-              <span className="font-medium">Last Contact:</span>{' '}
-              {new Date(lead.lastContactedAt).toLocaleString()}
-            </p>
-          )}
-        </div>
-
-        {/* Lead's notes/questions */}
-        {lead.notes && (
-          <p className="text-xs text-gray-500 italic px-1.5 mb-1">
-            <MessageSquare className="size-3 inline mr-1" />
-            {lead.notes}
-          </p>
-        )}
-
-        {/* Owner's Internal Notes */}
-        <div className="mb-2">
-          <InlineNotesEditor
-            leadId={lead.id}
-            initialNotes={lead.internalNotes || ''}
-            onSave={handleSaveNotes}
-          />
-        </div>
-
-        <div className="flex gap-1 items-center">
-          <Button
-            size="sm"
-            variant="ghost"
-            className="flex-1 h-7 text-xs inline-flex items-center justify-center text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-            onClick={() => {
-              setSelectedLead(lead);
-              setIsNegotiationDialogOpen(true);
-            }}
-          >
-            <MessageSquare className="size-3 mr-1 flex-shrink-0" />
-            Chat
-          </Button>
-
-          {lead.status === 'converted' && (
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-7 text-xs border-green-200 text-green-700 bg-green-50 hover:bg-green-100 dark:border-green-800 dark:bg-green-950/30 dark:text-green-400"
-              onClick={() => navigate('/tenants')}
-              title="View Tenant Details"
-            >
-              View Tenant
-            </Button>
-          )}
-
-          {lead.status === 'interested' && (
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-7 text-xs border-green-200 text-green-700 bg-green-50 hover:bg-green-100"
-              onClick={() => {
-                setSelectedLead(lead);
-                setIsConvertDialogOpen(true);
-              }}
-              title="Convert to Tenant"
-            >
-              Convert
-            </Button>
-          )}
-          {lead.status !== 'converted' && (
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 inline-flex items-center justify-center flex-shrink-0"
-              onClick={() => handleStatusChange(lead.id, 'dropped')}
-              title="Drop Lead"
-            >
-              <XCircle className="size-3.5" />
-            </Button>
-          )}
-        </div>
-      </div>
-    );
-  };
 
   const VisitTable = ({ visits: data }: { visits: Visit[] }) => (
     <div className="overflow-x-auto">
@@ -675,31 +448,11 @@ export function LeadsPage() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-2xl font-semibold text-gray-900">
-            Lead Conversion Pipeline
+            Leads
           </h2>
           <p className="text-sm text-gray-500 mt-1">
-            Track leads through stages: Interested → Converted
+            Manage prospective tenants and upcoming visits
           </p>
-        </div>
-        <div className="flex gap-2">
-          <div className="flex border rounded-lg">
-            <Button
-              variant={viewMode === 'pipeline' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setViewMode('pipeline')}
-            >
-              <LayoutGrid className="size-4 mr-2" />
-              Pipeline
-            </Button>
-            <Button
-              variant={viewMode === 'list' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setViewMode('list')}
-            >
-              <List className="size-4 mr-2" />
-              List
-            </Button>
-          </div>
         </div>
       </div>
 
@@ -742,129 +495,41 @@ export function LeadsPage() {
         </Card>
       </div>
 
-      {/* Pipeline View */}
-      {viewMode === 'pipeline' ? (
-        <div className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Overview</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Tabs defaultValue="funnel">
-                <TabsList>
-                  <TabsTrigger value="funnel">Funnel</TabsTrigger>
-                  <TabsTrigger value="visits">
-                    Upcoming Visits (
-                    {
-                      visits.filter(
-                        (v) =>
-                          v.status === 'confirmed' || v.status === 'pending'
-                      ).length
-                    }
-                    )
-                  </TabsTrigger>
-                </TabsList>
-                <TabsContent value="funnel">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-                    {pipelineStages.map((stage, index) => {
-                      const stageLeads = leads.filter(
-                        (l) => l.status === stage.status
-                      );
-                      return (
-                        <div key={stage.status}>
-                          <div
-                            className={`border-2 ${stage.color} rounded-lg p-4 min-h-[400px]`}
-                          >
-                            <div className="flex items-center justify-between mb-4">
-                              <h3 className="font-semibold text-sm">
-                                {stage.label}
-                              </h3>
-                              <Badge variant="secondary">
-                                {stageLeads.length}
-                              </Badge>
-                            </div>
-                            <div className="space-y-2">
-                              {stageLeads.map((lead) => (
-                                <LeadCard key={lead.id} lead={lead} />
-                              ))}
-                              {stageLeads.length === 0 && (
-                                <div className="text-center py-8 text-gray-400 text-sm">
-                                  No leads in this stage
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </TabsContent>
-                <TabsContent value="visits">
-                  <VisitTable
-                    visits={visits.filter((v) =>
-                      ['pending', 'confirmed'].includes(v.status)
-                    )}
-                  />
-                </TabsContent>
-              </Tabs>
-            </CardContent>
-          </Card>
-
-          {/* Dropped Leads */}
-          {droppedLeads.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Dropped Leads ({droppedLeads.length})</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                  {droppedLeads.map((lead) => (
-                    <LeadCard key={lead.id} lead={lead} />
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      ) : (
-        /* List View */
-        <Card>
-          <CardContent className="p-0">
-            <Tabs defaultValue="visits" className="w-full">
-              <div className="border-b px-6 pt-6">
-                <TabsList>
-                  <TabsTrigger value="visits">
-                    Scheduled Visits ({visits.length})
-                  </TabsTrigger>
-                  <TabsTrigger value="active">
-                    Active Leads ({activeLeads.length})
-                  </TabsTrigger>
-                  <TabsTrigger value="converted">
-                    Converted ({convertedLeadsList.length})
-                  </TabsTrigger>
-                  <TabsTrigger value="dropped">
-                    Dropped ({droppedLeads.length})
-                  </TabsTrigger>
-                </TabsList>
-              </div>
-              <TabsContent value="visits" className="m-0">
-                <VisitTable visits={visits} />
-              </TabsContent>
-              <TabsContent value="active" className="m-0">
-                <LeadTable leads={activeLeads} />
-              </TabsContent>
-              <TabsContent value="converted" className="m-0">
-                <LeadTable leads={convertedLeadsList} />
-              </TabsContent>
-              <TabsContent value="dropped" className="m-0">
-                <LeadTable leads={droppedLeads} />
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-        </Card>
-      )}
-
-
+      {/* List View */}
+      <Card>
+        <CardContent className="p-0">
+          <Tabs defaultValue="visits" className="w-full">
+            <div className="border-b px-6 pt-6">
+              <TabsList>
+                <TabsTrigger value="visits">
+                  Scheduled Visits ({visits.length})
+                </TabsTrigger>
+                <TabsTrigger value="active">
+                  Active Leads ({activeLeads.length})
+                </TabsTrigger>
+                <TabsTrigger value="converted">
+                  Converted ({convertedLeadsList.length})
+                </TabsTrigger>
+                <TabsTrigger value="dropped">
+                  Dropped ({droppedLeads.length})
+                </TabsTrigger>
+              </TabsList>
+            </div>
+            <TabsContent value="visits" className="m-0">
+              <VisitTable visits={visits} />
+            </TabsContent>
+            <TabsContent value="active" className="m-0">
+              <LeadTable leads={activeLeads} />
+            </TabsContent>
+            <TabsContent value="converted" className="m-0">
+              <LeadTable leads={convertedLeadsList} />
+            </TabsContent>
+            <TabsContent value="dropped" className="m-0">
+              <LeadTable leads={droppedLeads} />
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
 
       {/* Stage History Dialog */}
       <Dialog open={isHistoryDialogOpen} onOpenChange={setIsHistoryDialogOpen}>
