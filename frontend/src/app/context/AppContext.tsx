@@ -386,7 +386,7 @@ const INITIAL_DATA = {
 };
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
   const [visits, setVisits] = useState<Visit[]>([]);
   const [properties, setProperties] = useState<Property[]>([]);
   const [propertyTypes, setPropertyTypes] = useState<PropertyType[]>([]);
@@ -414,15 +414,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // Fetch initial data
   // Fetch initial data
   useEffect(() => {
-    // Wait for user to be loaded (if we want to be strict) or just run if token exists.
-    // Adding 'user' to dependency ensures we re-fetch if user status changes (e.g. login/processed).
-    if (!user) {
-      // Option: we could skip fetching if no user, but if token exists in storage we might want to try.
-      // However, standard flow is: AuthProvider loads user -> user set -> Fetch Data.
-      // Let's rely on user being truthy to avoid unauthorized calls (though api interceptor handles token).
-      const token = localStorage.getItem('authToken');
-      if (!token) return;
-    }
+    // Wait for AuthContext to finish loading local storage user before attempting any fetches.
+    // If we don't wait, this useEffect runs once with user=null (but a valid token),
+    // and then runs AGAIN when AuthContext sets the user, resulting in duplicate API calls across the board.
+    if (isLoading) return;
+    
+    // Only fetch if a valid user is present.
+    if (!user) return;
 
     // Fetch real treasurers from backend (sync with DB)
     const fetchData = async () => {
@@ -773,7 +771,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
     };
     fetchLeadStageHistory();
-  }, [user]); // Re-run when user auth state changes
+  }, [user, isLoading]); // Re-run when user auth state changes
 
   // Generate lease expiration notifications
   useEffect(() => {
