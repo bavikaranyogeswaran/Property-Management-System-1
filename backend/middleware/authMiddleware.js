@@ -45,7 +45,7 @@ export const optionalAuthenticateToken = (req, res, next) => {
 
 export const authorizeRoles = (...roles) => {
   return (req, res, next) => {
-    // console.log('[Auth] Checking roles:', roles, 'User role:', req.user?.role);
+    console.log('[Auth] Checking roles:', roles, 'User role:', req.user?.role);
     if (!req.user || !roles.includes(req.user.role)) {
       console.log('[Auth] Access denied. User:', req.user);
       return res.status(403).json({ error: `Access denied. Required role: ${roles.join(' or ')}` });
