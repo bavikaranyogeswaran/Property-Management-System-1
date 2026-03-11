@@ -372,7 +372,7 @@ export const applyLateFees = async () => {
       const lateFeeInvoiceId = await invoiceModel.createLateFeeInvoice({
         leaseId: inv.lease_id,
         amount: lateFeeAmount,
-        dueDate: new Date(), // Due immediately
+        dueDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000), // 5-day grace period
         description: `Late Fee for Invoice #${inv.invoice_id} (${inv.year}-${inv.month})`,
       });
 

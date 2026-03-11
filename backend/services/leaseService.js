@@ -126,7 +126,7 @@ class LeaseService {
           {
             leaseId,
             amount: securityDeposit,
-            dueDate: startDate,
+            dueDate: new Date(new Date(startDate).getTime() + 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
             description: 'Security Deposit',
             type: 'deposit',
           },
@@ -155,7 +155,7 @@ class LeaseService {
         {
           leaseId,
           amount: initialRentAmount,
-          dueDate: startDate,
+          dueDate: new Date(new Date(startDate).getTime() + 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
           description: invoiceDescription,
         },
         conn
@@ -265,7 +265,7 @@ class LeaseService {
       await invoiceModel.create({
         leaseId,
         amount: diff,
-        dueDate: new Date(), // Immediate
+        dueDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000), // 5-day grace period
         description: 'Security Deposit Top-Up (Rent Increase)',
         type: 'deposit', // Keeping type explicit
       });
@@ -415,7 +415,7 @@ class LeaseService {
       const invId = await invoiceModel.create({
         leaseId,
         amount: withheldAmount,
-        dueDate: new Date(), // Immediate
+        dueDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000), // 5-day grace period
         description: 'Security Deposit Deductions (Damages/Cleaning)',
       });
 
@@ -527,7 +527,7 @@ class LeaseService {
       await invoiceModel.create({
         leaseId,
         amount: terminationFee,
-        dueDate: new Date(), // Immediate
+        dueDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000), // 5-day grace period
         description: 'Early Termination Fee',
       });
 
