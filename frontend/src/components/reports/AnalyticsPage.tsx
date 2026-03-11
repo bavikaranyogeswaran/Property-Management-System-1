@@ -34,7 +34,6 @@ import {
   FileText,
   Calendar,
 } from 'lucide-react';
-import { LeadConversionAnalytics } from './LeadConversionAnalytics';
 
 export function AnalyticsPage() {
   const {
@@ -330,12 +329,11 @@ export function AnalyticsPage() {
 
       {/* Charts Section */}
       <Tabs defaultValue="financial" className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="financial">Financial</TabsTrigger>
           <TabsTrigger value="occupancy">Occupancy</TabsTrigger>
           <TabsTrigger value="maintenance">Maintenance</TabsTrigger>
           <TabsTrigger value="payments">Payments</TabsTrigger>
-          <TabsTrigger value="leads">Leads</TabsTrigger>
         </TabsList>
 
         {/* Financial Tab */}
@@ -1031,11 +1029,6 @@ export function AnalyticsPage() {
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
-
-        {/* Leads Tab */}
-        <TabsContent value="leads" className="space-y-6">
-          <LeadConversionAnalytics leads={leads} leadStageHistory={leadStageHistory} />
         </TabsContent>
       </Tabs>
     </div>
