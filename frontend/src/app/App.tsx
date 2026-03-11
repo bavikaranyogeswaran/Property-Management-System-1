@@ -109,8 +109,6 @@ import { AnalyticsPage } from '@/components/reports/AnalyticsPage';
 import { SettingsPage } from '@/components/pages/common/SettingsPage';
 import { NotificationsPage } from '@/components/pages/common/NotificationsPage';
 import { ReceiptsPage } from '@/components/pages/common/ReceiptsPage';
-import { NotificationsPage } from '@/components/pages/common/NotificationsPage';
-import OwnerPayoutsPage from '@/components/pages/OwnerPayoutsPage';
 import { PublicListingPage } from '@/components/pages/public/PublicListingPage';
 import { PublicPropertyDetailsPage } from '@/components/pages/public/PublicPropertyDetailsPage';
 
