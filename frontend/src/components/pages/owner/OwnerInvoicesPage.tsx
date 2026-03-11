@@ -227,14 +227,14 @@ export function OwnerInvoicesPage() {
                 <TableCell className="font-semibold">
                   LKR {invoice.amount}
                 </TableCell>
-                <TableCell>
-                  <div className={isOverdue ? 'text-red-600 font-medium' : ''}>
-                    {invoice.dueDate}
-                    {isOverdue && <div className="text-xs">Overdue</div>}
+                <TableCell className="align-middle h-14">
+                  <div className={`flex flex-col gap-0.5 ${isOverdue ? 'text-red-600 font-medium' : ''}`}>
+                    <span>{invoice.dueDate}</span>
+                    {isOverdue && <span className="text-xs">Overdue</span>}
                   </div>
                 </TableCell>
-                <TableCell>{invoice.generatedDate}</TableCell>
-                <TableCell>
+                <TableCell className="align-middle h-14">{invoice.generatedDate}</TableCell>
+                <TableCell className="align-middle h-14">
                   <div className="flex gap-2">
                     <Badge
                       variant={
@@ -270,7 +270,8 @@ export function OwnerInvoicesPage() {
                 </TableCell>
                 
                 {(user?.role === 'treasurer' || (invoicesList.length > 0 && invoicesList.every(i => i.status === 'paid'))) && (
-                  <TableCell className="text-right flex items-center justify-end gap-2">
+                  <TableCell className="text-right align-middle h-14">
+                    <div className="flex items-center justify-end gap-2">
                     {/* Cash Payment Button for Treasurer */}
                     {user?.role === 'treasurer' && invoice.status !== 'paid' && (
                       <Dialog>
@@ -327,6 +328,7 @@ export function OwnerInvoicesPage() {
                           </Button>
                         );
                       })()}
+                    </div>
                   </TableCell>
                 )}
               </TableRow>

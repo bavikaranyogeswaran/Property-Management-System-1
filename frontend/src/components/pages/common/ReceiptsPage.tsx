@@ -282,7 +282,7 @@ export function ReceiptsPage() {
                             {receipt.receiptNumber}
                           </div>
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="align-middle h-14">
                           <div className="text-sm">
                             {new Date(receipt.generatedDate).toLocaleDateString(
                               'en-US',
@@ -304,7 +304,7 @@ export function ReceiptsPage() {
                           </div>
                         </TableCell>
                         {user?.role !== 'tenant' && (
-                          <TableCell>
+                          <TableCell className="align-middle h-14">
                             <div className="text-sm">
                               <div className="font-medium">
                                 {receipt.tenantName || tenant?.name || 'N/A'}
@@ -315,7 +315,7 @@ export function ReceiptsPage() {
                             </div>
                           </TableCell>
                         )}
-                        <TableCell>
+                        <TableCell className="align-middle h-14">
                           <div className="text-sm">
                             <div className="font-medium">
                               {receipt.propertyName ||
@@ -333,10 +333,10 @@ export function ReceiptsPage() {
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell className="text-right font-semibold">
+                        <TableCell className="text-right align-middle h-14 font-semibold">
                           LKR {receipt.amount.toLocaleString()}
                         </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="text-right align-middle h-14">
                           <div className="flex gap-2 justify-end">
                             <Button
                               size="sm"
