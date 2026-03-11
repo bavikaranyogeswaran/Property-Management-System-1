@@ -21,25 +21,9 @@ class ReceiptController {
 
       const receipts = await receiptModel.findAll();
 
-      // Debug Logs
-      console.log(
-        `[DEBUG] getReceipts: Found ${receipts.length} total receipts.`
-      );
-      if (receipts.length > 0) {
-        console.log(
-          `[DEBUG] First receipt tenantId: ${receipts[0].tenantId} (Type: ${typeof receipts[0].tenantId})`
-        );
-      }
-      console.log(
-        `[DEBUG] User Role: ${req.user.role}, User ID: ${req.user.id} (Type: ${typeof req.user.id})`
-      );
-
       if (req.user.role === 'tenant') {
         const filtered = receipts.filter(
           (r) => r.tenantId === req.user.id.toString()
-        );
-        console.log(
-          `[DEBUG] Filtered for tenant: ${filtered.length} receipts.`
         );
         return res.json(filtered);
       }
