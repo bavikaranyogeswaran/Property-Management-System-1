@@ -107,8 +107,8 @@ import { MaintenanceExpensesPage } from '@/components/pages/treasurer/Maintenanc
 // Shared Pages
 import { AnalyticsPage } from '@/components/reports/AnalyticsPage';
 import { SettingsPage } from '@/components/pages/common/SettingsPage';
-import { ReceiptsPage } from '@/components/pages/common/ReceiptsPage';
 import { NotificationsPage } from '@/components/pages/common/NotificationsPage';
+import { ReceiptsPage } from '@/components/pages/common/ReceiptsPage';
 import { PublicListingPage } from '@/components/pages/public/PublicListingPage';
 import { PublicPropertyDetailsPage } from '@/components/pages/public/PublicPropertyDetailsPage';
 
@@ -339,6 +339,14 @@ function AppContent() {
             element={
               <ProtectedRoute>
                 <OwnerPaymentsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/payouts"
+            element={
+              <ProtectedRoute>
+                <OwnerPayoutsPage />
               </ProtectedRoute>
             }
           />
