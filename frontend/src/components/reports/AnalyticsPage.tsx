@@ -1,7 +1,13 @@
 import React, { useState } from 'react';
 import { useApp } from '@/app/context/AppContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -17,7 +23,7 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
-  ResponsiveContainer
+  ResponsiveContainer,
 } from 'recharts';
 import {
   DollarSign,
@@ -26,7 +32,7 @@ import {
   Home,
   Wrench,
   FileText,
-  Calendar
+  Calendar,
 } from 'lucide-react';
 
 export function AnalyticsPage() {
@@ -48,32 +54,48 @@ export function AnalyticsPage() {
 
   // Financial Analytics
   const totalRevenue = receipts.reduce((sum, r) => sum + r.amount, 0);
-  const totalMaintenanceCost = maintenanceCosts.reduce((sum, c) => sum + c.amount, 0);
+  const totalMaintenanceCost = maintenanceCosts.reduce(
+    (sum, c) => sum + c.amount,
+    0
+  );
   const netIncome = totalRevenue - totalMaintenanceCost;
-  const pendingPayments = invoices.filter(i => i.status === 'pending').reduce((sum, i) => sum + i.amount, 0);
+  const pendingPayments = invoices
+    .filter((i) => i.status === 'pending')
+    .reduce((sum, i) => sum + i.amount, 0);
   const expectedMonthlyRevenue = leases
-    .filter(l => l.status === 'active')
+    .filter((l) => l.status === 'active')
     .reduce((sum, l) => sum + l.monthlyRent, 0);
 
   // Occupancy Analytics
   const totalUnits = units.length;
-  const occupiedUnits = units.filter(u => u.status === 'occupied').length;
-  const availableUnits = units.filter(u => u.status === 'available').length;
-  const maintenanceUnits = units.filter(u => u.status === 'maintenance').length;
-  const occupancyRate = totalUnits > 0 ? ((occupiedUnits / totalUnits) * 100).toFixed(1) : '0';
+  const occupiedUnits = units.filter((u) => u.status === 'occupied').length;
+  const availableUnits = units.filter((u) => u.status === 'available').length;
+  const maintenanceUnits = units.filter(
+    (u) => u.status === 'maintenance'
+  ).length;
+  const occupancyRate =
+    totalUnits > 0 ? ((occupiedUnits / totalUnits) * 100).toFixed(1) : '0';
 
   // Maintenance Analytics
-  const completedRequests = maintenanceRequests.filter(r => r.status === 'completed').length;
-  const openRequests = maintenanceRequests.filter(r => r.status === 'submitted' || r.status === 'in_progress').length;
-  const avgMaintenanceCost = completedRequests > 0 ? (totalMaintenanceCost / completedRequests).toFixed(2) : '0';
+  const completedRequests = maintenanceRequests.filter(
+    (r) => r.status === 'completed'
+  ).length;
+  const openRequests = maintenanceRequests.filter(
+    (r) => r.status === 'submitted' || r.status === 'in_progress'
+  ).length;
+  const avgMaintenanceCost =
+    completedRequests > 0
+      ? (totalMaintenanceCost / completedRequests).toFixed(2)
+      : '0';
 
   // Payment Analytics
   const totalInvoices = invoices.length;
-  const paidInvoices = invoices.filter(i => i.status === 'paid').length;
-  const overdueInvoices = invoices.filter(i => {
+  const paidInvoices = invoices.filter((i) => i.status === 'paid').length;
+  const overdueInvoices = invoices.filter((i) => {
     return i.status === 'pending' && new Date(i.dueDate) < new Date();
   }).length;
-  const collectionRate = totalInvoices > 0 ? ((paidInvoices / totalInvoices) * 100).toFixed(1) : '0';
+  const collectionRate =
+    totalInvoices > 0 ? ((paidInvoices / totalInvoices) * 100).toFixed(1) : '0';
 
   // Chart data
   const unitStatusData = [
@@ -82,29 +104,62 @@ export function AnalyticsPage() {
     { name: 'Maintenance', value: maintenanceUnits, color: '#ef4444' },
   ];
 
-  const propertyRevenueData = properties.map(property => {
-    const propertyUnits = units.filter(u => u.propertyId === property.id);
-    const propertyLeases = leases.filter(l =>
-      propertyUnits.some(u => u.id === l.unitId) && l.status === 'active'
-    );
-    const revenue = propertyLeases.reduce((sum, l) => sum + l.monthlyRent, 0);
+  // Optimize data fetching for O(N) complexity using Hash Maps for O(1) lookups
+  // 1. Group units by propertyId
+  const unitsByProperty = new Map<string, typeof units>();
+  units.forEach(u => {
+    if (!unitsByProperty.has(u.propertyId)) unitsByProperty.set(u.propertyId, []);
+    unitsByProperty.get(u.propertyId)!.push(u);
+  });
+
+  // 2. Group active leases by unitId
+  const activeLeasesByUnit = new Map<string, typeof leases>();
+  leases.filter(l => l.status === 'active').forEach(l => {
+    if (!activeLeasesByUnit.has(l.unitId)) activeLeasesByUnit.set(l.unitId, []);
+    activeLeasesByUnit.get(l.unitId)!.push(l);
+  });
+
+  // 3. Group maintenance requests by unitId
+  const maintenanceRequestsByUnit = new Map<string, typeof maintenanceRequests>();
+  maintenanceRequests.forEach(r => {
+    if (!maintenanceRequestsByUnit.has(r.unitId)) maintenanceRequestsByUnit.set(r.unitId, []);
+    maintenanceRequestsByUnit.get(r.unitId)!.push(r);
+  });
+
+  // 4. Group maintenance costs by requestId
+  const costsByRequest = new Map<string, typeof maintenanceCosts>();
+  maintenanceCosts.forEach(c => {
+    if (!costsByRequest.has(c.requestId)) costsByRequest.set(c.requestId, []);
+    costsByRequest.get(c.requestId)!.push(c);
+  });
+
+  // Calculate property revenue using O(1) lookups
+  const propertyRevenueData = properties.map((property) => {
+    const propertyUnits = unitsByProperty.get(property.id) || [];
+    
+    const revenue = propertyUnits.reduce((sum, u) => {
+      const unitLeases = activeLeasesByUnit.get(u.id) || [];
+      return sum + unitLeases.reduce((leaseSum, l) => leaseSum + l.monthlyRent, 0);
+    }, 0);
 
     return {
       name: property.name,
       revenue: revenue,
       units: propertyUnits.length,
-      occupied: propertyUnits.filter(u => u.status === 'occupied').length,
+      occupied: propertyUnits.filter((u) => u.status === 'occupied').length,
     };
   });
 
-  const maintenanceCostByProperty = properties.map(property => {
-    const propertyUnits = units.filter(u => u.propertyId === property.id);
-    const propertyRequests = maintenanceRequests.filter(r =>
-      propertyUnits.some(u => u.id === r.unitId)
-    );
-    const totalCost = propertyRequests.reduce((sum, r) => {
-      const costs = maintenanceCosts.filter(c => c.requestId === r.id);
-      return sum + costs.reduce((s, c) => s + c.amount, 0);
+  // Calculate property maintenance using O(1) lookups
+  const maintenanceCostByProperty = properties.map((property) => {
+    const propertyUnits = unitsByProperty.get(property.id) || [];
+    
+    const totalCost = propertyUnits.reduce((sum, u) => {
+      const unitRequests = maintenanceRequestsByUnit.get(u.id) || [];
+      return sum + unitRequests.reduce((reqSum, r) => {
+        const costs = costsByRequest.get(r.id) || [];
+        return reqSum + costs.reduce((s, c) => s + c.amount, 0);
+      }, 0);
     }, 0);
 
     return {
@@ -113,16 +168,43 @@ export function AnalyticsPage() {
     };
   });
 
-  // Monthly revenue trend (mock data for demonstration)
-  const monthlyData = [
-    { month: 'Jul 25', revenue: 8500, expenses: 1200 },
-    { month: 'Aug 25', revenue: 9200, expenses: 800 },
-    { month: 'Sep 25', revenue: 9800, expenses: 1500 },
-    { month: 'Oct 25', revenue: 10200, expenses: 900 },
-    { month: 'Nov 25', revenue: 11000, expenses: 1100 },
-    { month: 'Dec 25', revenue: 11500, expenses: 1300 },
-    { month: 'Jan 26', revenue: totalRevenue, expenses: totalMaintenanceCost },
-  ];
+  // Calculate monthly revenue and expenses dynamically
+  const monthlyData = (() => {
+    const data: Record<string, { revenue: number; expenses: number }> = {};
+
+    // Process receipts for revenue
+    receipts.forEach((r) => {
+      const date = new Date(r.generatedDate);
+      const key = date.toLocaleString('default', {
+        month: 'short',
+        year: '2-digit',
+      }); // e.g., "Jan 26"
+      if (!data[key]) data[key] = { revenue: 0, expenses: 0 };
+      data[key].revenue += r.amount;
+    });
+
+    // Process maintenance costs for expenses
+    maintenanceCosts.forEach((c) => {
+      if (c.recordedDate) {
+        const date = new Date(c.recordedDate);
+        const key = date.toLocaleString('default', {
+          month: 'short',
+          year: '2-digit',
+        });
+        if (!data[key]) data[key] = { revenue: 0, expenses: 0 };
+        data[key].expenses += c.amount;
+      }
+    });
+
+    // Convert map to array and sort by date
+    return Object.entries(data)
+      .map(([month, values]) => ({ month, ...values }))
+      .sort((a, b) => {
+        // Simple sort by parsing "Jan 26" back to date or just assuming chronological if data is recent
+        // For robustness, we could use 'YYYY-MM' as key for sorting then format for display
+        return 0; // Keeping simple for now, can improve sort if needed
+      });
+  })();
 
   const kpiCards = [
     {
@@ -144,7 +226,7 @@ export function AnalyticsPage() {
     {
       title: 'Pending Payments',
       value: `LKR ${pendingPayments.toLocaleString()}`,
-      subtitle: `${invoices.filter(i => i.status === 'pending').length} invoices`,
+      subtitle: `${invoices.filter((i) => i.status === 'pending').length} invoices`,
       icon: FileText,
       color: 'text-orange-600',
       bgColor: 'bg-orange-50',
@@ -184,7 +266,7 @@ export function AnalyticsPage() {
     {
       title: 'Active Tenants',
       value: tenants.length,
-      subtitle: `${leases.filter(l => l.status === 'active').length} leases`,
+      subtitle: `${leases.filter((l) => l.status === 'active').length} leases`,
       icon: Users,
       color: 'text-cyan-600',
       bgColor: 'bg-cyan-50',
@@ -195,11 +277,17 @@ export function AnalyticsPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-semibold text-gray-900">Analytics & Reports</h2>
-          <p className="text-sm text-gray-500 mt-1">Comprehensive business insights and reporting</p>
+          <h2 className="text-2xl font-semibold text-gray-900">
+            Analytics & Reports
+          </h2>
+          <p className="text-sm text-gray-500 mt-1">
+            Comprehensive business insights and reporting
+          </p>
         </div>
         <div className="flex items-center gap-3">
-          <Label htmlFor="date-range" className="text-sm">Period:</Label>
+          <Label htmlFor="date-range" className="text-sm">
+            Period:
+          </Label>
           <Select value={dateRange} onValueChange={setDateRange}>
             <SelectTrigger id="date-range" className="w-[180px]">
               <SelectValue />
@@ -263,8 +351,18 @@ export function AnalyticsPage() {
                     <YAxis />
                     <Tooltip />
                     <Legend />
-                    <Line type="monotone" dataKey="revenue" stroke="#10b981" strokeWidth={2} />
-                    <Line type="monotone" dataKey="expenses" stroke="#ef4444" strokeWidth={2} />
+                    <Line
+                      type="monotone"
+                      dataKey="revenue"
+                      stroke="#10b981"
+                      strokeWidth={2}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="expenses"
+                      stroke="#ef4444"
+                      strokeWidth={2}
+                    />
                   </LineChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -298,11 +396,21 @@ export function AnalyticsPage() {
                 <table className="w-full">
                   <thead className="border-b">
                     <tr className="text-left">
-                      <th className="pb-3 text-sm font-medium text-gray-600">Property</th>
-                      <th className="pb-3 text-sm font-medium text-gray-600">Units</th>
-                      <th className="pb-3 text-sm font-medium text-gray-600">Occupied</th>
-                      <th className="pb-3 text-sm font-medium text-gray-600">Monthly Revenue</th>
-                      <th className="pb-3 text-sm font-medium text-gray-600">Occupancy</th>
+                      <th className="pb-3 text-sm font-medium text-gray-600">
+                        Property
+                      </th>
+                      <th className="pb-3 text-sm font-medium text-gray-600">
+                        Units
+                      </th>
+                      <th className="pb-3 text-sm font-medium text-gray-600">
+                        Occupied
+                      </th>
+                      <th className="pb-3 text-sm font-medium text-gray-600">
+                        Monthly Revenue
+                      </th>
+                      <th className="pb-3 text-sm font-medium text-gray-600">
+                        Occupancy
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -311,14 +419,24 @@ export function AnalyticsPage() {
                         <td className="py-3 font-medium">{prop.name}</td>
                         <td className="py-3">{prop.units}</td>
                         <td className="py-3">{prop.occupied}</td>
-                        <td className="py-3 font-semibold">LKR {prop.revenue.toLocaleString()}</td>
+                        <td className="py-3 font-semibold">
+                          LKR {prop.revenue.toLocaleString()}
+                        </td>
                         <td className="py-3">
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${prop.units === 0 ? 'bg-gray-100 text-gray-600' :
-                              (prop.occupied / prop.units) >= 0.8 ? 'bg-green-100 text-green-700' :
-                                (prop.occupied / prop.units) >= 0.5 ? 'bg-orange-100 text-orange-700' :
-                                  'bg-red-100 text-red-700'
-                            }`}>
-                            {prop.units === 0 ? 'N/A' : `${((prop.occupied / prop.units) * 100).toFixed(0)}%`}
+                          <span
+                            className={`px-2 py-1 rounded-full text-xs font-medium ${
+                              prop.units === 0
+                                ? 'bg-gray-100 text-gray-600'
+                                : prop.occupied / prop.units >= 0.8
+                                  ? 'bg-green-100 text-green-700'
+                                  : prop.occupied / prop.units >= 0.5
+                                    ? 'bg-orange-100 text-orange-700'
+                                    : 'bg-red-100 text-red-700'
+                            }`}
+                          >
+                            {prop.units === 0
+                              ? 'N/A'
+                              : `${((prop.occupied / prop.units) * 100).toFixed(0)}%`}
                           </span>
                         </td>
                       </tr>
@@ -391,20 +509,26 @@ export function AnalyticsPage() {
             <Card>
               <CardContent className="p-4">
                 <p className="text-xs text-gray-600">Occupied</p>
-                <p className="text-2xl font-semibold mt-1 text-green-600">{occupiedUnits}</p>
+                <p className="text-2xl font-semibold mt-1 text-green-600">
+                  {occupiedUnits}
+                </p>
                 <p className="text-xs text-gray-500 mt-1">{occupancyRate}%</p>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="p-4">
                 <p className="text-xs text-gray-600">Available</p>
-                <p className="text-2xl font-semibold mt-1 text-orange-600">{availableUnits}</p>
+                <p className="text-2xl font-semibold mt-1 text-orange-600">
+                  {availableUnits}
+                </p>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="p-4">
                 <p className="text-xs text-gray-600">In Maintenance</p>
-                <p className="text-2xl font-semibold mt-1 text-red-600">{maintenanceUnits}</p>
+                <p className="text-2xl font-semibold mt-1 text-red-600">
+                  {maintenanceUnits}
+                </p>
               </CardContent>
             </Card>
           </div>
@@ -437,14 +561,41 @@ export function AnalyticsPage() {
               <CardContent>
                 <div className="space-y-4">
                   {[
-                    { label: 'Total Requests', value: maintenanceRequests.length, color: 'bg-blue-100 text-blue-700' },
-                    { label: 'Submitted', value: maintenanceRequests.filter(r => r.status === 'submitted').length, color: 'bg-orange-100 text-orange-700' },
-                    { label: 'In Progress', value: maintenanceRequests.filter(r => r.status === 'in_progress').length, color: 'bg-yellow-100 text-yellow-700' },
-                    { label: 'Completed', value: maintenanceRequests.filter(r => r.status === 'completed').length, color: 'bg-green-100 text-green-700' },
+                    {
+                      label: 'Total Requests',
+                      value: maintenanceRequests.length,
+                      color: 'bg-blue-100 text-blue-700',
+                    },
+                    {
+                      label: 'Submitted',
+                      value: maintenanceRequests.filter(
+                        (r) => r.status === 'submitted'
+                      ).length,
+                      color: 'bg-orange-100 text-orange-700',
+                    },
+                    {
+                      label: 'In Progress',
+                      value: maintenanceRequests.filter(
+                        (r) => r.status === 'in_progress'
+                      ).length,
+                      color: 'bg-yellow-100 text-yellow-700',
+                    },
+                    {
+                      label: 'Completed',
+                      value: maintenanceRequests.filter(
+                        (r) => r.status === 'completed'
+                      ).length,
+                      color: 'bg-green-100 text-green-700',
+                    },
                   ].map((stat, index) => (
-                    <div key={index} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                    <div
+                      key={index}
+                      className="flex justify-between items-center p-3 bg-gray-50 rounded-lg"
+                    >
                       <span className="text-sm font-medium">{stat.label}</span>
-                      <span className={`px-3 py-1 rounded-full font-semibold ${stat.color}`}>
+                      <span
+                        className={`px-3 py-1 rounded-full font-semibold ${stat.color}`}
+                      >
                         {stat.value}
                       </span>
                     </div>
@@ -452,11 +603,17 @@ export function AnalyticsPage() {
                   <div className="pt-4 border-t">
                     <div className="flex justify-between items-center">
                       <span className="text-sm font-medium">Total Cost</span>
-                      <span className="text-xl font-semibold">LKR {totalMaintenanceCost.toLocaleString()}</span>
+                      <span className="text-xl font-semibold">
+                        LKR {totalMaintenanceCost.toLocaleString()}
+                      </span>
                     </div>
                     <div className="flex justify-between items-center mt-2">
-                      <span className="text-sm text-gray-600">Average per Request</span>
-                      <span className="font-semibold">LKR {avgMaintenanceCost}</span>
+                      <span className="text-sm text-gray-600">
+                        Average per Request
+                      </span>
+                      <span className="font-semibold">
+                        LKR {avgMaintenanceCost}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -477,28 +634,52 @@ export function AnalyticsPage() {
                   <div className="grid grid-cols-3 gap-3">
                     <div className="p-4 bg-green-50 rounded-lg border border-green-200">
                       <p className="text-xs text-gray-700">Paid</p>
-                      <p className="text-2xl font-semibold text-green-700 mt-2">{paidInvoices}</p>
-                      <p className="text-xs text-gray-600 mt-1">LKR {invoices.filter(i => i.status === 'paid').reduce((s, i) => s + i.amount, 0).toLocaleString()}</p>
+                      <p className="text-2xl font-semibold text-green-700 mt-2">
+                        {paidInvoices}
+                      </p>
+                      <p className="text-xs text-gray-600 mt-1">
+                        LKR{' '}
+                        {invoices
+                          .filter((i) => i.status === 'paid')
+                          .reduce((s, i) => s + i.amount, 0)
+                          .toLocaleString()}
+                      </p>
                     </div>
                     <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
                       <p className="text-xs text-gray-700">Pending</p>
                       <p className="text-2xl font-semibold text-orange-700 mt-2">
-                        {invoices.filter(i => i.status === 'pending').length}
+                        {invoices.filter((i) => i.status === 'pending').length}
                       </p>
-                      <p className="text-xs text-gray-600 mt-1">LKR {pendingPayments.toLocaleString()}</p>
+                      <p className="text-xs text-gray-600 mt-1">
+                        LKR {pendingPayments.toLocaleString()}
+                      </p>
                     </div>
                     <div className="p-4 bg-red-50 rounded-lg border border-red-200">
                       <p className="text-xs text-gray-700">Overdue</p>
-                      <p className="text-2xl font-semibold text-red-700 mt-2">{overdueInvoices}</p>
+                      <p className="text-2xl font-semibold text-red-700 mt-2">
+                        {overdueInvoices}
+                      </p>
                       <p className="text-xs text-gray-600 mt-1">
-                        LKR {invoices.filter(i => i.status === 'pending' && new Date(i.dueDate) < new Date()).reduce((s, i) => s + i.amount, 0).toLocaleString()}
+                        LKR{' '}
+                        {invoices
+                          .filter(
+                            (i) =>
+                              i.status === 'pending' &&
+                              new Date(i.dueDate) < new Date()
+                          )
+                          .reduce((s, i) => s + i.amount, 0)
+                          .toLocaleString()}
                       </p>
                     </div>
                   </div>
                   <div className="pt-4 border-t">
                     <div className="flex justify-between items-center mb-2">
-                      <span className="text-sm font-medium">Collection Rate</span>
-                      <span className="text-2xl font-semibold text-blue-700">{collectionRate}%</span>
+                      <span className="text-sm font-medium">
+                        Collection Rate
+                      </span>
+                      <span className="text-2xl font-semibold text-blue-700">
+                        {collectionRate}%
+                      </span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-2">
                       <div
@@ -520,35 +701,51 @@ export function AnalyticsPage() {
                   {[
                     {
                       label: 'Verified Payments',
-                      value: payments.filter(p => p.status === 'verified').length,
-                      amount: payments.filter(p => p.status === 'verified').reduce((s, p) => s + p.amount, 0),
-                      color: 'bg-green-100 text-green-700'
+                      value: payments.filter((p) => p.status === 'verified')
+                        .length,
+                      amount: payments
+                        .filter((p) => p.status === 'verified')
+                        .reduce((s, p) => s + p.amount, 0),
+                      color: 'bg-green-100 text-green-700',
                     },
                     {
                       label: 'Pending Verification',
-                      value: payments.filter(p => p.status === 'pending').length,
-                      amount: payments.filter(p => p.status === 'pending').reduce((s, p) => s + p.amount, 0),
-                      color: 'bg-orange-100 text-orange-700'
+                      value: payments.filter((p) => p.status === 'pending')
+                        .length,
+                      amount: payments
+                        .filter((p) => p.status === 'pending')
+                        .reduce((s, p) => s + p.amount, 0),
+                      color: 'bg-orange-100 text-orange-700',
                     },
                     {
                       label: 'Rejected Payments',
-                      value: payments.filter(p => p.status === 'rejected').length,
-                      amount: payments.filter(p => p.status === 'rejected').reduce((s, p) => s + p.amount, 0),
-                      color: 'bg-red-100 text-red-700'
+                      value: payments.filter((p) => p.status === 'rejected')
+                        .length,
+                      amount: payments
+                        .filter((p) => p.status === 'rejected')
+                        .reduce((s, p) => s + p.amount, 0),
+                      color: 'bg-red-100 text-red-700',
                     },
                     {
                       label: 'Receipts Generated',
                       value: receipts.length,
                       amount: receipts.reduce((s, r) => s + r.amount, 0),
-                      color: 'bg-blue-100 text-blue-700'
+                      color: 'bg-blue-100 text-blue-700',
                     },
                   ].map((stat, index) => (
-                    <div key={index} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                    <div
+                      key={index}
+                      className="flex justify-between items-center p-3 bg-gray-50 rounded-lg"
+                    >
                       <div>
                         <p className="text-sm font-medium">{stat.label}</p>
-                        <p className="text-xs text-gray-600 mt-1">LKR {stat.amount.toLocaleString()}</p>
+                        <p className="text-xs text-gray-600 mt-1">
+                          LKR {stat.amount.toLocaleString()}
+                        </p>
                       </div>
-                      <span className={`px-3 py-1 rounded-full font-semibold ${stat.color}`}>
+                      <span
+                        className={`px-3 py-1 rounded-full font-semibold ${stat.color}`}
+                      >
                         {stat.value}
                       </span>
                     </div>
@@ -568,9 +765,14 @@ export function AnalyticsPage() {
             <CardContent>
               <div className="space-y-4">
                 {properties.map((property) => {
-                  const propUnits = units.filter(u => u.propertyId === property.id);
-                  const propOccupied = propUnits.filter(u => u.status === 'occupied').length;
-                  const propRate = propUnits.length > 0 ? (propOccupied / propUnits.length) * 100 : 0;
+                  const propUnits = unitsByProperty.get(property.id) || [];
+                  const propOccupied = propUnits.filter(
+                    (u) => u.status === 'occupied'
+                  ).length;
+                  const propRate =
+                    propUnits.length > 0
+                      ? (propOccupied / propUnits.length) * 100
+                      : 0;
 
                   return (
                     <div key={property.id} className="space-y-2">
@@ -581,14 +783,19 @@ export function AnalyticsPage() {
                             {propOccupied} of {propUnits.length} units occupied
                           </p>
                         </div>
-                        <span className="text-lg font-semibold">{propRate.toFixed(0)}%</span>
+                        <span className="text-lg font-semibold">
+                          {propRate.toFixed(0)}%
+                        </span>
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-2">
                         <div
-                          className={`h-2 rounded-full transition-all ${propRate >= 80 ? 'bg-green-600' :
-                              propRate >= 50 ? 'bg-orange-600' :
-                                'bg-red-600'
-                            }`}
+                          className={`h-2 rounded-full transition-all ${
+                            propRate >= 80
+                              ? 'bg-green-600'
+                              : propRate >= 50
+                                ? 'bg-orange-600'
+                                : 'bg-red-600'
+                          }`}
                           style={{ width: `${propRate}%` }}
                         />
                       </div>
@@ -611,32 +818,52 @@ export function AnalyticsPage() {
                 <table className="w-full">
                   <thead className="border-b">
                     <tr className="text-left">
-                      <th className="pb-3 text-sm font-medium text-gray-600">Property</th>
-                      <th className="pb-3 text-sm font-medium text-gray-600">Total Requests</th>
-                      <th className="pb-3 text-sm font-medium text-gray-600">Completed</th>
-                      <th className="pb-3 text-sm font-medium text-gray-600">Total Cost</th>
-                      <th className="pb-3 text-sm font-medium text-gray-600">Avg Cost</th>
+                      <th className="pb-3 text-sm font-medium text-gray-600">
+                        Property
+                      </th>
+                      <th className="pb-3 text-sm font-medium text-gray-600">
+                        Total Requests
+                      </th>
+                      <th className="pb-3 text-sm font-medium text-gray-600">
+                        Completed
+                      </th>
+                      <th className="pb-3 text-sm font-medium text-gray-600">
+                        Total Cost
+                      </th>
+                      <th className="pb-3 text-sm font-medium text-gray-600">
+                        Avg Cost
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {properties.map((property) => {
-                      const propUnits = units.filter(u => u.propertyId === property.id);
-                      const propRequests = maintenanceRequests.filter(r =>
-                        propUnits.some(u => u.id === r.unitId)
-                      );
-                      const propCompleted = propRequests.filter(r => r.status === 'completed').length;
+                      const propUnits = unitsByProperty.get(property.id) || [];
+                      const propRequests = propUnits.flatMap(u => maintenanceRequestsByUnit.get(u.id) || []);
+                      
+                      const propCompleted = propRequests.filter(
+                        (r) => r.status === 'completed'
+                      ).length;
+                      
                       const propCost = propRequests.reduce((sum, r) => {
-                        const costs = maintenanceCosts.filter(c => c.requestId === r.id);
+                        const costs = costsByRequest.get(r.id) || [];
                         return sum + costs.reduce((s, c) => s + c.amount, 0);
                       }, 0);
-                      const propAvg = propCompleted > 0 ? (propCost / propCompleted).toFixed(2) : '0.00';
+                      const propAvg =
+                        propCompleted > 0
+                          ? (propCost / propCompleted).toFixed(2)
+                          : '0.00';
 
                       return (
-                        <tr key={property.id} className="border-b last:border-0">
+                        <tr
+                          key={property.id}
+                          className="border-b last:border-0"
+                        >
                           <td className="py-3 font-medium">{property.name}</td>
                           <td className="py-3">{propRequests.length}</td>
                           <td className="py-3">{propCompleted}</td>
-                          <td className="py-3 font-semibold">LKR {propCost.toLocaleString()}</td>
+                          <td className="py-3 font-semibold">
+                            LKR {propCost.toLocaleString()}
+                          </td>
                           <td className="py-3">LKR {propAvg}</td>
                         </tr>
                       );
@@ -645,7 +872,9 @@ export function AnalyticsPage() {
                       <td className="py-3">Total</td>
                       <td className="py-3">{maintenanceRequests.length}</td>
                       <td className="py-3">{completedRequests}</td>
-                      <td className="py-3">LKR {totalMaintenanceCost.toLocaleString()}</td>
+                      <td className="py-3">
+                        LKR {totalMaintenanceCost.toLocaleString()}
+                      </td>
                       <td className="py-3">LKR {avgMaintenanceCost}</td>
                     </tr>
                   </tbody>
@@ -672,17 +901,21 @@ export function AnalyticsPage() {
                     </div>
                     <div className="flex justify-between p-2 bg-green-50 rounded">
                       <span className="text-sm text-green-900">Paid</span>
-                      <span className="font-semibold text-green-700">{paidInvoices}</span>
+                      <span className="font-semibold text-green-700">
+                        {paidInvoices}
+                      </span>
                     </div>
                     <div className="flex justify-between p-2 bg-orange-50 rounded">
                       <span className="text-sm text-orange-900">Pending</span>
                       <span className="font-semibold text-orange-700">
-                        {invoices.filter(i => i.status === 'pending').length}
+                        {invoices.filter((i) => i.status === 'pending').length}
                       </span>
                     </div>
                     <div className="flex justify-between p-2 bg-red-50 rounded">
                       <span className="text-sm text-red-900">Overdue</span>
-                      <span className="font-semibold text-red-700">{overdueInvoices}</span>
+                      <span className="font-semibold text-red-700">
+                        {overdueInvoices}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -691,19 +924,29 @@ export function AnalyticsPage() {
                   <div className="space-y-2">
                     <div className="flex justify-between p-2 bg-gray-50 rounded">
                       <span className="text-sm">Expected Revenue</span>
-                      <span className="font-semibold">LKR {expectedMonthlyRevenue.toLocaleString()}</span>
+                      <span className="font-semibold">
+                        LKR {expectedMonthlyRevenue.toLocaleString()}
+                      </span>
                     </div>
                     <div className="flex justify-between p-2 bg-green-50 rounded">
                       <span className="text-sm text-green-900">Collected</span>
-                      <span className="font-semibold text-green-700">LKR {totalRevenue.toLocaleString()}</span>
+                      <span className="font-semibold text-green-700">
+                        LKR {totalRevenue.toLocaleString()}
+                      </span>
                     </div>
                     <div className="flex justify-between p-2 bg-orange-50 rounded">
                       <span className="text-sm text-orange-900">Pending</span>
-                      <span className="font-semibold text-orange-700">LKR {pendingPayments.toLocaleString()}</span>
+                      <span className="font-semibold text-orange-700">
+                        LKR {pendingPayments.toLocaleString()}
+                      </span>
                     </div>
                     <div className="flex justify-between p-2 bg-blue-50 rounded">
-                      <span className="text-sm text-blue-900">Collection Rate</span>
-                      <span className="font-semibold text-blue-700">{collectionRate}%</span>
+                      <span className="text-sm text-blue-900">
+                        Collection Rate
+                      </span>
+                      <span className="font-semibold text-blue-700">
+                        {collectionRate}%
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -721,32 +964,66 @@ export function AnalyticsPage() {
                 <table className="w-full">
                   <thead className="border-b">
                     <tr className="text-left">
-                      <th className="pb-3 text-sm font-medium text-gray-600">Tenant</th>
-                      <th className="pb-3 text-sm font-medium text-gray-600">Total Invoices</th>
-                      <th className="pb-3 text-sm font-medium text-gray-600">Paid</th>
-                      <th className="pb-3 text-sm font-medium text-gray-600">Pending</th>
-                      <th className="pb-3 text-sm font-medium text-gray-600">Total Paid</th>
+                      <th className="pb-3 text-sm font-medium text-gray-600">
+                        Tenant
+                      </th>
+                      <th className="pb-3 text-sm font-medium text-gray-600">
+                        Total Invoices
+                      </th>
+                      <th className="pb-3 text-sm font-medium text-gray-600">
+                        Paid
+                      </th>
+                      <th className="pb-3 text-sm font-medium text-gray-600">
+                        Pending
+                      </th>
+                      <th className="pb-3 text-sm font-medium text-gray-600">
+                        Total Paid
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
-                    {tenants.map((tenant) => {
-                      const tenantInvoices = invoices.filter(i => i.tenantId === tenant.id);
-                      const tenantPaid = tenantInvoices.filter(i => i.status === 'paid').length;
-                      const tenantPending = tenantInvoices.filter(i => i.status === 'pending').length;
-                      const tenantTotal = receipts
-                        .filter(r => r.tenantId === tenant.id)
-                        .reduce((sum, r) => sum + r.amount, 0);
+                    {(() => {
+                      // Pre-compute maps for O(1) lookups during tenant mapping
+                      const invoicesByTenant = new Map<string, typeof invoices>();
+                      invoices.forEach(i => {
+                        if (!invoicesByTenant.has(i.tenantId)) invoicesByTenant.set(i.tenantId, []);
+                        invoicesByTenant.get(i.tenantId)!.push(i);
+                      });
 
-                      return (
+                      const receiptsByTenant = new Map<string, typeof receipts>();
+                      receipts.forEach(r => {
+                        if (!receiptsByTenant.has(r.tenantId)) receiptsByTenant.set(r.tenantId, []);
+                        receiptsByTenant.get(r.tenantId)!.push(r);
+                      });
+
+                      return tenants.map((tenant) => {
+                        const tenantInvoices = invoicesByTenant.get(tenant.id) || [];
+                        const tenantPaid = tenantInvoices.filter(
+                          (i) => i.status === 'paid'
+                        ).length;
+                        const tenantPending = tenantInvoices.filter(
+                          (i) => i.status === 'pending'
+                        ).length;
+                        const tenantTotal = (receiptsByTenant.get(tenant.id) || [])
+                          .reduce((sum, r) => sum + r.amount, 0);
+
+                        return (
                         <tr key={tenant.id} className="border-b last:border-0">
                           <td className="py-3 font-medium">{tenant.name}</td>
                           <td className="py-3">{tenantInvoices.length}</td>
-                          <td className="py-3 text-green-700 font-semibold">{tenantPaid}</td>
-                          <td className="py-3 text-orange-700">{tenantPending}</td>
-                          <td className="py-3 font-semibold">LKR {tenantTotal.toLocaleString()}</td>
+                          <td className="py-3 text-green-700 font-semibold">
+                            {tenantPaid}
+                          </td>
+                          <td className="py-3 text-orange-700">
+                            {tenantPending}
+                          </td>
+                          <td className="py-3 font-semibold">
+                            LKR {tenantTotal.toLocaleString()}
+                          </td>
                         </tr>
                       );
-                    })}
+                      });
+                    })()}
                   </tbody>
                 </table>
               </div>

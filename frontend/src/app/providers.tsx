@@ -4,15 +4,13 @@ import { AuthProvider } from './context/AuthContext';
 import { AppProvider } from './context/AppContext';
 
 interface AppProvidersProps {
-    children: React.ReactNode;
+  children: React.ReactNode;
 }
 
 export function AppProviders({ children }: AppProvidersProps) {
-    return (
-        <AuthProvider>
-            <AppProvider>
-                {children}
-            </AppProvider>
-        </AuthProvider>
-    );
+  return (
+    <AuthProvider>
+      <AppProvider>{children}</AppProvider>
+    </AuthProvider>
+  );
 }

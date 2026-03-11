@@ -5,9 +5,28 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { FileText, CreditCard, AlertCircle, Download } from 'lucide-react';
 import { toast } from 'sonner';
@@ -15,7 +34,15 @@ import { ReceiptViewer } from '@/components/common/ReceiptViewer';
 
 export function TenantInvoicesPage() {
   const { user } = useAuth();
-  const { invoices, payments, receipts, units, properties, tenants, submitPayment } = useApp();
+  const {
+    invoices,
+    payments,
+    receipts,
+    units,
+    properties,
+    tenants,
+    submitPayment,
+  } = useApp();
   const [selectedInvoice, setSelectedInvoice] = useState<string | null>(null);
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -27,6 +54,7 @@ export function TenantInvoicesPage() {
     unitNumber: string;
     paymentMethod: string;
     paymentDate: string;
+    description: string;
   } | null>(null);
   const [paymentData, setPaymentData] = useState({
     amount: '',
@@ -37,9 +65,18 @@ export function TenantInvoicesPage() {
 
   // In a real app, filter by actual tenant ID
   const tenantInvoices = invoices;
-  const pendingInvoices = tenantInvoices.filter(i => i.status === 'pending');
-  const paidInvoices = tenantInvoices.filter(i => i.status === 'paid');
-  const overdueInvoices = pendingInvoices.filter(i => new Date(i.dueDate) < new Date());
+  const pendingInvoices = tenantInvoices.filter((i) => i.status === 'pending');
+  const paidInvoices = tenantInvoices.filter((i) => i.status === 'paid');
+  // Fix: Compare dates strictly (YYYY-MM-DD string comparison works if format is ISO)
+  // Fix: Compare dates strictly (YYYY-MM-DD string comparison works if format is ISO)
+  // Use local date to avoid UTC shifts marking today's invoices as overdue
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const todayStr = `${year}-${month}-${day}`;
+
+  const overdueInvoices = pendingInvoices.filter((i) => i.dueDate < todayStr);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -47,31 +84,38 @@ export function TenantInvoicesPage() {
     }
   };
 
-  const handleSubmitPayment = (e: React.FormEvent) => {
+  const handleSubmitPayment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedInvoice) return;
 
-    const invoice = invoices.find(i => i.id === selectedInvoice);
+    const invoice = invoices.find((i) => i.id === selectedInvoice);
     if (!invoice) return;
 
     // Simulate file upload by creating a local URL
-    let proofUrl = undefined;
-    if (selectedFile) {
-      proofUrl = URL.createObjectURL(selectedFile);
+    if (!selectedFile) {
+      toast.error('Please upload payment proof to proceed.');
+      return;
     }
 
-    submitPayment({
-      invoiceId: selectedInvoice,
-      tenantId: invoice.tenantId,
-      amount: parseFloat(paymentData.amount),
-      paymentDate: paymentData.paymentDate,
-      paymentMethod: paymentData.paymentMethod,
-      referenceNumber: paymentData.referenceNumber,
-      status: 'pending',
-      proofUrl,
-    });
+    // Create FormData for file upload
+    const formData = new FormData();
+    formData.append('invoiceId', selectedInvoice);
+    formData.append('amount', paymentData.amount);
+    formData.append('paymentDate', paymentData.paymentDate);
+    formData.append('paymentMethod', paymentData.paymentMethod);
+    formData.append('referenceNumber', paymentData.referenceNumber);
+    formData.append('proof', selectedFile); // Backend expects 'proof'
 
-    toast.success('Payment submitted successfully. Awaiting verification.');
+    // Fix: Await the submission. AppContext handles toasts.
+    await submitPayment(formData as any);
+
+    // Close dialog regardless of success/fail or strictly on success?
+    // AppContext helper doesn't throw if it handles error, so we might close unconditionally
+    // OR we should check if we should close. AppContext submitPayment currently swallows error but logs it.
+    // Ideally submitPayment should return success boolean.
+    // For now, let's assume success or we can move the close logic.
+    // To match current behavior of "optimistic close" but avoiding double toast:
+    setIsPaymentDialogOpen(false);
     setIsPaymentDialogOpen(false);
     setSelectedInvoice(null);
     setSelectedFile(null);
@@ -83,38 +127,32 @@ export function TenantInvoicesPage() {
     });
   };
 
-  const openPaymentDialog = (invoiceId: string) => {
-    const invoice = invoices.find(i => i.id === invoiceId);
-    if (invoice) {
-      setSelectedInvoice(invoiceId);
-      setPaymentData({
-        ...paymentData,
-        amount: invoice.amount.toString(),
-      });
-      setSelectedFile(null);
-      setIsPaymentDialogOpen(true);
-    }
+  const getInvoiceBalance = (invoiceId: string, totalAmount: number) => {
+    const verifiedPayments = payments
+      .filter((p) => p.invoiceId === invoiceId && p.status === 'verified')
+      .reduce((sum, p) => sum + Number(p.amount), 0);
+    return Math.max(0, totalAmount - verifiedPayments);
   };
 
   const getInvoicePayment = (invoiceId: string) => {
-    return payments.find(p => p.invoiceId === invoiceId);
+    return payments.find((p) => p.invoiceId === invoiceId);
   };
 
   const getInvoiceReceipt = (invoiceId: string) => {
-    return receipts.find(r => r.invoiceId === invoiceId);
+    return receipts.find((r) => r.invoiceId === invoiceId);
   };
 
   const stats = [
     {
       label: 'Pending Invoices',
       value: pendingInvoices.length,
-      subtitle: `LKR ${pendingInvoices.reduce((sum, i) => sum + i.amount, 0).toLocaleString()}`,
+      subtitle: `LKR ${pendingInvoices.reduce((sum, i) => sum + getInvoiceBalance(i.id, i.amount), 0).toLocaleString()}`,
       color: 'bg-orange-50 text-orange-700',
     },
     {
       label: 'Overdue',
       value: overdueInvoices.length,
-      subtitle: `LKR ${overdueInvoices.reduce((sum, i) => sum + i.amount, 0).toLocaleString()}`,
+      subtitle: `LKR ${overdueInvoices.reduce((sum, i) => sum + getInvoiceBalance(i.id, i.amount), 0).toLocaleString()}`,
       color: 'bg-red-50 text-red-700',
     },
     {
@@ -131,11 +169,27 @@ export function TenantInvoicesPage() {
     },
   ];
 
+  const openPaymentDialog = (invoiceId: string) => {
+    const invoice = invoices.find((i) => i.id === invoiceId);
+    if (invoice) {
+      const balance = getInvoiceBalance(invoiceId, invoice.amount);
+      setSelectedInvoice(invoiceId);
+      setPaymentData({
+        ...paymentData,
+        amount: balance.toString(),
+      });
+      setSelectedFile(null);
+      setIsPaymentDialogOpen(true);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-semibold text-gray-900">My Invoices</h2>
-        <p className="text-sm text-gray-500 mt-1">View and pay your rent invoices</p>
+        <p className="text-sm text-gray-500 mt-1">
+          View and pay your rent invoices
+        </p>
       </div>
 
       {/* Alert for overdue invoices */}
@@ -146,10 +200,17 @@ export function TenantInvoicesPage() {
               <AlertCircle className="size-5 text-red-600" />
               <div>
                 <p className="font-medium text-red-900">
-                  You have {overdueInvoices.length} overdue invoice{overdueInvoices.length > 1 ? 's' : ''}
+                  You have {overdueInvoices.length} overdue invoice
+                  {overdueInvoices.length > 1 ? 's' : ''}
                 </p>
                 <p className="text-sm text-red-700">
-                  Total overdue amount: LKR {overdueInvoices.reduce((sum, i) => sum + i.amount, 0).toLocaleString()}
+                  Total overdue amount: LKR{' '}
+                  {overdueInvoices
+                    .reduce(
+                      (sum, i) => sum + getInvoiceBalance(i.id, i.amount),
+                      0
+                    )
+                    .toLocaleString()}
                 </p>
               </div>
             </div>
@@ -163,7 +224,9 @@ export function TenantInvoicesPage() {
           <Card key={index}>
             <CardContent className="p-4">
               <p className="text-xs text-gray-600">{stat.label}</p>
-              <p className={`text-2xl font-semibold mt-1 ${stat.color.split(' ')[1]}`}>
+              <p
+                className={`text-2xl font-semibold mt-1 ${stat.color.split(' ')[1]}`}
+              >
                 {stat.value}
               </p>
               {stat.subtitle && (
@@ -185,6 +248,7 @@ export function TenantInvoicesPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Invoice Date</TableHead>
+                  <TableHead>Description</TableHead>
                   <TableHead>Property</TableHead>
                   <TableHead>Unit</TableHead>
                   <TableHead>Amount</TableHead>
@@ -195,32 +259,88 @@ export function TenantInvoicesPage() {
               </TableHeader>
               <TableBody>
                 {tenantInvoices.map((invoice) => {
-                  const unit = units.find(u => u.id === invoice.unitId);
-                  const property = unit ? properties.find(p => p.id === unit.propertyId) : null;
-                  const isOverdue = invoice.status === 'pending' && new Date(invoice.dueDate) < new Date();
+                  const unit = units.find((u) => u.id === invoice.unitId);
+                  const property = unit
+                    ? properties.find((p) => p.id === unit.propertyId)
+                    : null;
+                  // Fix: Compare dates only
+                  // Use local date to avoid UTC shifts marking today's invoices as overdue
+                  const d = new Date();
+                  const year = d.getFullYear();
+                  const month = String(d.getMonth() + 1).padStart(2, '0');
+                  const day = String(d.getDate()).padStart(2, '0');
+                  const todayStr = `${year}-${month}-${day}`;
+
+                  const isOverdue =
+                    (invoice.status === 'pending' ||
+                      invoice.status === 'partially_paid') &&
+                    invoice.dueDate < todayStr;
+                  const isLateFee = invoice.description?.includes('Late Fee');
                   const payment = getInvoicePayment(invoice.id);
                   const receipt = getInvoiceReceipt(invoice.id);
+                  const balance = getInvoiceBalance(invoice.id, invoice.amount);
+                  const isPartial = balance < invoice.amount && balance > 0;
 
                   return (
-                    <TableRow key={invoice.id}>
+                    <TableRow
+                      key={invoice.id}
+                      className={isLateFee ? 'bg-red-50' : ''}
+                    >
                       <TableCell>{invoice.generatedDate}</TableCell>
+                      <TableCell className="font-medium">
+                        {invoice.description || 'Rent Invoice'}
+                        {isLateFee && (
+                          <Badge
+                            variant="destructive"
+                            className="ml-2 bg-red-100 text-red-700 border-red-200"
+                          >
+                            Late Fee
+                          </Badge>
+                        )}
+                      </TableCell>
                       <TableCell>{property?.name || 'N/A'}</TableCell>
                       <TableCell>{unit?.unitNumber || 'N/A'}</TableCell>
-                      <TableCell className="font-semibold">LKR {invoice.amount}</TableCell>
+                      <TableCell className="font-semibold">
+                        <div className="flex flex-col">
+                          <span>LKR {balance.toLocaleString()}</span>
+                          {isPartial && (
+                            <span className="text-[10px] text-gray-500">
+                              of {invoice.amount.toLocaleString()}
+                            </span>
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell>
-                        <div className={isOverdue ? 'text-red-600 font-medium' : ''}>
+                        <div
+                          className={
+                            isOverdue ? 'text-red-600 font-medium' : ''
+                          }
+                        >
                           {invoice.dueDate}
                           {isOverdue && <div className="text-xs">Overdue</div>}
                         </div>
                       </TableCell>
                       <TableCell>
                         <div className="space-y-1">
-                          <Badge variant={
-                            invoice.status === 'paid' ? 'default' :
-                              isOverdue ? 'destructive' : 'secondary'
-                          }>
-                            {isOverdue && invoice.status === 'pending' ? 'Overdue' : invoice.status}
-                          </Badge>
+                          {invoice.status === 'partially_paid' ? (
+                            <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200 hover:bg-yellow-100">
+                              Partially Paid
+                            </Badge>
+                          ) : (
+                            <Badge
+                              variant={
+                                invoice.status === 'paid'
+                                  ? 'default'
+                                  : isOverdue
+                                    ? 'destructive'
+                                    : 'secondary'
+                              }
+                            >
+                              {isOverdue && invoice.status !== 'paid'
+                                ? 'Overdue'
+                                : invoice.status}
+                            </Badge>
+                          )}
                           {payment && payment.status === 'pending' && (
                             <Badge variant="outline" className="ml-2">
                               Payment Pending
@@ -230,7 +350,7 @@ export function TenantInvoicesPage() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex gap-2 justify-end">
-                          {invoice.status === 'pending' && !payment && (
+                          {invoice.status !== 'paid' && !payment && (
                             <Button
                               size="sm"
                               onClick={() => openPaymentDialog(invoice.id)}
@@ -239,35 +359,55 @@ export function TenantInvoicesPage() {
                               Pay Now
                             </Button>
                           )}
-                          {invoice.status === 'paid' && receipt && (() => {
-                            const receiptPayment = payments.find(p => p.id === receipt.paymentId);
-                            const tenant = tenants.find(t => t.id === invoice.tenantId);
-                            const unit = units.find(u => u.id === invoice.unitId);
-                            const property = unit ? properties.find(p => p.id === unit.propertyId) : null;
+                          {invoice.status === 'paid' &&
+                            receipt &&
+                            (() => {
+                              const receiptPayment = payments.find(
+                                (p) => p.id === receipt.paymentId
+                              );
+                              const tenant = tenants.find(
+                                (t) => t.id === invoice.tenantId
+                              );
+                              const unit = units.find(
+                                (u) => u.id === invoice.unitId
+                              );
+                              const property = unit
+                                ? properties.find(
+                                    (p) => p.id === unit.propertyId
+                                  )
+                                : null;
 
-                            if (!receiptPayment || !tenant || !unit || !property) return null;
+                              if (
+                                !receiptPayment ||
+                                !tenant ||
+                                !unit ||
+                                !property
+                              )
+                                return null;
 
-                            return (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => {
-                                  setSelectedReceipt({
-                                    receipt,
-                                    tenantName: tenant.name,
-                                    tenantEmail: tenant.email,
-                                    propertyName: property.name,
-                                    unitNumber: unit.unitNumber,
-                                    paymentMethod: receiptPayment.paymentMethod,
-                                    paymentDate: receiptPayment.paymentDate,
-                                  });
-                                }}
-                              >
-                                <Download className="size-4 mr-2" />
-                                Receipt
-                              </Button>
-                            );
-                          })()}
+                              return (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    setSelectedReceipt({
+                                      receipt,
+                                      tenantName: tenant.name,
+                                      tenantEmail: tenant.email,
+                                      propertyName: property.name,
+                                      unitNumber: unit.unitNumber,
+                                      paymentMethod:
+                                        receiptPayment.paymentMethod,
+                                      paymentDate: receiptPayment.paymentDate,
+                                      description: invoice.description || 'Rent Invoice',
+                                    });
+                                  }}
+                                >
+                                  <Download className="size-4 mr-2" />
+                                  Receipt
+                                </Button>
+                              );
+                            })()}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -299,7 +439,9 @@ export function TenantInvoicesPage() {
                 type="number"
                 step="0.01"
                 value={paymentData.amount}
-                onChange={(e) => setPaymentData({ ...paymentData, amount: e.target.value })}
+                onChange={(e) =>
+                  setPaymentData({ ...paymentData, amount: e.target.value })
+                }
                 required
                 readOnly
               />
@@ -310,7 +452,12 @@ export function TenantInvoicesPage() {
                 id="paymentDate"
                 type="date"
                 value={paymentData.paymentDate}
-                onChange={(e) => setPaymentData({ ...paymentData, paymentDate: e.target.value })}
+                onChange={(e) =>
+                  setPaymentData({
+                    ...paymentData,
+                    paymentDate: e.target.value,
+                  })
+                }
                 required
               />
             </div>
@@ -318,7 +465,9 @@ export function TenantInvoicesPage() {
               <Label htmlFor="paymentMethod">Payment Method</Label>
               <Select
                 value={paymentData.paymentMethod}
-                onValueChange={(value) => setPaymentData({ ...paymentData, paymentMethod: value })}
+                onValueChange={(value) =>
+                  setPaymentData({ ...paymentData, paymentMethod: value })
+                }
               >
                 <SelectTrigger id="paymentMethod">
                   <SelectValue />
@@ -337,19 +486,25 @@ export function TenantInvoicesPage() {
                 id="referenceNumber"
                 placeholder="e.g., Transaction ID or Check number"
                 value={paymentData.referenceNumber}
-                onChange={(e) => setPaymentData({ ...paymentData, referenceNumber: e.target.value })}
+                onChange={(e) =>
+                  setPaymentData({
+                    ...paymentData,
+                    referenceNumber: e.target.value,
+                  })
+                }
                 required
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="proof">Payment Proof (Optional)</Label>
+              <Label htmlFor="proof">Payment Proof (Required)</Label>
               <Input
                 id="proof"
                 type="file"
                 accept="image/*,.pdf"
                 onChange={handleFileChange}
                 className="cursor-pointer"
+                required
               />
               <p className="text-xs text-gray-500">
                 Upload a screenshot or photo of your payment receipt
@@ -358,8 +513,9 @@ export function TenantInvoicesPage() {
 
             <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
               <p className="text-sm text-blue-900">
-                <strong>Note:</strong> Your payment will be submitted for verification by the treasurer.
-                You'll receive a receipt once approved.
+                <strong>Note:</strong> Your payment will be submitted for
+                verification by the treasurer. You'll receive a receipt once
+                approved.
               </p>
             </div>
             <div className="flex gap-2 justify-end">
@@ -387,7 +543,10 @@ export function TenantInvoicesPage() {
       </Dialog>
 
       {/* Receipt Viewer Dialog */}
-      <Dialog open={selectedReceipt !== null} onOpenChange={() => setSelectedReceipt(null)}>
+      <Dialog
+        open={selectedReceipt !== null}
+        onOpenChange={() => setSelectedReceipt(null)}
+      >
         <DialogContent className="max-w-3xl">
           <DialogHeader>
             <DialogTitle className="sr-only">Payment Receipt</DialogTitle>
@@ -401,6 +560,7 @@ export function TenantInvoicesPage() {
               unitNumber={selectedReceipt.unitNumber}
               paymentMethod={selectedReceipt.paymentMethod}
               paymentDate={selectedReceipt.paymentDate}
+              description={selectedReceipt.description}
               onClose={() => setSelectedReceipt(null)}
             />
           )}

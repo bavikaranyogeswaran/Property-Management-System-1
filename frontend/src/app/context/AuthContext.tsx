@@ -1,101 +1,130 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useRef,
+  ReactNode,
+} from 'react';
+import authService from '../../services/auth';
 
-export type UserRole = 'owner' | 'tenant' | 'treasurer';
+export type UserRole = 'owner' | 'tenant' | 'treasurer' | 'lead';
 
 export interface User {
   id: string;
   email: string;
   name: string;
+  phone?: string;
   role: UserRole;
 }
 
 interface AuthContextType {
   user: User | null;
-  login: (email: string, password: string, role: UserRole) => Promise<boolean>;
+  login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
   isAuthenticated: boolean;
-  getTreasurers?: () => any[];
+  isLoading: boolean;
+  updateProfile: (data: Partial<User>) => Promise<void>;
+  changePassword: (data: any) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Mock users for demonstration
-const MOCK_USERS = [
-  { id: '1', email: 'owner@pms.com', password: 'owner123', name: 'John Owner', role: 'owner' as UserRole },
-  { id: '2', email: 'treasurer@pms.com', password: 'treasurer123', name: 'Jane Treasurer', role: 'treasurer' as UserRole },
-  { id: '3', email: 'tenant@pms.com', password: 'tenant123', name: 'Bob Tenant', role: 'tenant' as UserRole },
-];
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const logoutTimerRef = useRef<number | null>(null);
 
-  useEffect(() => {
-    // Check for stored user session
-    const storedUser = localStorage.getItem('pms_user');
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
+  const clearLogoutTimer = () => {
+    if (logoutTimerRef.current) {
+      window.clearTimeout(logoutTimerRef.current);
+      logoutTimerRef.current = null;
     }
-  }, []);
+  };
 
-  const login = async (email: string, password: string, role: UserRole): Promise<boolean> => {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    // First check mock users
-    const foundUser = MOCK_USERS.find(
-      u => u.email === email && u.password === password && u.role === role
-    );
-
-    if (foundUser) {
-      const userData = {
-        id: foundUser.id,
-        email: foundUser.email,
-        name: foundUser.name,
-        role: foundUser.role,
-      };
-      setUser(userData);
-      localStorage.setItem('pms_user', JSON.stringify(userData));
-      return true;
+  const scheduleLogout = (remainingTime: number) => {
+    clearLogoutTimer();
+    if (remainingTime > 0) {
+      logoutTimerRef.current = window.setTimeout(() => {
+        console.warn('Session expired. Logging out automatically.');
+        logout();
+      }, remainingTime);
     }
-
-    // If role is treasurer, check registered treasurers from localStorage
-    if (role === 'treasurer') {
-      const storedData = localStorage.getItem('pms_data');
-      if (storedData) {
-        const data = JSON.parse(storedData);
-        const treasurer = data.treasurers?.find(
-          (t: any) => t.email === email && t.password === password && t.status === 'active'
-        );
-        
-        if (treasurer) {
-          const userData = {
-            id: treasurer.id,
-            email: treasurer.email,
-            name: treasurer.name,
-            role: 'treasurer' as UserRole,
-          };
-          setUser(userData);
-          localStorage.setItem('pms_user', JSON.stringify(userData));
-          return true;
-        }
-      }
-    }
-
-    return false;
   };
 
   const logout = () => {
+    clearLogoutTimer();
+    authService.logout();
     setUser(null);
-    localStorage.removeItem('pms_user');
+  };
+
+  useEffect(() => {
+    const initAuth = () => {
+      const storedUser = authService.getCurrentUser();
+      const isAuth = authService.isAuthenticated();
+
+      if (storedUser && isAuth) {
+        setUser(storedUser);
+        const remainingTime = authService.getTokenRemainingTime();
+        scheduleLogout(remainingTime);
+      } else {
+        if (storedUser) {
+          authService.logout();
+          setUser(null);
+        }
+      }
+      setIsLoading(false);
+    };
+
+    initAuth();
+
+    return () => clearLogoutTimer();
+  }, []);
+
+  const login = async (email: string, password: string): Promise<boolean> => {
+    try {
+      const { user } = await authService.login({ email, password });
+      setUser(user);
+      const remainingTime = authService.getTokenRemainingTime();
+      scheduleLogout(remainingTime);
+      return true;
+    } catch (error) {
+      console.error('Login failed', error);
+      throw error;
+    }
+  };
+
+  const updateProfile = async (data: Partial<User>) => {
+    try {
+      const updatedUser = await authService.updateProfile(data);
+      setUser((prev) => (prev ? { ...prev, ...updatedUser } : null));
+    } catch (error) {
+      console.error('Profile update failed', error);
+      throw error;
+    }
+  };
+
+  const changePassword = async (data: any) => {
+    try {
+      await authService.changePassword(data);
+    } catch (error) {
+      console.error('Password change failed', error);
+      throw error;
+    }
   };
 
   return (
-    <AuthContext.Provider value={{
-      user,
-      login,
-      logout,
-      isAuthenticated: !!user,
-    }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        login,
+        logout,
+        isAuthenticated: !!user,
+        isLoading,
+        updateProfile,
+        changePassword,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
