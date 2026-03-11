@@ -540,11 +540,33 @@ export const syncUnitStatuses = async () => {
     }
 
     // 2. Find Units marked 'occupied' that satisfy NO active lease condition?
-    // (Optional: verifying cleanup)
-    // Only if NO active/pending lease exists.
-    // This is complex if 'maintenance' uses occupied status.
-    // We'll skip auto-cleaning 'occupied' to be safe (unless we're sure).
-    // But preventing 'False Available' is critical for avoiding double-booking.
+    // "Ghost Tenant" Cleanup: find units that are 'occupied' but have no lease that is active today
+    const [ghostOccupied] = await db.query(
+      `
+            SELECT u.unit_id 
+            FROM units u
+            WHERE u.status = 'occupied'
+            AND NOT EXISTS (
+                SELECT 1 FROM leases l
+                WHERE l.unit_id = u.unit_id
+                AND l.status = 'active'
+                AND l.start_date <= ?
+                AND l.end_date >= ?
+            )
+        `,
+      [today, today]
+    );
+
+    if (ghostOccupied.length > 0) {
+      console.log(
+        `Found ${ghostOccupied.length} "Ghost" units falsely marked 'occupied' (no active lease). Correcting to 'available'...`
+      );
+      const ids = ghostOccupied.map((u) => u.unit_id);
+      await db.query(
+        `UPDATE units SET status = 'available' WHERE unit_id IN (?)`,
+        [ids]
+      );
+    }
   } catch (error) {
     console.error('Error syncing unit statuses:', error);
   }

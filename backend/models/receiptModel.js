@@ -59,6 +59,51 @@ class ReceiptModel {
     return rows.map((row) => this.mapRow(row));
   }
 
+  async findByOwnerId(ownerId) {
+    const [rows] = await pool.query(
+      `
+            SELECT r.*, p.invoice_id, l.tenant_id, 
+                   pr.name as property_name, u.unit_number,
+                   tu.name as tenant_name, tu.email as tenant_email,
+                   p.payment_method, p.payment_date, i.description
+            FROM receipts r 
+            LEFT JOIN payments p ON r.payment_id = p.payment_id 
+            LEFT JOIN rent_invoices i ON p.invoice_id = i.invoice_id
+            LEFT JOIN leases l ON i.lease_id = l.lease_id
+            LEFT JOIN units u ON l.unit_id = u.unit_id
+            LEFT JOIN properties pr ON u.property_id = pr.property_id
+            LEFT JOIN users tu ON l.tenant_id = tu.user_id
+            WHERE pr.owner_id = ?
+            ORDER BY r.receipt_date DESC
+        `,
+      [ownerId]
+    );
+    return rows.map((row) => this.mapRow(row));
+  }
+
+  async findByTreasurerId(treasurerId) {
+    const [rows] = await pool.query(
+      `
+            SELECT r.*, p.invoice_id, l.tenant_id, 
+                   pr.name as property_name, u.unit_number,
+                   tu.name as tenant_name, tu.email as tenant_email,
+                   p.payment_method, p.payment_date, i.description
+            FROM receipts r 
+            LEFT JOIN payments p ON r.payment_id = p.payment_id 
+            LEFT JOIN rent_invoices i ON p.invoice_id = i.invoice_id
+            LEFT JOIN leases l ON i.lease_id = l.lease_id
+            LEFT JOIN units u ON l.unit_id = u.unit_id
+            LEFT JOIN properties pr ON u.property_id = pr.property_id
+            LEFT JOIN staff_property_assignments spa ON pr.property_id = spa.property_id
+            LEFT JOIN users tu ON l.tenant_id = tu.user_id
+            WHERE spa.user_id = ?
+            ORDER BY r.receipt_date DESC
+        `,
+      [treasurerId]
+    );
+    return rows.map((row) => this.mapRow(row));
+  }
+
   mapRow(row) {
     if (!row) return null;
     return {
