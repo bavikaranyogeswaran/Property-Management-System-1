@@ -605,18 +605,6 @@ export function LeadsPage() {
                 </p>
               </div>
             </div>
-
-
-
-            <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-              <p className="text-sm text-blue-900">
-                <strong>Note:</strong> The lead will be promoted to a Tenant.
-                They can use their existing credentials to log in. After
-                conversion, a lease will be created automatically with the dates
-                selected above.
-              </p>
-            </div>
-
             {/* Unit Selection Logic */}
             <div className="space-y-2 pt-2 border-t">
               <Label>Unit Assignment</Label>
@@ -629,9 +617,7 @@ export function LeadsPage() {
                         ?.unitNumber || 'Unknown'}
                     </strong>
                   </span>
-                  <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded">
-                    Pre-selected
-                  </span>
+
                 </div>
               ) : (
                 <div className="space-y-2">

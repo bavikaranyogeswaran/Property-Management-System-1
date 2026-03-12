@@ -33,17 +33,8 @@ class AuthController {
 
   async setupPassword(req, res) {
     try {
-      const { token, password } = req.body;
-      let tenantData = req.body.tenantData;
-
-      // Handle multipart/form-data where tenantData might be a JSON string
-      if (typeof tenantData === 'string') {
-        try {
-          tenantData = JSON.parse(tenantData);
-        } catch (e) {
-          console.error('Failed to parse tenantData JSON:', e);
-        }
-      }
+      const { token, password, tenantData: initialTenantData } = req.body;
+      let tenantData = initialTenantData;
 
       // If a file was uploaded, add its path to tenantData
       if (req.file) {

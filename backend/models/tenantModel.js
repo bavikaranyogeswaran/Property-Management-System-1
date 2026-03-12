@@ -23,7 +23,7 @@ class TenantModel {
 
     // Uses the provided connection for transaction support
     const query = `
-            (user_id, nic, nic_url, permanent_address, emergency_contact_name, emergency_contact_phone, 
+            INSERT INTO tenants (user_id, nic, nic_url, permanent_address, emergency_contact_name, emergency_contact_phone, 
              employment_status, monthly_income) 
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         `;

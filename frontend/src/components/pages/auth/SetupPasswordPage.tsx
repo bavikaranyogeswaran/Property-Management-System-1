@@ -103,10 +103,16 @@ export function SetupPasswordPage() {
       navigate('/login');
     } catch (error: any) {
       console.error(error);
-      toast.error(
-        error.response?.data?.error ||
-          'Failed to set password. Link may be expired.'
-      );
+      const errorMsg = error.response?.data?.error;
+      const details = error.response?.data?.details;
+
+      if (errorMsg === 'Validation Error' && Array.isArray(details)) {
+        toast.error(`Validation Error: ${details.join(', ')}`);
+      } else {
+        toast.error(
+          errorMsg || 'Failed to set password. Link may be expired.'
+        );
+      }
     }
   };
 
@@ -266,7 +272,7 @@ export function SetupPasswordPage() {
                         <FormItem>
                           <FormLabel>Monthly Income (LKR) *</FormLabel>
                           <FormControl>
-                            <Input type="number" placeholder="0.00" {...field} />
+                            <Input type="number" min="0" step="0.01" placeholder="0.00" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
