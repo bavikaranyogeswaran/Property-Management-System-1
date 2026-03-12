@@ -14,6 +14,7 @@ import { TenantScoreCard } from './TenantScoreCard';
 import { BehaviorLogList } from './BehaviorLogList';
 import { AddBehaviorModal, BehaviorLogFormData } from './AddBehaviorModal';
 import { useApp } from '@/app/context/AppContext';
+import { useAuth } from '@/app/context/AuthContext';
 
 interface TenantDetailsDialogProps {
   tenant: Tenant | null;
@@ -33,6 +34,7 @@ export const TenantDetailsDialog: React.FC<TenantDetailsDialogProps> = ({
   units,
   properties,
 }) => {
+  const { user } = useAuth();
   const [behaviorLogs, setBehaviorLogs] = useState<BehaviorLog[]>([]);
   const [score, setScore] = useState<number>(100);
   const [isAddBehaviorOpen, setIsAddBehaviorOpen] = useState(false);
@@ -74,7 +76,7 @@ export const TenantDetailsDialog: React.FC<TenantDetailsDialogProps> = ({
           tenantId: tenant.id, // Controller expects tenantId (which is userId for tenant) in params, but body might use it too?
           // The route is POST /:tenantId, so params handle it.
           ...data,
-          recordedBy: 1, // TODO: Get logged in user ID
+          recordedBy: user?.id || 1, // Use actual logged in user ID
         }),
       });
 
