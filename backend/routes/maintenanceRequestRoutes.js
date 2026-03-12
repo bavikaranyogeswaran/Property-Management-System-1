@@ -11,5 +11,10 @@ router.put(
   authenticateToken,
   maintenanceRequestController.updateStatus
 );
+router.post(
+  '/invoice',
+  authenticateToken,
+  maintenanceRequestController.createInvoice
+);
 
 export default router;

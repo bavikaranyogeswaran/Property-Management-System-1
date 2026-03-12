@@ -70,7 +70,7 @@ export const maintenanceApi = {
     amount: number;
     description: string;
     dueDate?: string;
-  }) => apiClient.post('/maintenance/invoice', data),
+  }) => apiClient.post('/maintenance-requests/invoice', data),
 };
 
 // Payment API

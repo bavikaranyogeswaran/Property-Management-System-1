@@ -613,16 +613,22 @@ class LeaseService {
         }
 
         // RBAC Check
-        if (user.role === 'owner') return lease;
+        if (user.role === 'owner') {
+             const propertyModel = (await import('../models/propertyModel.js')).default;
+             const property = await propertyModel.findById(lease.propertyId);
+             if (property && String(property.owner_id) === String(user.id)) {
+                  return lease;
+             }
+             throw new Error('Access denied');
+        }
         if (user.role === 'treasurer') {
-             // Verify assignment? or allow read? 
-             // Logic in controller allowed read if assigned. 
-             // Let's implement strict assignment check or lax read.
-             // Controller logic was: "Treasurer sees ASSIGNED only" in getLeases.
-             // But getLeaseById in Controller checked specific tenantId match for tenant, 
-             // and Treasurer was allowed.
-             // Let's replicate Controller logic:
-             return lease; // Simplify for checked roles
+             const staffModel = (await import('../models/staffModel.js')).default;
+             const assigned = await staffModel.getAssignedProperties(user.id);
+             const assignedIds = assigned.map((p) => String(p.property_id));
+             if (assignedIds.includes(String(lease.propertyId))) {
+                  return lease;
+             }
+             throw new Error('Access denied');
         }
         if (user.role === 'tenant') {
              if (String(lease.tenantId) !== String(user.id)) {

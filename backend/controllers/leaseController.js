@@ -19,7 +19,7 @@ class LeaseController {
   async getLeaseById(req, res) {
     try {
       const { id } = req.params;
-      const lease = await leaseService.getLeaseById(id, req.user); // Pending implementation
+      const lease = await leaseService.getLeaseById(id, req.user);
       res.json(lease);
     } catch (error) {
       if (error.message === 'Lease not found') return res.status(404).json({ error: error.message });
