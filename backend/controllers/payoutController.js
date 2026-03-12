@@ -1,4 +1,4 @@
-import payoutModel from '../models/payoutModel.js';
+import payoutService from '../services/payoutService.js';
 
 class PayoutController {
   // 1. Preview (Calculate but don't save)
@@ -19,7 +19,7 @@ class PayoutController {
           .json({ error: 'Start date and end date required' });
       }
 
-      const calculation = await payoutModel.calculateNetPayout(
+      const calculation = await payoutService.previewPayout(
         ownerId,
         startDate,
         endDate
@@ -41,33 +41,11 @@ class PayoutController {
         return res.status(403).json({ error: 'Access denied' });
       }
 
-      // Logic Fix: Prevent Overlapping Payouts
-      const hasOverlap = await payoutModel.checkOverlap(
+      const { payoutId, netPayout } = await payoutService.createPayout(
         ownerId,
         startDate,
         endDate
       );
-      if (hasOverlap) {
-        return res
-          .status(400)
-          .json({ error: 'A payout record already exists for this period.' });
-      }
-
-      const { netPayout } = await payoutModel.calculateNetPayout(
-        ownerId,
-        startDate,
-        endDate
-      );
-
-      // Logic: Can we implement a check to ensure we don't pay for the same period twice?
-      // For now, simple flow as requested.
-
-      const payoutId = await payoutModel.create({
-        ownerId,
-        amount: netPayout,
-        periodStart: startDate,
-        periodEnd: endDate,
-      });
 
       res
         .status(201)
@@ -84,7 +62,7 @@ class PayoutController {
       if (req.user.role !== 'owner') {
         return res.status(403).json({ error: 'Access denied' });
       }
-      const payouts = await payoutModel.findByOwnerId(ownerId);
+      const payouts = await payoutService.getHistory(ownerId);
       res.json(payouts);
     } catch (error) {
       console.error(error);
@@ -100,18 +78,7 @@ class PayoutController {
 
       const { id } = req.params;
 
-      // Verify payout belongs to the requesting owner
-      const payouts = await payoutModel.findByOwnerId(req.user.id);
-      const payout = payouts.find((p) => String(p.payout_id) === String(id));
-      if (!payout) {
-        return res.status(404).json({ error: 'Payout not found' });
-      }
-
-      if (payout.status === 'processed') {
-        return res.status(400).json({ error: 'Payout already processed' });
-      }
-
-      await payoutModel.markAsProcessed(id);
+      await payoutService.processPayout(req.user.id, id);
       res.json({ message: 'Payout marked as processed' });
     } catch (error) {
       console.error(error);
