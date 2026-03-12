@@ -317,7 +317,6 @@ export function TenantInvoicesPage() {
                           }
                         >
                           {invoice.dueDate}
-                          {isOverdue && <div className="text-xs">Overdue</div>}
                         </div>
                       </TableCell>
                       <TableCell>

@@ -232,7 +232,6 @@ export function OwnerInvoicesPage() {
                 <TableCell className="align-middle h-14">
                   <div className={`flex flex-col gap-0.5 ${isOverdue ? 'text-red-600 font-medium' : ''}`}>
                     <span>{invoice.dueDate}</span>
-                    {isOverdue && <span className="text-xs">Overdue</span>}
                   </div>
                 </TableCell>
                 <TableCell className="align-middle h-14">{invoice.generatedDate}</TableCell>
