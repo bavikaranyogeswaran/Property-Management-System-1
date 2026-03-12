@@ -749,6 +749,8 @@ export function PropertiesPage() {
                             <Label>Monthly Rent (LKR)</Label>
                             <Input
                               type="number"
+                              step="0.01"
+                              min="0"
                               placeholder="e.g. 150000"
                               value={singleUnitRent || ''}
                               onChange={(e) =>
@@ -794,6 +796,8 @@ export function PropertiesPage() {
                               <Label>Monthly Rent (LKR)</Label>
                               <Input
                                 type="number"
+                                step="0.01"
+                                min="0"
                                 placeholder="e.g. 50000"
                                 value={newUnitRent || ''}
                                 onChange={(e) =>

@@ -527,6 +527,7 @@ export function OwnerMaintenancePage() {
                   id="cost-amount"
                   type="number"
                   step="0.01"
+                  min="0"
                   placeholder="e.g., 150.00"
                   value={costFormData.amount}
                   onChange={(e) =>
