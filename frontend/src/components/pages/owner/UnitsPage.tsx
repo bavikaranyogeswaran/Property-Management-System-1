@@ -412,6 +412,8 @@ export function UnitsPage() {
                         <FormControl>
                           <Input
                             type="number"
+                            min="0"
+                            step="0.01"
                             placeholder="e.g., 1200"
                             {...field}
                             onChange={(e) =>

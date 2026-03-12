@@ -72,6 +72,8 @@ function RecordCashPaymentForm({
         <Label>Amount (LKR)</Label>
         <Input
           type="number"
+          min="0"
+          step="0.01"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
           required

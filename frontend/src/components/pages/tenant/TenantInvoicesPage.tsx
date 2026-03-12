@@ -437,6 +437,7 @@ export function TenantInvoicesPage() {
               <Input
                 id="amount"
                 type="number"
+                min="0"
                 step="0.01"
                 value={paymentData.amount}
                 onChange={(e) =>

@@ -269,6 +269,8 @@ export function MaintenanceExpensesPage() {
                 <Input
                   id="amount"
                   type="number"
+                  min="0"
+                  step="0.01"
                   placeholder="0.00"
                   className="pl-9"
                   value={amount}
