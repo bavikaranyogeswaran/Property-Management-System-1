@@ -43,6 +43,8 @@ import {
   MessageSquare,
   Check,
   X,
+  UserX,
+  AlertCircle,
 } from 'lucide-react';
 import { ChatInterface } from '@/components/common/ChatInterface';
 import { toast } from 'sonner';
@@ -63,6 +65,7 @@ export function LeadsPage() {
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [isConvertDialogOpen, setIsConvertDialogOpen] = useState(false);
   const [isNegotiationDialogOpen, setIsNegotiationDialogOpen] = useState(false);
+  const [isDropConfirmOpen, setIsDropConfirmOpen] = useState(false);
 
   const [conversionData, setConversionData] = useState({
     startDate: new Date().toISOString().split('T')[0],
@@ -359,30 +362,12 @@ export function LeadsPage() {
                   </div>
                 </TableCell>
                 <TableCell>
-                  {lead.status === 'converted' || lead.status === 'dropped' ? (
-                    <Badge
-                      variant={statusBadge.variant}
-                      className={statusBadge.color}
-                    >
-                      {statusBadge.label}
-                    </Badge>
-                  ) : (
-                    <Select
-                      value={lead.status}
-                      onValueChange={(value: Lead['status']) =>
-                        handleStatusChange(lead.id, value)
-                      }
-                    >
-                      <SelectTrigger className="w-[140px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="interested">Interested</SelectItem>
-                        <SelectItem value="converted">Converted</SelectItem>
-                        <SelectItem value="dropped">Dropped</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  )}
+                  <Badge
+                    variant={statusBadge.variant}
+                    className={statusBadge.color}
+                  >
+                    {statusBadge.label}
+                  </Badge>
                 </TableCell>
                 <TableCell>
                   <span className="text-sm text-gray-600">
@@ -406,17 +391,30 @@ export function LeadsPage() {
                     </Button>
                     {lead.status !== 'converted' &&
                       lead.status !== 'dropped' && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => {
-                            setSelectedLead(lead);
-                            setIsConvertDialogOpen(true);
-                          }}
-                          title="Convert to Tenant"
-                        >
-                          <CheckCircle className="size-4 text-green-600" />
-                        </Button>
+                        <>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              setSelectedLead(lead);
+                              setIsConvertDialogOpen(true);
+                            }}
+                            title="Convert to Tenant"
+                          >
+                            <CheckCircle className="size-4 text-green-600" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              setSelectedLead(lead);
+                              setIsDropConfirmOpen(true);
+                            }}
+                            title="Drop Lead"
+                          >
+                            <UserX className="size-4 text-red-600" />
+                          </Button>
+                        </>
                       )}
                   </div>
                 </TableCell>
@@ -521,6 +519,47 @@ export function LeadsPage() {
           </Tabs>
         </CardContent>
       </Card>
+
+      {/* Drop Confirmation Dialog */}
+      <Dialog open={isDropConfirmOpen} onOpenChange={setIsDropConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertCircle className="size-5" />
+              Drop Lead
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-4">
+            <p className="text-sm text-gray-600">
+              Are you sure you want to drop <strong>{selectedLead?.name}</strong>? 
+              This will move them to the "Dropped" category and stop any further processing.
+            </p>
+            <div className="flex gap-2 justify-end">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsDropConfirmOpen(false);
+                  setSelectedLead(null);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button 
+                variant="destructive" 
+                onClick={async () => {
+                  if (selectedLead) {
+                    await handleStatusChange(selectedLead.id, 'dropped');
+                    setIsDropConfirmOpen(false);
+                    setSelectedLead(null);
+                  }
+                }}
+              >
+                Drop Lead
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={isConvertDialogOpen} onOpenChange={setIsConvertDialogOpen}>
         <DialogContent>

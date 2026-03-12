@@ -121,10 +121,36 @@ class LeadService {
         if (user.role !== 'owner') {
              throw new Error('Access denied.');
         }
+
         const isOwner = await leadModel.verifyOwnership(id, user.id);
         if (!isOwner) throw new Error('Access denied. This lead does not belong to your property.');
+
+        // Status validation
+        if (data.status) {
+            const currentLead = await leadModel.findById(id);
+            if (!currentLead) throw new Error('Lead not found');
+
+            // 1. Prevent moving away from terminal states
+            if (currentLead.status === 'converted' || currentLead.status === 'dropped') {
+                if (data.status !== currentLead.status) {
+                    throw new Error(`Cannot change status of a ${currentLead.status} lead.`);
+                }
+            }
+
+            // 2. Prevent setting to 'converted' directly
+            if (data.status === 'converted' && currentLead.status !== 'converted') {
+                throw new Error("Leads must be converted via the 'Convert to Tenant' process.");
+            }
+
+            // 3. Validate enum
+            const validStatuses = ['interested', 'converted', 'dropped'];
+            if (!validStatuses.includes(data.status)) {
+                throw new Error('Invalid status value.');
+            }
+        }
+
         const success = await leadModel.update(id, data);
-        if (!success) throw new Error('Lead not found');
+        if (!success) throw new Error('Lead update failed');
         return success;
     }
 
