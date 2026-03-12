@@ -31,7 +31,8 @@ CREATE TABLE users (
 -- TENANTS
 CREATE TABLE tenants (
     user_id INT PRIMARY KEY,
-    nic VARCHAR(20) UNIQUE,              -- NIC (Old or New format)
+    nic VARCHAR(20) UNIQUE,              -- NIC (Optional, number format)
+    nic_url VARCHAR(500),                -- [ADDED] URL to uploaded NIC document
     permanent_address VARCHAR(255),      -- Tenant's permanent address
     emergency_contact_name VARCHAR(100),
     emergency_contact_phone VARCHAR(20),

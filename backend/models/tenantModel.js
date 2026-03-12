@@ -13,6 +13,7 @@ class TenantModel {
     const {
       userId,
       nic,
+      nic_url,
       permanentAddress,
       emergencyContactName,
       emergencyContactPhone,
@@ -22,15 +23,15 @@ class TenantModel {
 
     // Uses the provided connection for transaction support
     const query = `
-            INSERT INTO tenants 
-            (user_id, nic, permanent_address, emergency_contact_name, emergency_contact_phone, 
+            (user_id, nic, nic_url, permanent_address, emergency_contact_name, emergency_contact_phone, 
              employment_status, monthly_income) 
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         `;
 
     await connection.query(query, [
       userId,
       nic,
+      nic_url,
       permanentAddress,
       emergencyContactName,
       emergencyContactPhone,
@@ -52,6 +53,7 @@ class TenantModel {
     return {
       userId: row.user_id,
       nic: row.nic,
+      nicUrl: row.nic_url,
       permanentAddress: row.permanent_address,
       emergencyContactName: row.emergency_contact_name,
       emergencyContactPhone: row.emergency_contact_phone,
@@ -68,6 +70,7 @@ class TenantModel {
     const db = connection || pool;
     const {
       nic,
+      nicUrl,
       permanentAddress,
       emergencyContactName,
       emergencyContactPhone,
@@ -77,6 +80,7 @@ class TenantModel {
     const query = `
       UPDATE tenants 
       SET nic = ?, 
+          nic_url = ?, 
           permanent_address = ?, 
           emergency_contact_name = ?, 
           emergency_contact_phone = ?, 
@@ -86,6 +90,7 @@ class TenantModel {
 
     await db.query(query, [
       nic || null,
+      nicUrl || null,
       permanentAddress || null,
       emergencyContactName || null,
       emergencyContactPhone || null,
@@ -97,6 +102,7 @@ class TenantModel {
   // Whitelist of allowed fields: camelCase key -> snake_case column
   static ALLOWED_UPDATE_FIELDS = {
     nic: 'nic',
+    nicUrl: 'nic_url',
     permanentAddress: 'permanent_address',
     emergencyContactName: 'emergency_contact_name',
     emergencyContactPhone: 'emergency_contact_phone',

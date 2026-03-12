@@ -25,7 +25,7 @@ export const setupPasswordSchema = Joi.object({
   tenantData: Joi.object({
     nic: Joi.string()
       .pattern(/^([0-9]{9}[xXvV]|[0-9]{12})$/)
-      .required()
+      .optional()
       .messages({
         'string.pattern.base': 'Please enter a valid Sri Lankan NIC (e.g., 123456789V or 199012345678).',
       }),

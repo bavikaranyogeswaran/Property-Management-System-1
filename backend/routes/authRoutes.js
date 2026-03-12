@@ -16,6 +16,8 @@ import {
 
 const router = Router();
 
+import upload from '../middleware/upload.js';
+
 router.post('/login', validateRequest(loginSchema), authController.login);
 router.post(
   '/verify-email',
@@ -24,6 +26,7 @@ router.post(
 );
 router.post(
   '/setup-password',
+  upload.single('nicDoc'),
   validateRequest(setupPasswordSchema),
   authController.setupPassword
 );

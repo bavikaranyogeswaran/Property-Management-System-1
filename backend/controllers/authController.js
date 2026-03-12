@@ -33,7 +33,23 @@ class AuthController {
 
   async setupPassword(req, res) {
     try {
-      const { token, password, tenantData } = req.body;
+      const { token, password } = req.body;
+      let tenantData = req.body.tenantData;
+
+      // Handle multipart/form-data where tenantData might be a JSON string
+      if (typeof tenantData === 'string') {
+        try {
+          tenantData = JSON.parse(tenantData);
+        } catch (e) {
+          console.error('Failed to parse tenantData JSON:', e);
+        }
+      }
+
+      // If a file was uploaded, add its path to tenantData
+      if (req.file) {
+        tenantData = tenantData || {};
+        tenantData.nicUrl = `/uploads/${req.file.filename}`;
+      }
 
       const result = await authService.setupPassword(token, password, tenantData);
       res.json(result);

@@ -109,11 +109,23 @@ export const authService = {
   },
 
   setupPassword: async (token: string, password: string, tenantData?: any) => {
-    const response = await apiClient.post('/auth/setup-password', {
-      token,
-      password,
-      tenantData,
-    });
+    let payload: any = { token, password };
+
+    if (tenantData) {
+      const { nicDoc, ...rest } = tenantData;
+      if (nicDoc instanceof File) {
+        const formData = new FormData();
+        formData.append('token', token);
+        formData.append('password', password);
+        formData.append('tenantData', JSON.stringify(rest));
+        formData.append('nicDoc', nicDoc);
+        payload = formData;
+      } else {
+        payload.tenantData = tenantData;
+      }
+    }
+
+    const response = await apiClient.post('/auth/setup-password', payload);
     return response.data;
   },
 };

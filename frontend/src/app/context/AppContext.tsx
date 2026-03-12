@@ -98,6 +98,7 @@ export interface Tenant {
   status?: string;
   behaviorScore?: number;
   nic?: string;
+  nicUrl?: string;
   monthlyIncome?: number | string;
   employmentStatus?: string;
   permanentAddress?: string;
@@ -463,6 +464,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
                 createdAt: u.createdAt,
                 status: u.status,
                 nic: u.nic,
+                nicUrl: u.nicUrl || u.nic_url,
                 monthlyIncome: u.monthlyIncome,
                 employmentStatus: u.employmentStatus,
                 permanentAddress: u.permanentAddress

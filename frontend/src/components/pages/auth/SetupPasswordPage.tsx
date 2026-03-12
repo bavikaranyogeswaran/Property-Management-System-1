@@ -222,10 +222,35 @@ export function SetupPasswordPage() {
                     
                     <FormField
                       control={form.control}
+                      name="nicDoc"
+                      render={({ field: { value, onChange, ...fieldProps } }) => (
+                        <FormItem>
+                          <FormLabel>NIC Document / Image *</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="file"
+                              accept="image/*,application/pdf"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                onChange(file);
+                              }}
+                              {...fieldProps}
+                            />
+                          </FormControl>
+                          <CardDescription className="text-[10px] mt-1">
+                            Upload a clear photo or PDF of your NIC (Front & Back).
+                          </CardDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={form.control}
                       name="nic"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>NIC / ID Number *</FormLabel>
+                          <FormLabel>NIC / ID Number (Optional)</FormLabel>
                           <FormControl>
                             <Input placeholder="e.g. 199012345678" {...field} />
                           </FormControl>
