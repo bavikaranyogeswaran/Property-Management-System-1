@@ -143,6 +143,23 @@ export const generateRentInvoices = async () => {
               `Auto-applied credit ${amountToApply} to Invoice ${invoiceId}. Remaining Credit: ${tenant.creditBalance - amountToApply}`
             );
 
+            // 5. Post to Ledger (Credit Revenue for auto-applied credit)
+            try {
+              const ledgerModel = (await import('../models/ledgerModel.js')).default;
+              await ledgerModel.create({
+                paymentId: payId,
+                invoiceId,
+                leaseId: lease.id,
+                accountType: 'revenue',
+                category: 'rent',
+                credit: Number(amountToApply),
+                description: `Auto-applied credit from tenant balance to invoice #${invoiceId}`,
+                entryDate: new Date().toISOString().split('T')[0],
+              });
+            } catch (ledgerErr) {
+              console.error('Failed to post ledger entry for auto-applied credit:', ledgerErr);
+            }
+
             // Notify Tenant of Credit Usage
             await notificationModel.create({
               userId: lease.tenantId,

@@ -88,24 +88,27 @@ class LedgerModel {
       const name = row.property_name;
       if (!summary[name]) {
         summary[name] = {
-          revenue: 0,
+          revenue: 0,          // Collected (Credits)
+          revenueEarned: 0,    // Invoiced (Debits)
           liabilityHeld: 0,
           liabilityRefunded: 0,
           expense: 0,
         };
       }
 
-      const net = Number(row.total_credit) - Number(row.total_debit);
-
       if (row.account_type === 'revenue') {
-        summary[name].revenue += net;
+        summary[name].revenue += Number(row.total_credit);
+        summary[name].revenueEarned += Number(row.total_debit);
       } else if (row.account_type === 'liability') {
         // Credits increase liability (deposit received)
         // Debits decrease liability (deposit refunded)
         summary[name].liabilityHeld += Number(row.total_credit);
         summary[name].liabilityRefunded += Number(row.total_debit);
       } else if (row.account_type === 'expense') {
-        summary[name].expense += net;
+        // Expenses increase with credit (in our payments-are-credits logic?)
+        // Actually paymentService.js Case 'maintenance' -> Account 'expense', Credit: amount.
+        // So Expenses are Credits.
+        summary[name].expense += Number(row.total_credit) - Number(row.total_debit);
       }
     });
 
@@ -136,7 +139,8 @@ class LedgerModel {
       [propertyIds, year]
     );
 
-    let totalRevenue = 0;
+    let totalRevenueCollected = 0;
+    let totalRevenueEarned = 0;
     let totalLiabilityHeld = 0;
     let totalLiabilityRefunded = 0;
     let totalExpense = 0;
@@ -146,22 +150,25 @@ class LedgerModel {
       const debit = Number(row.total_debit);
 
       if (row.account_type === 'revenue') {
-        totalRevenue += credit;
+        totalRevenueCollected += credit;
+        totalRevenueEarned += debit;
       } else if (row.account_type === 'liability') {
         totalLiabilityHeld += credit;
         totalLiabilityRefunded += debit;
       } else if (row.account_type === 'expense') {
-        totalExpense += credit;
+        totalExpense += credit - debit;
       }
     });
 
     return {
-      totalRevenue,
+      totalRevenue: totalRevenueCollected,
+      totalRevenueEarned,
+      totalRevenueCollected,
       totalLiabilityHeld,
       totalLiabilityRefunded,
       netLiability: totalLiabilityHeld - totalLiabilityRefunded,
       totalExpense,
-      netOperatingIncome: totalRevenue - totalExpense,
+      netOperatingIncome: totalRevenueCollected - totalExpense,
     };
   }
 }

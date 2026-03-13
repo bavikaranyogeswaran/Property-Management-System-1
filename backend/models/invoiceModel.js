@@ -23,7 +23,32 @@ class InvoiceModel {
         'INSERT INTO rent_invoices (lease_id, year, month, amount, due_date, status, invoice_type, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
         [leaseId, year, month, amount, dueDate, 'pending', type, description]
       );
-      return result.insertId;
+      const invoiceId = result.insertId;
+
+      // [NEW] Post to Ledger (Debit Revenue/Liability to track accrual/debt)
+      if (invoiceId) {
+        try {
+          const ledgerModel = (await import('./ledgerModel.js')).default;
+          // Use dynamic import to avoid potential circular dependencies
+          
+          const accountType = type === 'deposit' ? 'liability' : 'revenue';
+          const category = type === 'deposit' ? 'deposit_accrued' : (type || 'rent');
+
+          await ledgerModel.create({
+            invoiceId,
+            leaseId,
+            accountType,
+            category,
+            debit: Number(amount),
+            description: `Generated ${type || 'rent'} invoice: ${description || 'No description'}`,
+            entryDate: new Date().toISOString().split('T')[0],
+          }, db);
+        } catch (ledgerErr) {
+          console.error('Failed to post initial ledger entry for invoice:', ledgerErr);
+        }
+      }
+
+      return invoiceId;
     } catch (error) {
       if (error.code === 'ER_DUP_ENTRY') {
         console.warn(`Duplicate invoice detected: Lease ${leaseId}, Period ${year}-${month}, Type ${type}`);
@@ -146,19 +171,10 @@ class InvoiceModel {
   }
 
   async createLateFeeInvoice(data) {
-    const { leaseId, amount, dueDate, description } = data;
-    const date = new Date();
-    const year = date.getFullYear();
-    const month = date.getMonth() + 1;
-
-    // Ensure we don't double charge for same month/year?
-    // Or should we link it to the original invoice?
-    // For now, standalone 'Late Fee' invoice.
-    const [result] = await pool.query(
-      'INSERT INTO rent_invoices (lease_id, year, month, amount, due_date, status, invoice_type, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [leaseId, year, month, amount, dueDate, 'pending', 'late_fee', description]
-    );
-    return result.insertId;
+    return await this.create({
+      ...data,
+      type: 'late_fee',
+    });
   }
 
   async findOverdue(gracePeriodDays = 5) {

@@ -404,6 +404,37 @@ class LeaseService {
             generatedDate: new Date().toISOString(),
             receiptNumber: `REC-OFFSET-${randomUUID()}`,
           });
+
+          // 1b. Post to Ledger (Credit Revenue + Debit Liability)
+          try {
+            const ledgerModel = (await import('../models/ledgerModel.js')).default;
+            // Revenue Credit (Paying off the debt)
+            await ledgerModel.create({
+              paymentId: payId,
+              invoiceId: inv.invoice_id,
+              leaseId: Number(leaseId),
+              accountType: 'revenue',
+              category: 'rent',
+              credit: Number(toPay),
+              description: `Deposit offset applied to outstanding invoice #${inv.invoice_id}`,
+              entryDate: new Date().toISOString().split('T')[0],
+            }, conn);
+
+            // Liability Debit (Decreasing the held deposit)
+            await ledgerModel.create({
+              paymentId: payId,
+              invoiceId: inv.invoice_id,
+              leaseId: Number(leaseId),
+              accountType: 'liability',
+              category: 'deposit_withheld',
+              debit: Number(toPay),
+              description: `Security deposit withheld for outstanding debt`,
+              entryDate: new Date().toISOString().split('T')[0],
+            }, conn);
+          } catch (ledgerErr) {
+            console.error('Failed to post ledger entry for offset:', ledgerErr);
+          }
+
           withheldAmount -= toPay;
         }
       }
@@ -417,6 +448,7 @@ class LeaseService {
         amount: withheldAmount,
         dueDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000), // 5-day grace period
         description: 'Security Deposit Deductions (Damages/Cleaning)',
+        type: 'maintenance',
       });
 
       // Create Payment for it
@@ -442,6 +474,36 @@ class LeaseService {
         generatedDate: new Date().toISOString(),
         receiptNumber: `REC-DEDUCT-${randomUUID()}`,
       });
+
+      // 2b. Post to Ledger (Credit Revenue/Expense + Debit Liability)
+      try {
+        const ledgerModel = (await import('../models/ledgerModel.js')).default;
+        // Revenue Credit (Collected income from damages deduction)
+        await ledgerModel.create({
+          paymentId: payId,
+          invoiceId: invId,
+          leaseId: Number(leaseId),
+          accountType: 'revenue',
+          category: 'maintenance',
+          credit: Number(withheldAmount),
+          description: `Security deposit deduction for damages: ${invId}`,
+          entryDate: new Date().toISOString().split('T')[0],
+        }, conn);
+
+        // Liability Debit (Decreasing the held deposit)
+        await ledgerModel.create({
+          paymentId: payId,
+          invoiceId: invId,
+          leaseId: Number(leaseId),
+          accountType: 'liability',
+          category: 'deposit_withheld',
+          debit: Number(withheldAmount),
+          description: `Security deposit withheld for property damages`,
+          entryDate: new Date().toISOString().split('T')[0],
+        }, conn);
+      } catch (ledgerErr) {
+        console.error('Failed to post ledger entry for deduction:', ledgerErr);
+      }
     }
 
     const currentRefunded = Number(lease.refundedAmount || lease.refunded_amount || 0);
@@ -529,6 +591,7 @@ class LeaseService {
         amount: terminationFee,
         dueDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000), // 5-day grace period
         description: 'Early Termination Fee',
+        type: 'late_fee',
       });
 
     }
