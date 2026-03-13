@@ -1,10 +1,11 @@
 import pool from '../config/db.js';
 
 class PayoutModel {
-  async create(data) {
+  async create(data, connection) {
     const { ownerId, amount, periodStart, periodEnd } = data;
+    const db = connection || pool;
     try {
-      const [result] = await pool.query(
+      const [result] = await db.query(
         'INSERT INTO owner_payouts (owner_id, amount, period_start, period_end) VALUES (?, ?, ?, ?)',
         [ownerId, amount, periodStart, periodEnd]
       );
@@ -49,11 +50,12 @@ class PayoutModel {
     return rows.length > 0;
   }
 
-  // Core Logic: Rent - Expenses
-  async calculateNetPayout(ownerId, startDate, endDate) {
+  // Core Logic: Rent - Expenses (Captures un-linked records)
+  async calculateNetPayout(ownerId, startDate, endDate, connection) {
+    const db = connection || pool;
     // 1. Total Verified Payments (Income)
     // Join: Payments -> Invoices -> Leases -> Units -> Properties
-    const [incomeRows] = await pool.query(
+    const [incomeRows] = await db.query(
       `
             SELECT COALESCE(SUM(p.amount), 0) as total_income
             FROM payments p
@@ -64,6 +66,7 @@ class PayoutModel {
             WHERE prop.owner_id = ? 
             AND p.status = 'verified'
             AND ri.invoice_type != 'deposit'
+            AND p.payout_id IS NULL
             AND p.payment_date BETWEEN ? AND ?
         `,
       [ownerId, startDate, endDate]
@@ -73,7 +76,7 @@ class PayoutModel {
 
     // 2. Total Maintenance Costs (Expenses)
     // Join: MaintCosts -> MaintRequests -> Units -> Properties
-    const [expenseRows] = await pool.query(
+    const [expenseRows] = await db.query(
       `
             SELECT COALESCE(SUM(mc.amount), 0) as total_expenses
             FROM maintenance_costs mc
@@ -81,6 +84,7 @@ class PayoutModel {
             JOIN units u ON mr.unit_id = u.unit_id
             JOIN properties prop ON u.property_id = prop.property_id
             WHERE prop.owner_id = ?
+            AND mc.payout_id IS NULL
             AND mc.recorded_date BETWEEN ? AND ?
         `,
       [ownerId, startDate, endDate]
@@ -93,6 +97,43 @@ class PayoutModel {
       totalExpenses,
       netPayout: totalIncome - totalExpenses,
     };
+  }
+
+  async linkRecordsToPayout(payoutId, ownerId, startDate, endDate, connection) {
+    const db = connection || pool;
+    // Link payments to the new payout
+    await db.query(
+      `
+            UPDATE payments p
+            JOIN rent_invoices ri ON p.invoice_id = ri.invoice_id
+            JOIN leases l ON ri.lease_id = l.lease_id
+            JOIN units u ON l.unit_id = u.unit_id
+            JOIN properties prop ON u.property_id = prop.property_id
+            SET p.payout_id = ?
+            WHERE prop.owner_id = ? 
+            AND p.status = 'verified'
+            AND ri.invoice_type != 'deposit'
+            AND p.payout_id IS NULL
+            AND p.payment_date BETWEEN ? AND ?
+        `,
+      [payoutId, ownerId, startDate, endDate]
+    );
+
+    // Link maintenance costs to the new payout
+    await db.query(
+      `
+            UPDATE maintenance_costs mc
+            JOIN maintenance_requests mr ON mc.request_id = mr.request_id
+            JOIN units u ON mr.unit_id = u.unit_id
+            JOIN properties prop ON u.property_id = prop.property_id
+            SET mc.payout_id = ?
+            WHERE prop.owner_id = ?
+            AND mc.payout_id IS NULL
+            AND mc.recorded_date BETWEEN ? AND ?
+        `,
+      [payoutId, ownerId, startDate, endDate]
+    );
+    return true;
   }
 }
 
