@@ -48,7 +48,21 @@ class StaffModel {
   }
 
   //  ASSIGN PROPERTY: Giving a Treasurer responsibility for a specific building.
+  //  Enforces exclusivity: A property can only have one treasurer.
   async assignProperty(userId, propertyId) {
+    // Check if property is already assigned to ANY treasurer
+    const [existing] = await pool.query(
+      'SELECT user_id FROM staff_property_assignments WHERE property_id = ?',
+      [propertyId]
+    );
+
+    if (existing.length > 0) {
+      if (existing[0].user_id === userId) {
+        throw new Error('This treasurer is already assigned to this property');
+      }
+      throw new Error('This property is already assigned to another treasurer');
+    }
+
     const [result] = await pool.query(
       'INSERT INTO staff_property_assignments (user_id, property_id) VALUES (?, ?)',
       [userId, propertyId]

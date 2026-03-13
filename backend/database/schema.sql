@@ -398,7 +398,7 @@ CREATE TABLE IF NOT EXISTS staff_property_assignments (
     assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
     FOREIGN KEY (property_id) REFERENCES properties(property_id) ON DELETE CASCADE,
-    UNIQUE KEY unique_assignment (user_id, property_id)
+    UNIQUE KEY unique_property (property_id)
 );
 
 -- =========================

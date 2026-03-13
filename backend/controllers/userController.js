@@ -197,6 +197,9 @@ class UserController {
       await staffModel.assignProperty(userId, propertyId);
       res.json({ message: 'Property assigned successfully' });
     } catch (error) {
+      if (error.message.includes('already assigned')) {
+        return res.status(400).json({ error: error.message });
+      }
       res.status(500).json({ error: error.message });
     }
   }
