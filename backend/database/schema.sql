@@ -53,7 +53,8 @@ CREATE TABLE tenant_behavior_logs (
     recorded_by INT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (tenant_id) REFERENCES tenants(user_id) ON DELETE CASCADE,
-    FOREIGN KEY (recorded_by) REFERENCES users(user_id) ON DELETE SET NULL
+    FOREIGN KEY (recorded_by) REFERENCES users(user_id) ON DELETE SET NULL,
+    UNIQUE KEY unique_daily_behavior (tenant_id, category, created_at)
 );
 
 -- OWNERS
@@ -340,7 +341,8 @@ CREATE TABLE notifications (
     type ENUM('invoice','lease','maintenance','payment','visit','system') NOT NULL,
     is_read BOOLEAN DEFAULT FALSE,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    UNIQUE KEY unique_unread_notif (user_id, message(255), type, is_read)
 );
 
 -- =========================

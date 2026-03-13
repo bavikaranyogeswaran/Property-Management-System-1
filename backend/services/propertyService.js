@@ -60,9 +60,15 @@ class PropertyService {
     const imagesData = files.map((file, index) => ({
       property_id: propertyId,
       image_url: file.path || file.secure_url, 
-      is_primary: index === 0 ? 1 : 0, // First image is primary by default? Or handled by frontend?
+      is_primary: index === 0 ? 1 : 0, 
       display_order: index,
     }));
+
+    // If any new image is primary, we MUST unset existing primary images for this property
+    const hasNewPrimary = imagesData.some(img => img.is_primary === 1);
+    if (hasNewPrimary) {
+      await propertyModel.clearPrimaryImages(propertyId);
+    }
 
     const addedImages = await propertyModel.addImages(propertyId, imagesData);
 

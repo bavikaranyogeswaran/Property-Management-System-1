@@ -249,6 +249,14 @@ class PropertyModel {
     );
     return rows[0];
   }
+
+  async clearPrimaryImages(propertyId) {
+    await db.query(
+      'UPDATE property_images SET is_primary = 0 WHERE property_id = ?',
+      [propertyId]
+    );
+    return true;
+  }
 }
 
 export default new PropertyModel();

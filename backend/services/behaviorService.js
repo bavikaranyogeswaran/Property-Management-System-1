@@ -13,17 +13,24 @@ class BehaviorService {
             await connection.beginTransaction();
 
             // 1. Create Log
-            await behaviorLogModel.create(
-                {
-                    tenantId,
-                    type,
-                    category,
-                    scoreChange,
-                    description,
-                    recordedBy,
-                },
-                connection
-            );
+            try {
+                await behaviorLogModel.create(
+                    {
+                        tenantId,
+                        type,
+                        category,
+                        scoreChange,
+                        description,
+                        recordedBy,
+                    },
+                    connection
+                );
+            } catch (err) {
+                if (err.code === 'ER_DUP_ENTRY') {
+                    throw new Error('A behavior log with this category has already been recorded for this tenant at this time.');
+                }
+                throw err;
+            }
 
             // 2. Update Tenant Score
             await tenantModel.incrementBehaviorScore(tenantId, scoreChange, connection);

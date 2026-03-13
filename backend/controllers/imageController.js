@@ -40,6 +40,13 @@ class ImageController {
         displayOrder: existing.length + index,
       }));
 
+      // If any new image is primary, clear existing ones first
+      const hasNewPrimary = images.some(img => img.isPrimary);
+      if (hasNewPrimary) {
+        // Direct update to FALSE is safer/easier here
+        await (await import('../config/db.js')).default.query('UPDATE property_images SET is_primary = FALSE WHERE property_id = ?', [propertyId]);
+      }
+
       await propertyImageModel.createMultiple(propertyId, images);
 
       const allImages = await propertyImageModel.findByPropertyId(propertyId);
@@ -129,6 +136,12 @@ class ImageController {
         isPrimary: existing.length === 0 && index === 0,
         displayOrder: existing.length + index,
       }));
+
+      // If any new image is primary, clear existing ones first
+      const hasNewPrimary = images.some(img => img.isPrimary);
+      if (hasNewPrimary) {
+        await (await import('../config/db.js')).default.query('UPDATE unit_images SET is_primary = FALSE WHERE unit_id = ?', [unitId]);
+      }
 
       await unitImageModel.createMultiple(unitId, images);
       const allImages = await unitImageModel.findByUnitId(unitId);
