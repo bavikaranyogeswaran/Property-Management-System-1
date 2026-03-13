@@ -9,7 +9,7 @@ const authenticateToken = (req, res, next) => {
     return res.status(401).json({ error: 'Access token required' });
   }
 
-  verify(token, process.env.JWT_SECRET || 'secret', (err, user) => {
+  verify(token, process.env.JWT_SECRET, (err, user) => {
     if (err) {
       console.log('[Auth] Token verification failed:', err.message);
       return res.status(401).json({ error: 'Invalid or expired token' });
@@ -28,7 +28,7 @@ export const optionalAuthenticateToken = (req, res, next) => {
     return next();
   }
 
-  verify(token, process.env.JWT_SECRET || 'secret', (err, user) => {
+  verify(token, process.env.JWT_SECRET, (err, user) => {
     if (err) {
       // Token invalid/expired - treat as unauthenticated or error?
       // For optional, usually we can just ignore and treat as public,

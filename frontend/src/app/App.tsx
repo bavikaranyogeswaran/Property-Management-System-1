@@ -111,6 +111,7 @@ import { ReceiptsPage } from '@/components/pages/common/ReceiptsPage';
 import { NotificationsPage } from '@/components/pages/common/NotificationsPage';
 import { PublicListingPage } from '@/components/pages/public/PublicListingPage';
 import { PublicPropertyDetailsPage } from '@/components/pages/public/PublicPropertyDetailsPage';
+import AuditLogsPage from '@/components/pages/AuditLogsPage';
 
 // Lead Pages
 import { LeadPortalPage } from '@/components/pages/lead/LeadPortalPage';
@@ -339,6 +340,14 @@ function AppContent() {
             element={
               <ProtectedRoute>
                 <OwnerPaymentsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/audit-logs"
+            element={
+              <ProtectedRoute>
+                <AuditLogsPage />
               </ProtectedRoute>
             }
           />

@@ -63,7 +63,6 @@ export const renderPage = (activePage: string, user: User | null) => {
     if (activePage === 'maintenance') return <OwnerMaintenancePage />;
     if (activePage === 'analytics') return <AnalyticsPage />;
     if (activePage === 'payouts') return <OwnerPayoutsPage />;
-    if (activePage === 'payouts') return <OwnerPayoutsPage />;
     if (activePage === 'audit') return <AuditLogsPage />;
     if (activePage === 'visits') return <VisitsPage />;
   }

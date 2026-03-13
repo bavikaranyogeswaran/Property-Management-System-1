@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import userController from '../controllers/userController.js';
-import authenticateToken from '../middleware/authMiddleware.js';
+import authenticateToken, { authorizeRoles } from '../middleware/authMiddleware.js';
 import validateRequest from '../middleware/validateRequest.js';
 import {
   createTreasurerSchema,
@@ -14,6 +14,7 @@ const router = Router();
 router.post(
   '/create-treasurer',
   authenticateToken,
+  authorizeRoles('owner'),
   validateRequest(createTreasurerSchema),
   userController.createTreasurer
 );
@@ -30,15 +31,26 @@ router.put(
 router.put(
   '/:id',
   authenticateToken,
+  authorizeRoles('owner'),
   validateRequest(updateTreasurerSchema),
   userController.updateTreasurer
 );
 
 // Treasurer deletion (Owner only)
-router.delete('/:id', authenticateToken, userController.deleteTreasurer);
+router.delete(
+  '/:id',
+  authenticateToken,
+  authorizeRoles('owner'),
+  userController.deleteTreasurer
+);
 
 // Get all treasurers (Owner only)
-router.get('/treasurers', authenticateToken, userController.getTreasurers);
+router.get(
+  '/treasurers',
+  authenticateToken,
+  authorizeRoles('owner'),
+  userController.getTreasurers
+);
 
 // Get all tenants (Owner only)
 router.get('/tenants', authenticateToken, userController.getTenants);

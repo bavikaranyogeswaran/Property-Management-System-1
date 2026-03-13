@@ -9,6 +9,7 @@
 import express, { json } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import xss from 'xss-clean';
 import rateLimit from 'express-rate-limit'; // Controls how many requests someone can make (Security)
 import 'dotenv/config';
 import path from 'path';
@@ -32,6 +33,7 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(helmet()); // Added Helmet for security headers
 app.use(json());
+app.use(xss()); // Add XSS protection
 
 //  Rate Limiting: Prevents hackers from guessing passwords by trying too fast.
 //  If someone fails login 100 times in 15 minutes, we block them.
@@ -117,7 +119,9 @@ app.get('/api/health', (req, res) => {
 //  catches the problem and sends a clear error message back to the user.
 // ============================================================================
 app.use((err, req, res, next) => {
-  console.error(err.stack);
+  if (process.env.NODE_ENV !== 'production') {
+    console.error(err.stack);
+  }
 
   if (err.code === 'LIMIT_FILE_SIZE') {
     return res
@@ -133,7 +137,10 @@ app.use((err, req, res, next) => {
     return res.status(409).json({ error: 'Duplicate entry' });
   }
 
-  res.status(500).json({ error: err.message || 'Something went wrong!' });
+  res.status(500).json({
+    error: err.message || 'Something went wrong!',
+    ...(process.env.NODE_ENV !== 'production' && { stack: err.stack }),
+  });
 });
 
 // ============================================================================

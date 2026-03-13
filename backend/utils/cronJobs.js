@@ -5,6 +5,11 @@ import invoiceModel from '../models/invoiceModel.js';
 import notificationModel from '../models/notificationModel.js';
 import emailService from './emailService.js';
 
+// Configuration Constants
+const RENT_DUE_DAY = 5; // Day of the month rent is due (e.g., 5th)
+const GRACE_PERIOD_DAYS = 5; // Days after due date before late fees apply
+const LATE_FEE_PERCENTAGE = 0.05; // 5% of invoice amount
+
 export const generateRentInvoices = async () => {
   console.log('Running automated rent invoicing...');
   const today = new Date();
@@ -20,7 +25,7 @@ export const generateRentInvoices = async () => {
 
   const currentYear = today.getFullYear();
   const currentMonth = today.getMonth() + 1; // 1-12
-  const dueDate = new Date(today.getFullYear(), today.getMonth(), 5); // Due on 5th? Or +X days. Let's say 5th.
+  const dueDate = new Date(today.getFullYear(), today.getMonth(), RENT_DUE_DAY);
 
   try {
     const activeLeases = await leaseModel.findActive(); // Should return all active (and pending? no only active)
@@ -355,9 +360,6 @@ export const sendLeaseExpiryWarnings = async () => {
 export const applyLateFees = async () => {
   console.log('Running late fee automation...');
   try {
-    const GRACE_PERIOD_DAYS = 5;
-    const LATE_FEE_PERCENTAGE = 0.05;
-
     const overdueInvoices = await invoiceModel.findOverdue(GRACE_PERIOD_DAYS);
     console.log(
       `Found ${overdueInvoices.length} overdue invoices eligible for late fees.`
