@@ -28,13 +28,24 @@ class LedgerModel {
     } = data;
 
     const db = connection || pool;
-    const [result] = await db.query(
-      `INSERT INTO accounting_ledger 
-       (payment_id, invoice_id, lease_id, account_type, category, debit, credit, description, entry_date) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [paymentId, invoiceId, leaseId, accountType, category, debit, credit, description, entryDate]
-    );
-    return result.insertId;
+    try {
+      const [result] = await db.query(
+        `INSERT INTO accounting_ledger 
+         (payment_id, invoice_id, lease_id, account_type, category, debit, credit, description, entry_date) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [paymentId, invoiceId, leaseId, accountType, category, debit, credit, description, entryDate]
+      );
+      return result.insertId;
+    } catch (err) {
+      if (err.code === 'ER_DUP_ENTRY') {
+        // Silently ignore or log warning for double-posting in ledger if it's the exact same entry.
+        // Usually, double-posting is an error, but we want the outer transaction to succeed if possible or handle it.
+        // For audit trail, let's log but don't strictly crash if it's already recorded.
+        console.warn('Attempted to double-post to ledger:', description);
+        return null; 
+      }
+      throw err;
+    }
   }
 
   /**

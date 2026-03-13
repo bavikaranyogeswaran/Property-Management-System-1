@@ -3,11 +3,18 @@ import pool from '../config/db.js';
 class PayoutModel {
   async create(data) {
     const { ownerId, amount, periodStart, periodEnd } = data;
-    const [result] = await pool.query(
-      'INSERT INTO owner_payouts (owner_id, amount, period_start, period_end) VALUES (?, ?, ?, ?)',
-      [ownerId, amount, periodStart, periodEnd]
-    );
-    return result.insertId;
+    try {
+      const [result] = await pool.query(
+        'INSERT INTO owner_payouts (owner_id, amount, period_start, period_end) VALUES (?, ?, ?, ?)',
+        [ownerId, amount, periodStart, periodEnd]
+      );
+      return result.insertId;
+    } catch (error) {
+      if (error.code === 'ER_DUP_ENTRY') {
+        throw new Error('A payout for this owner and period already exists.');
+      }
+      throw error;
+    }
   }
 
   async findByOwnerId(ownerId) {

@@ -279,7 +279,8 @@ CREATE TABLE payments (
     verified_by INT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (invoice_id) REFERENCES rent_invoices(invoice_id) ON DELETE CASCADE,
-    FOREIGN KEY (verified_by) REFERENCES users(user_id) ON DELETE SET NULL
+    FOREIGN KEY (verified_by) REFERENCES users(user_id) ON DELETE SET NULL,
+    UNIQUE KEY unique_payment_ref (reference_number)
 );
 
 -- =========================
@@ -354,7 +355,8 @@ CREATE TABLE owner_payouts (
     status ENUM('pending', 'processed') DEFAULT 'pending',
     generated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     processed_at DATETIME,
-    FOREIGN KEY (owner_id) REFERENCES users(user_id) ON DELETE CASCADE
+    FOREIGN KEY (owner_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    UNIQUE KEY unique_owner_payout_period (owner_id, period_start, period_end)
 );
 
 -- =========================
@@ -422,7 +424,8 @@ CREATE TABLE accounting_ledger (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (payment_id) REFERENCES payments(payment_id) ON DELETE SET NULL,
     FOREIGN KEY (invoice_id) REFERENCES rent_invoices(invoice_id) ON DELETE SET NULL,
-    FOREIGN KEY (lease_id) REFERENCES leases(lease_id) ON DELETE CASCADE
+    FOREIGN KEY (lease_id) REFERENCES leases(lease_id) ON DELETE CASCADE,
+    UNIQUE KEY unique_ledger_payment (payment_id, account_type, category)
 );
 
 CREATE INDEX idx_ledger_lease ON accounting_ledger(lease_id);

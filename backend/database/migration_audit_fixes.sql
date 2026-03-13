@@ -9,5 +9,11 @@ ALTER TABLE property_visits ADD UNIQUE KEY unique_unit_visit (unit_id, scheduled
 -- (We use the status in the key to allow re-submission if previous one is completed)
 ALTER TABLE maintenance_requests ADD UNIQUE KEY unique_request_spam (unit_id, tenant_id, title, status);
 
--- 4. Prevent duplicate lead entries for the same unit/email
-ALTER TABLE leads ADD UNIQUE KEY unique_active_lead (property_id, email, status);
+-- 5. Prevent duplicate payouts for the same owner/period
+ALTER TABLE owner_payouts ADD UNIQUE KEY unique_owner_payout_period (owner_id, period_start, period_end);
+
+-- 6. Prevent duplicate payment records with same reference number
+ALTER TABLE payments ADD UNIQUE KEY unique_payment_ref (reference_number);
+
+-- 7. Prevent double-posting of payments to the ledger
+ALTER TABLE accounting_ledger ADD UNIQUE KEY unique_ledger_payment (payment_id, account_type, category);

@@ -18,19 +18,26 @@ class PaymentModel {
       referenceNumber,
       evidenceUrl,
     } = data;
-    const [result] = await pool.query(
-      'INSERT INTO payments (invoice_id, amount, payment_date, payment_method, reference_number, proof_url, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [
-        invoiceId,
-        amount,
-        paymentDate,
-        paymentMethod,
-        referenceNumber,
-        evidenceUrl,
-        'pending',
-      ]
-    );
-    return result.insertId;
+    try {
+      const [result] = await pool.query(
+        'INSERT INTO payments (invoice_id, amount, payment_date, payment_method, reference_number, proof_url, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [
+          invoiceId,
+          amount,
+          paymentDate,
+          paymentMethod,
+          referenceNumber,
+          evidenceUrl,
+          'pending',
+        ]
+      );
+      return result.insertId;
+    } catch (error) {
+      if (error.code === 'ER_DUP_ENTRY') {
+        throw new Error('This payment reference number has already been used.');
+      }
+      throw error;
+    }
   }
 
   async findById(id) {
