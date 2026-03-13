@@ -18,12 +18,19 @@ class InvoiceModel {
     const month = date.getMonth() + 1; // 1-12
 
     const db = connection || pool;
-    const [result] = await db.query(
-      'INSERT INTO rent_invoices (lease_id, year, month, amount, due_date, status, invoice_type, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [leaseId, year, month, amount, dueDate, 'pending', type, description]
-    );
-
-    return result.insertId;
+    try {
+      const [result] = await db.query(
+        'INSERT INTO rent_invoices (lease_id, year, month, amount, due_date, status, invoice_type, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        [leaseId, year, month, amount, dueDate, 'pending', type, description]
+      );
+      return result.insertId;
+    } catch (error) {
+      if (error.code === 'ER_DUP_ENTRY') {
+        console.warn(`Duplicate invoice detected: Lease ${leaseId}, Period ${year}-${month}, Type ${type}`);
+        return null; // Signals that creation was skipped due to existing record
+      }
+      throw error;
+    }
   }
 
   async exists(leaseId, year, month, type = null, connection = null) {

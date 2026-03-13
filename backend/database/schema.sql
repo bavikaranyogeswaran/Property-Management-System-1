@@ -259,7 +259,8 @@ CREATE TABLE rent_invoices (
     invoice_type ENUM('rent', 'maintenance', 'late_fee', 'deposit', 'other') DEFAULT 'rent',
     description VARCHAR(255),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (lease_id) REFERENCES leases(lease_id) ON DELETE CASCADE
+    FOREIGN KEY (lease_id) REFERENCES leases(lease_id) ON DELETE CASCADE,
+    UNIQUE KEY unique_periodic_invoice (lease_id, year, month, invoice_type, description)
 );
 
 -- =========================
@@ -383,9 +384,10 @@ CREATE TABLE property_visits (
     status ENUM('pending', 'confirmed', 'cancelled', 'completed') DEFAULT 'pending',
     notes TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (property_id) REFERENCES properties(property_id) ON DELETE CASCADE,
-    FOREIGN KEY (unit_id) REFERENCES units(unit_id) ON DELETE SET NULL,
-    FOREIGN KEY (lead_id) REFERENCES leads(lead_id) ON DELETE SET NULL
+    FOREIGN KEY (property_id) REFERENCES properties(property_id),
+    FOREIGN KEY (unit_id) REFERENCES units(unit_id),
+    FOREIGN KEY (lead_id) REFERENCES leads(lead_id) ON DELETE SET NULL,
+    UNIQUE KEY unique_unit_visit (unit_id, scheduled_date)
 );
 
 -- =========================

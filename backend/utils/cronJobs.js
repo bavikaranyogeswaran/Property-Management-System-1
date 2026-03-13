@@ -86,6 +86,10 @@ export const generateRentInvoices = async () => {
           type: 'rent',
         });
 
+        if (!invoiceId) {
+          continue; // Skip if invoice already exists
+        }
+
         // Logic Fix: Auto-Apply Credits
         const tenantModel = (await import('../models/tenantModel.js')).default;
         // Fetch fresh tenant data (specifically credit balance)
