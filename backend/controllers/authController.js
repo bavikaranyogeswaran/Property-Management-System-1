@@ -39,7 +39,7 @@ class AuthController {
       // If a file was uploaded, add its path to tenantData
       if (req.file) {
         tenantData = tenantData || {};
-        tenantData.nicUrl = `/uploads/${req.file.filename}`;
+        tenantData.nicUrl = req.file.path || req.file.secure_url;
       }
 
       const result = await authService.setupPassword(token, password, tenantData);

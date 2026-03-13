@@ -59,7 +59,7 @@ class PropertyService {
     // Construct image URLs
     const imagesData = files.map((file, index) => ({
       property_id: propertyId,
-      image_url: `/uploads/${file.filename}`, // Assuming you serve "uploads" folder statically
+      image_url: file.path || file.secure_url, 
       is_primary: index === 0 ? 1 : 0, // First image is primary by default? Or handled by frontend?
       display_order: index,
     }));

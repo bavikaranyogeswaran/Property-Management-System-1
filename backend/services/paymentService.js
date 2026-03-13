@@ -36,7 +36,7 @@ class PaymentService {
         let evidenceUrl = data.evidenceUrl;
 
         if (file) {
-            evidenceUrl = `/uploads/${file.filename}`;
+            evidenceUrl = file.path || file.secure_url;
         }
 
         // Integrity Check: Is invoice already paid?
