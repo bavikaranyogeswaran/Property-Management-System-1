@@ -186,10 +186,10 @@ export function OwnerDashboard() {
 
       {/* Main Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((stat, index) => {
+        {stats.map((stat) => {
           const Icon = stat.icon;
           return (
-            <Card key={index}>
+            <Card key={stat.title}>
               <CardContent className="p-6">
                 <div className="flex items-start justify-between">
                   <div>
@@ -260,10 +260,10 @@ export function OwnerDashboard() {
         <NotificationBanner notifications={notifications} userRole="owner" />
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {alerts.map((alert, index) => {
+          {alerts.map((alert) => {
             const Icon = alert.icon;
             return (
-              <Card key={index}>
+              <Card key={alert.title}>
                 <CardContent className="p-4">
                   <div className="flex items-center gap-3">
                     <div className={`${alert.bgColor} p-2 rounded-lg`}>

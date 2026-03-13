@@ -334,9 +334,9 @@ export function TenantMaintenancePage() {
                       {/* Display attached images if any */}
                       {request.images && request.images.length > 0 && (
                         <div className="flex gap-2 mb-3 overflow-x-auto pb-2">
-                          {request.images.map((img, idx) => (
+                          {request.images.map((img) => (
                             <div
-                              key={idx}
+                              key={img}
                               className="relative size-16 rounded-md overflow-hidden bg-gray-100 border flex-shrink-0"
                             >
                               <img

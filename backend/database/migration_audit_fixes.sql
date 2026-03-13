@@ -15,11 +15,10 @@ ALTER TABLE owner_payouts ADD UNIQUE KEY unique_owner_payout_period (owner_id, p
 -- 6. Prevent duplicate payment records with same reference number
 ALTER TABLE payments ADD UNIQUE KEY unique_payment_ref (reference_number);
 
--- 8. Prevent duplicate behavior logs for the same tenant and category on the same day
--- Using DATE(created_at) isn't straightforward in a UNIQUE KEY, so we enforce it via (tenant_id, category, created_at) 
--- assuming created_at is just a date or precision is handled.
--- For standard SQL, we'll use a direct unique on the timestamp if it's meant to be one per "instance".
-ALTER TABLE tenant_behavior_logs ADD UNIQUE KEY unique_daily_behavior (tenant_id, category, created_at);
+-- 10. Prevent duplicate images for the same entity
+ALTER TABLE property_images ADD UNIQUE KEY unique_property_image (property_id, image_url(255));
+ALTER TABLE unit_images ADD UNIQUE KEY unique_unit_image (unit_id, image_url(255));
+ALTER TABLE maintenance_images ADD UNIQUE KEY unique_request_image (request_id, image_url(255));
 
--- 9. Prevent duplicate unread notifications
-ALTER TABLE notifications ADD UNIQUE KEY unique_unread_notif (user_id, message(255), type, is_read);
+-- 11. Prevent duplicate maintenance cost records
+ALTER TABLE maintenance_costs ADD UNIQUE KEY unique_cost_entry (request_id, description(255), amount, recorded_date);

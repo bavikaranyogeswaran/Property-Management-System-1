@@ -304,10 +304,10 @@ export function AnalyticsPage() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {kpiCards.map((kpi, index) => {
+        {kpiCards.map((kpi) => {
           const Icon = kpi.icon;
           return (
-            <Card key={index}>
+            <Card key={kpi.title}>
               <CardContent className="p-4">
                 <div className="flex items-start justify-between">
                   <div>
@@ -414,8 +414,8 @@ export function AnalyticsPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {propertyRevenueData.map((prop, index) => (
-                      <tr key={index} className="border-b last:border-0">
+                    {propertyRevenueData.map((prop) => (
+                      <tr key={prop.name} className="border-b last:border-0">
                         <td className="py-3 font-medium">{prop.name}</td>
                         <td className="py-3">{prop.units}</td>
                         <td className="py-3">{prop.occupied}</td>
@@ -468,8 +468,8 @@ export function AnalyticsPage() {
                       fill="#8884d8"
                       dataKey="value"
                     >
-                      {unitStatusData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      {unitStatusData.map((entry) => (
+                        <Cell key={entry.name} fill={entry.color} />
                       ))}
                     </Pie>
                     <Tooltip />
@@ -587,9 +587,9 @@ export function AnalyticsPage() {
                       ).length,
                       color: 'bg-green-100 text-green-700',
                     },
-                  ].map((stat, index) => (
+                  ].map((stat) => (
                     <div
-                      key={index}
+                      key={stat.label}
                       className="flex justify-between items-center p-3 bg-gray-50 rounded-lg"
                     >
                       <span className="text-sm font-medium">{stat.label}</span>
@@ -732,9 +732,9 @@ export function AnalyticsPage() {
                       amount: receipts.reduce((s, r) => s + r.amount, 0),
                       color: 'bg-blue-100 text-blue-700',
                     },
-                  ].map((stat, index) => (
+                  ].map((stat) => (
                     <div
-                      key={index}
+                      key={stat.label}
                       className="flex justify-between items-center p-3 bg-gray-50 rounded-lg"
                     >
                       <div>

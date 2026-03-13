@@ -145,7 +145,8 @@ CREATE TABLE property_images (
     is_primary BOOLEAN DEFAULT FALSE,
     display_order INT DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (property_id) REFERENCES properties(property_id) ON DELETE CASCADE
+    FOREIGN KEY (property_id) REFERENCES properties(property_id) ON DELETE CASCADE,
+    UNIQUE KEY unique_property_image (property_id, image_url(255))
 );
 
 CREATE TABLE unit_images (
@@ -155,7 +156,8 @@ CREATE TABLE unit_images (
     is_primary BOOLEAN DEFAULT FALSE,
     display_order INT DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (unit_id) REFERENCES units(unit_id) ON DELETE CASCADE
+    FOREIGN KEY (unit_id) REFERENCES units(unit_id) ON DELETE CASCADE,
+    UNIQUE KEY unique_unit_image (unit_id, image_url(255))
 );
 
 -- =========================
@@ -319,7 +321,8 @@ CREATE TABLE maintenance_images (
     request_id INT NOT NULL,
     image_url VARCHAR(500) NOT NULL,
     uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (request_id) REFERENCES maintenance_requests(request_id) ON DELETE CASCADE
+    FOREIGN KEY (request_id) REFERENCES maintenance_requests(request_id) ON DELETE CASCADE,
+    UNIQUE KEY unique_request_image (request_id, image_url(255))
 );
 
 CREATE TABLE maintenance_costs (
@@ -328,7 +331,8 @@ CREATE TABLE maintenance_costs (
     description VARCHAR(255),
     amount DECIMAL(10,2) NOT NULL,
     recorded_date DATE NOT NULL,
-    FOREIGN KEY (request_id) REFERENCES maintenance_requests(request_id) ON DELETE CASCADE
+    FOREIGN KEY (request_id) REFERENCES maintenance_requests(request_id) ON DELETE CASCADE,
+    UNIQUE KEY unique_cost_entry (request_id, description(255), amount, recorded_date)
 );
 
 -- =========================
