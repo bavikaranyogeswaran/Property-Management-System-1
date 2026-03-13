@@ -176,7 +176,8 @@ CREATE TABLE leads (
     last_contacted_at DATETIME,              -- [ADDED] For follow-up tracking
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (property_id) REFERENCES properties(property_id) ON DELETE CASCADE,
-    FOREIGN KEY (unit_id) REFERENCES units(unit_id) ON DELETE SET NULL
+    FOREIGN KEY (unit_id) REFERENCES units(unit_id) ON DELETE SET NULL,
+    UNIQUE KEY unique_active_lead (property_id, email, status)
 );
 
 CREATE TABLE lead_followups (
@@ -307,7 +308,8 @@ CREATE TABLE maintenance_requests (
     status ENUM('submitted','in_progress','completed') DEFAULT 'submitted',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (unit_id) REFERENCES units(unit_id) ON DELETE CASCADE,
-    FOREIGN KEY (tenant_id) REFERENCES users(user_id) ON DELETE CASCADE
+    FOREIGN KEY (tenant_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    UNIQUE KEY unique_request_spam (unit_id, tenant_id, title, status)
 );
 
 CREATE TABLE maintenance_images (

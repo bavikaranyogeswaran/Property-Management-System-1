@@ -97,6 +97,21 @@ class UnitController {
           .json({ error: 'Cannot delete an occupied unit.' });
       }
 
+      // Deeper Safeguards: Check for Maintenance history
+      const maintenanceRequestModel = (await import('../models/maintenanceRequestModel.js')).default;
+      const requests = await maintenanceRequestModel.findByUnitId ? await maintenanceRequestModel.findByUnitId(req.params.id) : []; 
+      // Fallback if I haven't added findByUnitId yet - I will add it or use raw
+      const [mRows] = await (await import('../config/db.js')).default.query('SELECT 1 FROM maintenance_requests WHERE unit_id = ? LIMIT 1', [req.params.id]);
+      if (mRows.length > 0) {
+        return res.status(400).json({ error: 'Cannot delete unit with maintenance history. Void or archive history first.' });
+      }
+
+      // Check for Active or Pending Leases
+      const [lRows] = await (await import('../config/db.js')).default.query("SELECT 1 FROM leases WHERE unit_id = ? AND status IN ('active', 'pending') LIMIT 1", [req.params.id]);
+      if (lRows.length > 0) {
+        return res.status(400).json({ error: 'Cannot delete unit with active or pending leases.' });
+      }
+
       const success = await unitModel.delete(req.params.id);
       if (!success) return res.status(404).json({ error: 'Unit not found' });
       res.json({ message: 'Unit deleted' });

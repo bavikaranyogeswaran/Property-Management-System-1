@@ -143,17 +143,25 @@ class MaintenanceRequestModel {
     try {
       await connection.beginTransaction();
 
-      const [result] = await connection.query(
-        'INSERT INTO maintenance_requests (unit_id, tenant_id, title, description, priority, status) VALUES (?, ?, ?, ?, ?, ?)',
-        [
-          unitId,
-          tenantId,
-          title,
-          description,
-          priority || 'medium',
-          'submitted',
-        ]
-      );
+      let result;
+      try {
+        [result] = await connection.query(
+          'INSERT INTO maintenance_requests (unit_id, tenant_id, title, description, priority, status) VALUES (?, ?, ?, ?, ?, ?)',
+          [
+            unitId,
+            tenantId,
+            title,
+            description,
+            priority || 'medium',
+            'submitted',
+          ]
+        );
+      } catch (insertErr) {
+        if (insertErr.code === 'ER_DUP_ENTRY') {
+           throw new Error('A maintenance request with this title is already active for this unit.');
+        }
+        throw insertErr;
+      }
       const requestId = result.insertId;
 
       if (images && images.length > 0) {
