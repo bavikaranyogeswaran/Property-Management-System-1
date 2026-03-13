@@ -6,6 +6,7 @@ import unitModel from '../models/unitModel.js';
 import leaseModel from '../models/leaseModel.js';
 import invoiceModel from '../models/invoiceModel.js';
 import userModel from '../models/userModel.js';
+import emailService from '../utils/emailService.js';
 
 class MaintenanceService {
 
@@ -133,6 +134,24 @@ class MaintenanceService {
             message: `You have been billed ${amount} for maintenance: ${request.title}`,
             type: 'invoice',
         });
+
+        // Notify Tenant via Email
+        try {
+            const tenant = await userModel.findById(request.tenant_id);
+            if (tenant && tenant.email) {
+                const dueDateObj = dueDate ? new Date(dueDate) : new Date();
+                await emailService.sendInvoiceNotification(tenant.email, {
+                    amount,
+                    dueDate: dueDate || dueDateObj.toISOString().split('T')[0],
+                    month: dueDateObj.getMonth() + 1,
+                    year: dueDateObj.getFullYear(),
+                    invoiceId: invoiceId,
+                    description: proposedDescription
+                });
+            }
+        } catch (err) {
+            console.error('Failed to send maintenance invoice email:', err);
+        }
 
         return invoiceId;
     }

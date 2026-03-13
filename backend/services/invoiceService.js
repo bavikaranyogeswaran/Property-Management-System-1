@@ -5,6 +5,8 @@ import staffModel from '../models/staffModel.js';
 import paymentModel from '../models/paymentModel.js';
 import behaviorLogModel from '../models/behaviorLogModel.js';
 import tenantModel from '../models/tenantModel.js';
+import userModel from '../models/userModel.js';
+import emailService from '../utils/emailService.js';
 
 class InvoiceService {
     
@@ -24,7 +26,30 @@ class InvoiceService {
         if (user.role !== 'treasurer') {
             throw new Error('Denied. Only Treasurers can create invoices.');
         }
-        return await invoiceModel.create(data);
+        const invoiceId = await invoiceModel.create(data);
+        
+        // Notify Tenant via Email
+        try {
+            const lease = await leaseModel.findById(data.leaseId);
+            if (lease) {
+                const tenant = await userModel.findById(lease.tenantId);
+                if (tenant && tenant.email) {
+                    const dueDate = new Date(data.dueDate);
+                    await emailService.sendInvoiceNotification(tenant.email, {
+                        amount: data.amount,
+                        dueDate: data.dueDate,
+                        month: dueDate.getMonth() + 1,
+                        year: dueDate.getFullYear(),
+                        invoiceId: invoiceId,
+                        description: data.description
+                    });
+                }
+            }
+        } catch (err) {
+            console.error('Failed to send manual invoice email:', err);
+        }
+
+        return invoiceId;
     }
 
     async generateMonthlyInvoices(year, month, user) {
@@ -69,12 +94,29 @@ class InvoiceService {
             const dueDate = new Date(y, m - 1, 5);
             const dueDateStr = dueDate.toISOString().split('T')[0];
 
-            await invoiceModel.create({
+            const invoiceId = await invoiceModel.create({
                 leaseId: lease.id,
                 amount: lease.monthlyRent,
                 dueDate: dueDateStr,
                 description: `Rent for ${y}-${m}`,
             });
+
+            // Notify Tenant via Email
+            try {
+                const tenant = await userModel.findById(lease.tenantId);
+                if (tenant && tenant.email) {
+                    await emailService.sendInvoiceNotification(tenant.email, {
+                        amount: lease.monthlyRent,
+                        dueDate: dueDateStr,
+                        month: m,
+                        year: y,
+                        invoiceId: invoiceId,
+                    });
+                }
+            } catch (err) {
+                console.error(`Failed to send email for invoice ${invoiceId}:`, err);
+            }
+
             generatedCount++;
         }
 
