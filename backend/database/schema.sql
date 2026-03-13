@@ -53,7 +53,7 @@ CREATE TABLE tenant_behavior_logs (
     recorded_by INT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (tenant_id) REFERENCES tenants(user_id) ON DELETE CASCADE,
-    FOREIGN KEY (recorded_by) REFERENCES users(user_id)
+    FOREIGN KEY (recorded_by) REFERENCES users(user_id) ON DELETE SET NULL
 );
 
 -- OWNERS
@@ -116,7 +116,7 @@ CREATE TABLE properties (
     status ENUM('active','inactive') DEFAULT 'active',
     image_url VARCHAR(255),                  -- [DEPRECATED] Use property_images table instead
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (owner_id) REFERENCES users(user_id),
+    FOREIGN KEY (owner_id) REFERENCES users(user_id) ON DELETE CASCADE,
     FOREIGN KEY (property_type_id) REFERENCES property_types(type_id)
 );
 
@@ -130,7 +130,7 @@ CREATE TABLE units (
     image_url VARCHAR(255),                  -- [DEPRECATED] Use unit_images table instead
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     UNIQUE (property_id, unit_number),
-    FOREIGN KEY (property_id) REFERENCES properties(property_id),
+    FOREIGN KEY (property_id) REFERENCES properties(property_id) ON DELETE CASCADE,
     FOREIGN KEY (unit_type_id) REFERENCES unit_types(type_id)
 );
 
@@ -175,8 +175,8 @@ CREATE TABLE leads (
     score INT DEFAULT 0,                     -- [ADDED] Lead scoring
     last_contacted_at DATETIME,              -- [ADDED] For follow-up tracking
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (property_id) REFERENCES properties(property_id),
-    FOREIGN KEY (unit_id) REFERENCES units(unit_id)
+    FOREIGN KEY (property_id) REFERENCES properties(property_id) ON DELETE CASCADE,
+    FOREIGN KEY (unit_id) REFERENCES units(unit_id) ON DELETE SET NULL
 );
 
 CREATE TABLE lead_followups (
@@ -241,8 +241,8 @@ CREATE TABLE leases (
     refunded_amount DECIMAL(10, 2) DEFAULT 0.00,
     document_url VARCHAR(500), -- [ADDED] Lease document URL
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (tenant_id) REFERENCES users(user_id),
-    FOREIGN KEY (unit_id) REFERENCES units(unit_id)
+    FOREIGN KEY (tenant_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    FOREIGN KEY (unit_id) REFERENCES units(unit_id) ON DELETE CASCADE
 );
 
 -- =========================
@@ -259,7 +259,7 @@ CREATE TABLE rent_invoices (
     invoice_type ENUM('rent', 'maintenance', 'late_fee', 'deposit', 'other') DEFAULT 'rent',
     description VARCHAR(255),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (lease_id) REFERENCES leases(lease_id)
+    FOREIGN KEY (lease_id) REFERENCES leases(lease_id) ON DELETE CASCADE
 );
 
 -- =========================
@@ -276,8 +276,8 @@ CREATE TABLE payments (
     status ENUM('pending','verified','rejected') DEFAULT 'pending',
     verified_by INT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (invoice_id) REFERENCES rent_invoices(invoice_id),
-    FOREIGN KEY (verified_by) REFERENCES users(user_id)
+    FOREIGN KEY (invoice_id) REFERENCES rent_invoices(invoice_id) ON DELETE CASCADE,
+    FOREIGN KEY (verified_by) REFERENCES users(user_id) ON DELETE SET NULL
 );
 
 -- =========================
@@ -289,7 +289,7 @@ CREATE TABLE receipts (
     amount DECIMAL(10,2) NOT NULL,
     receipt_date DATE NOT NULL,
     receipt_number VARCHAR(50) UNIQUE NOT NULL,
-    FOREIGN KEY (payment_id) REFERENCES payments(payment_id)
+    FOREIGN KEY (payment_id) REFERENCES payments(payment_id) ON DELETE CASCADE
 );
 
 -- =========================
@@ -305,8 +305,8 @@ CREATE TABLE maintenance_requests (
     -- images JSON removed for normalization
     status ENUM('submitted','in_progress','completed') DEFAULT 'submitted',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (unit_id) REFERENCES units(unit_id),
-    FOREIGN KEY (tenant_id) REFERENCES users(user_id)
+    FOREIGN KEY (unit_id) REFERENCES units(unit_id) ON DELETE CASCADE,
+    FOREIGN KEY (tenant_id) REFERENCES users(user_id) ON DELETE CASCADE
 );
 
 CREATE TABLE maintenance_images (
@@ -323,7 +323,7 @@ CREATE TABLE maintenance_costs (
     description VARCHAR(255),
     amount DECIMAL(10,2) NOT NULL,
     recorded_date DATE NOT NULL,
-    FOREIGN KEY (request_id) REFERENCES maintenance_requests(request_id)
+    FOREIGN KEY (request_id) REFERENCES maintenance_requests(request_id) ON DELETE CASCADE
 );
 
 -- =========================
@@ -336,7 +336,7 @@ CREATE TABLE notifications (
     type ENUM('invoice','lease','maintenance','payment','visit','system') NOT NULL,
     is_read BOOLEAN DEFAULT FALSE,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(user_id)
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 );
 
 -- =========================
@@ -351,7 +351,7 @@ CREATE TABLE owner_payouts (
     status ENUM('pending', 'processed') DEFAULT 'pending',
     generated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     processed_at DATETIME,
-    FOREIGN KEY (owner_id) REFERENCES users(user_id)
+    FOREIGN KEY (owner_id) REFERENCES users(user_id) ON DELETE CASCADE
 );
 
 -- =========================
@@ -365,7 +365,7 @@ CREATE TABLE system_audit_logs (
     details TEXT, -- JSON or text description of changes
     ip_address VARCHAR(45),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(user_id)
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE SET NULL
 );
 
 -- =========================
@@ -383,8 +383,8 @@ CREATE TABLE property_visits (
     status ENUM('pending', 'confirmed', 'cancelled', 'completed') DEFAULT 'pending',
     notes TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (property_id) REFERENCES properties(property_id),
-    FOREIGN KEY (unit_id) REFERENCES units(unit_id),
+    FOREIGN KEY (property_id) REFERENCES properties(property_id) ON DELETE CASCADE,
+    FOREIGN KEY (unit_id) REFERENCES units(unit_id) ON DELETE SET NULL,
     FOREIGN KEY (lead_id) REFERENCES leads(lead_id) ON DELETE SET NULL
 );
 
@@ -416,9 +416,9 @@ CREATE TABLE accounting_ledger (
     description VARCHAR(255),
     entry_date DATE NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (payment_id) REFERENCES payments(payment_id),
-    FOREIGN KEY (invoice_id) REFERENCES rent_invoices(invoice_id),
-    FOREIGN KEY (lease_id) REFERENCES leases(lease_id)
+    FOREIGN KEY (payment_id) REFERENCES payments(payment_id) ON DELETE SET NULL,
+    FOREIGN KEY (invoice_id) REFERENCES rent_invoices(invoice_id) ON DELETE SET NULL,
+    FOREIGN KEY (lease_id) REFERENCES leases(lease_id) ON DELETE CASCADE
 );
 
 CREATE INDEX idx_ledger_lease ON accounting_ledger(lease_id);
