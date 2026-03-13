@@ -26,6 +26,7 @@ interface AuthContextType {
   isLoading: boolean;
   updateProfile: (data: Partial<User>) => Promise<void>;
   changePassword: (data: any) => Promise<void>;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -67,6 +68,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(storedUser);
         const remainingTime = authService.getTokenRemainingTime();
         scheduleLogout(remainingTime);
+        
+        // Sync with backend to ensure the local user data is not stale
+        authService.getProfile().then(user => {
+          if (user) setUser(user);
+        }).catch(err => {
+          console.error('[AuthContext] Initial sync failed:', err);
+          // If 401, the interceptor will handle it, otherwise keep local for now
+        });
       } else {
         if (storedUser) {
           authService.logout();
@@ -113,6 +122,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const refreshUser = async () => {
+    try {
+      const user = await authService.getProfile();
+      if (user) {
+        setUser(user);
+      }
+    } catch (error) {
+      console.error('Profile refresh failed', error);
+      throw error;
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -123,6 +144,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLoading,
         updateProfile,
         changePassword,
+        refreshUser,
       }}
     >
       {children}

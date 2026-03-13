@@ -103,6 +103,20 @@ export const authService = {
     return response.data;
   },
 
+  getProfile: async () => {
+    try {
+      const response = await apiClient.get('/users/profile');
+      const user = response.data;
+      if (user) {
+        storage.setUser(user);
+      }
+      return user;
+    } catch (error) {
+      console.error('Fetch profile error:', error);
+      throw error;
+    }
+  },
+
   verifyEmail: async (token: string) => {
     const response = await apiClient.post('/auth/verify-email', { token });
     return response.data;

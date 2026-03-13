@@ -125,6 +125,13 @@ export const auditApi = {
   getLogs: (limit = 50) => apiClient.get(`/audit-logs?limit=${limit}`),
 };
 
+// User API
+export const userApi = {
+  getProfile: () => apiClient.get('/users/profile'),
+  updateProfile: (data: any) => apiClient.put('/users/profile', data),
+  getUserById: (id: string) => apiClient.get(`/users/${id}`),
+};
+
 // Receipts
 export const receiptApi = {
   getReceipts: () => apiClient.get('/receipts'),
