@@ -6,9 +6,9 @@ import notificationModel from '../models/notificationModel.js';
 import emailService from './emailService.js';
 
 // Configuration Constants
-const RENT_DUE_DAY = 5; // Day of the month rent is due (e.g., 5th)
-const GRACE_PERIOD_DAYS = 5; // Days after due date before late fees apply
-const LATE_FEE_PERCENTAGE = 0.05; // 5% of invoice amount
+const RENT_DUE_DAY = parseInt(process.env.RENT_DUE_DAY) || 5; // Day of the month rent is due
+const GRACE_PERIOD_DAYS = parseInt(process.env.GRACE_PERIOD_DAYS) || 5; // Days after due date before late fees apply
+const LATE_FEE_PERCENTAGE = parseFloat(process.env.LATE_FEE_PERCENTAGE) || 0.05; // 5% of invoice amount
 
 export const generateRentInvoices = async () => {
   console.log('Running automated rent invoicing...');
