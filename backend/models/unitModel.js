@@ -47,6 +47,7 @@ class UnitModel {
             FROM units u
             JOIN properties p ON u.property_id = p.property_id
             JOIN unit_types ut ON u.unit_type_id = ut.type_id
+            WHERE u.deleted_at IS NULL
             ORDER BY u.created_at DESC
         `);
     return this.mapRows(rows);
@@ -66,7 +67,7 @@ class UnitModel {
             FROM units u
             JOIN properties p ON u.property_id = p.property_id
             JOIN unit_types ut ON u.unit_type_id = ut.type_id
-            WHERE u.unit_id = ?
+            WHERE u.unit_id = ? AND u.deleted_at IS NULL
         `,
       [id]
     );
@@ -89,7 +90,7 @@ class UnitModel {
             FROM units u
             JOIN properties p ON u.property_id = p.property_id
             JOIN unit_types ut ON u.unit_type_id = ut.type_id
-            WHERE u.unit_id = ?
+            WHERE u.unit_id = ? AND u.deleted_at IS NULL
             FOR UPDATE
         `,
       [id]
@@ -112,7 +113,7 @@ class UnitModel {
             FROM units u
             JOIN properties p ON u.property_id = p.property_id
             JOIN unit_types ut ON u.unit_type_id = ut.type_id
-            WHERE u.property_id = ?
+            WHERE u.property_id = ? AND u.deleted_at IS NULL
             ORDER BY u.unit_number ASC
         `,
       [propertyId]
@@ -151,24 +152,18 @@ class UnitModel {
 
     const dbConn = connection || db;
     const [result] = await dbConn.query(
-      `UPDATE units SET ${fields.join(', ')} WHERE unit_id = ?`,
+      `UPDATE units SET ${fields.join(', ')} WHERE unit_id = ? AND deleted_at IS NULL`,
       values
     );
     return result.affectedRows > 0;
   }
 
   async delete(id) {
-    try {
-      const [result] = await db.query('DELETE FROM units WHERE unit_id = ?', [
-        id,
-      ]);
-      return result.affectedRows > 0;
-    } catch (error) {
-       if (error.errno === 1451) {
-         throw new Error('Cannot delete unit because it has associated historical records (e.g. leases or maintenance requests).');
-       }
-       throw error;
-    }
+    const [result] = await db.query(
+      "UPDATE units SET deleted_at = NOW(), status = 'inactive' WHERE unit_id = ?",
+      [id]
+    );
+    return result.affectedRows > 0;
   }
 
   mapRows(rows) {
@@ -212,7 +207,7 @@ class UnitModel {
 
   async countOccupied(propertyId) {
     const [rows] = await db.query(
-      "SELECT COUNT(*) as count FROM units WHERE property_id = ? AND status IN ('occupied', 'maintenance')",
+      "SELECT COUNT(*) as count FROM units WHERE property_id = ? AND deleted_at IS NULL AND status IN ('occupied', 'maintenance')",
       [propertyId]
     );
     return rows[0].count;
@@ -231,7 +226,7 @@ class UnitModel {
         GROUP_CONCAT(CASE WHEN u.status != 'occupied' THEN u.unit_number ELSE NULL END) AS vacancies
       FROM units u
       LEFT JOIN properties p ON u.property_id = p.property_id
-      WHERE u.property_id IN (?)
+      WHERE u.property_id IN (?) AND u.deleted_at IS NULL
       GROUP BY u.property_id
       `,
       [propertyIds]

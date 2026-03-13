@@ -9,7 +9,7 @@ import pool from '../config/db.js';
 
 class UserModel {
   async findByEmail(email) {
-    const [rows] = await pool.query('SELECT * FROM users WHERE email = ?', [
+    const [rows] = await pool.query('SELECT * FROM users WHERE email = ? AND deleted_at IS NULL', [
       email,
     ]);
     return rows[0];
@@ -29,7 +29,7 @@ class UserModel {
     // So we should probably exclude users where email LIKE 'deleted_%'.
 
     const [rows] = await pool.query(
-      "SELECT user_id as id, name, email, phone, role, status, created_at as createdAt FROM users WHERE role = ? AND email NOT LIKE 'deleted_%'",
+      "SELECT user_id as id, name, email, phone, role, status, created_at as createdAt FROM users WHERE role = ? AND deleted_at IS NULL",
       [role]
     );
     return rows;
@@ -60,7 +60,7 @@ class UserModel {
             
             WHERE u.role = 'tenant' 
                 AND p.owner_id = ?
-                AND u.email NOT LIKE 'deleted_%'
+                AND u.deleted_at IS NULL
             ORDER BY u.created_at DESC
         `,
       [ownerId]
@@ -97,7 +97,7 @@ class UserModel {
             WHERE u.role = 'tenant' 
                 AND ut.property_id = spa.property_id
                 AND l.status = 'active'
-                AND u.email NOT LIKE 'deleted_%'
+                AND u.deleted_at IS NULL
             ORDER BY u.created_at DESC
         `,
       [treasurerId]
@@ -117,7 +117,7 @@ class UserModel {
             LEFT JOIN tenants t ON u.user_id = t.user_id
             LEFT JOIN owners o ON u.user_id = o.user_id
             LEFT JOIN staff s ON u.user_id = s.user_id
-            WHERE u.user_id = ?
+            WHERE u.user_id = ? AND u.deleted_at IS NULL
         `;
     const [rows] = await pool.query(query, [id]);
     return rows[0];
@@ -159,7 +159,7 @@ class UserModel {
     // For simplicity now, we assume these specific fields are passed.
     // If password update is needed later, separate method is better.
     const [result] = await pool.query(
-      'UPDATE users SET name = ?, email = ?, phone = ?, status = ? WHERE user_id = ?',
+      'UPDATE users SET name = ?, email = ?, phone = ?, status = ? WHERE user_id = ? AND deleted_at IS NULL',
       [name, email, phone, status, id]
     );
     return result.affectedRows > 0;
@@ -183,36 +183,18 @@ class UserModel {
   }
 
   async delete(id) {
-    try {
-      // 1. Try Hard Delete first (Permanent removal)
-      const [result] = await pool.query('DELETE FROM users WHERE user_id = ?', [
-        id,
-      ]);
-      return result.affectedRows > 0;
-    } catch (error) {
-      // 2. If Foreign Key constraint fails (code 1451), fall back to Soft Delete
-      if (error.errno === 1451) {
-        console.log(
-          `[Smart Delete] User ${id} has related data. Falling back to Soft Delete.`
-        );
+    // Soft delete to preserve financial history and audit trail
+    const user = await this.findById(id);
+    if (!user) return false;
 
-        // Fetch user first to get email
-        const user = await this.findById(id);
-        if (!user) return false;
+    // Archive email to allow reusing the same email for new registrations
+    const archivedEmail = `deleted_${id}_${Date.now()}_${user.email}`.substring(0, 100);
 
-        const archivedEmail =
-          `deleted_${id}_${Date.now()}_${user.email}`.substring(0, 100);
-
-        const [result] = await pool.query(
-          'UPDATE users SET email = ?, status = ?, name = CONCAT(name, " (Deleted)") WHERE user_id = ?',
-          [archivedEmail, 'inactive', id]
-        );
-        return result.affectedRows > 0;
-      }
-
-      // Re-throw other errors
-      throw error;
-    }
+    const [result] = await pool.query(
+      'UPDATE users SET deleted_at = NOW(), email = ?, status = ?, name = CONCAT(name, " (Deleted)") WHERE user_id = ?',
+      [archivedEmail, 'inactive', id]
+    );
+    return result.affectedRows > 0;
   }
   async verifyEmail(id) {
     const [result] = await pool.query(

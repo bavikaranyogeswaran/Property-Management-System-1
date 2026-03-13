@@ -61,7 +61,7 @@ class LeaseModel {
     if (fields.length === 0) return false;
 
     const [result] = await dbConn.query(
-      `UPDATE leases SET ${fields.join(', ')} WHERE lease_id = ?`,
+      `UPDATE leases SET ${fields.join(', ')} WHERE lease_id = ? AND deleted_at IS NULL`,
       values
     );
     return result.affectedRows > 0;
@@ -75,11 +75,12 @@ class LeaseModel {
                    p.name as property_name
             FROM leases l
             JOIN units u ON l.unit_id = u.unit_id
-            JOIN properties p ON u.property_id = p.property_id`;
+            JOIN properties p ON u.property_id = p.property_id
+            WHERE l.deleted_at IS NULL`;
     const params = [];
 
     if (ownerId) {
-      query += ` WHERE p.owner_id = ?`;
+      query += ` AND p.owner_id = ?`;
       params.push(ownerId);
     }
 
@@ -99,7 +100,7 @@ class LeaseModel {
             FROM leases l
             JOIN units u ON l.unit_id = u.unit_id
             JOIN properties p ON u.property_id = p.property_id
-            WHERE l.lease_id = ?
+            WHERE l.lease_id = ? AND l.deleted_at IS NULL
         `,
       [id]
     );
@@ -117,7 +118,7 @@ class LeaseModel {
             FROM leases l
             JOIN units u ON l.unit_id = u.unit_id
             JOIN properties p ON u.property_id = p.property_id
-            WHERE l.tenant_id = ?
+            WHERE l.tenant_id = ? AND l.deleted_at IS NULL
         `,
       [tenantId]
     );
@@ -133,7 +134,7 @@ class LeaseModel {
             FROM leases l
             JOIN units u ON l.unit_id = u.unit_id
             JOIN properties p ON u.property_id = p.property_id
-            WHERE l.status = 'active'
+            WHERE l.status = 'active' AND l.deleted_at IS NULL
         `);
     return this.mapRows(rows);
   }
@@ -143,6 +144,7 @@ class LeaseModel {
             SELECT lease_id FROM leases 
             WHERE unit_id = ? 
             AND status IN ('active', 'pending')
+            AND deleted_at IS NULL
             AND start_date <= ? 
             AND end_date >= ?`;
     const params = [unitId, endDate, startDate];
@@ -154,6 +156,14 @@ class LeaseModel {
 
     const [rows] = await db.query(query, params);
     return rows.length > 0;
+  }
+
+  async delete(id) {
+    const [result] = await db.query(
+      "UPDATE leases SET deleted_at = NOW(), status = 'cancelled' WHERE lease_id = ?",
+      [id]
+    );
+    return result.affectedRows > 0;
   }
 
   mapRows(rows) {
