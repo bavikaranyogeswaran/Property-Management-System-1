@@ -43,7 +43,7 @@ export function LandingPage({
           <div className="space-y-6">
             <h1 className="text-4xl md:text-6xl font-bold text-gray-900 leading-tight">
               Find Your Perfect{' '}
-              <span className="text-blue-600">Dream Home</span>
+              <span className="text-blue-600">Dream Property</span>
             </h1>
             <p className="text-lg text-gray-600 leading-relaxed">
               Experience modern living with our premium properties. Seamless

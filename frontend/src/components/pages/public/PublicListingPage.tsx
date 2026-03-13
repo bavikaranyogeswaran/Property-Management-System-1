@@ -290,8 +290,8 @@ export function PublicListingPage({
                         const rents = units
                           .filter((u) => u.propertyId === property.id)
                           .map((u) => u.monthlyRent);
-                        const minRent =
-                          rents.length > 0 ? Math.min(...rents) : 0;
+                        const validRents = rents.filter(r => r > 0);
+                        const minRent = validRents.length > 0 ? Math.min(...validRents) : 0;
                         return minRent > 0 ? minRent.toLocaleString() : 'N/A';
                       })()}
                     </p>
