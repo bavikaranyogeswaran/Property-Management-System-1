@@ -146,12 +146,10 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    if (user) {
-      fetchProperties();
-      fetchPropertyTypes();
-      fetchUnitTypes();
-      fetchUnits();
-    }
+    fetchProperties();
+    fetchPropertyTypes();
+    fetchUnitTypes();
+    fetchUnits();
   }, [user]);
 
   const addProperty = async (property: Omit<Property, 'id' | 'createdAt'>): Promise<Property | undefined> => {

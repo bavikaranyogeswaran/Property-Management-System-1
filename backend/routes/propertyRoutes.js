@@ -23,8 +23,8 @@ router.post(
   propertyController.createProperty
 );
 
-// GET /:id - Allow all authenticated users
-router.get('/:id', authenticateToken, propertyController.getPropertyById);
+// GET /:id - Allow all users (public)
+router.get('/:id', optionalAuthenticateToken, propertyController.getPropertyById);
 
 // PUT /:id - Owner only
 router.put(
