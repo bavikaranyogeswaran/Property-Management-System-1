@@ -1,0 +1,137 @@
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import apiClient from '../../services/api';
+import { useAuth } from './AuthContext';
+import { toast } from 'sonner';
+
+export interface Tenant {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  leaseId?: string;
+  createdAt: string;
+  status?: string;
+  behaviorScore?: number;
+  nic?: string;
+  nicUrl?: string;
+  monthlyIncome?: number | string;
+  employmentStatus?: string;
+  permanentAddress?: string;
+}
+
+export interface Treasurer {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  password: string;
+  createdAt: string;
+  status: 'active' | 'inactive';
+}
+
+interface UserContextType {
+  tenants: Tenant[];
+  treasurers: Treasurer[];
+  addTenant: (tenant: Omit<Tenant, 'id' | 'createdAt'>) => void;
+  addTreasurer: (treasurer: Omit<Treasurer, 'id' | 'createdAt'> & { id?: string }) => void;
+  updateTreasurer: (id: string, treasurer: Partial<Treasurer>) => void;
+  deleteTreasurer: (id: string) => void;
+}
+
+const UserContext = createContext<UserContextType | undefined>(undefined);
+
+export function UserProvider({ children }: { children: ReactNode }) {
+  const { user } = useAuth();
+  const [tenants, setTenants] = useState<Tenant[]>([]);
+  const [treasurers, setTreasurers] = useState<Treasurer[]>([]);
+
+  const fetchUsers = async () => {
+    if (!user) return;
+
+    // Fetch Treasurers (Only for Owner)
+    if (user.role === 'owner') {
+      try {
+        const trRes = await apiClient.get('/users/treasurers');
+        if (trRes.data) {
+          setTreasurers(trRes.data.map((u: any) => ({
+            id: (u.id || u.user_id).toString(),
+            name: u.name,
+            email: u.email,
+            phone: u.phone || '',
+            password: '',
+            createdAt: u.createdAt || u.created_at,
+            status: u.status,
+          })));
+        }
+      } catch (e) {
+        console.error('Failed to fetch treasurers', e);
+      }
+    }
+
+    // Fetch Tenants (Owner and Treasurer)
+    if (user.role === 'owner' || user.role === 'treasurer') {
+      try {
+        const tRes = await apiClient.get('/users/tenants');
+        if (tRes.data) {
+          setTenants(tRes.data.map((u: any) => ({
+            id: (u.id || u.user_id).toString(),
+            name: u.name,
+            email: u.email,
+            phone: u.phone,
+            createdAt: u.createdAt,
+            status: u.status,
+            nic: u.nic,
+            nicUrl: u.nicUrl || u.nic_url,
+            monthlyIncome: u.monthlyIncome,
+            employmentStatus: u.employmentStatus,
+            permanentAddress: u.permanentAddress
+          })));
+        }
+      } catch (e) {
+        console.error('Failed to fetch tenants', e);
+      }
+    }
+  };
+
+  useEffect(() => {
+    fetchUsers();
+  }, [user]);
+
+  const addTenant = (tenant: Omit<Tenant, 'id' | 'createdAt'>) => {
+    const newTenant: Tenant = {
+      ...tenant,
+      id: `tenant-${Date.now()}`,
+      createdAt: new Date().toISOString().split('T')[0],
+    };
+    setTenants(prev => [...prev, newTenant]);
+  };
+
+  const addTreasurer = (treasurer: Omit<Treasurer, 'id' | 'createdAt'> & { id?: string }) => {
+    const newTreasurer: Treasurer = {
+      ...treasurer,
+      id: treasurer.id || `treasurer-${Date.now()}`,
+      createdAt: new Date().toISOString().split('T')[0],
+    };
+    setTreasurers(prev => [...prev, newTreasurer]);
+  };
+
+  const updateTreasurer = (id: string, updates: Partial<Treasurer>) => {
+    setTreasurers(prev => prev.map(t => (t.id === id ? { ...t, ...updates } : t)));
+  };
+
+  const deleteTreasurer = (id: string) => {
+    setTreasurers(prev => prev.filter(t => t.id !== id));
+  };
+
+  return (
+    <UserContext.Provider value={{ tenants, treasurers, addTenant, addTreasurer, updateTreasurer, deleteTreasurer }}>
+      {children}
+    </UserContext.Provider>
+  );
+}
+
+export function useUser() {
+  const context = useContext(UserContext);
+  if (context === undefined) throw new Error('useUser must be used within a UserProvider');
+  return context;
+}
