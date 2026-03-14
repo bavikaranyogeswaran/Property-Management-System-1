@@ -61,34 +61,48 @@ class MaintenanceService {
         const updated = await maintenanceRequestModel.updateStatus(id, status);
 
         // Notification Logic
-        if (status === 'completed') {
-            const treasurers = await userModel.findByRole('treasurer');
-            const request = await maintenanceRequestModel.findById(id);
+        if (status === 'completed' || status === 'in_progress') {
+            try {
+                const request = await maintenanceRequestModel.findById(id);
+                if (request && request.tenant_id) {
+                    // Internal Notification
+                    await notificationModel.create({
+                        userId: request.tenant_id,
+                        message: status === 'completed' 
+                            ? `Maintenance Request '${request.title}' has been marked as completed.`
+                            : `Maintenance Request '${request.title}' is now In Progress. Technician assigned.`,
+                        type: 'maintenance',
+                    });
 
-            for (const treasurer of treasurers) {
-                await notificationModel.create({
-                    userId: treasurer.user_id,
-                    message: `Maintenance Request '${request.title}' has been completed. Please record final costs.`,
-                    type: 'maintenance',
-                });
-            }
+                    // Email Notification
+                    const tenant = await userModel.findById(request.tenant_id);
+                    if (tenant && tenant.email) {
+                        const unit = await unitModel.findById(request.unitId);
+                        const property = unit ? await propertyModel.findById(unit.propertyId) : null;
+                        
+                        await emailService.sendMaintenanceStatusUpdate(tenant.email, {
+                            title: request.title,
+                            status: status,
+                            propertyName: property ? property.name : null,
+                            unitNumber: unit ? unit.unitNumber : null
+                        });
+                    }
+                }
 
-            if (request.tenant_id) {
-                await notificationModel.create({
-                    userId: request.tenant_id,
-                    message: `Maintenance Request '${request.title}' has been marked as completed.`,
-                    type: 'maintenance',
-                });
+                // If completed, also notify treasurers
+                if (status === 'completed') {
+                    const treasurers = await userModel.findByRole('treasurer');
+                    for (const treasurer of treasurers) {
+                        await notificationModel.create({
+                            userId: treasurer.user_id,
+                            message: `Maintenance Request '${request.title}' has been completed. Please record final costs.`,
+                            type: 'maintenance',
+                        });
+                    }
+                }
+            } catch (err) {
+                console.error('Failed to send maintenance status update notifications:', err);
             }
-        } else if (status === 'in_progress') {
-             const request = await maintenanceRequestModel.findById(id);
-             if (request && request.tenant_id) {
-                 await notificationModel.create({
-                     userId: request.tenant_id,
-                     message: `Maintenance Request '${request.title}' is now In Progress. Technician assigned.`,
-                     type: 'maintenance',
-                 });
-             }
         }
         return updated;
     }

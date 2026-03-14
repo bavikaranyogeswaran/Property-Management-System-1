@@ -10,6 +10,7 @@ import tenantModel from '../models/tenantModel.js';
 import leaseModel from '../models/leaseModel.js';
 import auditLogger from '../utils/auditLogger.js';
 import ledgerModel from '../models/ledgerModel.js';
+import emailService from '../utils/emailService.js';
 
 /**
  * Maps an invoice_type to the correct accounting ledger classification.
@@ -168,6 +169,21 @@ class PaymentService {
             } catch (ledgerErr) {
                 console.error('Failed to post ledger entry (cash):', ledgerErr);
             }
+
+            // Email Notification
+            try {
+                const tenant = await userModel.findById(invoice.tenant_id);
+                if (tenant && tenant.email) {
+                    await emailService.sendPaymentConfirmation(tenant.email, {
+                        amount: amount,
+                        paymentMethod: 'cash',
+                        referenceNumber: referenceNumber || `CASH-${Date.now()}`,
+                        invoiceId: invoiceId
+                    });
+                }
+            } catch (emailErr) {
+                console.error('Failed to send cash payment confirmation email:', emailErr);
+            }
         }
 
         return paymentId;
@@ -303,6 +319,19 @@ class PaymentService {
                     } catch (scoreErr) {
                          console.error('Failed to update positive score:', scoreErr);
                     }
+                     try {
+                        const tenant = await userModel.findById(invoice.tenant_id);
+                        if (tenant && tenant.email) {
+                            await emailService.sendPaymentConfirmation(tenant.email, {
+                                amount: payment.amount,
+                                paymentMethod: payment.paymentMethod,
+                                referenceNumber: payment.referenceNumber,
+                                invoiceId: payment.invoiceId
+                            });
+                        }
+                    } catch (emailErr) {
+                        console.error('Failed to send payment verification email:', emailErr);
+                    }
                  }
             }
         } else if (status === 'rejected') {
@@ -332,12 +361,26 @@ class PaymentService {
                           });
                      }
                      
-                     await notificationModel.create({
+                      await notificationModel.create({
                          userId: invoice.tenant_id,
                          message: `Payment of ${payment.amount} for Invoice #${payment.invoiceId} was rejected. Please contact support.`,
                          type: 'payment',
                          severity: 'urgent',
                      });
+
+                     // Email Notification
+                     try {
+                        const tenant = await userModel.findById(invoice.tenant_id);
+                        if (tenant && tenant.email) {
+                            await emailService.sendPaymentRejection(tenant.email, {
+                                amount: payment.amount,
+                                invoiceId: payment.invoiceId,
+                                reason: null // Or capture reason if available
+                            });
+                        }
+                     } catch (emailErr) {
+                        console.error('Failed to send payment rejection email:', emailErr);
+                     }
                  }
              }
         }

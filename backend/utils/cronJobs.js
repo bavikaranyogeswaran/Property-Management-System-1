@@ -326,49 +326,78 @@ export const checkLeaseExpiration = async () => {
 // Expiry Warning (Daily at 0:30 AM)
 export const sendLeaseExpiryWarnings = async () => {
   console.log('Running lease expiry warning check...');
-  // Warn 30 days before?
+  // Warn at 30 and 60 days
   const today = new Date();
-  const warningDate = new Date();
-  warningDate.setDate(today.getDate() + 30);
-  const dateStr = warningDate.toISOString().split('T')[0];
+  
+  const warningDate30 = new Date();
+  warningDate30.setDate(today.getDate() + 30);
+  const dateStr30 = warningDate30.toISOString().split('T')[0];
+
+  const warningDate60 = new Date();
+  warningDate60.setDate(today.getDate() + 60);
+  const dateStr60 = warningDate60.toISOString().split('T')[0];
 
   try {
-    // Find leases expiring exactly in 30 days
-    // Join units and properties to find the specific owner of the unit
+    // Find leases expiring exactly in 30 or 60 days
     const [expiringLeases] = await db.query(
       `
-            SELECT l.*, t.email as tenant_email, p.owner_id 
+            SELECT l.*, t.email as tenant_email, u_owner.email as owner_email, p.propertyName, un.unit_number
             FROM leases l
             JOIN users t ON l.tenant_id = t.user_id
             JOIN units un ON l.unit_id = un.unit_id
             JOIN properties p ON un.property_id = p.property_id
+            LEFT JOIN users u_owner ON p.owner_id = u_owner.user_id
             WHERE l.status = 'active'
-            AND l.end_date = ?
+            AND l.end_date IN (?, ?)
         `,
-      [dateStr]
+      [dateStr30, dateStr60]
     );
 
     if (expiringLeases.length > 0) {
       console.log(
-        `Found ${expiringLeases.length} leases expiring on ${dateStr}. Sending warnings...`
+        `Found ${expiringLeases.length} leases expiring soon. Sending warnings...`
       );
       for (const lease of expiringLeases) {
+        const daysCount = lease.end_date === dateStr30 ? 30 : 60;
+        
         // 1. Notify Tenant
         await notificationModel.create({
           userId: lease.tenant_id,
-          message: `Your lease is expiring in 30 days (on ${lease.end_date}). Please contact us if you wish to renew.`,
+          message: `Your lease is expiring in ${daysCount} days (on ${lease.end_date}). Please contact us if you wish to renew.`,
           type: 'system',
           severity: 'warning',
         });
+
+        // 1b. Email Tenant
+        if (lease.tenant_email) {
+            await emailService.sendLeaseExpiryReminder(lease.tenant_email, {
+                daysCount,
+                endDate: lease.end_date,
+                propertyName: lease.propertyName,
+                unitNumber: lease.unit_number,
+                role: 'tenant'
+            });
+        }
 
         // 2. Notify Owner
         if (lease.owner_id) {
           await notificationModel.create({
             userId: lease.owner_id,
-            message: `Lease for Unit ${lease.unit_id} is expiring in 30 days (on ${lease.end_date}).`,
+            message: `Lease for Unit ${lease.unit_number} is expiring in ${daysCount} days (on ${lease.end_date}).`,
             type: 'system',
             severity: 'warning',
           });
+
+          // 2b. Email Owner
+          if (lease.owner_email) {
+              await emailService.sendLeaseExpiryReminder(lease.owner_email, {
+                  daysCount,
+                  endDate: lease.end_date,
+                  propertyName: lease.propertyName,
+                  unitNumber: lease.unit_number,
+                  role: 'owner'
+              });
+          }
         }
       }
     }
@@ -595,6 +624,35 @@ export const syncUnitStatuses = async () => {
   }
 };
 
+// Rent Reminder (Daily at 8:00 AM)
+export const sendRentReminders = async () => {
+  const today = new Date();
+  const targetDay = RENT_DUE_DAY - 3;
+  
+  // Handling the case where targetDay is 2 (3 days before the 5th)
+  if (today.getDate() !== targetDay) return;
+
+  console.log('Running automated rent reminders...');
+  try {
+    const activeLeases = await leaseModel.findActive();
+    const dueDate = new Date(today.getFullYear(), today.getMonth(), RENT_DUE_DAY).toISOString().split('T')[0];
+
+    for (const lease of activeLeases) {
+        // Fetch tenant email
+        const [userRows] = await db.query('SELECT email FROM users WHERE user_id = ?', [lease.tenantId]);
+        if (userRows.length > 0 && userRows[0].email) {
+            await emailService.sendRentReminder(userRows[0].email, {
+                amount: lease.monthlyRent,
+                dueDate: dueDate,
+                daysLeft: 3
+            });
+        }
+    }
+  } catch (error) {
+    console.error('Error in automated rent reminders:', error);
+  }
+};
+
 // Notification Cleanup (Daily at 4:00 AM)
 // Prevents unbounded growth of the notifications table
 export const cleanupOldNotifications = async () => {
@@ -628,6 +686,9 @@ const initCronJobs = () => {
 
   // Run every day at 4:00 AM (Notification Cleanup)
   cron.schedule('0 4 * * *', cleanupOldNotifications);
+
+  // Run every day at 8:00 AM (Rent Reminders)
+  cron.schedule('0 8 * * *', sendRentReminders);
 };
 
 export default initCronJobs;

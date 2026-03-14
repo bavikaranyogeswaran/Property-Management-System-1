@@ -382,6 +382,248 @@ class EmailService {
     }
   }
 
+  async sendMaintenanceStatusUpdate(email, details) {
+    const { title, status, propertyName, unitNumber } = details;
+    const subject = `Maintenance Update: ${title} - ${status.replace('_', ' ').charAt(0).toUpperCase() + status.replace('_', ' ').slice(1)}`;
+
+    if (!this.transporter) {
+      console.log('==================================================');
+      console.log(`[EMAIL MOCK] Maintenance Status Update for ${email}`);
+      console.log(`Request: ${title}`);
+      console.log(`New Status: ${status}`);
+      console.log('==================================================');
+      return true;
+    }
+
+    try {
+      const statusColor = status === 'completed' ? '#16a34a' : '#2563eb';
+      const statusDisplay = status.replace('_', ' ').charAt(0).toUpperCase() + status.replace('_', ' ').slice(1);
+
+      await this.transporter.sendMail({
+        from: `"Property Management System" <${process.env.SMTP_USER}>`,
+        to: email,
+        subject: subject,
+        html: this._getTemplate(
+          'Maintenance Request Update',
+          `
+                    <p>The status of your maintenance request <strong>"${title}"</strong> has been updated.</p>
+                    
+                    <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; margin: 24px 0; border: 1px solid #e2e8f0;">
+                        <p style="margin: 4px 0; color: #475569;"><strong>Property:</strong> ${propertyName || 'Your Property'}</p>
+                        ${unitNumber ? `<p style="margin: 4px 0; color: #475569;"><strong>Unit:</strong> ${unitNumber}</p>` : ''}
+                        <p style="margin: 4px 0; color: #475569;"><strong>New Status:</strong> <span style="font-weight: 600; color: ${statusColor}">${statusDisplay}</span></p>
+                    </div>
+
+                    <p>Log in to your dashboard to view full details.</p>
+                    
+                    <div style="text-align: center; margin-top: 32px;">
+                        <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/tenant/maintenance" style="background-color: #2563eb; color: white; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px; display: inline-block;">View Maintenance Request</a>
+                    </div>
+                `
+        ),
+      });
+      return true;
+    } catch (error) {
+      console.error('Error sending maintenance status update email:', error);
+      return false;
+    }
+  }
+
+  async sendPaymentConfirmation(email, details) {
+    const { amount, paymentMethod, referenceNumber, invoiceId } = details;
+    const formattedAmount = new Intl.NumberFormat('en-LK', {
+      style: 'currency',
+      currency: 'LKR',
+    }).format(amount);
+
+    if (!this.transporter) {
+      console.log('==================================================');
+      console.log(`[EMAIL MOCK] Payment Receipt for ${email}`);
+      console.log(`Amount: ${formattedAmount}`);
+      console.log(`Method: ${paymentMethod}`);
+      console.log(`Invoice: #${invoiceId}`);
+      console.log('==================================================');
+      return true;
+    }
+
+    try {
+      await this.transporter.sendMail({
+        from: `"Property Management System" <${process.env.SMTP_USER}>`,
+        to: email,
+        subject: `Payment Receipt: Invoice #${invoiceId}`,
+        html: this._getTemplate(
+          'Payment Successful',
+          `
+                    <p>Thank you! Your payment has been successfully verified.</p>
+                    
+                    <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; margin: 24px 0; border: 1px solid #e2e8f0;">
+                        <p style="margin: 4px 0; color: #475569;"><strong>Invoice ID:</strong> #${invoiceId}</p>
+                        <p style="margin: 4px 0; color: #475569;"><strong>Amount Paid:</strong> ${formattedAmount}</p>
+                        <p style="margin: 4px 0; color: #475569;"><strong>Payment Method:</strong> ${paymentMethod.charAt(0).toUpperCase() + paymentMethod.slice(1)}</p>
+                        ${referenceNumber ? `<p style="margin: 4px 0; color: #475569;"><strong>Reference:</strong> ${referenceNumber}</p>` : ''}
+                    </div>
+
+                    <p>You can download your official receipt from the tenant portal.</p>
+                    
+                    <div style="text-align: center; margin-top: 32px;">
+                        <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/tenant/payments" style="background-color: #2563eb; color: white; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px; display: inline-block;">Go to Payments</a>
+                    </div>
+                `
+        ),
+      });
+      return true;
+    } catch (error) {
+      console.error('Error sending payment confirmation email:', error);
+      return false;
+    }
+  }
+
+  async sendPaymentRejection(email, details) {
+    const { amount, invoiceId, reason } = details;
+    const formattedAmount = new Intl.NumberFormat('en-LK', {
+      style: 'currency',
+      currency: 'LKR',
+    }).format(amount);
+
+    if (!this.transporter) {
+      console.log('==================================================');
+      console.log(`[EMAIL MOCK] Payment Rejected for ${email}`);
+      console.log(`Invoice: #${invoiceId}`);
+      console.log(`Amount: ${formattedAmount}`);
+      console.log('==================================================');
+      return true;
+    }
+
+    try {
+      await this.transporter.sendMail({
+        from: `"Property Management System" <${process.env.SMTP_USER}>`,
+        to: email,
+        subject: `ACTION REQUIRED: Payment Rejected for Invoice #${invoiceId}`,
+        html: this._getTemplate(
+          'Payment Verification Failed',
+          `
+                    <p style="color: #dc2626; font-weight: 600;">Your recent payment submission for Invoice #${invoiceId} could not be verified.</p>
+                    
+                    <div style="background-color: #fff1f2; padding: 20px; border-radius: 8px; margin: 24px 0; border: 1px solid #fecaca;">
+                        <p style="margin: 4px 0; color: #991b1b;"><strong>Amount:</strong> ${formattedAmount}</p>
+                        ${reason ? `<p style="margin: 12px 0 0 0; color: #991b1b;"><strong>Reason for Rejection:</strong> ${reason}</p>` : '<p style="margin: 12px 0 0 0; color: #991b1b;">The evidence provided was insufficient or incorrect.</p>'}
+                    </div>
+
+                    <p>Please log in to your portal and re-submit your proof of payment to avoid any potential late fees.</p>
+                    
+                    <div style="text-align: center; margin-top: 32px;">
+                         <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/tenant/payments" style="background-color: #dc2626; color: white; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px; display: inline-block;">Resubmit Payment Evidence</a>
+                    </div>
+                `
+        ),
+      });
+      return true;
+    } catch (error) {
+      console.error('Error sending payment rejection email:', error);
+      return false;
+    }
+  }
+
+  async sendLeaseExpiryReminder(email, details) {
+    const { daysCount, endDate, propertyName, unitNumber, role } = details;
+    const subject = role === 'tenant' 
+        ? `Your Lease is Expiring in ${daysCount} Days` 
+        : `Urgent: Lease for Unit ${unitNumber} Expiring in ${daysCount} Days`;
+
+    if (!this.transporter) {
+      console.log('==================================================');
+      console.log(`[EMAIL MOCK] Lease Expiry (${daysCount} days) to ${email} (${role})`);
+      console.log(`Property: ${propertyName}, Unit: ${unitNumber}`);
+      console.log(`End Date: ${endDate}`);
+      console.log('==================================================');
+      return true;
+    }
+
+    try {
+      const title = role === 'tenant' ? 'Lease Expiration Notice' : 'Unit Lease Expiry Notice';
+      const intro = role === 'tenant' 
+        ? `We are writing to remind you that your lease for <strong>${propertyName} (Unit ${unitNumber})</strong> is scheduled to end on <strong>${endDate}</strong> (${daysCount} days from now).`
+        : `This is an automated reminder that the lease for <strong>${propertyName} (Unit ${unitNumber})</strong> will expire on <strong>${endDate}</strong> (${daysCount} days from now).`;
+
+      const actionText = role === 'tenant'
+        ? 'If you wish to renew your lease or discuss your options, please contact your property manager as soon as possible.'
+        : 'Please review this lease and initiate renewal discussions or prepare for the turnover process.';
+
+      await this.transporter.sendMail({
+        from: `"Property Management System" <${process.env.SMTP_USER}>`,
+        to: email,
+        subject: subject,
+        html: this._getTemplate(
+          title,
+          `
+                    <p>${intro}</p>
+                    
+                    <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; margin: 24px 0; border: 1px solid #e2e8f0;">
+                        <p style="margin: 4px 0; color: #475569;"><strong>Lease End Date:</strong> ${endDate}</p>
+                        <p style="margin: 4px 0; color: #475569;"><strong>Days Remaining:</strong> ${daysCount} days</p>
+                    </div>
+
+                    <p>${actionText}</p>
+                    
+                    <div style="text-align: center; margin-top: 32px;">
+                        <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/${role === 'tenant' ? 'tenant' : 'owner'}/dashboard" style="background-color: #2563eb; color: white; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px; display: inline-block;">Go to Dashboard</a>
+                    </div>
+                `
+        ),
+      });
+      return true;
+    } catch (error) {
+      console.error('Error sending lease expiry reminder email:', error);
+      return false;
+    }
+  }
+
+  async sendRentReminder(email, details) {
+    const { amount, dueDate, daysLeft } = details;
+    const formattedAmount = new Intl.NumberFormat('en-LK', {
+      style: 'currency',
+      currency: 'LKR',
+    }).format(amount);
+
+    if (!this.transporter) {
+      console.log('==================================================');
+      console.log(`[EMAIL MOCK] Rent Reminder to ${email}`);
+      console.log(`Amount: ${formattedAmount}`);
+      console.log(`Due Date: ${dueDate} (${daysLeft} days left)`);
+      console.log('==================================================');
+      return true;
+    }
+
+    try {
+      await this.transporter.sendMail({
+        from: `"Property Management System" <${process.env.SMTP_USER}>`,
+        to: email,
+        subject: `Upcoming Rent Payment: Due in ${daysLeft} Days`,
+        html: this._getTemplate(
+          'Rent Reminder',
+          `
+                    <p>This is a friendly reminder that your upcoming rent payment is due in <strong>${daysLeft} days</strong>.</p>
+                    
+                    <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; margin: 24px 0; border: 1px solid #e2e8f0;">
+                        <p style="margin: 4px 0; color: #475569;"><strong>Amount Due:</strong> ${formattedAmount}</p>
+                        <p style="margin: 4px 0; color: #475569;"><strong>Due Date:</strong> ${dueDate}</p>
+                    </div>
+
+                    <p>You can pay your rent directly through the tenant portal using your preferred payment method.</p>
+                    
+                    <div style="text-align: center; margin-top: 32px;">
+                        <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/tenant/payments" style="background-color: #2563eb; color: white; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px; display: inline-block;">Pay Now</a>
+                    </div>
+                `
+        ),
+      });
+      return true;
+    } catch (error) {
+      console.error('Error sending rent reminder email:', error);
+      return false;
+    }
+  }
+
   _getTemplate(title, content) {
     return `
             <!DOCTYPE html>
