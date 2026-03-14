@@ -22,6 +22,8 @@ import {
 } from '@/components/ui/dialog';
 import { ChatInterface } from '@/components/common/ChatInterface';
 import apiClient from '@/services/api';
+import { TenantBehaviorHistory } from './TenantBehaviorHistory';
+import { Trophy } from 'lucide-react';
 
 export function TenantDashboard() {
   const { user } = useAuth();
@@ -37,6 +39,8 @@ export function TenantDashboard() {
   } = useApp();
   const [leadHistory, setLeadHistory] = React.useState<any>(null);
   const [isHistoryOpen, setIsHistoryOpen] = React.useState(false);
+  const [isBehaviorOpen, setIsBehaviorOpen] = React.useState(false);
+  const [behaviorSummary, setBehaviorSummary] = React.useState<any>(null);
 
   React.useEffect(() => {
     // Fetch lead history
@@ -48,6 +52,15 @@ export function TenantDashboard() {
       .catch((err) => {
         // Ignore if no history found
         console.log('No application history found');
+      });
+    // Fetch behavior summary
+    apiClient
+      .get('/behavior/my-score')
+      .then((res) => {
+        setBehaviorSummary(res.data);
+      })
+      .catch((err) => {
+        console.log('No behavior data found');
       });
   }, []);
 
@@ -120,6 +133,15 @@ export function TenantDashboard() {
       color: 'text-yellow-600',
       bgColor: 'bg-yellow-50',
     },
+    {
+      title: 'Behavior Score',
+      value: behaviorSummary ? behaviorSummary.score : '...',
+      subtitle: 'Excellent Standing',
+      icon: Trophy,
+      color: 'text-amber-600',
+      bgColor: 'bg-amber-50',
+      onClick: () => setIsBehaviorOpen(true),
+    },
   ];
 
   return (
@@ -185,7 +207,11 @@ export function TenantDashboard() {
         {stats.map((stat, index) => {
           const Icon = stat.icon;
           return (
-            <Card key={index}>
+            <Card 
+              key={index} 
+              className={stat.onClick ? "cursor-pointer hover:shadow-md transition-shadow" : ""}
+              onClick={stat.onClick}
+            >
               <CardContent className="p-6">
                 <div className="flex items-start justify-between">
                   <div>
@@ -348,6 +374,14 @@ export function TenantDashboard() {
               leadId={leadHistory.id}
             />
           )}
+        </DialogContent>
+      </Dialog>
+      <Dialog open={isBehaviorOpen} onOpenChange={setIsBehaviorOpen}>
+        <DialogContent className="max-w-3xl h-[80vh] flex flex-col p-6">
+          <DialogHeader>
+            <DialogTitle>Your Behavior Profile & Gamification</DialogTitle>
+          </DialogHeader>
+          <TenantBehaviorHistory />
         </DialogContent>
       </Dialog>
     </div>

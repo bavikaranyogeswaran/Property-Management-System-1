@@ -31,3 +31,15 @@ export const getTenantBehavior = async (req, res) => {
     res.status(500).json({ message: 'Internal Server Error' });
   }
 };
+
+export const getMyBehavior = async (req, res) => {
+  const tenantId = req.user.user_id; // Identifies the authenticated tenant
+
+  try {
+    const result = await behaviorService.getTenantBehavior(tenantId);
+    res.status(200).json(result);
+  } catch (error) {
+    console.error('Error fetching own behavior:', error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+};

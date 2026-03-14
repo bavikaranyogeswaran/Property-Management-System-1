@@ -485,6 +485,22 @@ export const applyLateFees = async () => {
         isRead: false,
       });
 
+      // Log Behavior (Negative)
+      try {
+        const behaviorLogModel = (await import('../models/behaviorLogModel.js')).default;
+        await behaviorLogModel.create({
+            tenantId: inv.tenant_id,
+            type: 'negative',
+            category: 'Payment',
+            scoreChange: -10,
+            description: `Late payment penalty for Invoice #${inv.invoice_id}`,
+            recordedBy: null
+        });
+        await tenantModel.incrementBehaviorScore(inv.tenant_id, -10);
+      } catch (scoreErr) {
+        console.error('Failed to log negative behavior for late fee:', scoreErr);
+      }
+
       // Logic Check: Mark Original Invoice as 'Overdue'
       // Previously, it remained 'pending'. Now explicitly set to 'overdue'.
       await invoiceModel.updateStatus(inv.invoice_id, 'overdue');
