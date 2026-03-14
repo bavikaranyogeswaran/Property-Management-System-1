@@ -11,6 +11,8 @@ import {
   CheckCircle,
   MessageSquare,
   History,
+  TrendingUp,
+  Star,
 } from 'lucide-react';
 import { NotificationBanner } from '@/components/common/NotificationBanner';
 import { Button } from '@/components/ui/button';
@@ -133,15 +135,6 @@ export function TenantDashboard() {
       color: 'text-yellow-600',
       bgColor: 'bg-yellow-50',
     },
-    {
-      title: 'Behavior Score',
-      value: behaviorSummary ? behaviorSummary.score : '...',
-      subtitle: 'Excellent Standing',
-      icon: Trophy,
-      color: 'text-amber-600',
-      bgColor: 'bg-amber-50',
-      onClick: () => setIsBehaviorOpen(true),
-    },
   ];
 
   return (
@@ -209,8 +202,8 @@ export function TenantDashboard() {
           return (
             <Card 
               key={index} 
-              className={stat.onClick ? "cursor-pointer hover:shadow-md transition-shadow" : ""}
-              onClick={stat.onClick}
+              className={(stat as any).onClick ? "cursor-pointer hover:shadow-md transition-shadow" : ""}
+              onClick={(stat as any).onClick}
             >
               <CardContent className="p-6">
                 <div className="flex items-start justify-between">
@@ -231,6 +224,40 @@ export function TenantDashboard() {
             </Card>
           );
         })}
+
+        {/* Featured Behavior Score Card */}
+        <Card 
+          className="lg:col-span-2 cursor-pointer hover:shadow-lg transition-all border-amber-100 bg-gradient-to-br from-amber-50 to-orange-50 overflow-hidden relative group"
+          onClick={() => setIsBehaviorOpen(true)}
+        >
+          <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform">
+            <Trophy className="size-24 text-amber-600" />
+          </div>
+          <CardContent className="p-6 relative z-10">
+            <div className="flex items-start justify-between">
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-amber-800 uppercase tracking-wider">Behavior Profile</p>
+                <div className="flex items-baseline gap-2">
+                  <h3 className="text-4xl font-bold text-amber-900">{behaviorSummary ? behaviorSummary.score : '...'}</h3>
+                  <span className="text-amber-700 font-medium">Points</span>
+                </div>
+                <p className="text-sm text-amber-700 font-semibold mt-2 flex items-center gap-1">
+                  <Trophy className="size-4" />
+                  Excellent Standing
+                </p>
+                <Button variant="ghost" size="sm" className="mt-4 text-amber-700 hover:text-amber-900 hover:bg-amber-100 p-0 h-auto font-bold flex items-center gap-2">
+                  View Full History & Rules
+                  <TrendingUp className="size-4" />
+                </Button>
+              </div>
+              <div className="bg-white/50 p-3 rounded-xl border border-amber-200/50 shadow-sm backdrop-blur-sm">
+                <div className="size-12 rounded-lg bg-amber-500 flex items-center justify-center text-white">
+                  <Star className="size-6 fill-white" />
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Lease Expiration Notifications */}
