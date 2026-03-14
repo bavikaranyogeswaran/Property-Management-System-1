@@ -210,6 +210,14 @@ class ReportService {
             Dropped: Number(stats.Dropped)
         };
     }
+
+    async getMonthlyCashFlow(user) {
+        const propertyIds = await this._getAccessiblePropertyIds(user);
+        if (propertyIds.length === 0) return [];
+
+        const stats = await ledgerModel.getMonthlyStats(propertyIds, 12);
+        return stats;
+    }
 }
 
 export default new ReportService();

@@ -171,6 +171,47 @@ class LedgerModel {
       netOperatingIncome: totalRevenueCollected - totalExpense,
     };
   }
+
+  /**
+   * Get monthly aggregated totals for the last N months.
+   * Returns: [ { month: '2025-01', revenue: 100, expense: 50 }, ... ]
+   */
+  async getMonthlyStats(propertyIds, monthsLimit = 12) {
+    if (!propertyIds || propertyIds.length === 0) return [];
+
+    const [rows] = await pool.query(
+      `SELECT 
+         DATE_FORMAT(al.entry_date, '%Y-%m') AS month_label,
+         al.account_type,
+         SUM(al.credit) AS total_credit,
+         SUM(al.debit) AS total_debit
+       FROM accounting_ledger al
+       JOIN leases l ON al.lease_id = l.lease_id
+       JOIN units u ON l.unit_id = u.unit_id
+       WHERE u.property_id IN (?)
+       AND al.entry_date >= DATE_SUB(CURDATE(), INTERVAL ? MONTH)
+       GROUP BY month_label, al.account_type
+       ORDER BY month_label ASC`,
+      [propertyIds, monthsLimit]
+    );
+
+    const monthlyData = {};
+
+    rows.forEach((row) => {
+      const month = row.month_label;
+      if (!monthlyData[month]) {
+        monthlyData[month] = { month, revenue: 0, expense: 0 };
+      }
+
+      if (row.account_type === 'revenue') {
+        monthlyData[month].revenue += Number(row.total_credit);
+      } else if (row.account_type === 'expense') {
+        monthlyData[month].expense += Number(row.total_credit) - Number(row.total_debit);
+      }
+    });
+
+    return Object.values(monthlyData);
+  }
 }
 
 export default new LedgerModel();

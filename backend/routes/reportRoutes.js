@@ -50,5 +50,11 @@ router.get(
   authorizeRoles('owner', 'treasurer'),
   reportController.getLedgerSummary
 );
+router.get(
+  '/cash-flow',
+  authenticateToken,
+  authorizeRoles('owner', 'treasurer'),
+  reportController.getMonthlyCashFlow
+);
 
 export default router;

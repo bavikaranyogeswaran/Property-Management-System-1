@@ -34,6 +34,7 @@ import {
   FileText,
   Calendar,
 } from 'lucide-react';
+import { MonthlyCashFlowCard } from '../pages/owner/MonthlyCashFlowCard';
 
 export function AnalyticsPage() {
   const {
@@ -339,34 +340,7 @@ export function AnalyticsPage() {
         {/* Financial Tab */}
         <TabsContent value="financial" className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Revenue vs Expenses Trend</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={monthlyData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
-                    <YAxis />
-                    <Tooltip />
-                    <Legend />
-                    <Line
-                      type="monotone"
-                      dataKey="revenue"
-                      stroke="#10b981"
-                      strokeWidth={2}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="expenses"
-                      stroke="#ef4444"
-                      strokeWidth={2}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
+            <MonthlyCashFlowCard />
 
             <Card>
               <CardHeader>

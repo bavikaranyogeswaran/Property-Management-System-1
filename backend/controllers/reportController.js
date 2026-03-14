@@ -638,6 +638,16 @@ class ReportController {
       res.status(500).json({ error: 'Failed to fetch ledger summary' });
     }
   }
+
+  async getMonthlyCashFlow(req, res) {
+    try {
+      const stats = await reportService.getMonthlyCashFlow(req.user);
+      res.json(stats);
+    } catch (error) {
+      console.error('Error fetching monthly cash flow:', error);
+      res.status(500).json({ error: 'Failed to fetch monthly cash flow' });
+    }
+  }
 }
 
 export default new ReportController();
