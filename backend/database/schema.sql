@@ -175,6 +175,7 @@ CREATE TABLE leads (
     internal_notes TEXT,                 -- [ADDED] Owner's private notes about this lead
     move_in_date DATE,                       -- [ADDED] Lead qualification
     occupants_count INT DEFAULT 1,           -- [ADDED] Lead qualification
+    preferred_term_months INT,               -- [ADDED] Desired lease duration
     score INT DEFAULT 0,                     -- [ADDED] Lead scoring
     last_contacted_at DATETIME,              -- [ADDED] For follow-up tracking
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -240,6 +241,7 @@ CREATE TABLE leases (
     end_date DATE,
     monthly_rent DECIMAL(10,2) NOT NULL,
     status ENUM('active','ended','cancelled') DEFAULT 'active',
+    notice_status ENUM('undecided', 'vacating', 'renewing') DEFAULT 'undecided', -- [ADDED] Tenant's intent
     security_deposit DECIMAL(10, 2) DEFAULT 0.00,
     deposit_status ENUM('pending', 'paid', 'partially_refunded', 'refunded') DEFAULT 'pending',
     refunded_amount DECIMAL(10, 2) DEFAULT 0.00,

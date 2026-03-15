@@ -20,6 +20,7 @@ export interface Lead {
   score?: number;
   moveInDate?: string;
   occupantsCount?: number;
+  preferredTermMonths?: number;
 }
 
 export interface LeadStageHistory {

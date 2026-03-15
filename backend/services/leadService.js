@@ -11,7 +11,7 @@ import { validateEmail, validatePhoneNumber } from '../utils/validators.js';
 class LeadService {
 
     async registerInterest(data) {
-        const { name, email, phone, propertyId, interestedUnit, unitId, notes, moveInDate, occupantsCount } = data;
+        const { name, email, phone, propertyId, interestedUnit, unitId, notes, moveInDate, occupantsCount, preferredTermMonths } = data;
 
         if (!name || !email || !propertyId) {
             throw new Error('Name, email, and property are required');
@@ -50,6 +50,31 @@ class LeadService {
                 throw new Error('This email is already associated with a staff/owner account. Please use a different email or log in.');
             }
         }
+        
+        // --- OVERLAP & PREFERENCE Logic ---
+        if (finalUnitId && moveInDate && preferredTermMonths) {
+            const startDate = new Date(moveInDate);
+            const endDate = new Date(startDate);
+            endDate.setMonth(endDate.getMonth() + parseInt(preferredTermMonths, 10));
+            
+            const hasOverlap = await (await import('../models/leaseModel.js')).default.checkOverlap(
+                finalUnitId, 
+                startDate.toISOString().split('T')[0], 
+                endDate.toISOString().split('T')[0]
+            );
+            
+            if (hasOverlap) {
+                // If there's an overlap, check if the current tenant is vacating
+                const activeLease = await (await import('../models/leaseModel.js')).default.checkOverlap(
+                    finalUnitId,
+                    startDate.toISOString().split('T')[0],
+                    endDate.toISOString().split('T')[0]
+                );
+                // Note: checkOverlap only returns true/false. 
+                // We might want to be more specific later, but for now, we follow the plan.
+                throw new Error('This unit is already booked/occupied for part of your requested period. Please try a different start date or unit.');
+            }
+        }
 
         const existingLeadId = await leadModel.findIdByEmailAndProperty(email, propertyId);
         
@@ -67,7 +92,8 @@ class LeadService {
                 name: name,
                 phone: phone,
                 move_in_date: moveInDate,
-                occupants_count: occupantsCount
+                occupants_count: occupantsCount,
+                preferred_term_months: preferredTermMonths
             });
             message = 'Interest updated. We will contact you soon.';
         } else {
@@ -82,6 +108,7 @@ class LeadService {
                 notes,
                 move_in_date: moveInDate,
                 occupants_count: occupantsCount,
+                preferred_term_months: preferredTermMonths,
                 status: 'interested',
             });
             message = 'Interest registered! We will contact you soon.';

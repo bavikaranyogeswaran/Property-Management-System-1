@@ -15,5 +15,6 @@ router.post(
   authenticateToken,
   leaseController.terminateLease
 );
+router.patch('/:id/notice-status', authenticateToken, leaseController.updateNoticeStatus);
 
 export default router;

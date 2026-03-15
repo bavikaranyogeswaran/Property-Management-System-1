@@ -125,6 +125,20 @@ class LeaseController {
       res.status(500).json({ error: error.message });
     }
   }
+
+  async updateNoticeStatus(req, res) {
+    try {
+      const { id } = req.params;
+      const { status } = req.body;
+
+      await leaseService.updateNoticeStatus(id, status, req.user);
+      res.json({ message: 'Notice status updated successfully', status });
+    } catch (error) {
+      if (error.message.includes('not found')) return res.status(404).json({ error: error.message });
+      if (error.message.includes('Access denied')) return res.status(403).json({ error: error.message });
+      res.status(500).json({ error: error.message });
+    }
+  }
 }
 
 export default new LeaseController();

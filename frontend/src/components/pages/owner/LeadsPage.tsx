@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   useApp,
@@ -71,6 +71,7 @@ export function LeadsPage() {
     startDate: new Date().toISOString().split('T')[0],
     endDate: '',
     unitId: '',
+    ignoreRenewalConflict: false,
   });
 
   const handleStatusChange = async (leadId: string, status: Lead['status']) => {
@@ -108,6 +109,18 @@ export function LeadsPage() {
   };
 
 
+  useEffect(() => {
+    if (selectedLead?.preferredTermMonths && conversionData.startDate) {
+      const start = new Date(conversionData.startDate);
+      const end = new Date(start);
+      end.setMonth(end.getMonth() + selectedLead.preferredTermMonths);
+      setConversionData((prev) => ({
+        ...prev,
+        endDate: end.toISOString().split('T')[0],
+      }));
+    }
+  }, [selectedLead, conversionData.startDate]);
+
   const handleConvert = async () => {
     if (!selectedLead) return;
 
@@ -128,6 +141,7 @@ export function LeadsPage() {
         startDate: new Date().toISOString().split('T')[0],
         endDate: '',
         unitId: '',
+        ignoreRenewalConflict: false,
       });
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to convert lead');
@@ -326,7 +340,7 @@ export function LeadsPage() {
             <TableHead>Name</TableHead>
             <TableHead>Contact</TableHead>
             <TableHead>Interested Unit</TableHead>
-            <TableHead>Details</TableHead>
+            <TableHead>Preferences</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Last Contact</TableHead>
             <TableHead className="text-right">Actions</TableHead>
@@ -354,6 +368,10 @@ export function LeadsPage() {
                       {lead.moveInDate
                         ? new Date(lead.moveInDate).toLocaleDateString()
                         : '-'}
+                    </div>
+                    <div>
+                      <span className="font-medium">Term:</span>{' '}
+                      {lead.preferredTermMonths ? `${lead.preferredTermMonths} months` : '-'}
                     </div>
                     <div>
                       <span className="font-medium">Occupants:</span>{' '}
@@ -601,7 +619,9 @@ export function LeadsPage() {
                   }
                 />
                 <p className="text-[10px] text-gray-500">
-                  Leave empty for 1 year default
+                  {selectedLead?.preferredTermMonths 
+                    ? `Pre-filled with lead's ${selectedLead.preferredTermMonths}mo preference`
+                    : 'Required (Min 90 days recommended)'}
                 </p>
               </div>
             </div>

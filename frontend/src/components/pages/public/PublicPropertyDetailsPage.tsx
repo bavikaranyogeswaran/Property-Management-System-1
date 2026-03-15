@@ -55,6 +55,7 @@ export function PublicPropertyDetailsPage() {
     notes: '',
     moveInDate: '',
     occupantsCount: '1',
+    preferredTermMonths: '12',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isMobileInterestOpen, setIsMobileInterestOpen] = useState(false);
@@ -140,6 +141,7 @@ export function PublicPropertyDetailsPage() {
       await addLead({
         ...interestFormData,
         occupantsCount: parseInt(interestFormData.occupantsCount, 10),
+        preferredTermMonths: parseInt(interestFormData.preferredTermMonths, 10),
         status: 'interested',
       });
       toast.success(
@@ -153,6 +155,7 @@ export function PublicPropertyDetailsPage() {
         notes: '',
         moveInDate: '',
         occupantsCount: '1',
+        preferredTermMonths: '12',
         propertyId: id || '',
       });
       setFormErrors({});
@@ -519,11 +522,13 @@ export function PublicPropertyDetailsPage() {
                           </Button>
                           <Button
                             className="flex-1"
-                            disabled={unit.status !== 'available'}
+                            disabled={unit.status === 'maintenance'}
                             onClick={() => handleOpenInterestModal(unit.id)}
                           >
                             {unit.status === 'available'
                               ? "I'm Interested"
+                              : unit.status === 'occupied'
+                              ? "Inquire for Future"
                               : 'Unavailable'}
                           </Button>
                         </div>
@@ -825,27 +830,48 @@ export function PublicPropertyDetailsPage() {
                   disabled={isUnitLocked}
                 >
                   {propertyUnits.some(
-                    (u) => u.status !== 'available'
+                    (u) => u.status !== 'available' && u.status !== 'occupied'
                   ) ? null : (
                     <option value="">
                       Whole Property / Any Available Unit
                     </option>
                   )}
-                  {propertyUnits.some((u) => u.status !== 'available') && (
+                  {propertyUnits.some((u) => u.status !== 'available' && u.status !== 'occupied') && (
                     <option value="" disabled>
                       Select a specific unit (Whole property unavailable due to
-                      occupancy)
+                      occupancy/maintenance)
                     </option>
                   )}
                   {propertyUnits
-                    .filter((u) => u.status === 'available')
+                    .filter((u) => u.status !== 'maintenance')
                     .map((u) => (
                       <option key={u.id} value={u.id}>
-                        Unit {u.unitNumber} - {u.type} (LKR {u.monthlyRent}/mo)
+                        Unit {u.unitNumber} - {u.type} (LKR {u.monthlyRent.toLocaleString()}/mo) 
+                        {u.status !== 'available' ? ` (${u.status.toUpperCase()})` : ''}
                       </option>
                     ))}
                 </select>
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="lead-term">Preferred Lease Term</Label>
+              <select
+                id="lead-term"
+                className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                value={interestFormData.preferredTermMonths}
+                onChange={(e) =>
+                  setInterestFormData({
+                    ...interestFormData,
+                    preferredTermMonths: e.target.value,
+                  })
+                }
+                required
+              >
+                <option value="6">6 Months</option>
+                <option value="12">1 Year</option>
+                <option value="24">2 Years</option>
+              </select>
             </div>
 
             <div className="grid grid-cols-2 gap-4">

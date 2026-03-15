@@ -141,3 +141,31 @@ export const validateName = (name: string): ValidationResult => {
     isValid: true,
   };
 };
+
+/**
+ * Lease duration validation
+ */
+export const validateLeaseDuration = (
+  startDate: string,
+  endDate: string,
+  minDays: number = 90
+): ValidationResult => {
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  
+  if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+    return { isValid: false, error: 'Invalid start or end date' };
+  }
+
+  const diffTime = end.getTime() - start.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+  if (diffDays < minDays) {
+    return {
+      isValid: false,
+      error: `Lease duration must be at least ${minDays} days (currently ${diffDays} days).`,
+    };
+  }
+
+  return { isValid: true };
+};

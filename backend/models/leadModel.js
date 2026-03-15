@@ -13,6 +13,7 @@ class LeadModel {
       notes,
       move_in_date,
       occupants_count,
+      preferred_term_months,
       status = 'interested',
     } = data;
 
@@ -23,8 +24,8 @@ class LeadModel {
     }
 
     const [result] = await db.query(
-      `INSERT INTO leads (property_id, unit_id, name, phone, email, notes, move_in_date, occupants_count, status) 
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO leads (property_id, unit_id, name, phone, email, notes, move_in_date, occupants_count, preferred_term_months, status) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         propertyId,
         finalUnitId,
@@ -34,6 +35,7 @@ class LeadModel {
         notes,
         move_in_date || null,
         occupants_count || 1,
+        preferred_term_months || null,
         status,
       ]
     );
@@ -60,6 +62,7 @@ class LeadModel {
                 internal_notes as internalNotes,
                 move_in_date as moveInDate,
                 occupants_count as occupantsCount,
+                preferred_term_months as preferredTermMonths,
                 status,
                 created_at as createdAt,
                 last_contacted_at as lastContactedAt
@@ -107,6 +110,10 @@ class LeadModel {
     if (data.occupants_count !== undefined) {
       fields.push('occupants_count = ?');
       values.push(data.occupants_count);
+    }
+    if (data.preferred_term_months !== undefined) {
+      fields.push('preferred_term_months = ?');
+      values.push(data.preferred_term_months);
     }
     if (data.notes !== undefined) {
       fields.push('notes = ?');
@@ -158,6 +165,7 @@ class LeadModel {
                     l.internal_notes as internalNotes,
                     l.move_in_date as moveInDate,
                     l.occupants_count as occupantsCount,
+                    l.preferred_term_months as preferredTermMonths,
                     l.status,
                     l.created_at as createdAt,
                     l.last_contacted_at as lastContactedAt
@@ -183,6 +191,7 @@ class LeadModel {
                 internal_notes as internalNotes,
                 move_in_date as moveInDate,
                 occupants_count as occupantsCount,
+                preferred_term_months as preferredTermMonths,
                 status,
                 created_at as createdAt,
                 last_contacted_at as lastContactedAt
@@ -237,6 +246,7 @@ class LeadModel {
         internal_notes as internalNotes,
         move_in_date as moveInDate,
         occupants_count as occupantsCount,
+        preferred_term_months as preferredTermMonths,
         status,
         created_at as createdAt,
         last_contacted_at as lastContactedAt

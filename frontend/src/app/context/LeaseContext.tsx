@@ -16,6 +16,7 @@ export interface Lease {
   depositStatus?: 'pending' | 'paid' | 'partially_refunded' | 'refunded';
   refundedAmount?: number;
   documentUrl?: string;
+  noticeStatus?: 'undecided' | 'vacating' | 'renewing';
   createdAt: string;
 }
 
@@ -26,6 +27,7 @@ interface LeaseContextType {
   renewLease: (id: string, newEndDate: string, newMonthlyRent?: number) => Promise<void>;
   refundDeposit: (id: string, amount: number) => Promise<void>;
   updateLeaseDocument: (id: string, documentUrl: string) => Promise<void>;
+  updateNoticeStatus: (id: string, status: 'undecided' | 'vacating' | 'renewing') => Promise<void>;
 }
 
 const LeaseContext = createContext<LeaseContextType | undefined>(undefined);
@@ -45,6 +47,7 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
           tenantId: l.tenantId?.toString() || l.tenant_id?.toString(),
           unitId: l.unitId?.toString() || l.unit_id?.toString(),
           documentUrl: l.documentUrl || l.document_url,
+          noticeStatus: l.noticeStatus || l.notice_status,
         })));
       }
     } catch (e) {
@@ -128,8 +131,19 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const updateNoticeStatus = async (id: string, status: 'undecided' | 'vacating' | 'renewing') => {
+    try {
+      await apiClient.patch(`/leases/${id}/notice-status`, { status });
+      setLeases(prev => prev.map(l => (l.id === id ? { ...l, noticeStatus: status } : l)));
+      toast.success(`Intent updated to: ${status}`);
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to update intent');
+      throw error;
+    }
+  };
+
   return (
-    <LeaseContext.Provider value={{ leases, addLease, endLease, renewLease, refundDeposit, updateLeaseDocument }}>
+    <LeaseContext.Provider value={{ leases, addLease, endLease, renewLease, refundDeposit, updateLeaseDocument, updateNoticeStatus }}>
       {children}
     </LeaseContext.Provider>
   );

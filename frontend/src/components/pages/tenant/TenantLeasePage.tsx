@@ -12,12 +12,14 @@ import {
   Shield,
   ExternalLink,
   AlertTriangle,
+  CheckCircle,
+  Check,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export function TenantLeasePage() {
   const { user } = useAuth();
-  const { leases, units, properties } = useApp();
+  const { leases, units, properties, updateNoticeStatus } = useApp();
 
   // Separate active and past leases
   const activeLeases = leases.filter((l) => l.status === 'active');
@@ -166,6 +168,71 @@ export function TenantLeasePage() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Renewal Intent Section */}
+            {daysRemaining <= 90 && currentLease.status === 'active' && (
+              <Card className="border-blue-200 bg-blue-50/50 shadow-sm">
+                <CardHeader className="pb-2">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="size-5 text-blue-600" />
+                    <CardTitle className="text-lg text-blue-900">Lease Renewal Intent</CardTitle>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <p className="text-sm text-gray-700">
+                      Your lease is ending in <span className="font-bold text-blue-700">{daysRemaining} days</span>. 
+                      Please let us know your future plans.
+                    </p>
+                    <div className="flex flex-wrap gap-3">
+                      <Button 
+                        size="sm" 
+                        variant={currentLease.noticeStatus === 'renewing' ? 'default' : 'outline'}
+                        className={currentLease.noticeStatus === 'renewing' ? 'bg-green-600 hover:bg-green-700 text-white' : ''}
+                        onClick={() => updateNoticeStatus(currentLease.id, 'renewing')}
+                      >
+                        {currentLease.noticeStatus === 'renewing' && <Check className="size-4 mr-2" />}
+                        I Plan to Renew
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant={currentLease.noticeStatus === 'vacating' ? 'default' : 'outline'}
+                        className={currentLease.noticeStatus === 'vacating' ? 'bg-red-600 hover:bg-red-700 text-white' : ''}
+                        onClick={() => updateNoticeStatus(currentLease.id, 'vacating')}
+                      >
+                        {currentLease.noticeStatus === 'vacating' && <Check className="size-4 mr-2" />}
+                        I Will Vacate
+                      </Button>
+                      {currentLease.noticeStatus && currentLease.noticeStatus !== 'undecided' && (
+                        <Button 
+                          size="sm" 
+                          variant="ghost" 
+                          className="text-gray-500 hover:text-gray-700"
+                          onClick={() => updateNoticeStatus(currentLease.id, 'undecided')}
+                        >
+                          Clear Selection
+                        </Button>
+                      )}
+                    </div>
+                    {currentLease.noticeStatus === 'renewing' && (
+                      <p className="text-xs text-green-700 font-medium">
+                        ✓ We've noted your interest in renewing. We'll be in touch with the updated contract.
+                      </p>
+                    )}
+                    {currentLease.noticeStatus === 'vacating' && (
+                      <p className="text-xs text-red-700 font-medium">
+                        ✓ We've noted that you will be vacating. We'll start the move-out process soon.
+                      </p>
+                    )}
+                    {(!currentLease.noticeStatus || currentLease.noticeStatus === 'undecided') && (
+                      <p className="text-xs text-gray-500">
+                        Indicating your intent helps us avoid scheduling new viewings for your unit.
+                      </p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Main Details Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
