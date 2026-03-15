@@ -450,6 +450,10 @@ function LeaseTermManager() {
   const handleAddTerm = (e: React.FormEvent) => {
     e.preventDefault();
     if (newTerm.name.trim()) {
+      if (newTerm.type === 'fixed' && newTerm.durationMonths < 3) {
+        toast.error('Minimum lease duration is 3 months');
+        return;
+      }
       addLeaseTerm({
         name: newTerm.name,
         type: newTerm.type,
@@ -496,6 +500,7 @@ function LeaseTermManager() {
             <Input
               type="number"
               placeholder="Months"
+              min="3"
               value={newTerm.durationMonths}
               onChange={(e) => setNewTerm({ ...newTerm, durationMonths: parseInt(e.target.value) })}
             />
