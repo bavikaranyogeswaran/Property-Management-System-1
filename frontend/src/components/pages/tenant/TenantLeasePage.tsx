@@ -37,6 +37,10 @@ export function TenantLeasePage() {
 
   // Helper: calculate lease timeline progress
   const getLeaseProgress = (lease: Lease) => {
+    if (!lease.endDate) {
+      return { progress: 0, daysRemaining: Infinity, totalDays: 0 };
+    }
+
     const start = new Date(lease.startDate).getTime();
     const end = new Date(lease.endDate).getTime();
     const now = Date.now();
@@ -53,7 +57,8 @@ export function TenantLeasePage() {
   };
 
   // Helper: format date nicely
-  const formatDate = (dateStr: string) => {
+  const formatDate = (dateStr: string | null | undefined) => {
+    if (!dateStr) return 'Ongoing';
     return new Date(dateStr).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'long',
@@ -143,7 +148,7 @@ export function TenantLeasePage() {
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-500">
-                      {progress}% complete
+                      {daysRemaining === Infinity ? 'Periodic' : `${progress}% complete`}
                     </span>
                     <span
                       className={`font-medium ${
@@ -154,7 +159,7 @@ export function TenantLeasePage() {
                             : 'text-gray-700'
                       }`}
                     >
-                      {daysRemaining} days remaining
+                      {daysRemaining === Infinity ? 'No fixed end date' : `${daysRemaining} days remaining`}
                     </span>
                   </div>
                   {daysRemaining <= 30 && daysRemaining > 0 && (
@@ -181,8 +186,10 @@ export function TenantLeasePage() {
                 <CardContent>
                   <div className="space-y-4">
                     <p className="text-sm text-gray-700">
-                      Your lease is ending in <span className="font-bold text-blue-700">{daysRemaining} days</span>. 
-                      Please let us know your future plans.
+                      {daysRemaining === Infinity 
+                        ? "Your periodic lease is ongoing. Let us know if your plans change."
+                        : `Your lease is ending in ${daysRemaining} days. Please let us know your future plans.`
+                      }
                     </p>
                     <div className="flex flex-wrap gap-3">
                       <Button 

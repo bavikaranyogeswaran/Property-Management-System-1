@@ -9,7 +9,7 @@ export interface Lease {
   tenantId: string;
   unitId: string;
   startDate: string;
-  endDate: string;
+  endDate: string | null;
   monthlyRent: number;
   status: 'active' | 'ended' | 'cancelled';
   securityDeposit?: number;
