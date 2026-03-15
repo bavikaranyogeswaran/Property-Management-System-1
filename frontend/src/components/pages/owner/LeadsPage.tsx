@@ -348,7 +348,6 @@ export function LeadsPage() {
         </TableHeader>
         <TableBody>
           {leadsData.map((lead) => {
-            const unit = units.find((u) => u.id === lead.interestedUnit);
             const statusBadge = getStatusBadge(lead.status);
 
             return (
@@ -360,7 +359,32 @@ export function LeadsPage() {
                     <div className="text-gray-500">{lead.phone}</div>
                   </div>
                 </TableCell>
-                <TableCell>{unit?.unitNumber || 'N/A'}</TableCell>
+                <TableCell>
+                  {(() => {
+                    const unit = units.find((u) => u.id === lead.interestedUnit);
+                    const property = properties.find((p) => p.id === lead.propertyId);
+                    
+                    if (unit) {
+                      return (
+                        <div>
+                          <div className="font-medium text-gray-900">{property?.name || 'Unknown Property'}</div>
+                          <div className="text-xs text-gray-500">Unit: {unit.unitNumber}</div>
+                        </div>
+                      );
+                    }
+                    
+                    if (property) {
+                      return (
+                        <div>
+                          <div className="font-medium text-gray-900">{property.name}</div>
+                          <div className="text-xs text-blue-600 font-medium italic">Whole Property</div>
+                        </div>
+                      );
+                    }
+
+                    return <span className="text-gray-400 italic">N/A</span>;
+                  })()}
+                </TableCell>
                 <TableCell>
                   <div className="text-sm text-gray-600">
                     <div>

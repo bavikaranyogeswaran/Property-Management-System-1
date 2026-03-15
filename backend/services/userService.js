@@ -173,6 +173,7 @@ class UserService {
       let userId;
       const existingUser = await userModel.findByEmail(lead.email);
 
+      let invitationData = null;
       if (existingUser) {
         if (existingUser.role === 'tenant') {
           // User is already an active tenant applying for another property.
@@ -204,7 +205,7 @@ class UserService {
           JWT_SECRET,
           { expiresIn: '48h' }
         );
-        await emailService.sendInvitationEmail(lead.email, 'tenant', token);
+        invitationData = { email: lead.email, role: 'tenant', token };
       }
 
       // 3. Create Tenant Profile
@@ -281,6 +282,12 @@ class UserService {
       }
 
       await connection.commit();
+
+      // [CRITICAL FIX] Send invitation email ONLY after successful transaction commit
+      if (invitationData) {
+        await emailService.sendInvitationEmail(invitationData.email, invitationData.role, invitationData.token);
+      }
+
       return { message: 'Lead converted successfully', tenantId: userId };
     } catch (error) {
       await connection.rollback();
