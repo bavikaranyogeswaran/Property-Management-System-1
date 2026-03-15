@@ -14,4 +14,7 @@ router.get('/messages', leadPortalController.getMessages);
 // POST /api/lead-portal/messages?token=xxx — Send a message
 router.post('/messages', leadPortalController.sendMessage);
 
+// PUT /api/lead-portal/preferences?token=xxx — Update preferences
+router.put('/preferences', leadPortalController.updatePreferences);
+
 export default router;

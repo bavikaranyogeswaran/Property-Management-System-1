@@ -35,6 +35,8 @@ interface LeadData {
   propertyId: string;
   interestedUnit?: string;
   createdAt: string;
+  moveInDate?: string;
+  preferredTermMonths?: number;
 }
 
 interface PropertyData {
@@ -82,6 +84,12 @@ function portalApi(token: string) {
         { content },
         { params: { token } }
       ),
+    updatePreferences: (moveInDate: string, preferredTermMonths: number) =>
+      axios.put(
+        `${API_BASE_URL}/lead-portal/preferences`,
+        { moveInDate, preferredTermMonths },
+        { params: { token } }
+      ),
   };
 }
 
@@ -96,6 +104,14 @@ export function LeadPortalPage() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Prefs Edit State
+  const [isEditingPrefs, setIsEditingPrefs] = useState(false);
+  const [savingPrefs, setSavingPrefs] = useState(false);
+  const [editData, setEditData] = useState({
+    moveInDate: '',
+    preferredTermMonths: 12,
+  });
 
   // Load portal data
   useEffect(() => {
@@ -115,6 +131,13 @@ export function LeadPortalPage() {
         ]);
         setPortalData(portalRes.data);
         setMessages(messagesRes.data);
+        // Init edit data
+        if (portalRes.data.lead) {
+          setEditData({
+            moveInDate: portalRes.data.lead.moveInDate ? portalRes.data.lead.moveInDate.split('T')[0] : '',
+            preferredTermMonths: portalRes.data.lead.preferredTermMonths || 12,
+          });
+        }
       } catch (err: any) {
         const msg =
           err.response?.data?.error ||
@@ -144,6 +167,35 @@ export function LeadPortalPage() {
 
     return () => clearInterval(interval);
   }, [token, error, portalData]);
+
+  const handleSavePreferences = async () => {
+    if (!token) return;
+    setSavingPrefs(true);
+    try {
+      const api = portalApi(token);
+      await api.updatePreferences(editData.moveInDate, editData.preferredTermMonths);
+      
+      // Refresh local state
+      setPortalData((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          lead: {
+            ...prev.lead,
+            moveInDate: editData.moveInDate,
+            preferredTermMonths: editData.preferredTermMonths
+          }
+        };
+      });
+      setIsEditingPrefs(false);
+      alert('Preferences updated successfully!');
+    } catch (err: any) {
+      const msg = err.response?.data?.error || 'Failed to update preferences';
+      alert(msg);
+    } finally {
+      setSavingPrefs(false);
+    }
+  };
 
   // Scroll to bottom on new messages
   useEffect(() => {
@@ -285,6 +337,8 @@ export function LeadPortalPage() {
                 )}
               </div>
 
+              <Separator />
+
               <div>
                 <p className="text-sm font-medium text-gray-500 mb-1 flex items-center gap-1">
                   <Calendar className="size-3" />
@@ -297,6 +351,74 @@ export function LeadPortalPage() {
                     day: 'numeric',
                   })}
                 </p>
+              </div>
+
+              {/* Preferences Section */}
+              <Separator />
+              <div className="pt-2">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-sm font-semibold text-gray-900">Requested Terms</p>
+                  {!isDropped && portalData.lead.status === 'interested' && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-7 text-xs text-blue-600 hover:text-blue-700 p-0"
+                      onClick={() => setIsEditingPrefs(!isEditingPrefs)}
+                    >
+                      {isEditingPrefs ? 'Cancel' : 'Edit'}
+                    </Button>
+                  )}
+                </div>
+                
+                {isEditingPrefs ? (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-[10px] uppercase font-bold text-gray-500">Move-in Date</label>
+                      <input 
+                        type="date" 
+                        value={editData.moveInDate}
+                        onChange={(e) => setEditData({...editData, moveInDate: e.target.value})}
+                        className="w-full text-sm border rounded p-1 mt-1"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] uppercase font-bold text-gray-500">Duration</label>
+                      <select 
+                        value={editData.preferredTermMonths}
+                        onChange={(e) => setEditData({...editData, preferredTermMonths: parseInt(e.target.value)})}
+                        className="w-full text-sm border rounded p-1 mt-1"
+                      >
+                        <option value={3}>3 Months</option>
+                        <option value={6}>6 Months</option>
+                        <option value={12}>1 Year</option>
+                        <option value={24}>2 Years</option>
+                      </select>
+                    </div>
+                    <Button 
+                      size="sm" 
+                      className="w-full h-8 text-xs bg-blue-600"
+                      disabled={savingPrefs}
+                      onClick={handleSavePreferences}
+                    >
+                      {savingPrefs ? <Loader2 className="size-3 animate-spin mr-2" /> : 'Save Changes'}
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-[10px] uppercase font-bold text-gray-500">Move-in Date</p>
+                      <p className="font-medium text-gray-900">
+                        {lead.moveInDate ? new Date(lead.moveInDate).toLocaleDateString() : 'Not set'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase font-bold text-gray-500">Term Period</p>
+                      <p className="font-medium text-gray-900">
+                        {lead.preferredTermMonths ? `${lead.preferredTermMonths} Months` : 'Not set'}
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>

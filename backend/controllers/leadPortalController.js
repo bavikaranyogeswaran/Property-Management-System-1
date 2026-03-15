@@ -56,6 +56,8 @@ class LeadPortalController {
           propertyId: lead.propertyId,
           interestedUnit: lead.interestedUnit,
           createdAt: lead.createdAt,
+          moveInDate: lead.move_in_date,
+          preferredTermMonths: lead.preferred_term_months,
         },
         property: property ? {
           name: property.name,
@@ -155,6 +157,36 @@ class LeadPortalController {
     } catch (error) {
       console.error('Error in portal sendMessage:', error);
       res.status(500).json({ error: 'Failed to send message' });
+    }
+  }
+
+  /**
+   * PUT /api/lead-portal/preferences?token=xxx
+   * Updates lead's move-in date and preferred term.
+   */
+  async updatePreferences(req, res) {
+    try {
+      const { token } = req.query;
+      const { moveInDate, preferredTermMonths } = req.body;
+
+      if (!token) {
+        return res.status(400).json({ error: 'Access token is required' });
+      }
+
+      const tokenRecord = await leadTokenModel.findByToken(token);
+      if (!tokenRecord) {
+        return res.status(401).json({ error: 'Invalid or expired access link' });
+      }
+
+      await leadModel.update(tokenRecord.leadId, {
+        move_in_date: moveInDate,
+        preferred_term_months: preferredTermMonths
+      });
+
+      res.json({ message: 'Preferences updated successfully' });
+    } catch (error) {
+      console.error('Error updating portal preferences:', error);
+      res.status(500).json({ error: 'Failed to update preferences' });
     }
   }
 }
