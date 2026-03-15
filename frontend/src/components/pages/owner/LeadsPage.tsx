@@ -5,6 +5,7 @@ import {
   Lead,
   Visit,
 } from '@/app/context/AppContext';
+import { useLease } from '@/app/context/LeaseContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -61,6 +62,7 @@ export function LeadsPage() {
     convertLeadToTenant,
     updateVisitStatus,
   } = useApp();
+  const { leaseTerms } = useLease();
 
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [isConvertDialogOpen, setIsConvertDialogOpen] = useState(false);
@@ -71,6 +73,7 @@ export function LeadsPage() {
     startDate: new Date().toISOString().split('T')[0],
     endDate: '',
     unitId: '',
+    leaseTermId: '',
     ignoreRenewalConflict: false,
   });
 
@@ -124,7 +127,7 @@ export function LeadsPage() {
   }, [selectedLead]);
 
   useEffect(() => {
-    if (selectedLead?.preferredTermMonths && conversionData.startDate) {
+    if (selectedLead?.preferredTermMonths && conversionData.startDate && !conversionData.leaseTermId) {
       const start = new Date(conversionData.startDate);
       const end = new Date(start);
       end.setMonth(end.getMonth() + selectedLead.preferredTermMonths);
@@ -133,7 +136,23 @@ export function LeadsPage() {
         endDate: end.toISOString().split('T')[0],
       }));
     }
-  }, [selectedLead?.preferredTermMonths, conversionData.startDate]);
+  }, [selectedLead?.preferredTermMonths, conversionData.startDate, conversionData.leaseTermId]);
+
+  useEffect(() => {
+    if (conversionData.leaseTermId) {
+        const term = leaseTerms.find(t => String(t.leaseTermId) === String(conversionData.leaseTermId));
+        if (term) {
+            if (term.type === 'periodic') {
+                setConversionData(prev => ({ ...prev, endDate: '' }));
+            } else if (term.durationMonths && conversionData.startDate) {
+                const start = new Date(conversionData.startDate);
+                const end = new Date(start);
+                end.setMonth(end.getMonth() + term.durationMonths);
+                setConversionData(prev => ({ ...prev, endDate: end.toISOString().split('T')[0] }));
+            }
+        }
+    }
+  }, [conversionData.leaseTermId, conversionData.startDate, leaseTerms]);
 
   const handleConvert = async () => {
     if (!selectedLead) return;
@@ -145,6 +164,7 @@ export function LeadsPage() {
         conversionData.endDate || undefined,
         {
           unitId: conversionData.unitId || undefined,
+          leaseTermId: conversionData.leaseTermId || undefined,
         }
       );
       toast.success('Lead converted to tenant successfully');
@@ -155,6 +175,7 @@ export function LeadsPage() {
         startDate: new Date().toISOString().split('T')[0],
         endDate: '',
         unitId: '',
+        leaseTermId: '',
         ignoreRenewalConflict: false,
       });
     } catch (error: any) {
@@ -409,7 +430,9 @@ export function LeadsPage() {
                     </div>
                     <div>
                       <span className="font-medium">Term:</span>{' '}
-                      {lead.preferredTermMonths ? `${lead.preferredTermMonths} months` : '-'}
+                      {lead.leaseTermId 
+                        ? leaseTerms.find(t => String(t.leaseTermId) === String(lead.leaseTermId))?.name 
+                        : (lead.preferredTermMonths ? `${lead.preferredTermMonths} months` : '-')}
                     </div>
                     <div>
                       <span className="font-medium">Occupants:</span>{' '}
@@ -628,6 +651,23 @@ export function LeadsPage() {
               <strong>{selectedLead?.name}</strong> to a tenant?
             </p>
 
+            <div className="space-y-2">
+              <Label htmlFor="conv-lease-term">Lease Model / Term</Label>
+              <select
+                id="conv-lease-term"
+                className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                value={conversionData.leaseTermId}
+                onChange={(e) => setConversionData({ ...conversionData, leaseTermId: e.target.value })}
+              >
+                <option value="">Custom / Manual</option>
+                {leaseTerms.map(term => (
+                  <option key={term.leaseTermId} value={term.leaseTermId}>
+                    {term.name} ({term.type})
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="conv-start-date">Lease Start Date</Label>
@@ -649,6 +689,7 @@ export function LeadsPage() {
                   id="conv-end-date"
                   type="date"
                   value={conversionData.endDate}
+                  disabled={!!(conversionData.leaseTermId && leaseTerms.find(t => String(t.leaseTermId) === String(conversionData.leaseTermId))?.type === 'periodic')}
                   onChange={(e) =>
                     setConversionData({
                       ...conversionData,
@@ -657,9 +698,11 @@ export function LeadsPage() {
                   }
                 />
                 <p className="text-[10px] text-gray-500">
-                  {selectedLead?.preferredTermMonths 
-                    ? `Pre-filled with lead's ${selectedLead.preferredTermMonths}mo preference`
-                    : 'Required (Min 90 days recommended)'}
+                  {conversionData.leaseTermId && leaseTerms.find(t => String(t.leaseTermId) === String(conversionData.leaseTermId))?.type === 'periodic'
+                    ? 'Periodic lease has no fixed end date'
+                    : selectedLead?.preferredTermMonths 
+                      ? `Pre-filled with lead's ${selectedLead.preferredTermMonths}mo preference`
+                      : 'Required (Min 90 days recommended)'}
                 </p>
               </div>
             </div>

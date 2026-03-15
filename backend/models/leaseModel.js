@@ -146,8 +146,8 @@ class LeaseModel {
             AND status IN ('active', 'pending')
             AND deleted_at IS NULL
             AND start_date <= ? 
-            AND end_date >= ?`;
-    const params = [unitId, endDate, startDate];
+            AND (end_date IS NULL OR end_date >= ?)`;
+    const params = [unitId, endDate || '2099-12-31', startDate];
 
     if (excludeLeaseId) {
       query += ` AND lease_id != ?`;

@@ -24,6 +24,13 @@ interface Unit {
   unitNumber: string;
 }
 
+interface LeaseTerm {
+  leaseTermId: number;
+  name: string;
+  type: 'fixed' | 'periodic';
+  durationMonths?: number;
+}
+
 interface ScheduleVisitDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -41,6 +48,8 @@ export function ScheduleVisitDialog({
 }: ScheduleVisitDialogProps) {
   const { scheduleVisit } = useApp();
   const [loading, setLoading] = useState(false);
+  const [leaseTerms, setLeaseTerms] = useState<LeaseTerm[]>([]);
+  const [fetchingTerms, setFetchingTerms] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -48,7 +57,28 @@ export function ScheduleVisitDialog({
     date: '',
     time: '',
     notes: '',
+    moveInDate: '',
+    preferredTermMonths: 12,
+    leaseTermId: '' as string | number,
   });
+
+  React.useEffect(() => {
+    if (open && property) {
+      const fetchTerms = async () => {
+        setFetchingTerms(true);
+        try {
+          const response = await fetch(`${import.meta.env.VITE_API_URL || '/api'}/properties/${property.id}/lease-terms`);
+          const data = await response.json();
+          setLeaseTerms(data);
+        } catch (e) {
+          console.error('Failed to fetch terms', e);
+        } finally {
+          setFetchingTerms(false);
+        }
+      };
+      fetchTerms();
+    }
+  }, [open, property]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -80,6 +110,9 @@ export function ScheduleVisitDialog({
         date: '',
         time: '',
         notes: '',
+        moveInDate: '',
+        preferredTermMonths: 12,
+        leaseTermId: '',
       });
     } catch (error: any) {
       console.error('Failed to schedule visit:', error);
@@ -140,6 +173,61 @@ export function ScheduleVisitDialog({
                   onChange={handleChange}
                 />
               </div>
+            </div>
+
+            <div className="space-y-3 p-3 bg-blue-50/50 rounded-lg border border-blue-100">
+                <p className="text-sm font-semibold text-blue-900 flex items-center gap-2">
+                    <CalendarIcon className="size-4" />
+                    Lease Preferences (Optional)
+                </p>
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                        <Label htmlFor="moveInDate" className="text-xs text-gray-500">Desired Move-in</Label>
+                        <Input
+                            id="moveInDate"
+                            type="date"
+                            value={formData.moveInDate}
+                            onChange={handleChange}
+                            className="bg-white"
+                        />
+                    </div>
+                    <div className="space-y-1">
+                        <Label htmlFor="leaseTermId" className="text-xs text-gray-500">Preferred Term</Label>
+                        <select
+                            id="leaseTermId"
+                            className="w-full h-10 px-3 py-2 border rounded-md text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            value={formData.leaseTermId}
+                            onChange={(e) => {
+                                const val = e.target.value;
+                                const term = leaseTerms.find(t => String(t.leaseTermId) === val);
+                                setFormData(prev => ({
+                                    ...prev,
+                                    leaseTermId: val,
+                                    preferredTermMonths: term?.durationMonths || prev.preferredTermMonths
+                                }));
+                            }}
+                        >
+                            <option value="">Custom / Undecided</option>
+                            {leaseTerms.map(t => (
+                                <option key={t.leaseTermId} value={t.leaseTermId}>
+                                    {t.name}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                </div>
+                {!formData.leaseTermId && (
+                    <div className="space-y-1">
+                        <Label htmlFor="preferredTermMonths" className="text-xs text-gray-500">Custom Duration (Months)</Label>
+                        <Input
+                            id="preferredTermMonths"
+                            type="number"
+                            value={formData.preferredTermMonths}
+                            onChange={handleChange}
+                            className="bg-white"
+                        />
+                    </div>
+                )}
             </div>
 
             <div className="grid grid-cols-2 gap-4">

@@ -13,6 +13,7 @@ import leaseModel from '../models/leaseModel.js';
 import leaseService from '../services/leaseService.js';
 import emailService from '../utils/emailService.js';
 import leadTokenModel from '../models/leadTokenModel.js';
+import leaseTermModel from '../models/leaseTermModel.js';
 import pool from '../config/db.js';
 
 const SALT_ROUNDS = 10;
@@ -259,8 +260,21 @@ class UserService {
           const today = new Date();
           const leaseStart = startDate ? new Date(startDate) : today;
           let leaseEnd;
-          if (endDate) {
+          
+          // Fetch lease term if ID provided
+          const leaseTermId = tenantData.leaseTermId || lead.leaseTermId;
+          let leaseTerm = null;
+          if (leaseTermId) {
+            leaseTerm = await leaseTermModel.findById(leaseTermId);
+          }
+
+          if (leaseTerm && leaseTerm.type === 'periodic') {
+            leaseEnd = null; // Periodic leases have no fixed end date
+          } else if (endDate) {
             leaseEnd = new Date(endDate);
+          } else if (leaseTerm && leaseTerm.type === 'fixed' && leaseTerm.durationMonths) {
+            leaseEnd = new Date(leaseStart);
+            leaseEnd.setMonth(leaseStart.getMonth() + leaseTerm.durationMonths);
           } else {
             leaseEnd = new Date(leaseStart);
             leaseEnd.setFullYear(leaseStart.getFullYear() + 1);
@@ -273,6 +287,7 @@ class UserService {
               unitId: targetUnitId,
               startDate: leaseStart,
               endDate: leaseEnd,
+              leaseTermId: leaseTermId,
               monthlyRent: unit.monthlyRent,
               securityDeposit: unit.monthlyRent, // Default 1 month deposit
             },

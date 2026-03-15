@@ -3,6 +3,7 @@ import leadTokenModel from '../models/leadTokenModel.js';
 import messageModel from '../models/messageModel.js';
 import propertyModel from '../models/propertyModel.js';
 import unitModel from '../models/unitModel.js';
+import leaseTermModel from '../models/leaseTermModel.js';
 
 class LeadPortalController {
   /**
@@ -45,6 +46,12 @@ class LeadPortalController {
           console.error('Failed to load unit for portal', e);
         }
       }
+      
+      // Fetch available lease terms for the owner
+      let leaseTerms = [];
+      if (property && property.owner_id) {
+          leaseTerms = await leaseTermModel.findAllByOwner(property.owner_id);
+      }
 
       res.json({
         lead: {
@@ -66,10 +73,10 @@ class LeadPortalController {
           district: property.district,
         } : null,
         unit: unit ? {
-          unitNumber: unit.unitNumber,
-          type: unit.type || unit.typeName,
+          typeName: unit.typeName,
           monthlyRent: unit.monthlyRent,
         } : null,
+        leaseTerms: leaseTerms
       });
     } catch (error) {
       console.error('Error in getPortalData:', error);
@@ -180,7 +187,8 @@ class LeadPortalController {
 
       await leadModel.update(tokenRecord.leadId, {
         move_in_date: moveInDate,
-        preferred_term_months: preferredTermMonths
+        preferred_term_months: preferredTermMonths,
+        lease_term_id: req.body.leaseTermId || null
       });
 
       res.json({ message: 'Preferences updated successfully' });

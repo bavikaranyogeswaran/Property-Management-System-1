@@ -7,6 +7,7 @@
 
 import propertyService from '../services/propertyService.js';
 import propertyModel from '../models/propertyModel.js';
+import leaseTermModel from '../models/leaseTermModel.js';
 
 class PropertyController {
   //  ADD PROPERTY: Owner registers a new building into the system.
@@ -130,6 +131,19 @@ class PropertyController {
     try {
       const types = await propertyService.getPropertyTypes();
       res.json(types);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+
+  async getLeaseTermsByPropertyId(req, res) {
+    try {
+      const property = await propertyModel.findById(req.params.id);
+      if (!property) {
+        return res.status(404).json({ error: 'Property not found' });
+      }
+      const terms = await leaseTermModel.findAllByOwner(property.ownerId);
+      res.json(terms);
     } catch (error) {
       res.status(500).json({ error: error.message });
     }

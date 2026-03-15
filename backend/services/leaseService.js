@@ -31,25 +31,25 @@ class LeaseService {
       !tenantId ||
       !unitId ||
       !startDate ||
-      !endDate ||
-      monthlyRent === undefined ||
-      monthlyRent === null
+      (monthlyRent === undefined || monthlyRent === null)
     ) {
       throw new Error('All fields are required for lease creation.');
     }
 
-    if (new Date(startDate) >= new Date(endDate)) {
+    if (endDate && new Date(startDate) >= new Date(endDate)) {
       throw new Error('End date must be after start date');
     }
 
-    const durationCheck = validateLeaseDuration(startDate, endDate);
-    if (!durationCheck.isValid) {
-      throw new Error(durationCheck.error);
+    if (endDate) {
+        const durationCheck = validateLeaseDuration(startDate, endDate);
+        if (!durationCheck.isValid) {
+            throw new Error(durationCheck.error);
+        }
     }
 
     if (
       isNaN(new Date(startDate).getTime()) ||
-      isNaN(new Date(endDate).getTime())
+      (endDate && isNaN(new Date(endDate).getTime()))
     ) {
       throw new Error('Invalid date format');
     }
@@ -121,6 +121,7 @@ class LeaseService {
         securityDeposit: 0, // Held amount starts at 0. Target is in Invoice.
         status: 'active',
         documentUrl: documentUrl || null, // [ADDED]
+        lease_term_id: data.leaseTermId || null,
       };
 
       // 3. Create Lease

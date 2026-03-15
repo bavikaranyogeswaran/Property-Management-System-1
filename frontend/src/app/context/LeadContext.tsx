@@ -21,6 +21,7 @@ export interface Lead {
   moveInDate?: string;
   occupantsCount?: number;
   preferredTermMonths?: number;
+  leaseTermId?: string;
 }
 
 export interface LeadStageHistory {

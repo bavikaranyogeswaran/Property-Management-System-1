@@ -20,6 +20,17 @@ export interface Lease {
   createdAt: string;
 }
 
+export interface LeaseTerm {
+  leaseTermId: number;
+  ownerId: number;
+  name: string;
+  type: 'fixed' | 'periodic';
+  durationMonths?: number;
+  noticePeriodMonths: number;
+  isDefault: boolean;
+  createdAt: string;
+}
+
 interface LeaseContextType {
   leases: Lease[];
   addLease: (lease: Omit<Lease, 'id' | 'createdAt'>) => Promise<void>;
@@ -28,6 +39,10 @@ interface LeaseContextType {
   refundDeposit: (id: string, amount: number) => Promise<void>;
   updateLeaseDocument: (id: string, documentUrl: string) => Promise<void>;
   updateNoticeStatus: (id: string, status: 'undecided' | 'vacating' | 'renewing') => Promise<void>;
+  leaseTerms: LeaseTerm[];
+  addLeaseTerm: (term: Omit<LeaseTerm, 'leaseTermId' | 'ownerId' | 'createdAt'>) => Promise<void>;
+  updateLeaseTerm: (id: number, term: Partial<LeaseTerm>) => Promise<void>;
+  deleteLeaseTerm: (id: number) => Promise<void>;
 }
 
 const LeaseContext = createContext<LeaseContextType | undefined>(undefined);
@@ -36,6 +51,16 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const { updateUnit } = useProperty();
   const [leases, setLeases] = useState<Lease[]>([]);
+  const [leaseTerms, setLeaseTerms] = useState<LeaseTerm[]>([]);
+
+  const fetchLeaseTerms = async () => {
+    try {
+      const response = await apiClient.get('/lease-terms');
+      setLeaseTerms(response.data);
+    } catch (e) {
+      console.error('Failed to fetch lease terms', e);
+    }
+  };
 
   const fetchLeases = async () => {
     try {
@@ -56,7 +81,10 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    if (user) fetchLeases();
+    if (user) {
+      fetchLeases();
+      if (user.role === 'owner') fetchLeaseTerms();
+    }
   }, [user]);
 
   const addLease = async (lease: Omit<Lease, 'id' | 'createdAt'>) => {
@@ -142,8 +170,53 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const addLeaseTerm = async (term: Omit<LeaseTerm, 'leaseTermId' | 'ownerId' | 'createdAt'>) => {
+    try {
+      await apiClient.post('/lease-terms', term);
+      await fetchLeaseTerms();
+      toast.success('Lease term added successfully');
+    } catch (error) {
+      toast.error('Failed to add lease term');
+      throw error;
+    }
+  };
+
+  const updateLeaseTerm = async (id: number, term: Partial<LeaseTerm>) => {
+    try {
+      await apiClient.put(`/lease-terms/${id}`, term);
+      await fetchLeaseTerms();
+      toast.success('Lease term updated successfully');
+    } catch (error) {
+      toast.error('Failed to update lease term');
+      throw error;
+    }
+  };
+
+  const deleteLeaseTerm = async (id: number) => {
+    try {
+      await apiClient.delete(`/lease-terms/${id}`);
+      await fetchLeaseTerms();
+      toast.success('Lease term deleted successfully');
+    } catch (error) {
+      toast.error('Failed to delete lease term');
+      throw error;
+    }
+  };
+
   return (
-    <LeaseContext.Provider value={{ leases, addLease, endLease, renewLease, refundDeposit, updateLeaseDocument, updateNoticeStatus }}>
+    <LeaseContext.Provider value={{ 
+      leases, 
+      addLease, 
+      endLease, 
+      renewLease, 
+      refundDeposit, 
+      updateLeaseDocument, 
+      updateNoticeStatus,
+      leaseTerms,
+      addLeaseTerm,
+      updateLeaseTerm,
+      deleteLeaseTerm
+    }}>
       {children}
     </LeaseContext.Provider>
   );

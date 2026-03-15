@@ -4,6 +4,7 @@ import axios from 'axios';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import {
@@ -37,6 +38,14 @@ interface LeadData {
   createdAt: string;
   moveInDate?: string;
   preferredTermMonths?: number;
+  leaseTermId?: number;
+}
+
+export interface LeaseTerm {
+  leaseTermId: number;
+  name: string;
+  type: 'fixed' | 'periodic';
+  durationMonths?: number;
 }
 
 interface PropertyData {
@@ -56,6 +65,7 @@ interface PortalData {
   lead: LeadData;
   property: PropertyData | null;
   unit: UnitData | null;
+  leaseTerms: LeaseTerm[];
 }
 
 interface ChatMessage {
@@ -84,10 +94,10 @@ function portalApi(token: string) {
         { content },
         { params: { token } }
       ),
-    updatePreferences: (moveInDate: string, preferredTermMonths: number) =>
+    updatePreferences: (moveInDate: string, preferredTermMonths: number, leaseTermId?: number) =>
       axios.put(
         `${API_BASE_URL}/lead-portal/preferences`,
-        { moveInDate, preferredTermMonths },
+        { moveInDate, preferredTermMonths, leaseTermId },
         { params: { token } }
       ),
   };
@@ -111,6 +121,7 @@ export function LeadPortalPage() {
   const [editData, setEditData] = useState({
     moveInDate: '',
     preferredTermMonths: 12,
+    leaseTermId: undefined as number | undefined,
   });
 
   // Load portal data
@@ -136,6 +147,7 @@ export function LeadPortalPage() {
           setEditData({
             moveInDate: portalRes.data.lead.moveInDate ? portalRes.data.lead.moveInDate.split('T')[0] : '',
             preferredTermMonths: portalRes.data.lead.preferredTermMonths || 12,
+            leaseTermId: portalRes.data.lead.leaseTermId,
           });
         }
       } catch (err: any) {
@@ -173,7 +185,7 @@ export function LeadPortalPage() {
     setSavingPrefs(true);
     try {
       const api = portalApi(token);
-      await api.updatePreferences(editData.moveInDate, editData.preferredTermMonths);
+      await api.updatePreferences(editData.moveInDate, editData.preferredTermMonths, editData.leaseTermId);
       
       // Refresh local state
       setPortalData((prev) => {
@@ -183,7 +195,8 @@ export function LeadPortalPage() {
           lead: {
             ...prev.lead,
             moveInDate: editData.moveInDate,
-            preferredTermMonths: editData.preferredTermMonths
+            preferredTermMonths: editData.preferredTermMonths,
+            leaseTermId: editData.leaseTermId
           }
         };
       });
@@ -382,18 +395,39 @@ export function LeadPortalPage() {
                       />
                     </div>
                     <div>
-                      <label className="text-[10px] uppercase font-bold text-gray-500">Duration</label>
+                      <label className="text-[10px] uppercase font-bold text-gray-500">Lease Term</label>
                       <select 
-                        value={editData.preferredTermMonths}
-                        onChange={(e) => setEditData({...editData, preferredTermMonths: parseInt(e.target.value)})}
+                        value={editData.leaseTermId || ''}
+                        onChange={(e) => {
+                            const val = e.target.value ? parseInt(e.target.value) : undefined;
+                            const term = portalData.leaseTerms.find(t => t.leaseTermId === val);
+                            setEditData({
+                                ...editData, 
+                                leaseTermId: val,
+                                preferredTermMonths: term?.durationMonths || editData.preferredTermMonths
+                            });
+                        }}
                         className="w-full text-sm border rounded p-1 mt-1"
                       >
-                        <option value={3}>3 Months</option>
-                        <option value={6}>6 Months</option>
-                        <option value={12}>1 Year</option>
-                        <option value={24}>2 Years</option>
+                        <option value="">Custom Duration</option>
+                        {portalData.leaseTerms.map(term => (
+                            <option key={term.leaseTermId} value={term.leaseTermId}>
+                                {term.name} ({term.type === 'fixed' ? `${term.durationMonths} mo` : 'Periodic'})
+                            </option>
+                        ))}
                       </select>
                     </div>
+                    {(!editData.leaseTermId) && (
+                        <div>
+                            <label className="text-[10px] uppercase font-bold text-gray-500">Custom Duration (Months)</label>
+                            <Input 
+                                type="number"
+                                value={editData.preferredTermMonths}
+                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditData({...editData, preferredTermMonths: parseInt(e.target.value)})}
+                                className="h-8 mt-1"
+                            />
+                        </div>
+                    )}
                     <Button 
                       size="sm" 
                       className="w-full h-8 text-xs bg-blue-600"
@@ -414,7 +448,10 @@ export function LeadPortalPage() {
                     <div>
                       <p className="text-[10px] uppercase font-bold text-gray-500">Term Period</p>
                       <p className="font-medium text-gray-900">
-                        {lead.preferredTermMonths ? `${lead.preferredTermMonths} Months` : 'Not set'}
+                        {lead.leaseTermId ? 
+                            portalData.leaseTerms.find(t => t.leaseTermId === lead.leaseTermId)?.name : 
+                            `${lead.preferredTermMonths} Months`
+                        }
                       </p>
                     </div>
                   </div>
