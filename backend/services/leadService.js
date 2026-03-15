@@ -11,7 +11,7 @@ import { validateEmail, validatePhoneNumber } from '../utils/validators.js';
 class LeadService {
 
     async registerInterest(data) {
-        const { name, email, phone, propertyId, interestedUnit, unitId, notes, moveInDate, occupantsCount, preferredTermMonths } = data;
+        const { name, email, phone, propertyId, interestedUnit, unitId, notes, moveInDate, occupantsCount, preferredTermMonths, leaseTermId } = data;
 
         if (!name || !email || !propertyId) {
             throw new Error('Name, email, and property are required');
@@ -93,7 +93,8 @@ class LeadService {
                 phone: phone,
                 move_in_date: moveInDate,
                 occupants_count: occupantsCount,
-                preferred_term_months: preferredTermMonths
+                preferred_term_months: preferredTermMonths,
+                lease_term_id: leaseTermId
             });
             message = 'Interest updated. We will contact you soon.';
         } else {
@@ -109,6 +110,7 @@ class LeadService {
                 move_in_date: moveInDate,
                 occupants_count: occupantsCount,
                 preferred_term_months: preferredTermMonths,
+                lease_term_id: leaseTermId,
                 status: 'interested',
             });
             message = 'Interest registered! We will contact you soon.';

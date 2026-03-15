@@ -7,6 +7,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
+  validateEmail,
+  validatePhoneNumber,
+  validateName,
+} from '@/utils/validators';
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -25,7 +30,6 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
-// ... imports
 import { ScheduleVisitDialog } from './ScheduleVisitDialog';
 
 export function PublicListingPage({
@@ -97,7 +101,13 @@ export function PublicListingPage({
     phone: '',
     interestedUnit: '',
     notes: '',
+    moveInDate: '',
+    occupantsCount: '1',
+    preferredTermMonths: '12',
+    leaseTermId: '',
   });
+  const [leaseTerms, setLeaseTerms] = useState<any[]>([]);
+  const [fetchingTerms, setFetchingTerms] = useState(false);
   const [interestProperty, setInterestProperty] = useState<Property | null>(
     null
   );
@@ -127,6 +137,8 @@ export function PublicListingPage({
     try {
       await addLead({
         ...interestFormData,
+        occupantsCount: parseInt(interestFormData.occupantsCount, 10),
+        preferredTermMonths: parseInt(interestFormData.preferredTermMonths, 10),
         status: 'interested',
         propertyId: interestProperty?.id || '',
       });
@@ -138,6 +150,10 @@ export function PublicListingPage({
         phone: '',
         interestedUnit: '',
         notes: '',
+        moveInDate: '',
+        occupantsCount: '1',
+        preferredTermMonths: '12',
+        leaseTermId: '',
       });
       setInterestProperty(null);
     } catch (error) {
@@ -145,10 +161,21 @@ export function PublicListingPage({
     }
   };
 
-  const openInterestDialog = (property: Property) => {
+  const openInterestDialog = async (property: Property) => {
     setInterestProperty(property);
     setInterestFormData((prev) => ({ ...prev, interestedUnit: '' }));
     setIsInterestDialogOpen(true);
+    
+    // Fetch lease terms for this property
+    setFetchingTerms(true);
+    try {
+      const response = await apiClient.get(`/properties/${property.id}/lease-terms`);
+      setLeaseTerms(response.data);
+    } catch (e) {
+      console.error('Failed to fetch terms', e);
+    } finally {
+      setFetchingTerms(false);
+    }
   };
 
   const openVisitDialog = (property: Property) => {
@@ -390,6 +417,84 @@ export function PublicListingPage({
                     setInterestFormData({
                       ...interestFormData,
                       phone: e.target.value,
+                    })
+                  }
+                  required
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="lead-term">Preferred Lease Term</Label>
+              <select
+                id="lead-term"
+                className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                value={interestFormData.leaseTermId}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  const term = leaseTerms.find(t => String(t.leaseTermId) === val);
+                  setInterestFormData({
+                    ...interestFormData,
+                    leaseTermId: val,
+                    preferredTermMonths: term?.durationMonths?.toString() || interestFormData.preferredTermMonths
+                  });
+                }}
+                required
+              >
+                <option value="">Custom / Undecided</option>
+                {leaseTerms.map(t => (
+                  <option key={t.leaseTermId} value={t.leaseTermId.toString()}>
+                    {t.name} ({t.type === 'periodic' ? 'Periodic' : `${t.durationMonths} months`})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {!interestFormData.leaseTermId && (
+              <div className="space-y-2">
+                <Label htmlFor="lead-term-custom">Custom Duration (Months)</Label>
+                <Input
+                  id="lead-term-custom"
+                  type="number"
+                  min="1"
+                  value={interestFormData.preferredTermMonths}
+                  onChange={(e) =>
+                    setInterestFormData({
+                      ...interestFormData,
+                      preferredTermMonths: e.target.value,
+                    })
+                  }
+                />
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="lead-movein">Move-in Date</Label>
+                <Input
+                  id="lead-movein"
+                  type="date"
+                  value={interestFormData.moveInDate}
+                  onChange={(e) =>
+                    setInterestFormData({
+                      ...interestFormData,
+                      moveInDate: e.target.value,
+                    })
+                  }
+                  min={new Date().toISOString().split('T')[0]}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="lead-occupants">Number of Occupants</Label>
+                <Input
+                  id="lead-occupants"
+                  type="number"
+                  min="1"
+                  value={interestFormData.occupantsCount}
+                  onChange={(e) =>
+                    setInterestFormData({
+                      ...interestFormData,
+                      occupantsCount: e.target.value,
                     })
                   }
                   required

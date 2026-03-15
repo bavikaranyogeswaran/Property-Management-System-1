@@ -34,6 +34,7 @@ import {
   validatePhoneNumber,
   validateName,
 } from '@/utils/validators';
+import apiClient from '@/services/api';
 
 export function PublicPropertyDetailsPage() {
   const { id } = useParams<{ id: string }>();
@@ -56,7 +57,10 @@ export function PublicPropertyDetailsPage() {
     moveInDate: '',
     occupantsCount: '1',
     preferredTermMonths: '12',
+    leaseTermId: '',
   });
+  const [leaseTerms, setLeaseTerms] = useState<any[]>([]);
+  const [fetchingTerms, setFetchingTerms] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isMobileInterestOpen, setIsMobileInterestOpen] = useState(false);
   const [isUnitLocked, setIsUnitLocked] = useState(false); // Validating feature request: lock unit if selected via card
@@ -101,6 +105,23 @@ export function PublicPropertyDetailsPage() {
       }
     }
   }, [id, properties, units, getPropertyImages]);
+
+  useEffect(() => {
+    if (id) {
+      const fetchTerms = async () => {
+        setFetchingTerms(true);
+        try {
+          const response = await apiClient.get(`/properties/${id}/lease-terms`);
+          setLeaseTerms(response.data);
+        } catch (e) {
+          console.error('Failed to fetch terms', e);
+        } finally {
+          setFetchingTerms(false);
+        }
+      };
+      fetchTerms();
+    }
+  }, [id]);
 
   const validateForm = (): boolean => {
     const errors: { [key: string]: string } = {};
@@ -156,6 +177,7 @@ export function PublicPropertyDetailsPage() {
         moveInDate: '',
         occupantsCount: '1',
         preferredTermMonths: '12',
+        leaseTermId: '',
         propertyId: id || '',
       });
       setFormErrors({});
@@ -859,20 +881,44 @@ export function PublicPropertyDetailsPage() {
               <select
                 id="lead-term"
                 className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                value={interestFormData.preferredTermMonths}
-                onChange={(e) =>
+                value={interestFormData.leaseTermId}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  const term = leaseTerms.find(t => String(t.leaseTermId) === val);
                   setInterestFormData({
                     ...interestFormData,
-                    preferredTermMonths: e.target.value,
-                  })
-                }
+                    leaseTermId: val,
+                    preferredTermMonths: term?.durationMonths?.toString() || interestFormData.preferredTermMonths
+                  });
+                }}
                 required
               >
-                <option value="6">6 Months</option>
-                <option value="12">1 Year</option>
-                <option value="24">2 Years</option>
+                <option value="">Custom / Undecided</option>
+                {leaseTerms.map(t => (
+                  <option key={t.leaseTermId} value={t.leaseTermId.toString()}>
+                    {t.name} ({t.type === 'periodic' ? 'Periodic' : `${t.durationMonths} months`})
+                  </option>
+                ))}
               </select>
             </div>
+
+            {!interestFormData.leaseTermId && (
+              <div className="space-y-2">
+                <Label htmlFor="lead-term-custom">Custom Duration (Months)</Label>
+                <Input
+                  id="lead-term-custom"
+                  type="number"
+                  min="1"
+                  value={interestFormData.preferredTermMonths}
+                  onChange={(e) =>
+                    setInterestFormData({
+                      ...interestFormData,
+                      preferredTermMonths: e.target.value,
+                    })
+                  }
+                />
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">

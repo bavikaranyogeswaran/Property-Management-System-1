@@ -14,6 +14,7 @@ class LeadModel {
       move_in_date,
       occupants_count,
       preferred_term_months,
+      lease_term_id,
       status = 'interested',
     } = data;
 
@@ -24,8 +25,8 @@ class LeadModel {
     }
 
     const [result] = await db.query(
-      `INSERT INTO leads (property_id, unit_id, name, phone, email, notes, move_in_date, occupants_count, preferred_term_months, status) 
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO leads (property_id, unit_id, name, phone, email, notes, move_in_date, occupants_count, preferred_term_months, lease_term_id, status) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         propertyId,
         finalUnitId,
@@ -36,6 +37,7 @@ class LeadModel {
         move_in_date || null,
         occupants_count || 1,
         preferred_term_months || null,
+        lease_term_id || null,
         status,
       ]
     );
@@ -63,6 +65,7 @@ class LeadModel {
                 move_in_date as moveInDate,
                 occupants_count as occupantsCount,
                 preferred_term_months as preferredTermMonths,
+                lease_term_id as leaseTermId,
                 status,
                 created_at as createdAt,
                 last_contacted_at as lastContactedAt
@@ -118,6 +121,11 @@ class LeadModel {
       fields.push('preferred_term_months = ?');
       values.push(term);
     }
+    const leaseTermId = data.leaseTermId || data.lease_term_id;
+    if (leaseTermId !== undefined) {
+      fields.push('lease_term_id = ?');
+      values.push(leaseTermId);
+    }
     if (data.notes !== undefined) {
       fields.push('notes = ?');
       values.push(data.notes);
@@ -169,6 +177,7 @@ class LeadModel {
                     l.move_in_date as moveInDate,
                     l.occupants_count as occupantsCount,
                     l.preferred_term_months as preferredTermMonths,
+                    l.lease_term_id as leaseTermId,
                     l.status,
                     l.created_at as createdAt,
                     l.last_contacted_at as lastContactedAt
@@ -195,6 +204,7 @@ class LeadModel {
                 move_in_date as moveInDate,
                 occupants_count as occupantsCount,
                 preferred_term_months as preferredTermMonths,
+                lease_term_id as leaseTermId,
                 status,
                 created_at as createdAt,
                 last_contacted_at as lastContactedAt
@@ -250,6 +260,7 @@ class LeadModel {
         move_in_date as moveInDate,
         occupants_count as occupantsCount,
         preferred_term_months as preferredTermMonths,
+        lease_term_id as leaseTermId,
         status,
         created_at as createdAt,
         last_contacted_at as lastContactedAt
