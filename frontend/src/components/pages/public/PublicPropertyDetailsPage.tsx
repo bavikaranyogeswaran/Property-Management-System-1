@@ -896,7 +896,6 @@ export function PublicPropertyDetailsPage() {
                     preferredTermMonths: term?.durationMonths?.toString() || interestFormData.preferredTermMonths
                   });
                 }}
-                required
               >
                 <option value="">Custom / Undecided</option>
                 {leaseTerms.map(t => (
