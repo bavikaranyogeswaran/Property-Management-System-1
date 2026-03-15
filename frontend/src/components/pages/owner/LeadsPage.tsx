@@ -110,6 +110,20 @@ export function LeadsPage() {
 
 
   useEffect(() => {
+    if (selectedLead) {
+      const initialStartDate = selectedLead.moveInDate 
+        ? new Date(selectedLead.moveInDate).toISOString().split('T')[0]
+        : new Date().toISOString().split('T')[0];
+      
+      setConversionData(prev => ({
+        ...prev,
+        startDate: initialStartDate,
+        unitId: selectedLead.interestedUnit || ''
+      }));
+    }
+  }, [selectedLead]);
+
+  useEffect(() => {
     if (selectedLead?.preferredTermMonths && conversionData.startDate) {
       const start = new Date(conversionData.startDate);
       const end = new Date(start);
@@ -119,7 +133,7 @@ export function LeadsPage() {
         endDate: end.toISOString().split('T')[0],
       }));
     }
-  }, [selectedLead, conversionData.startDate]);
+  }, [selectedLead?.preferredTermMonths, conversionData.startDate]);
 
   const handleConvert = async () => {
     if (!selectedLead) return;
