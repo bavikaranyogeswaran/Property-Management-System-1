@@ -103,17 +103,20 @@ class LeadModel {
       fields.push('phone = ?');
       values.push(data.phone);
     }
-    if (data.move_in_date !== undefined) {
+    const moveIn = data.moveInDate || data.move_in_date;
+    if (moveIn !== undefined) {
       fields.push('move_in_date = ?');
-      values.push(data.move_in_date);
+      values.push(moveIn);
     }
-    if (data.occupants_count !== undefined) {
+    const occupants = data.occupantsCount || data.occupants_count;
+    if (occupants !== undefined) {
       fields.push('occupants_count = ?');
-      values.push(data.occupants_count);
+      values.push(occupants);
     }
-    if (data.preferred_term_months !== undefined) {
+    const term = data.preferredTermMonths || data.preferred_term_months;
+    if (term !== undefined) {
       fields.push('preferred_term_months = ?');
-      values.push(data.preferred_term_months);
+      values.push(term);
     }
     if (data.notes !== undefined) {
       fields.push('notes = ?');

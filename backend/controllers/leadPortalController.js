@@ -56,8 +56,8 @@ class LeadPortalController {
           propertyId: lead.propertyId,
           interestedUnit: lead.interestedUnit,
           createdAt: lead.createdAt,
-          moveInDate: lead.move_in_date,
-          preferredTermMonths: lead.preferred_term_months,
+          moveInDate: lead.moveInDate,
+          preferredTermMonths: lead.preferredTermMonths,
         },
         property: property ? {
           name: property.name,
