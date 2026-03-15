@@ -121,7 +121,8 @@ export function LeadsPage() {
       setConversionData(prev => ({
         ...prev,
         startDate: initialStartDate,
-        unitId: selectedLead.interestedUnit || ''
+        unitId: selectedLead.interestedUnit || '',
+        leaseTermId: selectedLead.leaseTermId || ''
       }));
     }
   }, [selectedLead]);
