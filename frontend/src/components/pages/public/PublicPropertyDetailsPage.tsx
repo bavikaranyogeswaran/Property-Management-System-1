@@ -144,6 +144,11 @@ export function PublicPropertyDetailsPage() {
       errors.phone = phoneValidation.error || 'Invalid phone number';
     }
 
+    // Term validation
+    if (!interestFormData.leaseTermId && parseInt(interestFormData.preferredTermMonths) < 3) {
+      errors.preferredTermMonths = 'Minimum lease duration is 3 months';
+    }
+
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -908,7 +913,7 @@ export function PublicPropertyDetailsPage() {
                 <Input
                   id="lead-term-custom"
                   type="number"
-                  min="1"
+                  min="3"
                   value={interestFormData.preferredTermMonths}
                   onChange={(e) =>
                     setInterestFormData({

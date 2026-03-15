@@ -134,6 +134,13 @@ export function PublicListingPage({
 
   const handleInterestSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Term validation
+    if (!interestFormData.leaseTermId && parseInt(interestFormData.preferredTermMonths) < 3) {
+      toast.error('Minimum lease duration is 3 months');
+      return;
+    }
+
     try {
       await addLead({
         ...interestFormData,
@@ -455,7 +462,7 @@ export function PublicListingPage({
                 <Input
                   id="lead-term-custom"
                   type="number"
-                  min="1"
+                  min="3"
                   value={interestFormData.preferredTermMonths}
                   onChange={(e) =>
                     setInterestFormData({

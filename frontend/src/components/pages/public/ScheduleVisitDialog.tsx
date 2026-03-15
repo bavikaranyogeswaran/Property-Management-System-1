@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { Loader2, Calendar as CalendarIcon, Clock } from 'lucide-react';
+import apiClient from '@/services/api';
 
 interface Property {
   id: string;
@@ -67,9 +68,8 @@ export function ScheduleVisitDialog({
       const fetchTerms = async () => {
         setFetchingTerms(true);
         try {
-          const response = await fetch(`${import.meta.env.VITE_API_URL || '/api'}/properties/${property.id}/lease-terms`);
-          const data = await response.json();
-          setLeaseTerms(data);
+          const response = await apiClient.get(`/properties/${property.id}/lease-terms`);
+          setLeaseTerms(response.data);
         } catch (e) {
           console.error('Failed to fetch terms', e);
         } finally {
@@ -92,6 +92,14 @@ export function ScheduleVisitDialog({
     if (!property) return;
 
     setLoading(true);
+
+    // Term validation
+    if (!formData.leaseTermId && formData.preferredTermMonths < 3) {
+      toast.error('Minimum lease duration is 3 months');
+      setLoading(false);
+      return;
+    }
+
     try {
       await scheduleVisit({
         propertyId: property.id,
@@ -222,6 +230,7 @@ export function ScheduleVisitDialog({
                         <Input
                             id="preferredTermMonths"
                             type="number"
+                            min="3"
                             value={formData.preferredTermMonths}
                             onChange={handleChange}
                             className="bg-white"
