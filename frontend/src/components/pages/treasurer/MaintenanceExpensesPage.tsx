@@ -13,6 +13,16 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   Table,
   TableBody,
   TableCell,
@@ -47,6 +57,11 @@ export function MaintenanceExpensesPage() {
   const [billToTenant, setBillToTenant] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
+  // Deletion States
+  const [isDeleteExpenseDialogOpen, setIsDeleteExpenseDialogOpen] =
+    useState(false);
+  const [expenseToDelete, setExpenseToDelete] = useState<any | null>(null);
+
   // Filter for completed or relevant requests
   // Treasurers might want to see In Progress ones too to anticipate costs, but usually costs are recorded upon completion or invoice receipt.
   // Let's show all for now, but focus on completed.
@@ -78,6 +93,19 @@ export function MaintenanceExpensesPage() {
     setAmount('');
     setDescription('');
     setIsDialogOpen(false);
+  };
+
+  const handleRemoveExpense = (cost: any) => {
+    setExpenseToDelete(cost);
+    setIsDeleteExpenseDialogOpen(true);
+  };
+
+  const confirmDeleteExpense = () => {
+    if (!expenseToDelete) return;
+    deleteMaintenanceCost(expenseToDelete.id);
+    toast.success('Expense deleted successfully');
+    setIsDeleteExpenseDialogOpen(false);
+    setExpenseToDelete(null);
   };
 
   const openAddCostDialog = (requestId: string) => {
@@ -218,15 +246,7 @@ export function MaintenanceExpensesPage() {
                                       LKR {cost.amount.toLocaleString()}
                                     </span>
                                     <button
-                                      onClick={() => {
-                                        if (
-                                          confirm(
-                                            'Are you sure you want to delete this cost?'
-                                          )
-                                        ) {
-                                          deleteMaintenanceCost(cost.id);
-                                        }
-                                      }}
+                                      onClick={() => handleRemoveExpense(cost)}
                                       className="text-red-500 hover:text-red-700 opacity-0 group-hover:opacity-100 transition-opacity"
                                       title="Delete Cost"
                                     >
@@ -311,6 +331,35 @@ export function MaintenanceExpensesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog
+        open={isDeleteExpenseDialogOpen}
+        onOpenChange={setIsDeleteExpenseDialogOpen}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the
+              recorded expense for{' '}
+              <span className="font-semibold text-gray-900">
+                {expenseToDelete?.description}
+              </span>
+              .
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={confirmDeleteExpense}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

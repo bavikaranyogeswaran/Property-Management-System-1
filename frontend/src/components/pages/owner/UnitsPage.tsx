@@ -19,6 +19,16 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   Table,
   TableBody,
   TableCell,
@@ -77,6 +87,12 @@ export function UnitsPage() {
   const [viewUnit, setViewUnit] = useState<Unit | null>(null);
   const [viewUnitImages, setViewUnitImages] = useState<any[]>([]);
   const [existingImages, setExistingImages] = useState<any[]>([]);
+
+  // Deletion States
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [unitToDelete, setUnitToDelete] = useState<string | null>(null);
+  const [isDeleteImageDialogOpen, setIsDeleteImageDialogOpen] = useState(false);
+  const [imageToDelete, setImageToDelete] = useState<any | null>(null);
 
   // Fetch images when viewing a unit
   React.useEffect(() => {
@@ -154,24 +170,31 @@ export function UnitsPage() {
     }
   };
 
-  const handleRemoveExistingImage = async (image: any) => {
+  const handleRemoveExistingImage = (image: any) => {
     if (!editingUnit) return;
-    if (confirm('Delete this image?')) {
-      try {
-        await deleteUnitImage(editingUnit.id, image.id);
-        // Refresh images
-        const images = await getUnitImages(editingUnit.id);
-        setExistingImages(
-          images.map((img: any) => ({
-            id: img.image_id?.toString() || img.id?.toString(),
-            url: img.image_url,
-            isPrimary: Boolean(img.is_primary),
-          }))
-        );
-        toast.success('Image deleted');
-      } catch (e) {
-        toast.error('Failed to delete image');
-      }
+    setImageToDelete(image);
+    setIsDeleteImageDialogOpen(true);
+  };
+
+  const confirmDeleteImage = async () => {
+    if (!editingUnit || !imageToDelete) return;
+    try {
+      await deleteUnitImage(editingUnit.id, imageToDelete.id);
+      // Refresh images
+      const images = await getUnitImages(editingUnit.id);
+      setExistingImages(
+        images.map((img: any) => ({
+          id: img.image_id?.toString() || img.id?.toString(),
+          url: img.image_url,
+          isPrimary: Boolean(img.is_primary),
+        }))
+      );
+      toast.success('Image deleted');
+    } catch (e) {
+      toast.error('Failed to delete image');
+    } finally {
+      setIsDeleteImageDialogOpen(false);
+      setImageToDelete(null);
     }
   };
 
@@ -247,9 +270,20 @@ export function UnitsPage() {
       return;
     }
 
-    if (confirm('Are you sure you want to delete this unit?')) {
-      deleteUnit(id);
+    setUnitToDelete(id);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const confirmDeleteUnit = async () => {
+    if (!unitToDelete) return;
+    try {
+      await deleteUnit(unitToDelete);
       toast.success('Unit deleted successfully');
+    } catch (error) {
+      toast.error('Failed to delete unit');
+    } finally {
+      setIsDeleteDialogOpen(false);
+      setUnitToDelete(null);
     }
   };
 
@@ -743,6 +777,55 @@ export function UnitsPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog
+        open={isDeleteDialogOpen}
+        onOpenChange={setIsDeleteDialogOpen}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the
+              unit and all associated data.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={confirmDeleteUnit}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Image Confirmation Dialog */}
+      <AlertDialog
+        open={isDeleteImageDialogOpen}
+        onOpenChange={setIsDeleteImageDialogOpen}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Image?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this image?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={confirmDeleteImage}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

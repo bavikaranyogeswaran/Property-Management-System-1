@@ -11,6 +11,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Building2, Plus, Edit, Trash2, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 import { MultiImageUpload } from '@/components/ui/multi-image-upload';
@@ -100,6 +110,12 @@ export function PropertiesPage() {
   const [uploadFiles, setUploadFiles] = useState<File[]>([]);
   const [primaryImageIndex, setPrimaryImageIndex] = useState(0);
   const [viewProperty, setViewProperty] = useState<Property | null>(null);
+
+  // Deletion States
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [propertyToDelete, setPropertyToDelete] = useState<string | null>(null);
+  const [isDeleteImageDialogOpen, setIsDeleteImageDialogOpen] = useState(false);
+  const [imageToDelete, setImageToDelete] = useState<any | null>(null);
 
   // Quick Add Units State
   const [quickUnits, setQuickUnits] = useState<
@@ -349,10 +365,21 @@ export function PropertiesPage() {
     setIsAddDialogOpen(true);
   };
 
-  const handleDeleteClick = async (id: string) => {
-    if (confirm('Are you sure you want to delete this property?')) {
-      await deleteProperty(id);
+  const handleDeleteClick = (id: string) => {
+    setPropertyToDelete(id);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const confirmDeleteProperty = async () => {
+    if (!propertyToDelete) return;
+    try {
+      await deleteProperty(propertyToDelete);
       toast.success('Property deleted successfully');
+    } catch (error) {
+      toast.error('Failed to delete property');
+    } finally {
+      setIsDeleteDialogOpen(false);
+      setPropertyToDelete(null);
     }
   };
 
@@ -408,24 +435,31 @@ export function PropertiesPage() {
     );
   };
 
-  const handleRemoveExistingImage = async (image: any) => {
+  const handleRemoveExistingImage = (image: any) => {
     if (!editingProperty) return;
-    if (confirm('Delete this image?')) {
-      try {
-        await deletePropertyImage(editingProperty.id, image.id);
-        // Refresh images
-        const images = await getPropertyImages(editingProperty.id);
-        setExistingImages(
-          images.map((img: any) => ({
-            id: img.image_id?.toString() || img.id?.toString(),
-            url: img.image_url || img.url, // Handle backend naming
-            isPrimary: Boolean(img.is_primary),
-          }))
-        );
-        toast.success('Image deleted');
-      } catch (e) {
-        toast.error('Failed to delete image');
-      }
+    setImageToDelete(image);
+    setIsDeleteImageDialogOpen(true);
+  };
+
+  const confirmDeleteImage = async () => {
+    if (!editingProperty || !imageToDelete) return;
+    try {
+      await deletePropertyImage(editingProperty.id, imageToDelete.id);
+      // Refresh images
+      const images = await getPropertyImages(editingProperty.id);
+      setExistingImages(
+        images.map((img: any) => ({
+          id: img.image_id?.toString() || img.id?.toString(),
+          url: img.image_url || img.url, // Handle backend naming
+          isPrimary: Boolean(img.is_primary),
+        }))
+      );
+      toast.success('Image deleted');
+    } catch (e) {
+      toast.error('Failed to delete image');
+    } finally {
+      setIsDeleteImageDialogOpen(false);
+      setImageToDelete(null);
     }
   };
 
@@ -467,10 +501,8 @@ export function PropertiesPage() {
       return;
     }
 
-    if (confirm('Are you sure you want to delete this property?')) {
-      deleteProperty(id);
-      toast.success('Property deleted successfully');
-    }
+    setPropertyToDelete(id);
+    setIsDeleteDialogOpen(true);
   };
 
   const getUnitCount = (propertyId: string) => {
@@ -1247,6 +1279,55 @@ export function PropertiesPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog
+        open={isDeleteDialogOpen}
+        onOpenChange={setIsDeleteDialogOpen}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the
+              property and all associated data.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={confirmDeleteProperty}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Image Confirmation Dialog */}
+      <AlertDialog
+        open={isDeleteImageDialogOpen}
+        onOpenChange={setIsDeleteImageDialogOpen}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Image?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this image?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={confirmDeleteImage}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

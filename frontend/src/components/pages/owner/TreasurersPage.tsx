@@ -13,6 +13,16 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   Table,
   TableBody,
   TableCell,
@@ -62,6 +72,12 @@ export function TreasurersPage() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isAssignmentDialogOpen, setIsAssignmentDialogOpen] = useState(false);
   const [selectedTreasurer, setSelectedTreasurer] = useState<Treasurer | null>(
+    null
+  );
+
+  // Deletion States
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [treasurerToDelete, setTreasurerToDelete] = useState<Treasurer | null>(
     null
   );
 
@@ -181,22 +197,23 @@ export function TreasurersPage() {
     }
   };
 
-  const handleDelete = async (treasurer: Treasurer) => {
-    if (
-      window.confirm(
-        `Are you sure you want to remove ${treasurer.name} as a treasurer?`
-      )
-    ) {
-      try {
-        await apiClient.delete(`/users/${treasurer.id}`);
-        deleteTreasurer(treasurer.id);
-        toast.success('Treasurer removed successfully');
-      } catch (error: any) {
-        console.error('Failed to remove treasurer:', error);
-        toast.error(
-          error.response?.data?.error || 'Failed to remove treasurer'
-        );
-      }
+  const handleDelete = (treasurer: Treasurer) => {
+    setTreasurerToDelete(treasurer);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const confirmDeleteTreasurer = async () => {
+    if (!treasurerToDelete) return;
+    try {
+      await apiClient.delete(`/users/${treasurerToDelete.id}`);
+      deleteTreasurer(treasurerToDelete.id);
+      toast.success('Treasurer removed successfully');
+    } catch (error: any) {
+      console.error('Failed to remove treasurer:', error);
+      toast.error(error.response?.data?.error || 'Failed to remove treasurer');
+    } finally {
+      setIsDeleteDialogOpen(false);
+      setTreasurerToDelete(null);
     }
   };
 
@@ -525,6 +542,34 @@ export function TreasurersPage() {
         treasurer={selectedTreasurer}
         properties={properties}
       />
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog
+        open={isDeleteDialogOpen}
+        onOpenChange={setIsDeleteDialogOpen}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently remove{' '}
+              <span className="font-semibold text-gray-900">
+                {treasurerToDelete?.name}
+              </span>{' '}
+              as a treasurer and revoke all their access to the properties.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={confirmDeleteTreasurer}
+            >
+              Remove Treasurer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -22,6 +22,16 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   Table,
   TableBody,
   TableCell,
@@ -70,6 +80,12 @@ export function OwnerMaintenancePage() {
     description: '',
     dueDate: '',
   });
+
+  // Deletion States
+  const [isDeleteCostDialogOpen, setIsDeleteCostDialogOpen] = useState(false);
+  const [costToDelete, setCostToDelete] = useState<MaintenanceCost | null>(
+    null
+  );
 
   const submittedRequests = maintenanceRequests.filter(
     (r) => r.status === 'submitted'
@@ -317,6 +333,14 @@ export function OwnerMaintenancePage() {
     </div>
   );
 
+  const confirmDeleteCost = () => {
+    if (!costToDelete) return;
+    deleteMaintenanceCost(costToDelete.id);
+    toast.success('Maintenance cost deleted');
+    setIsDeleteCostDialogOpen(false);
+    setCostToDelete(null);
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -497,13 +521,8 @@ export function OwnerMaintenancePage() {
                           <button
                             type="button"
                             onClick={() => {
-                              if (
-                                confirm(
-                                  'Are you sure you want to delete this cost?'
-                                )
-                              ) {
-                                deleteMaintenanceCost(cost.id);
-                              }
+                              setCostToDelete(cost);
+                              setIsDeleteCostDialogOpen(true);
                             }}
                             className="text-red-500 hover:text-red-700 opacity-0 group-hover:opacity-100 transition-opacity"
                             title="Delete Cost"
@@ -753,6 +772,31 @@ export function OwnerMaintenancePage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Delete Cost Confirmation Dialog */}
+      <AlertDialog
+        open={isDeleteCostDialogOpen}
+        onOpenChange={setIsDeleteCostDialogOpen}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete maintenance cost?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this maintenance cost? This action
+              cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={confirmDeleteCost}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
