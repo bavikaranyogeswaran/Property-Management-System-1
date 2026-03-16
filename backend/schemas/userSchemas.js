@@ -22,6 +22,7 @@ export const updateTreasurerSchema = Joi.object({
     .messages({
       'string.pattern.base': 'Please enter a valid Sri Lankan phone number (e.g., +94 77 123 4567 or 0771234567).',
     }),
+  status: Joi.string().valid('active', 'inactive').optional(),
 });
 
 export const updateProfileSchema = Joi.object({
