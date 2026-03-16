@@ -122,14 +122,31 @@ export function LeadsPage() {
         ? new Date(selectedLead.moveInDate).toISOString().split('T')[0]
         : new Date().toISOString().split('T')[0];
       
+      // Auto-identify unit if not pre-filled
+      let autoUnitId = selectedLead.interestedUnit || '';
+      
+      if (!autoUnitId) {
+        // 1. Check if lead had a specific unit visit
+        const leadVisit = visits.find(v => String(v.lead_id) === String(selectedLead.id) && v.unit_id);
+        if (leadVisit && leadVisit.unit_id) {
+            autoUnitId = leadVisit.unit_id;
+        } else {
+            // 2. Check if property has only one available unit
+            const availableUnits = units.filter(u => String(u.propertyId) === String(selectedLead.propertyId) && u.status === 'available');
+            if (availableUnits.length === 1) {
+                autoUnitId = availableUnits[0].id;
+            }
+        }
+      }
+
       setConversionData(prev => ({
         ...prev,
         startDate: initialStartDate,
-        unitId: selectedLead.interestedUnit || '',
+        unitId: autoUnitId,
         leaseTermId: selectedLead.leaseTermId || ''
       }));
     }
-  }, [selectedLead]);
+  }, [selectedLead, units, visits]);
 
   useEffect(() => {
     if (selectedLead?.preferredTermMonths && conversionData.startDate && !conversionData.leaseTermId) {
