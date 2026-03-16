@@ -268,20 +268,23 @@ export const TenantDetailsDialog: React.FC<TenantDetailsDialogProps> = ({
             <div className="w-full border rounded-lg overflow-hidden bg-gray-50 flex items-center justify-center min-h-[400px]">
               {tenant.nicUrl?.toLowerCase().endsWith('.pdf') ? (
                 <iframe 
-                  src={`http://localhost:3000/${tenant.nicUrl.replace(/\\/g, '/')}`} 
+                  src={tenant.nicUrl.startsWith('http') ? tenant.nicUrl : `http://localhost:3000/${tenant.nicUrl.replace(/\\/g, '/')}`} 
                   className="w-full h-[500px]"
                   title="NIC PDF Preview"
                 />
               ) : (
                 <img 
-                  src={`http://localhost:3000/${tenant.nicUrl?.replace(/\\/g, '/')}`} 
+                  src={tenant.nicUrl?.startsWith('http') ? tenant.nicUrl : `http://localhost:3000/${tenant.nicUrl?.replace(/\\/g, '/')}`} 
                   alt="NIC Document" 
                   className="max-w-full h-auto"
                 />
               )}
             </div>
             <div className="flex justify-end w-full gap-2">
-              <Button variant="outline" onClick={() => window.open(`http://localhost:3000/${tenant.nicUrl?.replace(/\\/g, '/')}`, '_blank')}>
+              <Button variant="outline" onClick={() => {
+                const url = tenant.nicUrl?.startsWith('http') ? tenant.nicUrl : `http://localhost:3000/${tenant.nicUrl?.replace(/\\/g, '/')}`;
+                window.open(url, '_blank');
+              }}>
                 Open in New Tab
               </Button>
               <Button onClick={() => setIsNicPreviewOpen(false)}>

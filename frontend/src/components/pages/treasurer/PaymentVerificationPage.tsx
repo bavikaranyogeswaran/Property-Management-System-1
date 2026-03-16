@@ -134,7 +134,10 @@ export function PaymentVerificationPage() {
                   <Button
                     variant="outline"
                     className="w-full bg-white hover:bg-blue-50 text-blue-700 border-blue-200"
-                    onClick={() => window.open(`http://localhost:3000/${payment.proofUrl?.replace(/\\/g, '/')}`, '_blank')}
+                    onClick={() => {
+                      const url = payment.proofUrl?.startsWith('http') ? payment.proofUrl : `http://localhost:3000/${payment.proofUrl?.replace(/\\/g, '/')}`;
+                      window.open(url, '_blank');
+                    }}
                   >
                     <ExternalLink className="size-4 mr-2" />
                     View Attached Proof

@@ -618,12 +618,14 @@ export function LeasesPage() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() =>
-                            window.open(
-                              `http://localhost:3000${selectedLease.documentUrl}`,
-                              '_blank'
-                            )
-                          }
+                          onClick={() => {
+                            if (selectedLease.documentUrl) {
+                              const url = selectedLease.documentUrl.startsWith('http') 
+                                ? selectedLease.documentUrl 
+                                : `http://localhost:3000${selectedLease.documentUrl}`;
+                              window.open(url, '_blank');
+                            }
+                          }}
                         >
                           View Document
                         </Button>
