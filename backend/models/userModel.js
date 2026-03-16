@@ -51,7 +51,8 @@ class UserModel {
                 t.permanent_address as permanentAddress,
                 t.employment_status as employmentStatus,
                 t.monthly_income as monthlyIncome,
-                t.behavior_score as behaviorScore
+                t.behavior_score as behaviorScore,
+                t.nic_url as nicUrl
             FROM users u
             JOIN tenants t ON u.user_id = t.user_id
             JOIN leases l ON u.user_id = l.tenant_id
@@ -84,7 +85,8 @@ class UserModel {
                 t.permanent_address as permanentAddress,
                 t.employment_status as employmentStatus,
                 t.monthly_income as monthlyIncome,
-                t.behavior_score as behaviorScore
+                t.behavior_score as behaviorScore,
+                t.nic_url as nicUrl
             FROM users u
             JOIN tenants t ON u.user_id = t.user_id
             -- Join path 1: via Leases for Assigned Properties
@@ -110,7 +112,7 @@ class UserModel {
     // Joining everything is safer to fetch all data in one go.
     const query = `
             SELECT u.*, 
-                   t.nic as tenant_nic, t.monthly_income,
+                   t.nic as tenant_nic, t.monthly_income, t.nic_url as nicUrl,
                    o.nic as owner_nic, o.tin, o.bank_name, o.account_number,
                    s.employee_id, s.job_title
             FROM users u

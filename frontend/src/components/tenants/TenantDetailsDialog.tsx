@@ -38,6 +38,7 @@ export const TenantDetailsDialog: React.FC<TenantDetailsDialogProps> = ({
   const [behaviorLogs, setBehaviorLogs] = useState<BehaviorLog[]>([]);
   const [score, setScore] = useState<number>(100);
   const [isAddBehaviorOpen, setIsAddBehaviorOpen] = useState(false);
+  const [isNicPreviewOpen, setIsNicPreviewOpen] = useState(false);
   const [loading, setLoading] = useState(false);
 
   // In a real app, use environment variable or context for API URL
@@ -177,14 +178,12 @@ export const TenantDetailsDialog: React.FC<TenantDetailsDialogProps> = ({
                     {tenant.nicUrl && (
                       <div className="sm:col-span-2 mt-2">
                         <p className="text-sm text-gray-600 mb-1">NIC Document</p>
-                        <a 
-                          href={`http://localhost:3000${tenant.nicUrl}`} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
+                        <button 
+                          onClick={() => setIsNicPreviewOpen(true)}
                           className="text-blue-600 hover:underline text-sm font-medium flex items-center gap-1"
                         >
                           View Uploaded Document
-                        </a>
+                        </button>
                       </div>
                     )}
                   </div>
@@ -258,6 +257,39 @@ export const TenantDetailsDialog: React.FC<TenantDetailsDialogProps> = ({
         onClose={() => setIsAddBehaviorOpen(false)}
         onSubmit={handleAddBehavior}
       />
+
+      <Dialog open={isNicPreviewOpen} onOpenChange={setIsNicPreviewOpen}>
+        <DialogContent className="sm:max-w-[700px]">
+          <DialogHeader>
+            <DialogTitle>NIC Document Preview</DialogTitle>
+          </DialogHeader>
+          <div className="mt-4 flex flex-col items-center gap-4">
+            <div className="w-full border rounded-lg overflow-hidden bg-gray-50 flex items-center justify-center min-h-[400px]">
+              {tenant.nicUrl?.toLowerCase().endsWith('.pdf') ? (
+                <iframe 
+                  src={`http://localhost:3000${tenant.nicUrl}`} 
+                  className="w-full h-[500px]"
+                  title="NIC PDF Preview"
+                />
+              ) : (
+                <img 
+                  src={`http://localhost:3000${tenant.nicUrl}`} 
+                  alt="NIC Document" 
+                  className="max-w-full h-auto"
+                />
+              )}
+            </div>
+            <div className="flex justify-end w-full gap-2">
+              <Button variant="outline" onClick={() => window.open(`http://localhost:3000${tenant.nicUrl}`, '_blank')}>
+                Open in New Tab
+              </Button>
+              <Button onClick={() => setIsNicPreviewOpen(false)}>
+                Close
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 };
