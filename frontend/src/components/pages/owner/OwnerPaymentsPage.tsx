@@ -373,7 +373,7 @@ export function OwnerPaymentsPage() {
                 src={
                   proofImage.startsWith('http')
                     ? proofImage
-                    : `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${proofImage}`
+                    : `http://localhost:3000/${proofImage.replace(/\\/g, '/')}`
                 }
                 alt="Payment proof"
                 className="max-w-full max-h-[60vh] rounded-lg border object-contain"
