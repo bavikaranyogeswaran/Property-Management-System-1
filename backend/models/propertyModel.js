@@ -66,7 +66,7 @@ class PropertyModel {
                 pt.type_id as type_id
             FROM properties p
             LEFT JOIN property_types pt ON p.property_type_id = pt.type_id
-            WHERE p.deleted_at IS NULL
+            WHERE p.is_archived = FALSE
         `;
 
     const params = [];
@@ -117,7 +117,7 @@ class PropertyModel {
                 pt.type_id as type_id
             FROM properties p
             JOIN property_types pt ON p.property_type_id = pt.type_id
-            WHERE p.property_id = ? AND p.deleted_at IS NULL
+            WHERE p.property_id = ? AND p.is_archived = FALSE
         `,
       [id]
     );
@@ -196,7 +196,7 @@ class PropertyModel {
 
     values.push(id);
     const [result] = await db.query(
-      `UPDATE properties SET ${fields.join(', ')} WHERE property_id = ? AND deleted_at IS NULL`,
+      `UPDATE properties SET ${fields.join(', ')} WHERE property_id = ? AND is_archived = FALSE`,
       values
     );
     return result.affectedRows > 0;
@@ -204,7 +204,7 @@ class PropertyModel {
 
   async delete(id) {
     const [result] = await db.query(
-      "UPDATE properties SET deleted_at = NOW(), status = 'inactive' WHERE property_id = ?",
+      "UPDATE properties SET archived_at = NOW(), is_archived = TRUE, status = 'inactive' WHERE property_id = ?",
       [id]
     );
     return result.affectedRows > 0;

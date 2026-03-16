@@ -155,9 +155,9 @@ class MaintenanceCostController {
         }
       }
 
-      const deleted = await maintenanceCostModel.delete(id);
-      if (deleted) {
-        res.json({ message: 'Cost deleted' });
+      const successfullyVoided = await maintenanceCostModel.void(id);
+      if (successfullyVoided) {
+        res.json({ message: 'Cost marked as voided' });
       } else {
         res.status(404).json({ error: 'Cost not found' });
       }

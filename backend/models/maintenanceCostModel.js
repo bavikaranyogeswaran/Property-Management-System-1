@@ -52,9 +52,9 @@ class MaintenanceCostModel {
     );
     return rows[0].total_cost || 0;
   }
-  async delete(id) {
+  async void(id) {
     const [result] = await pool.query(
-      'DELETE FROM maintenance_costs WHERE cost_id = ?',
+      "UPDATE maintenance_costs SET status = 'voided' WHERE cost_id = ?",
       [id]
     );
     return result.affectedRows > 0;

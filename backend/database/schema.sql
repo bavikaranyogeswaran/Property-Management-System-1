@@ -21,6 +21,8 @@ CREATE TABLE users (
     is_email_verified BOOLEAN DEFAULT FALSE,
     email_verified_at DATETIME,
     status ENUM('active','inactive','banned') DEFAULT 'active',
+    is_archived BOOLEAN DEFAULT FALSE,
+    archived_at DATETIME,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -115,6 +117,8 @@ CREATE TABLE properties (
     district VARCHAR(100) NOT NULL,      -- [ADDED] District
     -- address_line_1/2/3 Removed
     status ENUM('active','inactive') DEFAULT 'active',
+    is_archived BOOLEAN DEFAULT FALSE,
+    archived_at DATETIME,
     image_url VARCHAR(255),                  -- [DEPRECATED] Use property_images table instead
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (owner_id) REFERENCES users(user_id) ON DELETE CASCADE,
@@ -128,6 +132,8 @@ CREATE TABLE units (
     unit_type_id INT NOT NULL,               -- [MODIFIED] FK to unit_types
     monthly_rent DECIMAL(10,2) NOT NULL,
     status ENUM('available','occupied','maintenance') DEFAULT 'available',
+    is_archived BOOLEAN DEFAULT FALSE,
+    archived_at DATETIME,
     image_url VARCHAR(255),                  -- [DEPRECATED] Use unit_images table instead
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     UNIQUE (property_id, unit_number),
@@ -247,8 +253,8 @@ CREATE TABLE leases (
     refunded_amount DECIMAL(10, 2) DEFAULT 0.00,
     document_url VARCHAR(500), -- [ADDED] Lease document URL
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (tenant_id) REFERENCES users(user_id) ON DELETE CASCADE,
-    FOREIGN KEY (unit_id) REFERENCES units(unit_id) ON DELETE CASCADE
+    FOREIGN KEY (tenant_id) REFERENCES users(user_id) ON DELETE RESTRICT,
+    FOREIGN KEY (unit_id) REFERENCES units(unit_id) ON DELETE RESTRICT
 );
 
 -- =========================
@@ -265,7 +271,7 @@ CREATE TABLE rent_invoices (
     invoice_type ENUM('rent', 'maintenance', 'late_fee', 'deposit', 'other') DEFAULT 'rent',
     description VARCHAR(255),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (lease_id) REFERENCES leases(lease_id) ON DELETE CASCADE,
+    FOREIGN KEY (lease_id) REFERENCES leases(lease_id) ON DELETE RESTRICT,
     UNIQUE KEY unique_periodic_invoice (lease_id, year, month, invoice_type, description)
 );
 
@@ -283,7 +289,7 @@ CREATE TABLE payments (
     status ENUM('pending','verified','rejected') DEFAULT 'pending',
     verified_by INT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (invoice_id) REFERENCES rent_invoices(invoice_id) ON DELETE CASCADE,
+    FOREIGN KEY (invoice_id) REFERENCES rent_invoices(invoice_id) ON DELETE RESTRICT,
     FOREIGN KEY (verified_by) REFERENCES users(user_id) ON DELETE SET NULL,
     UNIQUE KEY unique_payment_ref (reference_number)
 );
@@ -333,6 +339,7 @@ CREATE TABLE maintenance_costs (
     description VARCHAR(255),
     amount DECIMAL(10,2) NOT NULL,
     recorded_date DATE NOT NULL,
+    status ENUM('active', 'voided') DEFAULT 'active',
     FOREIGN KEY (request_id) REFERENCES maintenance_requests(request_id) ON DELETE CASCADE,
     UNIQUE KEY unique_cost_entry (request_id, description(255), amount, recorded_date)
 );

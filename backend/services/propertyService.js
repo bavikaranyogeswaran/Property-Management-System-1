@@ -35,11 +35,12 @@ class PropertyService {
   }
 
   async deleteProperty(id) {
-    // Validation: Check for existing units
+    // Validation: Check for existing units that are NOT archived
     const units = await unitModel.findByPropertyId(id);
-    if (units.length > 0) {
+    const activeUnits = units.filter(u => !u.is_archived);
+    if (activeUnits.length > 0) {
       throw new Error(
-        'Cannot delete property with existing units. Please remove units first.'
+        'Cannot delete property with existing active units. Please remove or archive units first.'
       );
     }
 

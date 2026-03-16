@@ -47,7 +47,7 @@ class UnitModel {
             FROM units u
             JOIN properties p ON u.property_id = p.property_id
             JOIN unit_types ut ON u.unit_type_id = ut.type_id
-            WHERE u.deleted_at IS NULL
+            WHERE u.is_archived = FALSE
             ORDER BY u.created_at DESC
         `);
     return this.mapRows(rows);
@@ -67,7 +67,7 @@ class UnitModel {
             FROM units u
             JOIN properties p ON u.property_id = p.property_id
             JOIN unit_types ut ON u.unit_type_id = ut.type_id
-            WHERE u.unit_id = ? AND u.deleted_at IS NULL
+            WHERE u.unit_id = ? AND u.is_archived = FALSE
         `,
       [id]
     );
@@ -90,7 +90,7 @@ class UnitModel {
             FROM units u
             JOIN properties p ON u.property_id = p.property_id
             JOIN unit_types ut ON u.unit_type_id = ut.type_id
-            WHERE u.unit_id = ? AND u.deleted_at IS NULL
+            WHERE u.unit_id = ? AND u.is_archived = FALSE
             FOR UPDATE
         `,
       [id]
@@ -113,7 +113,7 @@ class UnitModel {
             FROM units u
             JOIN properties p ON u.property_id = p.property_id
             JOIN unit_types ut ON u.unit_type_id = ut.type_id
-            WHERE u.property_id = ? AND u.deleted_at IS NULL
+            WHERE u.property_id = ? AND u.is_archived = FALSE
             ORDER BY u.unit_number ASC
         `,
       [propertyId]
@@ -152,7 +152,7 @@ class UnitModel {
 
     const dbConn = connection || db;
     const [result] = await dbConn.query(
-      `UPDATE units SET ${fields.join(', ')} WHERE unit_id = ? AND deleted_at IS NULL`,
+      `UPDATE units SET ${fields.join(', ')} WHERE unit_id = ? AND is_archived = FALSE`,
       values
     );
     return result.affectedRows > 0;
@@ -160,7 +160,7 @@ class UnitModel {
 
   async delete(id) {
     const [result] = await db.query(
-      "UPDATE units SET deleted_at = NOW(), status = 'inactive' WHERE unit_id = ?",
+      "UPDATE units SET archived_at = NOW(), is_archived = TRUE, status = 'inactive' WHERE unit_id = ?",
       [id]
     );
     return result.affectedRows > 0;
@@ -207,7 +207,7 @@ class UnitModel {
 
   async countOccupied(propertyId) {
     const [rows] = await db.query(
-      "SELECT COUNT(*) as count FROM units WHERE property_id = ? AND deleted_at IS NULL AND status IN ('occupied', 'maintenance')",
+      "SELECT COUNT(*) as count FROM units WHERE property_id = ? AND is_archived = FALSE AND status IN ('occupied', 'maintenance')",
       [propertyId]
     );
     return rows[0].count;
@@ -226,7 +226,7 @@ class UnitModel {
         GROUP_CONCAT(CASE WHEN u.status != 'occupied' THEN u.unit_number ELSE NULL END) AS vacancies
       FROM units u
       LEFT JOIN properties p ON u.property_id = p.property_id
-      WHERE u.property_id IN (?) AND u.deleted_at IS NULL
+      WHERE u.property_id IN (?) AND u.is_archived = FALSE
       GROUP BY u.property_id
       `,
       [propertyIds]
