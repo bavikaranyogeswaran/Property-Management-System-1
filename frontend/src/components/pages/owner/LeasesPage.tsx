@@ -30,7 +30,6 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   FileText,
-  Plus,
   Eye,
   Calendar,
   DollarSign,
@@ -42,17 +41,6 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { leaseSchema, type LeaseFormValues } from '@/schemas/ownerSchemas';
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form';
 import apiClient from '@/services/api';
 
 // ============================================================================
@@ -68,61 +56,13 @@ export function LeasesPage() {
     leases,
     units,
     properties,
-    addLease,
     endLease,
     renewLease,
     refundDeposit,
     updateLeaseDocument,
   } = useApp();
-  const [isAddLeaseDialogOpen, setIsAddLeaseDialogOpen] = useState(false);
   const [selectedLease, setSelectedLease] = useState<Lease | null>(null);
 
-  const leaseForm = useForm<LeaseFormValues>({
-    resolver: zodResolver(leaseSchema),
-    defaultValues: {
-      tenantId: '',
-      unitId: '',
-      startDate: '',
-      endDate: '',
-      monthlyRent: 0,
-    },
-  });
-
-  const onSubmit = async (values: LeaseFormValues) => {
-    const unit = units.find((u) => u.id === values.unitId);
-    if (unit?.status === 'occupied') {
-      toast.error('This unit is already occupied');
-      return;
-    }
-
-    try {
-      let documentUrl = values.documentUrl;
-      const fileInput = document.getElementById('lease-document') as HTMLInputElement;
-      if (fileInput && fileInput.files && fileInput.files[0]) {
-        const formData = new FormData();
-        formData.append('file', fileInput.files[0]);
-        const uploadRes = await apiClient.post('/upload', formData, {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-        });
-        documentUrl = uploadRes.data.url;
-      }
-
-      await addLease({
-        ...values,
-        monthlyRent: values.monthlyRent,
-        documentUrl,
-        status: 'active',
-      });
-
-      toast.success('Lease created successfully');
-      setIsAddLeaseDialogOpen(false);
-      leaseForm.reset();
-    } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Failed to create lease');
-    }
-  };
 
   const handleDocumentUpdate = async (leaseId: string, e: React.ChangeEvent<HTMLInputElement>) => {
     try {
@@ -162,6 +102,7 @@ export function LeasesPage() {
     today.getTime() + 30 * 24 * 60 * 60 * 1000
   );
   const expiringSoon = activeLeases.filter((lease) => {
+    if (!lease.endDate) return false;
     const endDate = new Date(lease.endDate);
     return endDate <= thirtyDaysFromNow && endDate >= today;
   });
@@ -202,11 +143,11 @@ export function LeasesPage() {
       : null;
 
     // Check if expiring soon
-    const endDate = new Date(lease.endDate);
-    const isExpiringSoon =
-      lease.status === 'active' &&
-      endDate <= thirtyDaysFromNow &&
-      endDate >= today;
+    let isExpiringSoon = false;
+    if (lease.status === 'active' && lease.endDate) {
+      const endDate = new Date(lease.endDate);
+      isExpiringSoon = endDate <= thirtyDaysFromNow && endDate >= today;
+    }
 
     return (
       <TableRow key={lease.id} className={isExpiringSoon ? 'bg-orange-50' : ''}>
@@ -285,8 +226,10 @@ export function LeasesPage() {
                   onClick={() => {
                     setRenewLeaseId(lease.id);
                     setRenewDate(
-                      new Date(lease.endDate).toISOString().split('T')[0]
-                    ); // Default to current end date
+                      lease.endDate 
+                        ? new Date(lease.endDate).toISOString().split('T')[0]
+                        : new Date().toISOString().split('T')[0]
+                    ); 
                     setRenewRent(lease.monthlyRent.toString());
                   }}
                   className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
@@ -400,93 +343,6 @@ export function LeasesPage() {
             Manage rental agreements and lease contracts
           </p>
         </div>
-        <Dialog
-          open={isAddLeaseDialogOpen}
-          onOpenChange={setIsAddLeaseDialogOpen}
-        >
-          <DialogTrigger asChild>
-            <Button onClick={() => leaseForm.reset()}>
-              <Plus className="size-4 mr-2" />
-              Create Lease
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-h-[90vh] overflow-y-auto">
-            {/* ... existing form content ... */}
-            <DialogHeader>
-              <DialogTitle>Create New Lease</DialogTitle>
-            </DialogHeader>
-            <Form {...leaseForm}>
-              <form
-                onSubmit={leaseForm.handleSubmit(onSubmit)}
-                className="space-y-4 mt-4"
-              >
-                  <FormField
-                    control={leaseForm.control}
-                    name="monthlyRent"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Monthly Rent (LKR)</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            {...field}
-                            onChange={(e) =>
-                              field.onChange(
-                                e.target.value === ''
-                                  ? ''
-                                  : Number(e.target.value)
-                              )
-                            }
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  {/* Lease Document Upload */}
-                  <FormItem>
-                    <FormLabel>Lease Document (PDF)</FormLabel>
-                    <FormControl>
-                      <Input
-                        id="lease-document"
-                        type="file"
-                        accept=".pdf,.doc,.docx"
-                      />
-                    </FormControl>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Upload the signed lease agreement (optional).
-                    </p>
-                  </FormItem>
-
-                  <div className="flex justify-end gap-2 pt-4">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setIsAddLeaseDialogOpen(false)}
-                    >
-                      Cancel
-                    </Button>
-                    <Button type="submit">Create Lease</Button>
-                  </div>
-                {/* I need to make sure I don't delete the form content. 
-                     Since I am checking LeasesPage content, it controls the DialogContent.
-                     Wait, replace_file_content replaces the whole block. 
-                     I should use a separate replace for Layout vs Logic? 
-                     Current strategy: I am replacing the RETURN block or just appending Dialogs?
-                     The file is large. I should inject the Dialogs at the end and the buttons in the Row.
-                     
-                     Let's STOP and do it in chunks.
-                     1. Add State and Handlers at top.
-                     2. Add Buttons to LeaseRow.
-                     3. Add Dialogs at bottom.
-                 */}
-              </form>
-            </Form>
-          </DialogContent>
-        </Dialog>
       </div>
 
       {/* Stats */}
@@ -656,11 +512,15 @@ export function LeasesPage() {
 
               // Calculate lease duration
               const startDate = new Date(selectedLease.startDate);
-              const endDate = new Date(selectedLease.endDate);
-              const durationMonths = Math.round(
-                (endDate.getTime() - startDate.getTime()) /
-                  (1000 * 60 * 60 * 24 * 30)
-              );
+              let durationMonths: number | null = null;
+              
+              if (selectedLease.endDate) {
+                const endDate = new Date(selectedLease.endDate);
+                durationMonths = Math.round(
+                  (endDate.getTime() - startDate.getTime()) /
+                    (1000 * 60 * 60 * 24 * 30)
+                );
+              }
 
               return (
                 <div className="space-y-6 mt-4">
@@ -734,7 +594,7 @@ export function LeasesPage() {
                       </div>
                       <div>
                         <p className="text-sm text-gray-600">Lease Duration</p>
-                        <p className="font-medium">{durationMonths} months</p>
+                        <p className="font-medium">{durationMonths !== null ? `${durationMonths} months` : 'Periodic (Indefinite)'}</p>
                       </div>
                       <div>
                         <p className="text-sm text-gray-600">Monthly Rent</p>
