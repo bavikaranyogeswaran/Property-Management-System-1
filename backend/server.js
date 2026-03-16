@@ -31,7 +31,18 @@ const PORT = process.env.PORT || 3000;
 //  - JSON: Translates incoming messages into a language the app matches (JavaScript Objects).
 // ============================================================================
 app.use(cors());
-app.use(helmet()); // Added Helmet for security headers
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' }, // Allow images/files to be accessed by frontend
+    contentSecurityPolicy: {
+      directives: {
+        ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+        'frame-ancestors': ["'self'", 'http://localhost:5173'], // Allow frontend to frame backend content
+        'img-src': ["'self'", 'data:', 'http://localhost:3000'], // Allow images from backend
+      },
+    },
+  })
+);
 app.use(json());
 app.use(xss()); // Add XSS protection
 
