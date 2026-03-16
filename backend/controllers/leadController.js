@@ -44,7 +44,10 @@ class LeadController {
         id,
         startDate,
         endDate,
-        tenantData
+        {
+          ...tenantData,
+          documentUrl: req.body.documentUrl
+        }
       );
       res.status(200).json(result);
     } catch (error) {

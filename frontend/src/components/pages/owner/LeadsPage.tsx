@@ -49,6 +49,7 @@ import {
 } from 'lucide-react';
 import { ChatInterface } from '@/components/common/ChatInterface';
 import { toast } from 'sonner';
+import apiClient from '@/services/api';
 
 export function LeadsPage() {
   const navigate = useNavigate();
@@ -75,7 +76,10 @@ export function LeadsPage() {
     unitId: '',
     leaseTermId: '',
     ignoreRenewalConflict: false,
+    documentUrl: '',
   });
+
+  const [isUploading, setIsUploading] = useState(false);
 
   const handleStatusChange = async (leadId: string, status: Lead['status']) => {
     const lead = leads.find((l) => l.id === leadId);
@@ -155,6 +159,34 @@ export function LeadsPage() {
     }
   }, [conversionData.leaseTermId, conversionData.startDate, leaseTerms]);
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    try {
+      if (!e.target.files || !e.target.files[0]) return;
+      
+      setIsUploading(true);
+      const loadingToastId = toast.loading("Uploading lease document...");
+      
+      const formData = new FormData();
+      formData.append('file', e.target.files[0]);
+      
+      const uploadRes = await apiClient.post('/upload', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      
+      setConversionData(prev => ({ ...prev, documentUrl: uploadRes.data.url }));
+      
+      toast.dismiss(loadingToastId);
+      toast.success("Document uploaded successfully");
+    } catch(err) {
+      toast.dismiss();
+      toast.error('Failed to upload document');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const handleConvert = async () => {
     if (!selectedLead) return;
 
@@ -166,6 +198,7 @@ export function LeadsPage() {
         {
           unitId: conversionData.unitId || undefined,
           leaseTermId: conversionData.leaseTermId || undefined,
+          documentUrl: conversionData.documentUrl || undefined,
         }
       );
       toast.success('Lead converted to tenant successfully');
@@ -178,6 +211,7 @@ export function LeadsPage() {
         unitId: '',
         leaseTermId: '',
         ignoreRenewalConflict: false,
+        documentUrl: '',
       });
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to convert lead');
@@ -765,6 +799,29 @@ export function LeadsPage() {
                   )}
                 </div>
               )}
+            </div>
+            
+            {/* Document Upload */}
+            <div className="space-y-2 pt-2 border-t">
+              <Label>Lease Document</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="file"
+                  accept=".pdf,.doc,.docx"
+                  onChange={handleFileUpload}
+                  disabled={isUploading}
+                  className="cursor-pointer"
+                />
+              </div>
+              {conversionData.documentUrl && (
+                <p className="text-xs text-green-600 flex items-center gap-1">
+                  <CheckCircle className="size-3" />
+                  Document attached
+                </p>
+              )}
+              <p className="text-[10px] text-gray-500">
+                Optional: Upload the signed rental agreement now.
+              </p>
             </div>
 
             <div className="flex gap-2 justify-end">

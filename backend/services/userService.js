@@ -290,6 +290,7 @@ class UserService {
               leaseTermId: leaseTermId,
               monthlyRent: unit.monthlyRent,
               securityDeposit: unit.monthlyRent, // Default 1 month deposit
+              documentUrl: tenantData.documentUrl || null,
             },
             connection
           );
