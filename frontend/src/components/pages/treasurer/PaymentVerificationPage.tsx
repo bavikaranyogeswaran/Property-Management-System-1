@@ -135,8 +135,7 @@ export function PaymentVerificationPage() {
                     variant="outline"
                     className="w-full bg-white hover:bg-blue-50 text-blue-700 border-blue-200"
                     onClick={() => {
-                      const url = payment.proofUrl?.startsWith('http') ? payment.proofUrl : `http://localhost:3000/${payment.proofUrl?.replace(/\\/g, '/')}`;
-                      window.open(url, '_blank');
+                      if (payment.proofUrl) window.open(payment.proofUrl, '_blank');
                     }}
                   >
                     <ExternalLink className="size-4 mr-2" />

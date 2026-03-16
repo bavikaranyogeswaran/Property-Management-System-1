@@ -67,7 +67,7 @@ export function TenantMaintenancePage() {
     setSelectedImages((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!tenantUnit) {
@@ -75,27 +75,30 @@ export function TenantMaintenancePage() {
       return;
     }
 
-    // Simulate image upload by creating local URLs
-    const imageUrls = selectedImages.map((file) => URL.createObjectURL(file));
+    const submissionData = new FormData();
+    submissionData.append('unitId', tenantUnit.id);
+    submissionData.append('title', formData.title);
+    submissionData.append('description', formData.description);
+    submissionData.append('priority', formData.priority);
 
-    addMaintenanceRequest({
-      tenantId: 'tenant-1', // In real app, use actual tenant ID
-      unitId: tenantUnit.id,
-      title: formData.title,
-      description: formData.description,
-      priority: formData.priority,
-      status: 'submitted',
-      images: imageUrls.length > 0 ? imageUrls : undefined,
+    selectedImages.forEach((file) => {
+      submissionData.append('images', file);
     });
 
-    toast.success('Maintenance request submitted successfully');
-    setIsAddDialogOpen(false);
-    setFormData({
-      title: '',
-      description: '',
-      priority: 'medium',
-    });
-    setSelectedImages([]);
+    try {
+      await addMaintenanceRequest(submissionData as any);
+      toast.success('Maintenance request submitted successfully');
+      setIsAddDialogOpen(false);
+      setFormData({
+        title: '',
+        description: '',
+        priority: 'medium',
+      });
+      setSelectedImages([]);
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to submit maintenance request');
+    }
   };
 
   const getStatusBadge = (status: MaintenanceRequest['status']) => {

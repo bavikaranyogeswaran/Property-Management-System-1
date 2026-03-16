@@ -370,11 +370,7 @@ export function OwnerPaymentsPage() {
           {proofImage && (
             <div className="flex justify-center">
               <img
-                src={
-                  proofImage.startsWith('http')
-                    ? proofImage
-                    : `http://localhost:3000/${proofImage.replace(/\\/g, '/')}`
-                }
+                src={proofImage}
                 alt="Payment proof"
                 className="max-w-full max-h-[60vh] rounded-lg border object-contain"
               />

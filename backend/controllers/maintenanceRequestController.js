@@ -11,7 +11,14 @@ class MaintenanceRequestController {
   //  REPORT ISSUE: Tenant says "Something is broken".
   async createRequest(req, res) {
     try {
-      const requestId = await maintenanceService.createRequest(req.body, req.user.id);
+      const data = { ...req.body };
+      if (req.files) {
+        data.images = req.files.map((file) => file.path || file.secure_url);
+      }
+      const requestId = await maintenanceService.createRequest(
+        data,
+        req.user.id
+      );
       res
         .status(201)
         .json({ message: 'Maintenance request created', requestId });

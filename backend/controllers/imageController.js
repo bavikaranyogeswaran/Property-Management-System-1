@@ -2,6 +2,28 @@ import propertyImageModel from '../models/propertyImageModel.js';
 import propertyModel from '../models/propertyModel.js';
 import unitModel from '../models/unitModel.js';
 import unitImageModel from '../models/unitImageModel.js';
+import { v2 as cloudinary } from 'cloudinary';
+
+// Configure Cloudinary for deletion (pattern matching upload.js)
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+// Helper to extract Cloudinary public_id from URL
+const extractPublicId = (url) => {
+  if (!url || !url.includes('cloudinary.com')) return null;
+  // URL format: .../upload/v12345/pms_uploads/filename.ext
+  const parts = url.split('/');
+  const uploadIndex = parts.indexOf('upload');
+  if (uploadIndex === -1) return null;
+  
+  // Public ID starts after the version (v12345)
+  // Everything after upload/v... until the last dot
+  const publicIdWithExt = parts.slice(uploadIndex + 2).join('/');
+  return publicIdWithExt.split('.')[0];
+};
 
 class ImageController {
   // General File Upload
@@ -101,10 +123,29 @@ class ImageController {
   async deletePropertyImage(req, res) {
     try {
       const { imageId } = req.params;
+      
+      // Get image details first to get the URL
+      const [rows] = await (await import('../config/db.js')).default.query(
+          'SELECT image_url FROM property_images WHERE image_id = ?',
+          [imageId]
+      );
+      
+      const imageUrl = rows[0]?.image_url;
       const success = await propertyImageModel.deleteById(imageId);
 
       if (!success) {
         return res.status(404).json({ error: 'Image not found' });
+      }
+
+      // Cleanup Cloudinary
+      const publicId = extractPublicId(imageUrl);
+      if (publicId) {
+        try {
+          await cloudinary.uploader.destroy(publicId);
+          console.log(`Cloudinary asset deleted: ${publicId}`);
+        } catch (cloudinaryErr) {
+          console.error(`Failed to delete Cloudinary asset ${publicId}:`, cloudinaryErr);
+        }
       }
 
       res.json({ message: 'Image deleted' });
@@ -194,10 +235,29 @@ class ImageController {
   async deleteUnitImage(req, res) {
     try {
       const { imageId } = req.params;
+
+      // Get image details first to get the URL
+      const [rows] = await (await import('../config/db.js')).default.query(
+          'SELECT image_url FROM unit_images WHERE image_id = ?',
+          [imageId]
+      );
+      
+      const imageUrl = rows[0]?.image_url;
       const success = await unitImageModel.deleteById(imageId);
 
       if (!success) {
         return res.status(404).json({ error: 'Image not found' });
+      }
+
+      // Cleanup Cloudinary
+      const publicId = extractPublicId(imageUrl);
+      if (publicId) {
+        try {
+          await cloudinary.uploader.destroy(publicId);
+          console.log(`Cloudinary asset deleted: ${publicId}`);
+        } catch (cloudinaryErr) {
+          console.error(`Failed to delete Cloudinary asset ${publicId}:`, cloudinaryErr);
+        }
       }
 
       res.json({ message: 'Image deleted' });

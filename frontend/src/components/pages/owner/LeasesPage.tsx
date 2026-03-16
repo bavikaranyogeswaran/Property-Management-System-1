@@ -620,10 +620,7 @@ export function LeasesPage() {
                           size="sm"
                           onClick={() => {
                             if (selectedLease.documentUrl) {
-                              const url = selectedLease.documentUrl.startsWith('http') 
-                                ? selectedLease.documentUrl 
-                                : `http://localhost:3000${selectedLease.documentUrl}`;
-                              window.open(url, '_blank');
+                              window.open(selectedLease.documentUrl, '_blank');
                             }
                           }}
                         >

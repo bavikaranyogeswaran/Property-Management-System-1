@@ -38,7 +38,8 @@ app.use(
       directives: {
         ...helmet.contentSecurityPolicy.getDefaultDirectives(),
         'frame-ancestors': ["'self'", 'http://localhost:5173'], // Allow frontend to frame backend content
-        'img-src': ["'self'", 'data:', 'http://localhost:3000'], // Allow images from backend
+        'img-src': ["'self'", 'data:', 'http://localhost:3000', 'https://res.cloudinary.com'],
+        'connect-src': ["'self'", 'http://localhost:3000', 'https://api.cloudinary.com', 'https://res.cloudinary.com'],
       },
     },
   })
