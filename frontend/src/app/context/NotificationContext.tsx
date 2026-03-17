@@ -40,17 +40,19 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     if (!user) return;
     try {
       const res = await notificationApi.getNotifications();
-      if (res.data) {
-        const backendNotifs = res.data.map((n: any) => ({
-          id: n.notification_id.toString(),
-          type: n.type,
-          title: n.type === 'maintenance' ? 'Maintenance Update' : 'Notification',
-          message: n.message,
-          targetRole: 'both',
-          severity: 'info',
-          createdAt: n.created_at,
-          read: Boolean(n.is_read),
-        }));
+      if (res.data && Array.isArray(res.data)) {
+        const backendNotifs = res.data
+          .filter((n: any) => n && n.notification_id !== undefined && n.notification_id !== null)
+          .map((n: any) => ({
+            id: n.notification_id.toString(),
+            type: n.type || 'system',
+            title: n.type === 'maintenance' ? 'Maintenance Update' : 'Notification',
+            message: n.message || 'No message content',
+            targetRole: n.target_role || 'both',
+            severity: n.severity || 'info',
+            createdAt: n.created_at || new Date().toISOString(),
+            read: Boolean(n.is_read),
+          }));
         setNotifications(prev => {
           const local = prev.filter(n => n.id.startsWith('notif-'));
           return [...local, ...backendNotifs];
@@ -68,7 +70,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     const generatedNotifications: Notification[] = [];
 
     leases.forEach((lease) => {
-      if (lease.status !== 'active') return;
+      if (lease.status !== 'active' || !lease.endDate) return;
       const endDate = new Date(lease.endDate);
       const daysUntilExpiry = Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
       if (daysUntilExpiry < 0) return;
@@ -99,7 +101,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
             unitId: lease.unitId,
             severity,
             createdAt: today.toISOString(),
-            expiresAt: lease.endDate,
+            expiresAt: lease.endDate || undefined,
             daysUntilExpiry,
             read: false,
           });

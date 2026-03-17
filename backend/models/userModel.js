@@ -10,7 +10,7 @@ import pool from '../config/db.js';
 class UserModel {
   async findByEmail(email, connection = null) {
     const db = connection || pool;
-    const [rows] = await db.query('SELECT * FROM users WHERE email = ? AND is_archived = FALSE', [
+    const [rows] = await db.query('SELECT *, user_id as id FROM users WHERE email = ? AND is_archived = FALSE', [
       email,
     ]);
     return rows[0];
@@ -113,7 +113,7 @@ class UserModel {
     // We first fetch the user to know the role, or we just LEFT JOIN everything.
     // Joining everything is safer to fetch all data in one go.
     const query = `
-            SELECT u.*, 
+            SELECT u.*, u.user_id as id,
                    t.nic as tenant_nic, t.monthly_income, t.nic_url as nicUrl,
                    o.nic as owner_nic, o.tin, o.bank_name, o.account_number,
                    s.employee_id, s.job_title

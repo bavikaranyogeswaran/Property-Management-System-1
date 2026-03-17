@@ -20,6 +20,7 @@ router.post(
 );
 
 // Update own profile (Specific route must come before generic /:id)
+router.get('/profile', authenticateToken, userController.getProfile);
 router.put(
   '/profile',
   authenticateToken,

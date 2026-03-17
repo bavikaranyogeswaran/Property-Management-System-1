@@ -52,10 +52,12 @@ export function ReceiptsPage() {
     console.log('User:', user);
     console.log('Receipts (Total):', receipts);
 
-    if (user?.role === 'tenant') {
+    if (user?.role === 'tenant' && user.id) {
       console.log('Filtering for tenant ID:', user.id);
+      const userIdStr = String(user.id);
       const filtered = receipts.filter((r) => {
-        const match = r.tenantId === user.id.toString();
+        const receiptTenantId = r.tenantId ? String(r.tenantId) : '';
+        const match = receiptTenantId === userIdStr;
         console.log(
           `Receipt ${r.id}: tenantId=${r.tenantId}, user.id=${user.id} -> Match? ${match}`
         );

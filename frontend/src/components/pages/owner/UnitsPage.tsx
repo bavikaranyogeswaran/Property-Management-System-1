@@ -294,9 +294,10 @@ export function UnitsPage() {
     return true;
   });
 
-  const getStatusBadge = (status: Unit['status']) => {
+  const getStatusBadge = (status: string) => {
+    const s = (status || '').toLowerCase();
     const variants: Record<
-      Unit['status'],
+      string,
       {
         variant: 'default' | 'secondary' | 'destructive' | 'outline';
         label: string;
@@ -306,7 +307,7 @@ export function UnitsPage() {
       occupied: { variant: 'secondary', label: 'Occupied' },
       maintenance: { variant: 'outline', label: 'Maintenance' },
     };
-    return variants[status];
+    return variants[s] || { variant: 'outline', label: status || 'Unknown' };
   };
 
   const stats = [
