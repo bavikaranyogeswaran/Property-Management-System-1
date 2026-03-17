@@ -142,11 +142,18 @@ class UserModel {
     // Use provided connection or default pool (for non-transactional calls)
     const db = connection || pool;
 
-    const [result] = await db.query(
-      'INSERT INTO users (name, email, phone, password_hash, role, is_email_verified, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [name, email, phone, passwordHash, role, is_email_verified, status]
-    );
-    return result.insertId;
+    try {
+      const [result] = await db.query(
+        'INSERT INTO users (name, email, phone, password_hash, role, is_email_verified, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [name, email, phone, passwordHash, role, is_email_verified, status]
+      );
+      return result.insertId;
+    } catch (error) {
+      if (error.code === 'ER_DUP_ENTRY') {
+        throw new Error('Email address is already in use.');
+      }
+      throw error;
+    }
   }
 
   async countByRole(role) {

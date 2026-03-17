@@ -29,7 +29,7 @@ class UserService {
       // Better to use connection if possible, but finding by email is just a read.
       // However, concurrent inserts might race.
       // For now, simple read is fine.
-      const existingUser = await userModel.findByEmail(email);
+      const existingUser = await userModel.findByEmail(email, connection);
       if (existingUser) {
         throw new Error('Email already in use');
       }
@@ -233,7 +233,7 @@ class UserService {
       );
 
       // 4a. Invalidate portal access tokens
-      await leadTokenModel.invalidateForLead(leadId);
+      await leadTokenModel.invalidateForLead(leadId, connection);
 
       // 4b. Record stage history (positional args: leadId, fromStatus, toStatus, notes, connection)
       const leadStageHistoryModel = (await import('../models/leadStageHistoryModel.js')).default;
@@ -265,7 +265,7 @@ class UserService {
           const leaseTermId = tenantData.leaseTermId || lead.leaseTermId;
           let leaseTerm = null;
           if (leaseTermId) {
-            leaseTerm = await leaseTermModel.findById(leaseTermId);
+            leaseTerm = await leaseTermModel.findById(leaseTermId, connection);
           }
 
           if (leaseTerm && leaseTerm.type === 'periodic') {
