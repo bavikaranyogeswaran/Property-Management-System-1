@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { toast } from 'sonner';
 
 interface ImageFile {
   file: File;
@@ -39,7 +40,7 @@ export function MultiImageUpload({
     const remaining = maxImages - (images.length + existingImages.length);
 
     if (files.length > remaining) {
-      alert(`You can only upload ${remaining} more image(s)`);
+      toast.error(`You can only upload ${remaining} more image(s)`);
       return;
     }
 

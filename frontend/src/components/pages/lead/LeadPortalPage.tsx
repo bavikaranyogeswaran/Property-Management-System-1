@@ -18,6 +18,7 @@ import {
   MessageSquare,
 } from 'lucide-react';
 import { API_BASE_URL } from '@/services/api';
+import { toast } from 'sonner';
 
 // ============================================================================
 //  LEAD PORTAL PAGE (Guest Access via Token Link)
@@ -201,10 +202,10 @@ export function LeadPortalPage() {
         };
       });
       setIsEditingPrefs(false);
-      alert('Preferences updated successfully!');
+      toast.success('Preferences updated successfully!');
     } catch (err: any) {
       const msg = err.response?.data?.error || 'Failed to update preferences';
-      alert(msg);
+      toast.error(msg);
     } finally {
       setSavingPrefs(false);
     }
@@ -229,7 +230,7 @@ export function LeadPortalPage() {
       setNewMessage('');
     } catch (err: any) {
       const msg = err.response?.data?.error || 'Failed to send message';
-      alert(msg);
+      toast.error(msg);
     } finally {
       setSending(false);
     }
