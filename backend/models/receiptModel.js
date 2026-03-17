@@ -1,7 +1,7 @@
 import pool from '../config/db.js';
 
 class ReceiptModel {
-  async create(data) {
+  async create(data, connection = null) {
     const {
       paymentId,
       invoiceId,
@@ -13,7 +13,8 @@ class ReceiptModel {
     // generatedDate becomes receipt_date. Ensure valid date linked to payment.
     const dateValue = generatedDate ? new Date(generatedDate) : new Date();
 
-    const [result] = await pool.query(
+    const db = connection || pool;
+    const [result] = await db.query(
       'INSERT INTO receipts (payment_id, amount, receipt_date, receipt_number) VALUES (?, ?, ?, ?)',
       [paymentId, amount, dateValue, receiptNumber]
     );

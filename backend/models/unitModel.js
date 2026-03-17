@@ -53,8 +53,9 @@ class UnitModel {
     return this.mapRows(rows);
   }
 
-  async findById(id) {
-    const [rows] = await db.query(
+  async findById(id, connection = null) {
+    const dbConn = connection || db;
+    const [rows] = await dbConn.query(
       `
             SELECT u.*, 
                    p.name as property_name, 

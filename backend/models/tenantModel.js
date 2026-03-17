@@ -110,7 +110,8 @@ class TenantModel {
     monthlyIncome: 'monthly_income',
   };
 
-  async update(userId, data) {
+  async update(userId, data, connection = null) {
+    const db = connection || pool;
     const fields = [];
     const values = [];
 
@@ -125,22 +126,24 @@ class TenantModel {
     if (fields.length === 0) return false;
 
     values.push(userId);
-    const [result] = await pool.query(
+    const [result] = await db.query(
       `UPDATE tenants SET ${fields.join(', ')} WHERE user_id = ?`,
       values
     );
     return result.affectedRows > 0;
   }
 
-  async addCredit(userId, amount) {
-    await pool.query(
+  async addCredit(userId, amount, connection = null) {
+    const db = connection || pool;
+    await db.query(
       'UPDATE tenants SET credit_balance = credit_balance + ? WHERE user_id = ?',
       [amount, userId]
     );
   }
 
-  async deductCredit(userId, amount) {
-    await pool.query(
+  async deductCredit(userId, amount, connection = null) {
+    const db = connection || pool;
+    await db.query(
       'UPDATE tenants SET credit_balance = credit_balance - ? WHERE user_id = ?',
       [amount, userId]
     );

@@ -81,9 +81,10 @@ class InvoiceModel {
     return rows[0].total || 0;
   }
 
-  async findById(id) {
+  async findById(id, connection = null) {
+    const db = connection || pool;
     // Join with leases to get tenant_id for scoring hooks
-    const [rows] = await pool.query(
+    const [rows] = await db.query(
       `
             SELECT ri.*, l.tenant_id,
                    COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id = ri.invoice_id AND status = 'verified'), 0) AS amount_paid
@@ -162,19 +163,20 @@ class InvoiceModel {
     return rows;
   }
 
-  async updateStatus(id, status) {
-    await pool.query(
+  async updateStatus(id, status, connection = null) {
+    const db = connection || pool;
+    await db.query(
       'UPDATE rent_invoices SET status = ? WHERE invoice_id = ?',
       [status, id]
     );
-    return this.findById(id);
+    return this.findById(id, db);
   }
 
-  async createLateFeeInvoice(data) {
+  async createLateFeeInvoice(data, connection = null) {
     return await this.create({
       ...data,
       type: 'late_fee',
-    });
+    }, connection);
   }
 
   async findOverdue(gracePeriodDays = 5) {
@@ -208,8 +210,9 @@ class InvoiceModel {
     );
     return rows;
   }
-  async syncFutureRentInvoices(leaseId, newAmount, fromDate) {
-    await pool.query(
+  async syncFutureRentInvoices(leaseId, newAmount, fromDate, connection = null) {
+    const db = connection || pool;
+    await db.query(
       `UPDATE rent_invoices 
              SET amount = ?, description = CONCAT(description, ' (Rent Adjusted)')
              WHERE lease_id = ? 
@@ -220,8 +223,9 @@ class InvoiceModel {
     );
   }
 
-  async voidPendingByLeaseId(leaseId) {
-    await pool.query(
+  async voidPendingByLeaseId(leaseId, connection = null) {
+    const db = connection || pool;
+    await db.query(
       "UPDATE rent_invoices SET status='void' WHERE lease_id = ? AND status='pending'",
       [leaseId]
     );
@@ -233,8 +237,9 @@ class InvoiceModel {
       [leaseId, date]
     );
   }
-  async findPendingDebts(leaseId) {
-    const [rows] = await pool.query(
+  async findPendingDebts(leaseId, connection = null) {
+    const db = connection || pool;
+    const [rows] = await db.query(
       `SELECT *, COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id = rent_invoices.invoice_id AND status = 'verified'), 0) AS amount_paid FROM rent_invoices WHERE lease_id = ? AND status IN ('pending', 'partially_paid') ORDER BY due_date ASC`,
       [leaseId]
     );

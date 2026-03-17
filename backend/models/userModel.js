@@ -8,8 +8,9 @@
 import pool from '../config/db.js';
 
 class UserModel {
-  async findByEmail(email) {
-    const [rows] = await pool.query('SELECT * FROM users WHERE email = ? AND is_archived = FALSE', [
+  async findByEmail(email, connection = null) {
+    const db = connection || pool;
+    const [rows] = await db.query('SELECT * FROM users WHERE email = ? AND is_archived = FALSE', [
       email,
     ]);
     return rows[0];
@@ -107,7 +108,8 @@ class UserModel {
     return rows;
   }
 
-  async findById(id) {
+  async findById(id, connection = null) {
+    const db = connection || pool;
     // We first fetch the user to know the role, or we just LEFT JOIN everything.
     // Joining everything is safer to fetch all data in one go.
     const query = `
@@ -121,7 +123,7 @@ class UserModel {
             LEFT JOIN staff s ON u.user_id = s.user_id
             WHERE u.user_id = ? AND u.is_archived = FALSE
         `;
-    const [rows] = await pool.query(query, [id]);
+    const [rows] = await db.query(query, [id]);
     return rows[0];
   }
 
@@ -155,20 +157,22 @@ class UserModel {
     return rows[0].count;
   }
 
-  async update(id, updateData) {
+  async update(id, updateData, connection = null) {
+    const db = connection || pool;
     const { name, email, phone, status } = updateData;
     // Build query dynamically based on provided fields?
     // For simplicity now, we assume these specific fields are passed.
     // If password update is needed later, separate method is better.
-    const [result] = await pool.query(
+    const [result] = await db.query(
       'UPDATE users SET name = ?, email = ?, phone = ?, status = ? WHERE user_id = ? AND is_archived = FALSE',
       [name, email, phone, status, id]
     );
     return result.affectedRows > 0;
   }
 
-  async updatePassword(id, passwordHash) {
-    const [result] = await pool.query(
+  async updatePassword(id, passwordHash, connection = null) {
+    const db = connection || pool;
+    const [result] = await db.query(
       'UPDATE users SET password_hash = ? WHERE user_id = ?',
       [passwordHash, id]
     );
@@ -184,7 +188,8 @@ class UserModel {
     return result.affectedRows > 0;
   }
 
-  async delete(id) {
+  async delete(id, connection = null) {
+    const db = connection || pool;
     // Soft delete to preserve financial history and audit trail
     const user = await this.findById(id);
     if (!user) return false;
@@ -192,22 +197,24 @@ class UserModel {
     // Archive email to allow reusing the same email for new registrations
     const archivedEmail = `deleted_${id}_${Date.now()}_${user.email}`.substring(0, 100);
 
-    const [result] = await pool.query(
+    const [result] = await db.query(
       'UPDATE users SET archived_at = NOW(), is_archived = TRUE, email = ?, status = ?, name = CONCAT(name, " (Deleted)") WHERE user_id = ?',
       [archivedEmail, 'inactive', id]
     );
     return result.affectedRows > 0;
   }
-  async verifyEmail(id) {
-    const [result] = await pool.query(
+  async verifyEmail(id, connection = null) {
+    const db = connection || pool;
+    const [result] = await db.query(
       'UPDATE users SET is_email_verified = TRUE, email_verified_at = NOW(), status = "active" WHERE user_id = ?',
       [id]
     );
     return result.affectedRows > 0;
   }
 
-  async setupPassword(id, passwordHash) {
-    const [result] = await pool.query(
+  async setupPassword(id, passwordHash, connection = null) {
+    const db = connection || pool;
+    const [result] = await db.query(
       'UPDATE users SET password_hash = ?, is_email_verified = TRUE, email_verified_at = NOW(), status = "active" WHERE user_id = ?',
       [passwordHash, id]
     );

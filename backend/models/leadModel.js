@@ -50,8 +50,9 @@ class LeadModel {
     return leadId;
   }
 
-  async findById(id) {
-    const [rows] = await db.query(
+  async findById(id, connection = null) {
+    const dbConn = connection || db;
+    const [rows] = await dbConn.query(
       `
             SELECT 
                 lead_id as id,

@@ -139,7 +139,8 @@ class LeaseModel {
     return this.mapRows(rows);
   }
 
-  async checkOverlap(unitId, startDate, endDate, excludeLeaseId = null) {
+  async checkOverlap(unitId, startDate, endDate, excludeLeaseId = null, connection = null) {
+    const dbConn = connection || db;
     let query = `
             SELECT lease_id FROM leases 
             WHERE unit_id = ? 
@@ -154,12 +155,13 @@ class LeaseModel {
       params.push(excludeLeaseId);
     }
 
-    const [rows] = await db.query(query, params);
+    const [rows] = await dbConn.query(query, params);
     return rows.length > 0;
   }
 
-  async delete(id) {
-    const [result] = await db.query(
+  async delete(id, connection = null) {
+    const dbConn = connection || db;
+    const [result] = await dbConn.query(
       "UPDATE leases SET deleted_at = NOW(), status = 'cancelled' WHERE lease_id = ?",
       [id]
     );

@@ -161,7 +161,7 @@ class UserService {
       await connection.beginTransaction();
 
       // 1. Get lead details
-      const lead = await leadModel.findById(leadId);
+      const lead = await leadModel.findById(leadId, connection);
       if (!lead) {
         throw new Error('Lead not found');
       }
@@ -172,7 +172,7 @@ class UserService {
 
       // 2. Check if a user with this email already exists
       let userId;
-      const existingUser = await userModel.findByEmail(lead.email);
+      const existingUser = await userModel.findByEmail(lead.email, connection);
 
       let invitationData = null;
       if (existingUser) {
@@ -254,7 +254,7 @@ class UserService {
         // However, we need to fetch the unit to get the rent first?
         // LeaseService expects us to pass monthlyRent.
 
-        const unit = await unitModel.findById(targetUnitId);
+        const unit = await unitModel.findById(targetUnitId, connection);
 
         if (unit) {
           const today = new Date();

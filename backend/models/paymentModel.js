@@ -8,8 +8,7 @@
 import pool from '../config/db.js';
 
 class PaymentModel {
-  //  RECORD PAYMENT: Saving a transaction slip.
-  async create(data) {
+  async create(data, connection = null) {
     const {
       invoiceId,
       amount,
@@ -18,8 +17,9 @@ class PaymentModel {
       referenceNumber,
       evidenceUrl,
     } = data;
+    const db = connection || pool;
     try {
-      const [result] = await pool.query(
+      const [result] = await db.query(
         'INSERT INTO payments (invoice_id, amount, payment_date, payment_method, reference_number, proof_url, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
         [
           invoiceId,
@@ -172,9 +172,10 @@ class PaymentModel {
     return rows;
   }
 
-  async updateStatus(id, status, verifiedBy = null) {
+  async updateStatus(id, status, verifiedBy = null, connection = null) {
+    const db = connection || pool;
     // verifiedBy could be stored if we add that column, for now just status
-    const [result] = await pool.query('UPDATE payments SET status = ? WHERE payment_id = ? AND status != ?', [
+    const [result] = await db.query('UPDATE payments SET status = ? WHERE payment_id = ? AND status != ?', [
       status,
       id,
       status, // Prevent redundant updates taking lock success
