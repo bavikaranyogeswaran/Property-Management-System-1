@@ -11,15 +11,35 @@ class VisitController {
       const result = await visitService.scheduleVisit(req.body);
 
       res.status(201).json({
-        message: 'Visit scheduled successfully',
+        message: `Visit scheduled successfully for ${result.roundedTime}`,
         ...result,
       });
     } catch (error) {
       console.error('Error scheduling visit:', error);
-      if (error.message.includes('Missing')) {
-           return res.status(400).json({ error: error.message });
+      const isBusinessError = 
+        error.message.includes('Missing') || 
+        error.message.includes('booked') || 
+        error.message.includes('not available') || 
+        error.message.includes('advance');
+        
+      if (isBusinessError) {
+        return res.status(400).json({ error: error.message });
       }
       res.status(500).json({ error: 'Failed to schedule visit' });
+    }
+  }
+
+  async cancelVisit(req, res) {
+    try {
+      const { id } = req.params;
+      await visitService.cancelVisit(id, req.user);
+      res.json({ message: 'Visit cancelled successfully' });
+    } catch (error) {
+      console.error('Error cancelling visit:', error);
+      if (error.message.includes('not found')) {
+        return res.status(404).json({ error: 'Visit not found' });
+      }
+      res.status(500).json({ error: 'Failed to cancel visit' });
     }
   }
 

@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
-import { Loader2, Calendar as CalendarIcon, Clock } from 'lucide-react';
+import { Loader2, Calendar as CalendarIcon, Clock, AlertCircle } from 'lucide-react';
 import apiClient from '@/services/api';
 
 interface Property {
@@ -93,11 +93,22 @@ export function ScheduleVisitDialog({
 
     setLoading(true);
 
-    // Term validation
+    // 1. Term validation
     if (!formData.leaseTermId && formData.preferredTermMonths < 3) {
       toast.error('Minimum lease duration is 3 months');
       setLoading(false);
       return;
+    }
+
+    // 2. Lead Time Validation (Min 2 hours)
+    const scheduledDateTime = new Date(`${formData.date}T${formData.time}`);
+    const now = new Date();
+    const twoHoursFromNow = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+    
+    if (scheduledDateTime < twoHoursFromNow) {
+        toast.error('Visits must be scheduled at least 2 hours in advance. Please select a later time.');
+        setLoading(false);
+        return;
     }
 
     try {
@@ -144,6 +155,10 @@ export function ScheduleVisitDialog({
             Request a time to view <strong>{property.name}</strong>{' '}
             {unit ? `- Unit ${unit.unitNumber}` : ''}.
           </DialogDescription>
+          <div className="bg-orange-50 border border-orange-100 p-2 rounded text-xs text-orange-800 flex items-center gap-2">
+            <Clock className="size-3" />
+            <span>Visits are scheduled in 30-minute slots.</span>
+          </div>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4 py-4">
@@ -183,61 +198,7 @@ export function ScheduleVisitDialog({
               </div>
             </div>
 
-            <div className="space-y-3 p-3 bg-blue-50/50 rounded-lg border border-blue-100">
-                <p className="text-sm font-semibold text-blue-900 flex items-center gap-2">
-                    <CalendarIcon className="size-4" />
-                    Lease Preferences (Optional)
-                </p>
-                <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                        <Label htmlFor="moveInDate" className="text-xs text-gray-500">Desired Move-in</Label>
-                        <Input
-                            id="moveInDate"
-                            type="date"
-                            value={formData.moveInDate}
-                            onChange={handleChange}
-                            className="bg-white"
-                        />
-                    </div>
-                    <div className="space-y-1">
-                        <Label htmlFor="leaseTermId" className="text-xs text-gray-500">Preferred Term</Label>
-                        <select
-                            id="leaseTermId"
-                            className="w-full h-10 px-3 py-2 border rounded-md text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            value={formData.leaseTermId}
-                            onChange={(e) => {
-                                const val = e.target.value;
-                                const term = leaseTerms.find(t => String(t.leaseTermId) === val);
-                                setFormData(prev => ({
-                                    ...prev,
-                                    leaseTermId: val,
-                                    preferredTermMonths: term?.durationMonths || prev.preferredTermMonths
-                                }));
-                            }}
-                        >
-                            <option value="">Custom / Undecided</option>
-                            {leaseTerms.map(t => (
-                                <option key={t.leaseTermId} value={t.leaseTermId}>
-                                    {t.name}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-                </div>
-                {!formData.leaseTermId && (
-                    <div className="space-y-1">
-                        <Label htmlFor="preferredTermMonths" className="text-xs text-gray-500">Custom Duration (Months)</Label>
-                        <Input
-                            id="preferredTermMonths"
-                            type="number"
-                            min="3"
-                            value={formData.preferredTermMonths}
-                            onChange={handleChange}
-                            className="bg-white"
-                        />
-                    </div>
-                )}
-            </div>
+            
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -254,15 +215,29 @@ export function ScheduleVisitDialog({
                 </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="time">Time</Label>
+                <Label htmlFor="time">Time Slot</Label>
                 <div className="relative">
-                  <Input
+                  <select
                     id="time"
-                    type="time"
                     required
+                    className="w-full h-10 px-3 py-2 border rounded-md text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                     value={formData.time}
-                    onChange={handleChange}
-                  />
+                    onChange={(e) => setFormData(prev => ({ ...prev, time: e.target.value }))}
+                  >
+                    <option value="">Select a slot</option>
+                    {/* Generates slots from 09:00 to 17:00 */}
+                    {Array.from({ length: 17 }, (_, i) => {
+                      const hour = Math.floor(i / 2) + 9;
+                      const minute = i % 2 === 0 ? '00' : '30';
+                      const timeStr = `${hour.toString().padStart(2, '0')}:${minute}`;
+                      const label = `${hour > 12 ? hour - 12 : hour}:${minute} ${hour >= 12 ? 'PM' : 'AM'}`;
+                      return (
+                        <option key={timeStr} value={timeStr}>
+                          {label}
+                        </option>
+                      );
+                    })}
+                  </select>
                 </div>
               </div>
             </div>

@@ -624,6 +624,61 @@ class EmailService {
     }
   }
 
+  async sendVisitScheduledToVisitor(visitorEmail, visitDetails) {
+    const { 
+        visitorName, 
+        propertyName, 
+        unitNumber, 
+        scheduledDate, 
+        visitId 
+    } = visitDetails;
+    
+    const dateStr = new Date(scheduledDate).toLocaleString();
+    const cancelLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/cancel-visit?id=${visitId}`;
+
+    if (!this.transporter) {
+        console.log('==================================================');
+        console.log(`[EMAIL MOCK] Visit Scheduled Confirmation to Visitor: ${visitorEmail}`);
+        console.log(`Property/Unit: ${propertyName}${unitNumber ? ' (Unit ' + unitNumber + ')' : ''}`);
+        console.log(`Date: ${dateStr}`);
+        console.log(`Cancellation Link: ${cancelLink}`);
+        console.log('==================================================');
+        return true;
+    }
+
+    try {
+        await this.transporter.sendMail({
+            from: `"Property Management System" <${process.env.SMTP_USER}>`,
+            to: visitorEmail,
+            subject: `Visit Scheduled: ${propertyName}`,
+            html: this._getTemplate(
+                'Visit Scheduled Successfully',
+                `
+                <p>Hi ${visitorName},</p>
+                <p>Your visit to <strong>${propertyName}</strong> ${unitNumber ? '(Unit ' + unitNumber + ')' : ''} has been scheduled.</p>
+                
+                <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; margin: 24px 0; border: 1px solid #e2e8f0;">
+                    <p style="margin: 4px 0; color: #475569;"><strong>Scheduled For:</strong> ${dateStr}</p>
+                    <p style="margin: 4px 0; color: #475569;"><strong>Status:</strong> <span style="color: #2563eb; font-weight: 600;">Pending Confirmation</span></p>
+                </div>
+
+                <p>If your plans change and you need to cancel this visit, please click the button below:</p>
+                
+                <div style="text-align: center; margin: 32px 0;">
+                    <a href="${cancelLink}" style="background-color: #ef4444; color: white; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px; display: inline-block;">Cancel Visit</a>
+                </div>
+
+                <p style="color: #64748b; font-size: 14px;">Please note: We will contact you if there are any changes to this schedule.</p>
+                `
+            ),
+        });
+        return true;
+    } catch (e) {
+        console.error('Error sending visit confirmation to visitor:', e);
+        return false;
+    }
+  }
+
   _getTemplate(title, content) {
     return `
             <!DOCTYPE html>

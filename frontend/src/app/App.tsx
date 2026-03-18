@@ -112,6 +112,7 @@ import { ReceiptsPage } from '@/components/pages/common/ReceiptsPage';
 import { NotificationsPage } from '@/components/pages/common/NotificationsPage';
 import { PublicListingPage } from '@/components/pages/public/PublicListingPage';
 import { PublicPropertyDetailsPage } from '@/components/pages/public/PublicPropertyDetailsPage';
+import CancelVisitPage from '@/components/pages/public/CancelVisitPage';
 import AuditLogsPage from '@/components/pages/AuditLogsPage';
 
 // Lead Pages
@@ -168,6 +169,7 @@ function AppContent() {
       <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/verify-email" element={<VerifyEmailPage />} />
       <Route path="/setup-password" element={<SetupPasswordPage />} />
+      <Route path="/cancel-visit" element={<CancelVisitPage />} />
 
       {/* Public/Shared Properties Route */}
       <Route

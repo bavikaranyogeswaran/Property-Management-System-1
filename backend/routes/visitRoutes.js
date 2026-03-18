@@ -14,4 +14,7 @@ router.get('/', authenticateToken, visitController.getVisits);
 // Update visit status
 router.patch('/:id/status', authenticateToken, visitController.updateStatus);
 
+// Visitor cancellation (Public)
+router.post('/:id/cancel', visitController.cancelVisit);
+
 export default router;

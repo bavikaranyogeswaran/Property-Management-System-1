@@ -117,6 +117,16 @@ class VisitModel {
       [unitId, date]
     );
   }
+
+  async existsInSlot(unitId, scheduledDate) {
+    if (!unitId) return false;
+    const [rows] = await db.query(
+      `SELECT visit_id FROM property_visits 
+             WHERE unit_id = ? AND scheduled_date = ? AND status IN ('pending', 'confirmed')`,
+      [unitId, scheduledDate]
+    );
+    return rows.length > 0;
+  }
 }
 
 export default new VisitModel();
