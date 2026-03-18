@@ -254,8 +254,8 @@ export function LeasesPage() {
               </>
             )}
 
-            {/* Refund / Approval Actions */}
-            {(lease.status === 'active' || lease.status === 'ended') && lease.depositStatus !== 'refunded' && (
+            {/* Refund / Approval Actions - Only show for ended leases or those vacating */}
+            {(lease.status === 'ended' || lease.noticeStatus === 'vacating') && lease.depositStatus !== 'refunded' && (
               <>
                 {((user?.role === 'treasurer') || (user?.role === 'owner' && ['paid', 'partially_refunded'].includes(lease.depositStatus || ''))) &&
                   !['awaiting_approval', 'disputed'].includes(lease.depositStatus || '') && (
@@ -273,34 +273,7 @@ export function LeasesPage() {
                     </Button>
                   )}
 
-                {user?.role === 'owner' && lease.depositStatus === 'awaiting_approval' && (
-                  <>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => {
-                        setRefundLeaseId(lease.id);
-                        setRefundType('approve');
-                      }}
-                      className="text-green-600 hover:text-green-700 hover:bg-green-50"
-                      title="Approve Refund"
-                    >
-                      <CheckCircle className="size-4" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => {
-                        setRefundLeaseId(lease.id);
-                        setRefundType('dispute');
-                      }}
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                      title="Dispute Refund"
-                    >
-                      <AlertCircle className="size-4" />
-                    </Button>
-                  </>
-                )}
+                {/* Refund Approval/Dispute now handled in dedicated Refunds page */}
               </>
             )}
           </div>
