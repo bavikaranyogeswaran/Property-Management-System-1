@@ -159,7 +159,7 @@ class PaymentService {
                         entityId: paymentId,
                         details: { invoiceId, amount, receiptGenerated: true },
                     },
-                    { user: treasurerUser },
+                    null,
                     connection
                 );
 
@@ -258,7 +258,7 @@ class PaymentService {
                                     userId: invoice.tenant_id,
                                     message: `Overpayment of ${amountExcess} has been credited to your account balance.`,
                                     type: 'payment',
-                                });
+                                }, connection);
                              }
                         }
 
@@ -267,7 +267,7 @@ class PaymentService {
                     }
 
                     // Generate Receipt
-                     const existingReceipt = await receiptModel.findByPaymentId(paymentId);
+                     const existingReceipt = await receiptModel.findByPaymentId(paymentId, connection);
                      if (!existingReceipt) {
                         await receiptModel.create({
                             paymentId: paymentId,
@@ -284,11 +284,12 @@ class PaymentService {
                              const remainingDue = Math.max(0, Number(invoice.amount) - previousTotal);
                              const amountUsed = Math.min(Number(payment.amount), remainingDue);
                              
-                             const lease = await leaseModel.findById(invoice.lease_id);
+                             const lease = await leaseModel.findById(invoice.lease_id, connection);
                              const currentHeld = Number(lease.securityDeposit || 0);
                              const newHeld = currentHeld + amountUsed;
                              
-                             const finalStatus = (await invoiceModel.findById(payment.invoiceId)).status === 'paid' ? 'paid' : 'pending';
+                             const finalInvoice = await invoiceModel.findById(payment.invoiceId, connection);
+                             const finalStatus = finalInvoice.status === 'paid' ? 'paid' : 'pending';
                              
                              await leaseModel.update(invoice.lease_id, {
                                  deposit_status: finalStatus,
@@ -308,7 +309,7 @@ class PaymentService {
                             actionType: 'PAYMENT_VERIFIED',
                             entityId: paymentId,
                             details: { invoiceId: payment.invoiceId, amount: payment.amount },
-                        }, { user: user }, connection);
+                        }, null, connection);
 
                         // Post Ledger Entry
                         const { accountType, category } = getLedgerClassification(invoice.invoice_type);

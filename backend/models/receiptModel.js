@@ -126,8 +126,9 @@ class ReceiptModel {
       description: row.description || `Invoice #${row.invoice_id}`,
     };
   }
-  async findByPaymentId(paymentId) {
-    const [rows] = await pool.query(
+  async findByPaymentId(paymentId, connection = null) {
+    const db = connection || pool;
+    const [rows] = await db.query(
       'SELECT * FROM receipts WHERE payment_id = ?',
       [paymentId]
     );
