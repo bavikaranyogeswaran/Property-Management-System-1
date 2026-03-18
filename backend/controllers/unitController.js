@@ -73,6 +73,20 @@ class UnitController {
 
   async updateUnit(req, res) {
     try {
+      // 1. Fetch unit to check ownership
+      const unit = await unitModel.findById(req.params.id);
+      if (!unit) {
+        return res.status(404).json({ error: 'Unit not found' });
+      }
+
+      // 2. Ownership check
+      if (req.user.role === 'owner') {
+        const property = await propertyModel.findById(unit.propertyId);
+        if (!property || String(property.ownerId) !== String(req.user.id)) {
+          return res.status(403).json({ error: 'You do not own the property associated with this unit.' });
+        }
+      }
+
       const success = await unitModel.update(req.params.id, req.body);
       if (!success)
         return res.status(404).json({ error: 'Unit not found or no changes' });
@@ -85,16 +99,26 @@ class UnitController {
 
   async deleteUnit(req, res) {
     try {
-      // Safeguard: Check if occupied
       const unit = await unitModel.findById(req.params.id);
       if (!unit) {
         return res.status(404).json({ error: 'Unit not found' });
       }
 
-      if (unit.status === 'occupied') {
-        return res
-          .status(400)
-          .json({ error: 'Cannot delete an occupied unit.' });
+      // 1. Ownership check
+      if (req.user.role === 'owner') {
+        const property = await propertyModel.findById(unit.propertyId);
+        if (!property || String(property.ownerId) !== String(req.user.id)) {
+          return res.status(403).json({ error: 'You do not own the property associated with this unit.' });
+        }
+      }
+
+      // 2. Lease check: Block if any active or pending leases exist
+      const leaseModel = (await import('../models/leaseModel.js')).default;
+      const activeLeaseCount = await leaseModel.countActiveByUnitId(req.params.id);
+      if (activeLeaseCount > 0) {
+        return res.status(400).json({ 
+          error: 'Cannot archive unit with active or pending leases. Please terminate or finish leases first.' 
+        });
       }
 
       const success = await unitModel.delete(req.params.id);

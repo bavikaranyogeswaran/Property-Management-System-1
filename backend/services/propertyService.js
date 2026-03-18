@@ -1,5 +1,7 @@
 import propertyModel from '../models/propertyModel.js';
 import unitModel from '../models/unitModel.js';
+import leaseModel from '../models/leaseModel.js';
+import pool from '../config/db.js';
 
 class PropertyService {
   async createProperty(data) {
@@ -35,20 +37,35 @@ class PropertyService {
   }
 
   async deleteProperty(id) {
-    // Validation: Check for existing units that are NOT archived
-    const units = await unitModel.findByPropertyId(id);
-    const activeUnits = units.filter(u => !u.is_archived);
-    if (activeUnits.length > 0) {
+    // 1. Check for any active or pending leases targeting units in this property
+    const activeLeaseCount = await leaseModel.countActiveByPropertyId(id);
+    if (activeLeaseCount > 0) {
       throw new Error(
-        'Cannot delete property with existing active units. Please remove or archive units first.'
+        'Cannot archive property with active or pending leases. Please terminate or finish leases first.'
       );
     }
 
-    const deleted = await propertyModel.delete(id);
-    if (!deleted) {
-      throw new Error('Property not found or delete failed');
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      // 2. Cascading Archival: Mark all units of this property as archived
+      await unitModel.archiveByPropertyId(id, connection);
+
+      // 3. Mark property as archived
+      const deleted = await propertyModel.delete(id, connection);
+      if (!deleted) {
+        throw new Error('Property not found or archival failed');
+      }
+
+      await connection.commit();
+      return { message: 'Property and all its units archived successfully' };
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
     }
-    return { message: 'Property deleted successfully' };
   }
 
   async getPropertyTypes() {

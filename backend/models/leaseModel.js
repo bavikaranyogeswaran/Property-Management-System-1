@@ -167,6 +167,31 @@ class LeaseModel {
     );
     return result.affectedRows > 0;
   }
+  
+  async countActiveByUnitId(unitId, connection = null) {
+    const dbConn = connection || db;
+    const [rows] = await dbConn.query(
+      `SELECT COUNT(*) as count FROM leases 
+       WHERE unit_id = ? 
+       AND status IN ('active', 'pending')
+       AND deleted_at IS NULL`,
+      [unitId]
+    );
+    return rows[0].count;
+  }
+
+  async countActiveByPropertyId(propertyId, connection = null) {
+    const dbConn = connection || db;
+    const [rows] = await dbConn.query(
+      `SELECT COUNT(*) as count FROM leases l
+       JOIN units u ON l.unit_id = u.unit_id
+       WHERE u.property_id = ? 
+       AND l.status IN ('active', 'pending')
+       AND l.deleted_at IS NULL`,
+      [propertyId]
+    );
+    return rows[0].count;
+  }
 
   mapRows(rows) {
     return rows.map((row) => ({

@@ -202,8 +202,9 @@ class PropertyModel {
     return result.affectedRows > 0;
   }
 
-  async delete(id) {
-    const [result] = await db.query(
+  async delete(id, connection = null) {
+    const dbConn = connection || db;
+    const [result] = await dbConn.query(
       "UPDATE properties SET archived_at = NOW(), is_archived = TRUE, status = 'inactive' WHERE property_id = ?",
       [id]
     );

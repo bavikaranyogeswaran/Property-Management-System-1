@@ -159,12 +159,22 @@ class UnitModel {
     return result.affectedRows > 0;
   }
 
-  async delete(id) {
-    const [result] = await db.query(
+  async delete(id, connection = null) {
+    const dbConn = connection || db;
+    const [result] = await dbConn.query(
       "UPDATE units SET archived_at = NOW(), is_archived = TRUE, status = 'inactive' WHERE unit_id = ?",
       [id]
     );
     return result.affectedRows > 0;
+  }
+
+  async archiveByPropertyId(propertyId, connection = null) {
+    const dbConn = connection || db;
+    const [result] = await dbConn.query(
+      "UPDATE units SET archived_at = NOW(), is_archived = TRUE, status = 'inactive' WHERE property_id = ? AND is_archived = FALSE",
+      [propertyId]
+    );
+    return result.affectedRows >= 0;
   }
 
   mapRows(rows) {
