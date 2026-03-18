@@ -113,7 +113,7 @@ class PaymentService {
             const { payment: updatedPayment } = await paymentModel.updateStatus(paymentId, 'verified', null, connection);
 
             // Calculate total verified payments for this invoice
-            const allPayments = await paymentModel.findByInvoiceId(invoiceId);
+            const allPayments = await paymentModel.findByInvoiceId(invoiceId, connection);
             const totalVerified = allPayments
                 .filter((p) => p.status === 'verified')
                 .reduce((sum, p) => sum + Number(p.amount), 0) + Number(amount); 
@@ -123,11 +123,11 @@ class PaymentService {
                 // But totalVerified calculation above should be inside transaction-aware if possible.
                 // For now, I'll use the current verified amount logic but ensure it's correct.
 
-            const invoice = await invoiceModel.findById(invoiceId);
+            const invoice = await invoiceModel.findById(invoiceId, connection);
 
             if (invoice) {
                 if (totalVerified >= invoice.amount) {
-                    await invoiceModel.updateStatus(invoiceId, 'paid');
+                    await invoiceModel.updateStatus(invoiceId, 'paid', connection);
 
                     // Overpayment Logic: Credit excess to tenant account
                     const overpayment = totalVerified - invoice.amount;
@@ -137,10 +137,10 @@ class PaymentService {
                             userId: invoice.tenant_id,
                             message: `Overpayment of ${overpayment} has been credited to your account balance.`,
                             type: 'payment',
-                        });
+                        }, connection);
                     }
                 } else if (totalVerified > 0) {
-                    await invoiceModel.updateStatus(invoiceId, 'partially_paid');
+                    await invoiceModel.updateStatus(invoiceId, 'partially_paid', connection);
                 }
 
                 await receiptModel.create({
@@ -230,19 +230,19 @@ class PaymentService {
                 const payment = updatedPayment;
                 if (payment) {
                     // Logic Check: Partial Payments
-                    const allPayments = await paymentModel.findByInvoiceId(payment.invoiceId);
+                    const allPayments = await paymentModel.findByInvoiceId(payment.invoiceId, connection);
                     const totalVerified = allPayments
                         .filter((p) => p.status === 'verified')
                         .reduce((sum, p) => sum + Number(p.amount), 0);
 
-                    const invoice = await invoiceModel.findById(payment.invoiceId);
+                    const invoice = await invoiceModel.findById(payment.invoiceId, connection);
 
                     if (!invoice) {
                         throw new Error('Invoice not found for verification');
                     }
 
                     if (totalVerified >= invoice.amount) {
-                        await invoiceModel.updateStatus(payment.invoiceId, 'paid');
+                        await invoiceModel.updateStatus(payment.invoiceId, 'paid', connection);
                         
                         // Overpayment Logic
                         const overpayment = totalVerified - invoice.amount;
@@ -263,7 +263,7 @@ class PaymentService {
                         }
 
                     } else if (totalVerified > 0) {
-                         await invoiceModel.updateStatus(payment.invoiceId, 'partially_paid');
+                         await invoiceModel.updateStatus(payment.invoiceId, 'partially_paid', connection);
                     }
 
                     // Generate Receipt
@@ -301,7 +301,7 @@ class PaymentService {
                             userId: invoice.tenant_id,
                             message: `Payment of ${payment.amount} for Invoice #${payment.invoiceId} has been verified.`,
                             type: 'payment',
-                        });
+                        }, connection);
 
                         await auditLogger.log({
                             userId: user.id,
@@ -342,9 +342,9 @@ class PaymentService {
             } else if (status === 'rejected') {
                  const payment = updatedPayment;
                  if (payment) {
-                     const invoice = await invoiceModel.findById(payment.invoiceId);
+                     const invoice = await invoiceModel.findById(payment.invoiceId, connection);
                      if (invoice) {
-                         const allPayments = await paymentModel.findByInvoiceId(payment.invoiceId);
+                         const allPayments = await paymentModel.findByInvoiceId(payment.invoiceId, connection);
                          const totalVerified = allPayments
                             .filter((p) => p.status === 'verified')
                             .reduce((sum, p) => sum + Number(p.amount), 0);
@@ -357,7 +357,7 @@ class PaymentService {
                                  const isOverdue = new Date() > new Date(invoice.due_date);
                                  newStatus = isOverdue ? 'overdue' : 'pending';
                              }
-                             await invoiceModel.updateStatus(invoice.invoice_id, newStatus);
+                             await invoiceModel.updateStatus(invoice.invoice_id, newStatus, connection);
                          }
 
                          if (invoice.invoice_type === 'deposit') {

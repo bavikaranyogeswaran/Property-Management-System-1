@@ -40,8 +40,9 @@ class PaymentModel {
     }
   }
 
-  async findById(id) {
-    const [rows] = await pool.query(
+  async findById(id, connection = null) {
+    const db = connection || pool;
+    const [rows] = await db.query(
       'SELECT * FROM payments WHERE payment_id = ?',
       [id]
     );
@@ -140,17 +141,19 @@ class PaymentModel {
     return rows;
   }
 
-  async findByInvoiceId(invoiceId) {
-    const [rows] = await pool.query(
+  async findByInvoiceId(invoiceId, connection = null) {
+    const db = connection || pool;
+    const [rows] = await db.query(
       'SELECT * FROM payments WHERE invoice_id = ?',
       [invoiceId]
     );
     return rows;
   }
 
-  async findByInvoiceIds(invoiceIds) {
+  async findByInvoiceIds(invoiceIds, connection = null) {
     if (!invoiceIds || invoiceIds.length === 0) return [];
-    const [rows] = await pool.query(
+    const db = connection || pool;
+    const [rows] = await db.query(
       'SELECT * FROM payments WHERE invoice_id IN (?)',
       [invoiceIds]
     );
@@ -184,7 +187,7 @@ class PaymentModel {
     // If approved, we might want to update the invoice status too - handled in controller transaction potentially?
     // Or simple model call.
     return {
-        payment: await this.findById(id),
+        payment: await this.findById(id, connection),
         changed: result.affectedRows > 0
     };
   }

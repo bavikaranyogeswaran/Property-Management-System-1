@@ -99,7 +99,7 @@ class UserModel {
             
             WHERE u.role = 'tenant' 
                 AND ut.property_id = spa.property_id
-                AND l.status = 'active'
+                AND l.status != 'cancelled'
                 AND u.is_archived = FALSE
             ORDER BY u.created_at DESC
         `,
