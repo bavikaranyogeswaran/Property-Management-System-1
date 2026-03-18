@@ -43,6 +43,7 @@ class LeaseModel {
     'tenant_id', 'unit_id', 'start_date', 'end_date',
     'monthly_rent', 'status', 'security_deposit',
     'deposit_status', 'refunded_amount', 'document_url',
+    'proposed_refund_amount', 'refund_notes',
   ];
 
   async update(id, data, connection = null) {
@@ -204,6 +205,8 @@ class LeaseModel {
       status: row.status,
       securityDeposit: parseFloat(row.security_deposit || 0),
       depositStatus: row.deposit_status,
+      proposedRefundAmount: parseFloat(row.proposed_refund_amount || 0),
+      refundNotes: row.refund_notes,
       refundedAmount: parseFloat(row.refunded_amount || 0),
       documentUrl: row.document_url,
       createdAt: row.created_at,

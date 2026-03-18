@@ -273,7 +273,7 @@ class LeaseService {
     }
   }
 
-  async refundDeposit(leaseId, amount) {
+  async requestRefund(leaseId, amount, notes, user) {
     const lease = await leaseModel.findById(leaseId);
     if (!lease) throw new Error('Lease not found');
 
@@ -281,22 +281,47 @@ class LeaseService {
       throw new Error('No security deposit available to refund.');
     }
 
-    if (lease.deposit_status === 'refunded') {
-      throw new Error('Deposit has already been refunded.');
+    if (['refunded', 'awaiting_approval'].includes(lease.depositStatus)) {
+      throw new Error(`Deposit is already ${lease.depositStatus.replace('_', ' ')}.`);
     }
 
-    if (lease.deposit_status !== 'paid') {
+    if (lease.depositStatus !== 'paid' && lease.depositStatus !== 'partially_refunded') {
       throw new Error('Cannot refund deposit that has not been fully paid.');
     }
-
-    const status = amount >= lease.securityDeposit ? 'refunded' : 'partially_refunded';
 
     if (amount > lease.securityDeposit) {
       throw new Error('Refund amount cannot exceed security deposit');
     }
 
-    const connection = await pool.getConnection();
+    await leaseModel.update(leaseId, {
+      deposit_status: 'awaiting_approval',
+      proposed_refund_amount: amount,
+      refund_notes: notes
+    });
 
+    const auditLogger = (await import('../utils/auditLogger.js')).default;
+    await auditLogger.log({
+      userId: user.id,
+      actionType: 'DEPOSIT_REFUND_REQUESTED',
+      entityId: leaseId,
+      details: { amount, notes },
+    });
+
+    return { status: 'awaiting_approval', proposedRefundAmount: amount };
+  }
+
+  async approveRefund(leaseId, user) {
+    const lease = await leaseModel.findById(leaseId);
+    if (!lease) throw new Error('Lease not found');
+
+    if (lease.depositStatus !== 'awaiting_approval') {
+      throw new Error('No refund request awaiting approval.');
+    }
+
+    const amount = lease.proposedRefundAmount;
+    const status = amount >= lease.securityDeposit ? 'refunded' : 'partially_refunded';
+
+    const connection = await pool.getConnection();
     try {
       await connection.beginTransaction();
 
@@ -386,7 +411,7 @@ class LeaseService {
           leaseId,
           amount: withheldAmount,
           dueDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          description: 'Security Deposit Deductions (Damages/Cleaning)',
+          description: `Security Deposit Deductions (Damages/Cleaning): ${lease.refundNotes || ''}`,
           type: 'maintenance',
         }, connection);
 
@@ -439,12 +464,14 @@ class LeaseService {
       await leaseModel.update(leaseId, {
         refunded_amount: Number(lease.refundedAmount || 0) + Number(amount),
         deposit_status: status,
+        proposed_refund_amount: 0,
+        refund_notes: null
       }, connection);
 
       const auditLogger = (await import('../utils/auditLogger.js')).default;
       await auditLogger.log({
-        userId: null,
-        actionType: 'DEPOSIT_REFUNDED',
+        userId: user.id,
+        actionType: 'DEPOSIT_REFUND_APPROVED',
         entityId: leaseId,
         details: { refundedAmount: amount, status },
       }, null, connection);
@@ -456,7 +483,7 @@ class LeaseService {
           accountType: 'liability',
           category: 'deposit_refund',
           debit: Number(amount),
-          description: `Deposit refund of ${amount}`,
+          description: `Deposit refund approved by owner: ${amount}`,
           entryDate: new Date().toISOString().split('T')[0],
         }, connection);
       }
@@ -468,6 +495,40 @@ class LeaseService {
       throw error;
     } finally {
       connection.release();
+    }
+  }
+
+  async disputeRefund(leaseId, notes, user) {
+    const lease = await leaseModel.findById(leaseId);
+    if (!lease) throw new Error('Lease not found');
+
+    await leaseModel.update(leaseId, {
+      deposit_status: 'disputed',
+      refund_notes: notes 
+    });
+
+    const auditLogger = (await import('../utils/auditLogger.js')).default;
+    await auditLogger.log({
+      userId: user.id,
+      actionType: 'DEPOSIT_REFUND_DISPUTED',
+      entityId: leaseId,
+      details: { notes },
+    });
+
+    return { status: 'disputed' };
+  }
+
+  async refundDeposit(leaseId, amount, user) {
+    // This now acts as a shortcut for owners or a request for treasurers
+    if (user.role === 'owner') {
+      // Owners can directly approve if they want, but usually they'll use approveRefund.
+      // For backward compatibility or direct action, we'll make them request then immediately approve?
+      // Or just call the request then they can approve later.
+      // Re-evaluating: The controller will handle the branching. 
+      // LeaseService.refundDeposit is now essentially requestRefund.
+      return await this.requestRefund(leaseId, amount, 'Direct refund request', user);
+    } else {
+      return await this.requestRefund(leaseId, amount, 'Refund request by treasurer', user);
     }
   }
 

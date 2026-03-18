@@ -79,13 +79,42 @@ class LeaseController {
         return res.status(403).json({ error: 'Access denied.' });
       }
       const { id } = req.params;
-      const { amount } = req.body; 
+      const { amount, notes } = req.body; 
 
-      const result = await leaseService.refundDeposit(id, amount);
-      res.json({ message: 'Deposit refunded successfully', ...result });
+      const result = await leaseService.refundDeposit(id, amount, notes, req.user);
+      res.json({ message: 'Deposit refund requested successfully', ...result });
     } catch (error) {
        if (error.message.includes('not found')) return res.status(404).json({ error: error.message });
        if (error.message.includes('exceed') || error.message.includes('required')) return res.status(400).json({ error: error.message });
+      res.status(500).json({ error: error.message });
+    }
+  }
+
+  async approveRefund(req, res) {
+    try {
+      if (req.user.role !== 'owner') {
+        return res.status(403).json({ error: 'Only owners can approve refunds.' });
+      }
+      const { id } = req.params;
+      const result = await leaseService.approveRefund(id, req.user);
+      res.json({ message: 'Refund approved and executed successfully', ...result });
+    } catch (error) {
+      if (error.message.includes('not found')) return res.status(404).json({ error: error.message });
+      res.status(500).json({ error: error.message });
+    }
+  }
+
+  async disputeRefund(req, res) {
+    try {
+      if (req.user.role !== 'owner' && req.user.role !== 'treasurer') {
+        return res.status(403).json({ error: 'Access denied.' });
+      }
+      const { id } = req.params;
+      const { notes } = req.body;
+      const result = await leaseService.disputeRefund(id, notes, req.user);
+      res.json({ message: 'Refund request marked as disputed', ...result });
+    } catch (error) {
+       if (error.message.includes('not found')) return res.status(404).json({ error: error.message });
       res.status(500).json({ error: error.message });
     }
   }

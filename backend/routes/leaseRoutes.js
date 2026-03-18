@@ -9,6 +9,8 @@ router.post('/', authenticateToken, leaseController.createLease);
 router.get('/:id', authenticateToken, leaseController.getLeaseById);
 router.put('/:id/renew', authenticateToken, leaseController.renewLease);
 router.post('/:id/refund', authenticateToken, leaseController.refundDeposit);
+router.post('/:id/refund/approve', authenticateToken, leaseController.approveRefund);
+router.post('/:id/refund/dispute', authenticateToken, leaseController.disputeRefund);
 router.patch('/:id/document', authenticateToken, leaseController.updateLeaseDocument);
 router.post(
   '/:id/terminate',

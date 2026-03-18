@@ -249,7 +249,9 @@ CREATE TABLE leases (
     status ENUM('active','ended','cancelled') DEFAULT 'active',
     notice_status ENUM('undecided', 'vacating', 'renewing') DEFAULT 'undecided', -- [ADDED] Tenant's intent
     security_deposit DECIMAL(10, 2) DEFAULT 0.00,
-    deposit_status ENUM('pending', 'paid', 'partially_refunded', 'refunded') DEFAULT 'pending',
+    deposit_status ENUM('pending', 'paid', 'awaiting_approval', 'disputed', 'partially_refunded', 'refunded') DEFAULT 'pending',
+    proposed_refund_amount DECIMAL(10, 2) DEFAULT 0.00,
+    refund_notes TEXT,
     refunded_amount DECIMAL(10, 2) DEFAULT 0.00,
     document_url VARCHAR(500), -- [ADDED] Lease document URL
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
