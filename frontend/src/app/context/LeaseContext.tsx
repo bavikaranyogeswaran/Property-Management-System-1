@@ -19,6 +19,9 @@ export interface Lease {
   refundedAmount?: number;
   documentUrl?: string;
   noticeStatus?: 'undecided' | 'vacating' | 'renewing';
+  unitNumber?: string;
+  propertyId?: string;
+  propertyName?: string;
   createdAt: string;
 }
 

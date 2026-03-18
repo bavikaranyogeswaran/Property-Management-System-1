@@ -22,6 +22,7 @@ import OwnerPayoutsPage from '@/components/pages/OwnerPayoutsPage';
 import AuditLogsPage from '@/components/pages/AuditLogsPage';
 import { VisitsPage } from '@/components/pages/owner/VisitsPage';
 import { NotificationsPage } from '@/components/pages/common/NotificationsPage';
+import { RefundRequestsPage } from '@/components/pages/owner/RefundRequestsPage';
 
 interface User {
   role: 'owner' | 'tenant' | 'treasurer';
@@ -65,6 +66,7 @@ export const renderPage = (activePage: string, user: User | null) => {
     if (activePage === 'payouts') return <OwnerPayoutsPage />;
     if (activePage === 'audit') return <AuditLogsPage />;
     if (activePage === 'visits') return <VisitsPage />;
+    if (activePage === 'refund-requests') return <RefundRequestsPage />;
   }
 
   // Tenant pages

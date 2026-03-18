@@ -27,6 +27,7 @@ import {
   Bell,
   Calendar,
   Wallet,
+  RotateCcw,
 } from 'lucide-react';
 
 import { Link, useLocation } from 'react-router-dom';
@@ -66,6 +67,7 @@ export function AppLayout({ children }: AppLayoutProps) {
     { path: '/tenants', label: 'Tenants', icon: Users },
     { path: '/treasurers', label: 'Treasurers', icon: Shield },
     { path: '/leases', label: 'Leases', icon: FileText },
+    { path: '/refund-requests', label: 'Refunds', icon: RotateCcw },
     { path: '/invoices', label: 'Invoices', icon: CreditCard },
     { path: '/payments', label: 'Payments', icon: DollarSign },
     { path: '/payouts', label: 'Payouts', icon: Wallet },

@@ -90,6 +90,7 @@ import { OwnerReportsPage } from '@/components/pages/owner/OwnerReportsPage';
 import { VisitsPage } from '@/components/pages/owner/VisitsPage';
 import OwnerPayoutsPage from '@/components/pages/OwnerPayoutsPage';
 import { OwnerPaymentsPage } from '@/components/pages/owner/OwnerPaymentsPage';
+import { RefundRequestsPage } from '@/components/pages/owner/RefundRequestsPage';
 
 // Tenant Pages
 import { TenantDashboard } from '@/components/pages/tenant/TenantDashboard';
@@ -292,6 +293,14 @@ function AppContent() {
             element={
               <ProtectedRoute>
                 <LeasesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/refund-requests"
+            element={
+              <ProtectedRoute>
+                <RefundRequestsPage />
               </ProtectedRoute>
             }
           />
