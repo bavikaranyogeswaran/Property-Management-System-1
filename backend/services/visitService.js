@@ -11,6 +11,7 @@ class VisitService {
 
     async scheduleVisit(data) {
         const { propertyId, unitId, name, email, phone, date, time, notes } = data;
+        let unit = null;
 
         if (!propertyId || !name || !email || !date || !time) {
              throw new Error('Missing required fields');
@@ -35,7 +36,7 @@ class VisitService {
 
         // 3. Unit Status Validation
         if (unitId) {
-            const unit = await unitModel.findById(unitId);
+            unit = await unitModel.findById(unitId);
             if (!unit) throw new Error('Unit not found');
             if (unit.status !== 'available') {
                 throw new Error(`Unit ${unit.unitNumber} is currently ${unit.status} and not available for visits.`);
