@@ -43,7 +43,12 @@ class UnitModel {
                     WHERE l.unit_id = u.unit_id 
                     AND l.status = 'active' 
                     AND l.start_date <= CURRENT_DATE() 
-                    AND l.end_date >= CURRENT_DATE()) as active_lease_count
+                    AND (l.end_date IS NULL OR l.end_date >= CURRENT_DATE())) as active_lease_count,
+                   (SELECT COUNT(*) FROM leases l 
+                    WHERE l.unit_id = u.unit_id 
+                    AND l.status IN ('active', 'pending')
+                    AND l.start_date > CURRENT_DATE() 
+                    AND l.deleted_at IS NULL) as future_lease_count
             FROM units u
             JOIN properties p ON u.property_id = p.property_id
             JOIN unit_types ut ON u.unit_type_id = ut.type_id
@@ -64,7 +69,12 @@ class UnitModel {
                     WHERE l.unit_id = u.unit_id 
                     AND l.status = 'active' 
                     AND l.start_date <= CURRENT_DATE() 
-                    AND l.end_date >= CURRENT_DATE()) as active_lease_count
+                    AND (l.end_date IS NULL OR l.end_date >= CURRENT_DATE())) as active_lease_count,
+                   (SELECT COUNT(*) FROM leases l 
+                    WHERE l.unit_id = u.unit_id 
+                    AND l.status IN ('active', 'pending')
+                    AND l.start_date > CURRENT_DATE() 
+                    AND l.deleted_at IS NULL) as future_lease_count
             FROM units u
             JOIN properties p ON u.property_id = p.property_id
             JOIN unit_types ut ON u.unit_type_id = ut.type_id
@@ -87,7 +97,12 @@ class UnitModel {
                     WHERE l.unit_id = u.unit_id 
                     AND l.status = 'active' 
                     AND l.start_date <= CURRENT_DATE() 
-                    AND l.end_date >= CURRENT_DATE()) as active_lease_count
+                    AND (l.end_date IS NULL OR l.end_date >= CURRENT_DATE())) as active_lease_count,
+                   (SELECT COUNT(*) FROM leases l 
+                    WHERE l.unit_id = u.unit_id 
+                    AND l.status IN ('active', 'pending')
+                    AND l.start_date > CURRENT_DATE() 
+                    AND l.deleted_at IS NULL) as future_lease_count
             FROM units u
             JOIN properties p ON u.property_id = p.property_id
             JOIN unit_types ut ON u.unit_type_id = ut.type_id
@@ -110,7 +125,12 @@ class UnitModel {
                     WHERE l.unit_id = u.unit_id 
                     AND l.status = 'active' 
                     AND l.start_date <= CURRENT_DATE() 
-                    AND l.end_date >= CURRENT_DATE()) as active_lease_count
+                    AND (l.end_date IS NULL OR l.end_date >= CURRENT_DATE())) as active_lease_count,
+                   (SELECT COUNT(*) FROM leases l 
+                    WHERE l.unit_id = u.unit_id 
+                    AND l.status IN ('active', 'pending')
+                    AND l.start_date > CURRENT_DATE() 
+                    AND l.deleted_at IS NULL) as future_lease_count
             FROM units u
             JOIN properties p ON u.property_id = p.property_id
             JOIN unit_types ut ON u.unit_type_id = ut.type_id
@@ -189,6 +209,8 @@ class UnitModel {
       let status = row.status;
       if (row.active_lease_count > 0) {
         status = 'occupied';
+      } else if (row.future_lease_count > 0) {
+        status = 'reserved';
       }
 
       return {

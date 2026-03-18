@@ -12,9 +12,9 @@ import unitModel from '../models/unitModel.js';
 import leaseModel from '../models/leaseModel.js';
 import leaseService from '../services/leaseService.js';
 import emailService from '../utils/emailService.js';
-import leadTokenModel from '../models/leadTokenModel.js';
 import leaseTermModel from '../models/leaseTermModel.js';
 import pool from '../config/db.js';
+import unitLockService from '../services/unitLockService.js';
 
 const SALT_ROUNDS = 10;
 
@@ -166,8 +166,24 @@ class UserService {
         throw new Error('Lead not found');
       }
 
+      // IDEMPOTENCY: If lead already converted, return Success.
       if (lead.status === 'converted') {
-        throw new Error('Lead is already converted');
+        // Return existing user ID by finding user with lead's email
+        const existingUser = await userModel.findByEmail(lead.email, connection);
+        return { 
+            message: 'Lead already converted', 
+            tenantId: existingUser ? existingUser.user_id : null,
+            alreadyConverted: true 
+        };
+      }
+
+      // LOCKING: Ensure unit is not being processed by another conversion.
+      const targetUnitIdForLock = tenantData.unitId || lead.interestedUnit;
+      if (targetUnitIdForLock) {
+        const lockAcquired = unitLockService.acquireLock(targetUnitIdForLock, leadId);
+        if (!lockAcquired) {
+          throw new Error('This unit is currently being processed by another staff member. Please wait 10 minutes or choose another unit.');
+        }
       }
 
       // 2. Check if a user with this email already exists
@@ -298,6 +314,11 @@ class UserService {
       }
 
       await connection.commit();
+
+      // RELEASE LOCK: Clear reservation on success
+      if (targetUnitId) {
+        unitLockService.releaseLock(targetUnitId);
+      }
 
       // [CRITICAL FIX] Send invitation email ONLY after successful transaction commit
       if (invitationData) {
