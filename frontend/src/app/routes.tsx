@@ -81,6 +81,7 @@ export const renderPage = (activePage: string, user: User | null) => {
   if (user?.role === 'treasurer') {
     if (activePage === 'payments') return <PaymentVerificationPage />;
     if (activePage === 'expenses') return <MaintenanceExpensesPage />;
+    if (activePage === 'leases') return <LeasesPage />;
     if (activePage === 'tenants') return <TenantsPage />;
     if (activePage === 'analytics') return <AnalyticsPage />;
   }

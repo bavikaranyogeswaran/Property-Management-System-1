@@ -436,6 +436,14 @@ function AppContent() {
             }
           />
           <Route
+            path="/leases"
+            element={
+              <ProtectedRoute>
+                <LeasesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/expenses"
             element={
               <ProtectedRoute>

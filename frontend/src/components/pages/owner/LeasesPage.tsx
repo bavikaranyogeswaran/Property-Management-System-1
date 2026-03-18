@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp, Lease } from '@/app/context/AppContext';
+import { useAuth } from '@/app/context/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -38,6 +39,7 @@ import {
   XCircle,
   CheckCircle,
   RotateCcw,
+  AlertCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -59,8 +61,11 @@ export function LeasesPage() {
     endLease,
     renewLease,
     refundDeposit,
+    approveRefund,
+    disputeRefund,
     updateLeaseDocument,
   } = useApp();
+  const { user } = useAuth();
   const [selectedLease, setSelectedLease] = useState<Lease | null>(null);
 
 
@@ -248,21 +253,56 @@ export function LeasesPage() {
                 </Button>
               </>
             )}
-            {(lease.status === 'active' || lease.status === 'ended') &&
-              lease.depositStatus !== 'refunded' && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => {
-                    setRefundLeaseId(lease.id);
-                    // setRefundAmount(lease.securityDeposit?.toString() || '');
-                  }}
-                  className="text-orange-600 hover:text-orange-700 hover:bg-orange-50"
-                  title="Refund Deposit"
-                >
-                  <RotateCcw className="size-4" />
-                </Button>
-              )}
+
+            {/* Refund / Approval Actions */}
+            {(lease.status === 'active' || lease.status === 'ended') && lease.depositStatus !== 'refunded' && (
+              <>
+                {((user?.role === 'treasurer') || (user?.role === 'owner' && ['paid', 'partially_refunded'].includes(lease.depositStatus || ''))) &&
+                  !['awaiting_approval', 'disputed'].includes(lease.depositStatus || '') && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        setRefundLeaseId(lease.id);
+                        setRefundType('request');
+                      }}
+                      className="text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                      title="Request Refund / Offset"
+                    >
+                      <RotateCcw className="size-4" />
+                    </Button>
+                  )}
+
+                {user?.role === 'owner' && lease.depositStatus === 'awaiting_approval' && (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        setRefundLeaseId(lease.id);
+                        setRefundType('approve');
+                      }}
+                      className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                      title="Approve Refund"
+                    >
+                      <CheckCircle className="size-4" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        setRefundLeaseId(lease.id);
+                        setRefundType('dispute');
+                      }}
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      title="Dispute Refund"
+                    >
+                      <AlertCircle className="size-4" />
+                    </Button>
+                  </>
+                )}
+              </>
+            )}
           </div>
         </TableCell>
       </TableRow>
@@ -301,6 +341,8 @@ export function LeasesPage() {
   // Refund State
   const [refundLeaseId, setRefundLeaseId] = useState<string | null>(null);
   const [refundAmount, setRefundAmount] = useState('');
+  const [refundNotes, setRefundNotes] = useState('');
+  const [refundType, setRefundType] = useState<'request' | 'approve' | 'dispute'>('request');
 
   const handleRenew = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -319,13 +361,21 @@ export function LeasesPage() {
     }
   };
 
-  const handleRefund = async (e: React.FormEvent) => {
+  const handleRefundAction = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!refundLeaseId) return;
     try {
-      await refundDeposit(refundLeaseId, parseFloat(refundAmount));
+      if (refundType === 'request') {
+        await refundDeposit(refundLeaseId, parseFloat(refundAmount), refundNotes);
+      } else if (refundType === 'approve') {
+        await approveRefund(refundLeaseId);
+      } else if (refundType === 'dispute') {
+        await disputeRefund(refundLeaseId, refundNotes);
+      }
       setRefundLeaseId(null);
       setRefundAmount('');
+      setRefundNotes('');
+      setRefundType('request');
     } catch (e) {
       // toast handled in context
     }
@@ -548,6 +598,31 @@ export function LeasesPage() {
                     </Badge>
                   </div>
 
+                  {/* Deposit Info */}
+                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                    <div>
+                      <p className="text-sm text-gray-600">Deposit Status</p>
+                      <p className="text-lg font-semibold flex items-center gap-2">
+                        {selectedLease.depositStatus?.replace('_', ' ')}
+                        {selectedLease.depositStatus === 'awaiting_approval' && (
+                           <span className="text-xs text-orange-600 bg-orange-100 px-2 py-1 rounded">Action Required</span>
+                        )}
+                      </p>
+                    </div>
+                    {(selectedLease.depositStatus === 'awaiting_approval' || selectedLease.depositStatus === 'disputed') && (
+                      <div className="text-right">
+                         <p className="text-sm text-gray-600">Proposed Refund</p>
+                         <p className="text-lg font-semibold text-orange-600">LKR {selectedLease.proposedRefundAmount}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {(selectedLease.refundNotes) && (
+                    <div className="p-4 bg-blue-50 rounded-lg text-sm text-blue-900">
+                      <strong>Notes:</strong> {selectedLease.refundNotes}
+                    </div>
+                  )}
+
                   {/* Parties */}
                   <div className="grid grid-cols-2 gap-4">
                     <div className="border rounded-lg p-4">
@@ -738,34 +813,70 @@ export function LeasesPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Refund Deposit Dialog */}
+      {/* Refund Deposit / Action Dialog */}
       <Dialog
         open={!!refundLeaseId}
         onOpenChange={(open) => !open && setRefundLeaseId(null)}
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Refund Security Deposit</DialogTitle>
+            <DialogTitle>
+              {refundType === 'request' && 'Request Security Deposit Refund'}
+              {refundType === 'approve' && 'Approve Refund Request'}
+              {refundType === 'dispute' && 'Dispute Refund Request'}
+            </DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleRefund} className="space-y-4">
-            <div className="space-y-2">
-              <Label>Refund Amount (LKR)</Label>
-              <Input
-                type="number"
-                step="0.01"
-                min="0"
-                value={refundAmount}
-                onChange={(e) => setRefundAmount(e.target.value)}
-                required
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Enter the amount to be returned to the tenant. (Max:{' '}
-                {leases.find((l) => l.id === refundLeaseId)?.securityDeposit ||
-                  0}
-                )
-              </p>
-            </div>
-            <div className="flex justify-end gap-2">
+          <form onSubmit={handleRefundAction} className="space-y-4">
+            {refundType === 'request' && (
+              <>
+                <div className="space-y-2">
+                  <Label>Refund Amount (LKR)</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={refundAmount}
+                    onChange={(e) => setRefundAmount(e.target.value)}
+                    required
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Enter the amount to be returned to the tenant. (Max:{' '}
+                    {leases.find((l) => l.id === refundLeaseId)?.securityDeposit || 0}
+                    )
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label>Notes / Reason for Deduction</Label>
+                  <Input
+                    type="text"
+                    value={refundNotes}
+                    onChange={(e) => setRefundNotes(e.target.value)}
+                    placeholder="E.g., Cleaning fee deducted"
+                  />
+                </div>
+              </>
+            )}
+
+            {refundType === 'approve' && (
+              <div className="bg-yellow-50 text-yellow-800 p-4 rounded-lg text-sm">
+                <p>Are you sure you want to approve this refund? This action will generate the necessary ledger entries and cannot be easily undone.</p>
+              </div>
+            )}
+
+            {refundType === 'dispute' && (
+              <div className="space-y-2">
+                <Label>Dispute Reason / Notes</Label>
+                <Input
+                  type="text"
+                  value={refundNotes}
+                  onChange={(e) => setRefundNotes(e.target.value)}
+                  required
+                  placeholder="Reason for disputing"
+                />
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2 mt-4">
               <Button
                 type="button"
                 variant="outline"
@@ -773,7 +884,14 @@ export function LeasesPage() {
               >
                 Cancel
               </Button>
-              <Button type="submit">Process Refund</Button>
+              <Button 
+                type="submit" 
+                variant={refundType === 'dispute' ? 'destructive' : 'default'}
+              >
+                {refundType === 'request' && 'Submit Request'}
+                {refundType === 'approve' && 'Approve & Finalize'}
+                {refundType === 'dispute' && 'Mark as Disputed'}
+              </Button>
             </div>
           </form>
         </DialogContent>

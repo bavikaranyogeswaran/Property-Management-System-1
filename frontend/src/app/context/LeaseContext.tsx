@@ -13,7 +13,9 @@ export interface Lease {
   monthlyRent: number;
   status: 'active' | 'ended' | 'cancelled';
   securityDeposit?: number;
-  depositStatus?: 'pending' | 'paid' | 'partially_refunded' | 'refunded';
+  depositStatus?: 'pending' | 'paid' | 'awaiting_approval' | 'disputed' | 'partially_refunded' | 'refunded';
+  proposedRefundAmount?: number;
+  refundNotes?: string;
   refundedAmount?: number;
   documentUrl?: string;
   noticeStatus?: 'undecided' | 'vacating' | 'renewing';
@@ -36,7 +38,9 @@ interface LeaseContextType {
   addLease: (lease: Omit<Lease, 'id' | 'createdAt'>) => Promise<void>;
   endLease: (id: string) => Promise<void>;
   renewLease: (id: string, newEndDate: string, newMonthlyRent?: number) => Promise<void>;
-  refundDeposit: (id: string, amount: number) => Promise<void>;
+  refundDeposit: (id: string, amount: number, notes?: string) => Promise<void>;
+  approveRefund: (id: string) => Promise<void>;
+  disputeRefund: (id: string, notes: string) => Promise<void>;
   updateLeaseDocument: (id: string, documentUrl: string) => Promise<void>;
   updateNoticeStatus: (id: string, status: 'undecided' | 'vacating' | 'renewing') => Promise<void>;
   leaseTerms: LeaseTerm[];
@@ -71,6 +75,9 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
           id: l.id?.toString() || l.lease_id?.toString(),
           tenantId: l.tenantId?.toString() || l.tenant_id?.toString(),
           unitId: l.unitId?.toString() || l.unit_id?.toString(),
+          depositStatus: l.depositStatus || l.deposit_status,
+          proposedRefundAmount: l.proposedRefundAmount || l.proposed_refund_amount || 0,
+          refundNotes: l.refundNotes || l.refund_notes,
           documentUrl: l.documentUrl || l.document_url,
           noticeStatus: l.noticeStatus || l.notice_status,
         })));
@@ -129,20 +136,37 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const refundDeposit = async (id: string, amount: number) => {
+  const refundDeposit = async (id: string, amount: number, notes?: string) => {
     try {
-      await apiClient.post(`/leases/${id}/refund`, { amount });
-      const lRes = await apiClient.get('/leases');
-      setLeases(lRes.data.map((l: any) => ({
-        ...l,
-        id: l.id?.toString() || l.lease_id?.toString(),
-        tenantId: l.tenantId?.toString() || l.tenant_id?.toString(),
-        unitId: l.unitId?.toString() || l.unit_id?.toString(),
-        documentUrl: l.documentUrl || l.document_url,
-      })));
-      toast.success('Deposit refunded successfully');
+      await apiClient.post(`/leases/${id}/refund`, { amount, notes });
+      await fetchLeases(); // Easier to refetch instead of manual mapping
+      toast.success('Refund requested successfully');
     } catch (e: any) {
       const msg = e.response?.data?.error || 'Failed to refund deposit';
+      toast.error(msg);
+      throw new Error(msg);
+    }
+  };
+
+  const approveRefund = async (id: string) => {
+    try {
+      await apiClient.post(`/leases/${id}/refund/approve`);
+      await fetchLeases();
+      toast.success('Refund approved successfully');
+    } catch (e: any) {
+      const msg = e.response?.data?.error || 'Failed to approve refund';
+      toast.error(msg);
+      throw new Error(msg);
+    }
+  };
+
+  const disputeRefund = async (id: string, notes: string) => {
+    try {
+      await apiClient.post(`/leases/${id}/refund/dispute`, { notes });
+      await fetchLeases();
+      toast.success('Refund disputed successfully');
+    } catch (e: any) {
+      const msg = e.response?.data?.error || 'Failed to dispute refund';
       toast.error(msg);
       throw new Error(msg);
     }
@@ -209,7 +233,9 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
       addLease, 
       endLease, 
       renewLease, 
-      refundDeposit, 
+      refundDeposit,
+      approveRefund,
+      disputeRefund,
       updateLeaseDocument, 
       updateNoticeStatus,
       leaseTerms,

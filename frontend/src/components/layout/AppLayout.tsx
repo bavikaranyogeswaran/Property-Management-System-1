@@ -79,6 +79,7 @@ export function AppLayout({ children }: AppLayoutProps) {
     { path: '/properties', label: 'My Properties', icon: Building2 }, // New
     { path: '/tenants', label: 'Tenants', icon: Users }, // New
     { path: '/invoices', label: 'Invoices', icon: FileText },
+    { path: '/leases', label: 'Leases', icon: FileText },
     { path: '/payments', label: 'Payment Verification', icon: CreditCard },
     { path: '/receipts', label: 'Receipts', icon: Receipt },
     { path: '/expenses', label: 'Expenses', icon: DollarSign },
