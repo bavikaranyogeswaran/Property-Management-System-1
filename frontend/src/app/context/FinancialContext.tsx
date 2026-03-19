@@ -67,6 +67,7 @@ interface FinancialContextType {
   submitPayment: (payment: Omit<Payment, 'id' | 'submittedAt'>) => Promise<void>;
   verifyPayment: (id: string, approved: boolean) => Promise<void>;
   recordCashPayment: (invoiceId: string, amount: number, paymentDate: string, referenceNumber?: string) => Promise<void>;
+  runLateFeeAudit: () => Promise<void>;
 }
 
 const FinancialContext = createContext<FinancialContextType | undefined>(undefined);
@@ -191,9 +192,20 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
       toast.error(e.response?.data?.error || 'Failed to record cash payment');
     }
   };
+  
+  const runLateFeeAudit = async () => {
+    try {
+      const { adminApi } = await import('../../services/api');
+      await adminApi.triggerLateFees();
+      toast.success('Late fee audit completed');
+      await fetchFinancialData();
+    } catch (e: any) {
+      toast.error(e.response?.data?.error || 'Failed to run late fee audit');
+    }
+  };
 
   return (
-    <FinancialContext.Provider value={{ invoices, payments, receipts, fetchLedgerSummary, generateMonthlyInvoices, submitPayment, verifyPayment, recordCashPayment }}>
+    <FinancialContext.Provider value={{ invoices, payments, receipts, fetchLedgerSummary, generateMonthlyInvoices, submitPayment, verifyPayment, recordCashPayment, runLateFeeAudit }}>
       {children}
     </FinancialContext.Provider>
   );

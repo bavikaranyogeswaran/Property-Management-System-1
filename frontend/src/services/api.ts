@@ -138,4 +138,9 @@ export const receiptApi = {
   getReceiptById: (id: string) => apiClient.get(`/receipts/${id}`),
 };
 
+// Admin API
+export const adminApi = {
+  triggerLateFees: () => apiClient.post('/admin/trigger-late-fees'),
+};
+
 export default apiClient;

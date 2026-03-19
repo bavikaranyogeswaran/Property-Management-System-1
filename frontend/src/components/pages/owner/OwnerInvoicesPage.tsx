@@ -106,6 +106,7 @@ export function OwnerInvoicesPage() {
     receipts,
     payments,
     generateMonthlyInvoices,
+    runLateFeeAudit, // Add this
   } = useApp();
   const [selectedReceipt, setSelectedReceipt] = useState<{
     receipt: ReceiptType;
@@ -120,8 +121,7 @@ export function OwnerInvoicesPage() {
 
   const pendingInvoices = invoices.filter((i) => i.status === 'pending');
   const paidInvoices = invoices.filter((i) => i.status === 'paid');
-  // Fix: Compare dates strictly (YYYY-MM-DD string comparison works if format is ISO)
-  // Use local date to avoid UTC shifts marking today's invoices as overdue
+  
   const d = new Date();
   const year = d.getFullYear();
   const month = String(d.getMonth() + 1).padStart(2, '0');
@@ -182,8 +182,6 @@ export function OwnerInvoicesPage() {
             <TableHead>Due Date</TableHead>
             <TableHead>Generated</TableHead>
             <TableHead>Status</TableHead>
-            {/* Only show the Actions header if the user is a treasurer (who can use Cash Pay) 
-                or if we are exclusively viewing paid invoices (the Paid tab) */}
             {(user?.role === 'treasurer' || (invoicesList.length > 0 && invoicesList.every(i => i.status === 'paid'))) && (
               <TableHead className="text-right">Actions</TableHead>
             )}
@@ -195,21 +193,12 @@ export function OwnerInvoicesPage() {
             const propertyName = invoice.propertyName || 'Unknown';
             const unitNumber = invoice.unitNumber || 'Unknown';
 
-            // Fallback object lookups (needed for Receipt/Form logic that use other fields like email)
             const tenant = tenants.find((t) => t.id === invoice.tenantId);
             const unit = units.find((u) => u.id === invoice.unitId);
             const property = unit
               ? properties.find((p) => p.id === unit.propertyId)
               : null;
 
-            // Search query filtering (if implemented) or other logic
-            // Note: searchQuery is not defined in this scope. This line will cause a compilation error.
-            // Assuming it's a placeholder or intended for a different context.
-            // const matchesSearch =
-            //   tenantName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            //   propertyName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            //   unitNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            //   invoice.id.includes(searchQuery); is YYYY-MM-DD
             const isOverdue =
               invoice.status === 'pending' && invoice.dueDate < todayStr;
             const isLateFee = invoice.description?.includes('Late Fee');
@@ -242,7 +231,7 @@ export function OwnerInvoicesPage() {
                         invoice.status === 'paid'
                           ? 'default'
                           : invoice.status === 'partially_paid'
-                            ? 'outline' // Changed to outline or custom class for visibility
+                            ? 'outline' 
                             : isOverdue
                               ? 'destructive'
                               : 'secondary'
@@ -273,7 +262,6 @@ export function OwnerInvoicesPage() {
                 {(user?.role === 'treasurer' || (invoicesList.length > 0 && invoicesList.every(i => i.status === 'paid'))) && (
                   <TableCell className="text-right align-middle h-14">
                     <div className="flex items-center justify-end gap-2">
-                    {/* Cash Payment Button for Treasurer */}
                     {user?.role === 'treasurer' && invoice.status !== 'paid' && (
                       <Dialog>
                         <DialogTrigger asChild>
@@ -357,12 +345,20 @@ export function OwnerInvoicesPage() {
             Manage rent invoices and payments
           </p>
         </div>
-        {user?.role === 'treasurer' && (
-          <Button onClick={handleGenerateInvoices}>
-            <Plus className="size-4 mr-2" />
-            Generate Monthly Invoices
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {(user?.role === 'treasurer' || user?.role === 'owner') && (
+            <Button variant="outline" onClick={runLateFeeAudit} className="text-red-700 border-red-200 hover:bg-red-50">
+              <AlertCircle className="size-4 mr-2" />
+              Run Late Fee Audit
+            </Button>
+          )}
+          {user?.role === 'treasurer' && (
+            <Button onClick={handleGenerateInvoices}>
+              <Plus className="size-4 mr-2" />
+              Generate Monthly Invoices
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Info Card */}
@@ -389,7 +385,6 @@ export function OwnerInvoicesPage() {
         </Card>
       )}
 
-      {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((stat, index) => {
           const Icon = stat.icon;
@@ -420,7 +415,6 @@ export function OwnerInvoicesPage() {
         })}
       </div>
 
-      {/* Invoices Tabs */}
       <Card>
         <CardContent className="p-0">
           <Tabs defaultValue="all" className="w-full">
@@ -468,7 +462,6 @@ export function OwnerInvoicesPage() {
         </CardContent>
       </Card>
 
-      {/* Receipt Viewer Dialog */}
       <Dialog
         open={selectedReceipt !== null}
         onOpenChange={() => setSelectedReceipt(null)}

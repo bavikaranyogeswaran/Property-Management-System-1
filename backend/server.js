@@ -97,11 +97,13 @@ import payoutRoutes from './routes/payoutRoutes.js';
 import messageRoutes from './routes/messageRoutes.js';
 import leaseTermRoutes from './routes/leaseTermRoutes.js';
 import documentRoutes from './routes/documentRoutes.js';
+import adminRoutes from './routes/adminRoutes.js';
 
 // Lead Portal (public, no auth) — MUST be mounted before imageRoutes
 app.use('/api/lead-portal', leadPortalRoutes);
 
 app.use('/api/auth', authRoutes);
+app.use('/api/admin', adminRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/leads', leadRoutes);
 app.use('/api/properties', propertyRoutes);
