@@ -6,6 +6,7 @@
 // ============================================================================
 
 import db from '../config/db.js';
+import { getCurrentDateString, formatToLocalDate } from '../utils/dateUtils.js';
 
 class LeaseModel {
   //  CREATE LEASE: Filing a new contract.
@@ -218,12 +219,7 @@ class LeaseModel {
   }
 
   formatDate(date) {
-    if (!date) return null;
-    // Adjust for timezone offset to ensure we get the local YYYY-MM-DD
-    const d = new Date(date);
-    const offset = d.getTimezoneOffset() * 60000;
-    const localDate = new Date(d.getTime() - offset);
-    return localDate.toISOString().split('T')[0];
+    return formatToLocalDate(date);
   }
 }
 

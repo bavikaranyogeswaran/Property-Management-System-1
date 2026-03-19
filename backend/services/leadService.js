@@ -7,6 +7,7 @@ import leadStageHistoryModel from '../models/leadStageHistoryModel.js';
 import leadTokenModel from '../models/leadTokenModel.js';
 import emailService from '../utils/emailService.js';
 import { validateEmail, validatePhoneNumber } from '../utils/validators.js';
+import { getCurrentDateString, getLocalTime, formatToLocalDate } from '../utils/dateUtils.js';
 
 class LeadService {
 
@@ -59,16 +60,16 @@ class LeadService {
             
             const hasOverlap = await (await import('../models/leaseModel.js')).default.checkOverlap(
                 finalUnitId, 
-                startDate.toISOString().split('T')[0], 
-                endDate.toISOString().split('T')[0]
+                formatToLocalDate(startDate), 
+                formatToLocalDate(endDate)
             );
             
             if (hasOverlap) {
                 // If there's an overlap, check if the current tenant is vacating
                 const activeLease = await (await import('../models/leaseModel.js')).default.checkOverlap(
                     finalUnitId,
-                    startDate.toISOString().split('T')[0],
-                    endDate.toISOString().split('T')[0]
+                    formatToLocalDate(startDate),
+                    formatToLocalDate(endDate)
                 );
                 // Note: checkOverlap only returns true/false. 
                 // We might want to be more specific later, but for now, we follow the plan.
@@ -85,7 +86,7 @@ class LeadService {
         if (existingLeadId) {
             leadId = existingLeadId;
             await leadModel.update(leadId, {
-                lastContactedAt: new Date(),
+                lastContactedAt: getLocalTime(),
                 notes: notes ? `${notes} (Re-inquiry)` : undefined,
                 interestedUnit: finalUnitId,
                 unitId: finalUnitId,

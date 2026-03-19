@@ -7,6 +7,7 @@ import invoiceModel from '../models/invoiceModel.js';
 import visitModel from '../models/visitModel.js';
 import leadModel from '../models/leadModel.js';
 import { validateLeaseDuration } from '../utils/validators.js';
+import { getCurrentDateString, getLocalTime } from '../utils/dateUtils.js';
 
 class LeaseService {
   /**
@@ -363,7 +364,7 @@ class LeaseService {
             const payId = await paymentModel.create({
               invoiceId: inv.invoice_id,
               amount: toPay,
-              paymentDate: new Date(),
+              paymentDate: getLocalTime(),
               paymentMethod: 'deposit_offset',
               referenceNumber: `DEP-OFF-${Date.now()}`,
             }, connection);
@@ -382,7 +383,7 @@ class LeaseService {
               invoiceId: inv.invoice_id,
               tenantId: lease.tenantId,
               amount: toPay,
-              generatedDate: new Date().toISOString(),
+              generatedDate: getLocalTime(),
               receiptNumber: `REC-OFFSET-${randomUUID()}`,
             }, connection);
 
@@ -395,7 +396,7 @@ class LeaseService {
               category: 'rent',
               credit: Number(toPay),
               description: `Deposit offset applied to outstanding invoice #${inv.invoice_id}`,
-              entryDate: new Date().toISOString().split('T')[0],
+              entryDate: getCurrentDateString(),
             }, connection);
 
             await ledgerModel.create({
@@ -406,7 +407,7 @@ class LeaseService {
               category: 'deposit_withheld',
               debit: Number(toPay),
               description: `Security deposit withheld for outstanding debt`,
-              entryDate: new Date().toISOString().split('T')[0],
+              entryDate: getCurrentDateString(),
             }, connection);
 
             withheldAmount -= toPay;
@@ -418,7 +419,11 @@ class LeaseService {
         const invId = await invoiceModel.create({
           leaseId,
           amount: withheldAmount,
-          dueDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          dueDate: (() => {
+            const d = getLocalTime();
+            d.setDate(d.getDate() + 5);
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+          })(),
           description: `Security Deposit Deductions (Damages/Cleaning): ${lease.refundNotes || ''}`,
           type: 'maintenance',
         }, connection);
@@ -427,7 +432,7 @@ class LeaseService {
         const payId = await paymentModel.create({
           invoiceId: invId,
           amount: withheldAmount,
-          paymentDate: new Date(),
+          paymentDate: getLocalTime(),
           paymentMethod: 'deposit_deduction',
           referenceNumber: `SYS-DEDUCT-${Date.now()}`,
         }, connection);
@@ -441,7 +446,7 @@ class LeaseService {
           invoiceId: invId,
           tenantId: lease.tenantId,
           amount: withheldAmount,
-          generatedDate: new Date().toISOString(),
+          generatedDate: getLocalTime(),
           receiptNumber: `REC-DEDUCT-${randomUUID()}`,
         }, connection);
 
@@ -454,7 +459,7 @@ class LeaseService {
           category: 'maintenance',
           credit: Number(withheldAmount),
           description: `Security deposit deduction for damages: ${invId}`,
-          entryDate: new Date().toISOString().split('T')[0],
+          entryDate: getCurrentDateString(),
         }, connection);
 
         await ledgerModel.create({

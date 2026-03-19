@@ -6,6 +6,7 @@
 // ============================================================================
 
 import pool from '../config/db.js';
+import { getCurrentDateString } from '../utils/dateUtils.js';
 
 class InvoiceModel {
   //  CREATE: Writing a new bill to the ledger.
@@ -41,7 +42,7 @@ class InvoiceModel {
             category,
             debit: Number(amount),
             description: `Generated ${type || 'rent'} invoice: ${description || 'No description'}`,
-            entryDate: new Date().toISOString().split('T')[0],
+            entryDate: getCurrentDateString(),
           }, db);
         } catch (ledgerErr) {
           console.error('Failed to post initial ledger entry for invoice:', ledgerErr);

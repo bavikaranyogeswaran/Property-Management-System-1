@@ -7,6 +7,7 @@ import leaseModel from '../models/leaseModel.js';
 import invoiceModel from '../models/invoiceModel.js';
 import userModel from '../models/userModel.js';
 import emailService from '../utils/emailService.js';
+import { getCurrentDateString, getLocalTime } from '../utils/dateUtils.js';
 
 class MaintenanceService {
 
@@ -138,7 +139,7 @@ class MaintenanceService {
         const invoiceId = await invoiceModel.create({
             leaseId: activeLease.id,
             amount,
-            dueDate: dueDate || new Date(),
+            dueDate: dueDate || getCurrentDateString(),
             description: proposedDescription,
             type: 'maintenance',
         });
@@ -153,12 +154,11 @@ class MaintenanceService {
         try {
             const tenant = await userModel.findById(request.tenant_id);
             if (tenant && tenant.email) {
-                const dueDateObj = dueDate ? new Date(dueDate) : new Date();
                 await emailService.sendInvoiceNotification(tenant.email, {
                     amount,
-                    dueDate: dueDate || dueDateObj.toISOString().split('T')[0],
-                    month: dueDateObj.getMonth() + 1,
-                    year: dueDateObj.getFullYear(),
+                    dueDate: dueDate || getCurrentDateString(),
+                    month: getLocalTime().getMonth() + 1,
+                    year: getLocalTime().getFullYear(),
                     invoiceId: invoiceId,
                     description: proposedDescription
                 });

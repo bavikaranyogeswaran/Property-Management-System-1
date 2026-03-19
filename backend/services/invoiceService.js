@@ -7,6 +7,7 @@ import behaviorLogModel from '../models/behaviorLogModel.js';
 import tenantModel from '../models/tenantModel.js';
 import userModel from '../models/userModel.js';
 import emailService from '../utils/emailService.js';
+import { getCurrentDateString, getLocalTime } from '../utils/dateUtils.js';
 
 class InvoiceService {
     
@@ -57,7 +58,7 @@ class InvoiceService {
             throw new Error('Access denied. Only Treasurers can generate invoices.');
         }
 
-        const now = new Date();
+        const now = getLocalTime();
         const y = year || now.getFullYear();
         const m = month || now.getMonth() + 1;
 
@@ -91,8 +92,7 @@ class InvoiceService {
                 continue;
             }
 
-            const dueDate = new Date(y, m - 1, 5);
-            const dueDateStr = dueDate.toISOString().split('T')[0];
+            const dueDateStr = `${y}-${String(m).padStart(2, '0')}-05`; // Standard due date
 
             const invoiceId = await invoiceModel.create({
                 leaseId: lease.id,
@@ -134,7 +134,7 @@ class InvoiceService {
 
         if (status === 'overdue') {
             const dueDate = new Date(invoice.due_date);
-            const today = new Date();
+            const today = getLocalTime();
             today.setHours(0, 0, 0, 0);
             dueDate.setHours(0, 0, 0, 0);
 

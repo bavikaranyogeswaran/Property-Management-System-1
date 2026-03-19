@@ -11,6 +11,7 @@ import leaseModel from '../models/leaseModel.js';
 import auditLogger from '../utils/auditLogger.js';
 import ledgerModel from '../models/ledgerModel.js';
 import emailService from '../utils/emailService.js';
+import { getCurrentDateString, getLocalTime } from '../utils/dateUtils.js';
 
 /**
  * Maps an invoice_type to the correct accounting ledger classification.
@@ -91,7 +92,7 @@ class PaymentService {
             category,
             credit: Number(amount),
             description: description || `Payment for ${invoice.invoice_type}`,
-            entryDate: new Date().toISOString().split('T')[0],
+            entryDate: getCurrentDateString(),
         }, connection);
     }
 

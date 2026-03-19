@@ -1,4 +1,5 @@
 import pool from '../config/db.js';
+import { getLocalTime } from '../utils/dateUtils.js';
 
 class ReceiptModel {
   async create(data, connection = null) {
@@ -11,7 +12,7 @@ class ReceiptModel {
       receiptNumber,
     } = data;
     // generatedDate becomes receipt_date. Ensure valid date linked to payment.
-    const dateValue = generatedDate ? new Date(generatedDate) : new Date();
+    const dateValue = generatedDate ? new Date(generatedDate) : getLocalTime();
 
     const db = connection || pool;
     const [result] = await db.query(

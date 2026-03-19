@@ -4,6 +4,7 @@ import leaseModel from '../models/leaseModel.js';
 import invoiceModel from '../models/invoiceModel.js';
 import notificationModel from '../models/notificationModel.js';
 import emailService from './emailService.js';
+import { getCurrentDateString, getLocalTime } from './dateUtils.js';
 
 // Configuration Constants
 const RENT_DUE_DAY = parseInt(process.env.RENT_DUE_DAY) || 5; // Day of the month rent is due
@@ -12,7 +13,7 @@ const LATE_FEE_PERCENTAGE = parseFloat(process.env.LATE_FEE_PERCENTAGE) || 0.05;
 
 export const generateRentInvoices = async () => {
   console.log('Running automated rent invoicing...');
-  const today = new Date();
+  const today = getLocalTime();
 
   // Check if it's the 1st of the month (or for testing purposes, we assume checks are safe to run anytime due to existence check)
   // Production: if (today.getDate() !== 1) return;
@@ -25,7 +26,9 @@ export const generateRentInvoices = async () => {
 
   const currentYear = today.getFullYear();
   const currentMonth = today.getMonth() + 1; // 1-12
-  const dueDate = new Date(today.getFullYear(), today.getMonth(), RENT_DUE_DAY);
+  
+  // Calculate due date in local components
+  const dueDateStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(RENT_DUE_DAY).padStart(2, '0')}`;
 
   try {
     const activeLeases = await leaseModel.findActive(); // Should return all active (and pending? no only active)
@@ -81,7 +84,7 @@ export const generateRentInvoices = async () => {
         const invoiceId = await invoiceModel.create({
           leaseId: lease.id,
           amount: rentAmount,
-          dueDate: dueDate.toISOString().split('T')[0],
+          dueDate: dueDateStr,
           description: description,
           type: 'rent',
         });
