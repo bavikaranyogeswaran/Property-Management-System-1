@@ -212,6 +212,19 @@ class LedgerModel {
 
     return Object.values(monthlyData);
   }
+
+  /**
+   * Internal Audit Tool: Finds verified payments that don't have a corresponding ledger entry.
+   */
+  async findMismatches() {
+    const [rows] = await db.query(`
+        SELECT p.payment_id, p.amount, p.invoice_id, p.status
+        FROM payments p
+        LEFT JOIN ledger l ON p.payment_id = l.payment_id
+        WHERE p.status = 'verified' AND l.ledger_id IS NULL
+    `);
+    return rows;
+  }
 }
 
 export default new LedgerModel();

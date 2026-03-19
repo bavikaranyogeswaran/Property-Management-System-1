@@ -641,6 +641,41 @@ class LeaseService {
     if (user.role === 'tenant' && String(lease.tenantId) !== String(user.id)) throw new Error('Access denied');
     if (!['undecided', 'vacating', 'renewing'].includes(status)) throw new Error('Invalid notice status');
     await leaseModel.update(leaseId, { notice_status: status });
+
+    // [FIX] Lease Notice Paradox: Automatically create a draft lease if renewing
+    if (status === 'renewing' && lease.status === 'active' && lease.endDate) {
+        const nextStartDate = new Date(lease.endDate);
+        nextStartDate.setDate(nextStartDate.getDate() + 1);
+        
+        const nextEndDate = new Date(nextStartDate);
+        nextEndDate.setFullYear(nextEndDate.getFullYear() + 1); // Default to 1 year
+        
+        const nextStartDateStr = nextStartDate.toISOString().split('T')[0];
+        const nextEndDateStr = nextEndDate.toISOString().split('T')[0];
+
+        // Check if a draft or active lease already exists for this next period
+        const hasOverlap = await leaseModel.checkOverlap(
+            lease.unitId,
+            nextStartDateStr,
+            nextEndDateStr,
+            null
+        );
+
+        if (!hasOverlap) {
+            await leaseModel.create({
+                tenantId: lease.tenantId,
+                unitId: lease.unitId,
+                startDate: nextStartDateStr,
+                endDate: nextEndDateStr,
+                monthlyRent: lease.monthlyRent,
+                securityDeposit: 0,
+                status: 'draft',
+                documentUrl: null
+            });
+            console.log(`[RENEWAL] Created draft lease for Tenant ${lease.tenantId} at Unit ${lease.unitId}`);
+        }
+    }
+
     return true;
   }
 }

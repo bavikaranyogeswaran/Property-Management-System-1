@@ -81,6 +81,20 @@ class PaymentService {
         return paymentId;
     }
 
+    async _postToLedger(paymentId, invoice, amount, description, connection) {
+        const { accountType, category } = getLedgerClassification(invoice.invoice_type);
+        return await ledgerModel.create({
+            paymentId: Number(paymentId),
+            invoiceId: invoice.invoice_id,
+            leaseId: invoice.lease_id,
+            accountType,
+            category,
+            credit: Number(amount),
+            description: description || `Payment for ${invoice.invoice_type}`,
+            entryDate: new Date().toISOString().split('T')[0],
+        }, connection);
+    }
+
     async recordCashPayment(data, treasurerUser) {
         if (treasurerUser.role !== 'treasurer') {
             throw new Error('Access denied. Only Treasurers can record cash payments.');
@@ -117,11 +131,6 @@ class PaymentService {
             const totalVerified = allPayments
                 .filter((p) => p.status === 'verified')
                 .reduce((sum, p) => sum + Number(p.amount), 0) + Number(amount); 
-                // Note: allPayments doesn't include the current one yet if we don't refetch or use connection.
-                // However, standard findByInvoiceId uses pool, not the connection.
-                // It's safer to calculate based on (totalVerified from DB excluding current) + current amount.
-                // But totalVerified calculation above should be inside transaction-aware if possible.
-                // For now, I'll use the current verified amount logic but ensure it's correct.
 
             const invoice = await invoiceModel.findById(invoiceId, connection);
 
@@ -163,18 +172,14 @@ class PaymentService {
                     connection
                 );
 
-                // Post Ledger Entry
-                const { accountType, category } = getLedgerClassification(invoice.invoice_type);
-                await ledgerModel.create({
-                    paymentId,
-                    invoiceId: invoice.invoice_id,
-                    leaseId: invoice.lease_id,
-                    accountType,
-                    category,
-                    credit: Number(amount),
-                    description: `Cash payment for ${invoice.description || invoice.invoice_type}`,
-                    entryDate: new Date().toISOString().split('T')[0],
-                }, connection);
+                // Post Ledger Entry (Centralized)
+                await this._postToLedger(
+                    paymentId, 
+                    invoice, 
+                    amount, 
+                    `Cash payment for ${invoice.description || invoice.invoice_type}`, 
+                    connection
+                );
 
                 await connection.commit();
 
@@ -311,18 +316,14 @@ class PaymentService {
                             details: { invoiceId: payment.invoiceId, amount: payment.amount },
                         }, null, connection);
 
-                        // Post Ledger Entry
-                        const { accountType, category } = getLedgerClassification(invoice.invoice_type);
-                        await ledgerModel.create({
-                            paymentId: Number(paymentId),
-                            invoiceId: invoice.invoice_id,
-                            leaseId: invoice.lease_id,
-                            accountType,
-                            category,
-                            credit: Number(payment.amount),
-                            description: `Payment verified for ${invoice.description || invoice.invoice_type}`,
-                            entryDate: new Date().toISOString().split('T')[0],
-                        }, connection);
+                        // Post Ledger Entry (Centralized)
+                        await this._postToLedger(
+                            paymentId,
+                            invoice,
+                            payment.amount,
+                            `Payment verified for ${invoice.description || invoice.invoice_type}`,
+                            connection
+                        );
 
                         // Behavior Score
                         try {

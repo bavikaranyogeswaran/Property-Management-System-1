@@ -15,6 +15,9 @@ router.get('/units/:unitId/images', imageController.getUnitImages);
 router.use(authenticateToken);
 router.post('/upload', upload.single('file'), imageController.uploadGeneralFile);
 
+import { privateUpload } from '../middleware/upload.js';
+router.post('/upload/private', privateUpload.single('file'), imageController.uploadGeneralFile);
+
 // Protected Routes (Owner Only)
 router.use(authorizeRoles('owner'));
 

@@ -43,7 +43,7 @@ class LeaseModel {
     'tenant_id', 'unit_id', 'start_date', 'end_date',
     'monthly_rent', 'status', 'security_deposit',
     'deposit_status', 'refunded_amount', 'document_url',
-    'proposed_refund_amount', 'refund_notes',
+    'proposed_refund_amount', 'refund_notes', 'notice_status',
   ];
 
   async update(id, data, connection = null) {
@@ -145,7 +145,7 @@ class LeaseModel {
     let query = `
             SELECT lease_id FROM leases 
             WHERE unit_id = ? 
-            AND status IN ('active', 'pending')
+            AND status IN ('active', 'pending', 'draft')
             AND deleted_at IS NULL
             AND start_date <= ? 
             AND (end_date IS NULL OR end_date >= ?)`;
@@ -174,7 +174,7 @@ class LeaseModel {
     const [rows] = await dbConn.query(
       `SELECT COUNT(*) as count FROM leases 
        WHERE unit_id = ? 
-       AND status IN ('active', 'pending')
+       AND status IN ('active', 'pending', 'draft')
        AND deleted_at IS NULL`,
       [unitId]
     );
@@ -187,7 +187,7 @@ class LeaseModel {
       `SELECT COUNT(*) as count FROM leases l
        JOIN units u ON l.unit_id = u.unit_id
        WHERE u.property_id = ? 
-       AND l.status IN ('active', 'pending')
+       AND l.status IN ('active', 'pending', 'draft')
        AND l.deleted_at IS NULL`,
       [propertyId]
     );

@@ -11,18 +11,31 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// Configure Cloudinary Storage
+// Configure Cloudinary Storage (Public)
 const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: {
-    folder: 'pms_uploads', // The name of the folder in Cloudinary
+    folder: 'pms_uploads', 
     allowed_formats: ['jpg', 'jpeg', 'png', 'webp', 'pdf', 'doc', 'docx'],
     public_id: (req, file) => {
-      // Generate unique filename: timestamp-random-originalname
       const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
       const ext = path.extname(file.originalname);
       const name = path.basename(file.originalname, ext);
       return `${name}-${uniqueSuffix}`;
+    },
+  },
+});
+
+// Configure Private Storage (Authenticated)
+const privateStorage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: 'pms_private',
+    access_mode: 'authenticated', // Requires signed URL
+    allowed_formats: ['jpg', 'jpeg', 'png', 'webp', 'pdf', 'doc', 'docx'],
+    public_id: (req, file) => {
+      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+      return `doc-${uniqueSuffix}`; 
     },
   },
 });
@@ -59,4 +72,13 @@ const upload = multer({
   fileFilter: fileFilter,
 });
 
+const privateUpload = multer({
+  storage: privateStorage,
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB for documents
+  },
+  fileFilter: fileFilter,
+});
+
+export { upload, privateUpload };
 export default upload;

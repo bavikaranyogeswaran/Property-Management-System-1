@@ -78,7 +78,7 @@ export function LeasesPage() {
       const formData = new FormData();
       formData.append('file', e.target.files[0]);
       
-      const uploadRes = await apiClient.post('/upload', formData, {
+      const uploadRes = await apiClient.post('/upload/private', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -667,8 +667,9 @@ export function LeasesPage() {
                           variant="outline"
                           size="sm"
                           onClick={() => {
-                            if (selectedLease.documentUrl) {
-                              window.open(selectedLease.documentUrl, '_blank');
+                            if (selectedLease.id) {
+                              const baseUrl = apiClient.defaults.baseURL || '/api';
+                              window.open(`${baseUrl}/documents/view/${selectedLease.id}?type=lease`, '_blank');
                             }
                           }}
                         >

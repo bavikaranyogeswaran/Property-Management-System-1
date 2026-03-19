@@ -268,13 +268,13 @@ export const TenantDetailsDialog: React.FC<TenantDetailsDialogProps> = ({
             <div className="w-full border rounded-lg overflow-hidden bg-gray-50 flex items-center justify-center min-h-[400px]">
               {tenant.nicUrl?.toLowerCase().endsWith('.pdf') ? (
                 <iframe 
-                  src={tenant.nicUrl} 
+                  src={`${API_URL}/documents/view/${tenant.id}?type=nic`} 
                   className="w-full h-[500px]"
                   title="NIC PDF Preview"
                 />
               ) : (
                 <img 
-                  src={tenant.nicUrl} 
+                  src={`${API_URL}/documents/view/${tenant.id}?type=nic`} 
                   alt="NIC Document" 
                   className="max-w-full h-auto"
                 />
@@ -282,7 +282,7 @@ export const TenantDetailsDialog: React.FC<TenantDetailsDialogProps> = ({
             </div>
             <div className="flex justify-end w-full gap-2">
               <Button variant="outline" onClick={() => {
-                if (tenant.nicUrl) window.open(tenant.nicUrl, '_blank');
+                window.open(`${API_URL}/documents/view/${tenant.id}?type=nic`, '_blank');
               }}>
                 Open in New Tab
               </Button>

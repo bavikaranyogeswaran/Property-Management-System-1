@@ -399,9 +399,12 @@ export function TenantLeasePage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() =>
-                        window.open(currentLease.documentUrl, '_blank')
-                      }
+                      onClick={() => {
+                        if (currentLease.id) {
+                          const baseUrl = '/api'; // Assuming standard base
+                          window.open(`${baseUrl}/documents/view/${currentLease.id}?type=lease`, '_blank');
+                        }
+                      }}
                     >
                       <ExternalLink className="size-4 mr-2" />
                       View Lease Document
