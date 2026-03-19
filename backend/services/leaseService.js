@@ -78,6 +78,14 @@ class LeaseService {
         throw new Error('Unit not found');
       }
 
+      // Check unit status - cannot lease units currently under maintenance or trashed
+      if (unit.status === 'maintenance') {
+        throw new Error('Unit is currently under maintenance and cannot be leased.');
+      }
+      if (unit.status === 'trashed') {
+        throw new Error('Unit is no longer available (trashed).');
+      }
+
       // 2. Check for Date Overlaps
       const hasOverlap = await leaseModel.checkOverlap(
         unitId,

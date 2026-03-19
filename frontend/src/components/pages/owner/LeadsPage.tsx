@@ -231,7 +231,8 @@ export function LeadsPage() {
         documentUrl: '',
       });
     } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Failed to convert lead');
+      const errorMsg = error.response?.data?.error || error.message || 'Failed to convert lead';
+      toast.error(errorMsg);
     }
   };
 
@@ -762,15 +763,60 @@ export function LeadsPage() {
             <div className="space-y-2 pt-2 border-t">
               <Label>Unit Assignment</Label>
               {selectedLead?.interestedUnit ? (
-                <div className="p-3 bg-gray-50 rounded-md border text-sm text-gray-700 flex justify-between items-center">
-                  <span>
-                    Interested Unit:{' '}
-                    <strong>
-                      {units.find((u) => u.id === selectedLead.interestedUnit)
-                        ?.unitNumber || 'Unknown'}
-                    </strong>
-                  </span>
+                <div className="space-y-3">
+                  <div className="p-3 bg-gray-50 rounded-md border text-sm text-gray-700 flex justify-between items-center">
+                    <span>
+                      Interested Unit:{' '}
+                      <strong className="text-gray-900">
+                        {units.find((u) => u.id === selectedLead.interestedUnit)
+                          ?.unitNumber || 'Unknown'}
+                      </strong>
+                    </span>
+                    {(() => {
+                        const unit = units.find((u) => u.id === selectedLead.interestedUnit);
+                        if (!unit) return null;
+                        
+                        const statusColors: Record<string, string> = {
+                            available: 'bg-green-100 text-green-700',
+                            occupied: 'bg-blue-100 text-blue-700',
+                            maintenance: 'bg-red-100 text-red-700',
+                            reserved: 'bg-yellow-100 text-yellow-700'
+                        };
 
+                        return (
+                            <Badge className={`${statusColors[unit.status] || 'bg-gray-100'} border-none`}>
+                                {unit.status.toUpperCase()}
+                            </Badge>
+                        );
+                    })()}
+                  </div>
+
+                  {(() => {
+                    const unit = units.find((u) => u.id === selectedLead.interestedUnit);
+                    if (unit?.status === 'maintenance') {
+                      return (
+                        <div className="p-3 bg-red-50 border border-red-200 rounded-md flex gap-2 items-start text-red-700">
+                          <AlertCircle className="size-4 mt-0.5 shrink-0" />
+                          <div className="text-xs">
+                            <p className="font-bold">Unit Under Maintenance</p>
+                            <p>This unit is currently offline for repairs. You cannot create a lease until maintenance is completed.</p>
+                          </div>
+                        </div>
+                      );
+                    }
+                    if (unit?.status === 'occupied') {
+                      return (
+                        <div className="p-3 bg-blue-50 border border-blue-100 rounded-md flex gap-2 items-start text-blue-700">
+                            <AlertCircle className="size-4 mt-0.5 shrink-0" />
+                            <div className="text-xs">
+                                <p className="font-bold">Unit Currently Occupied</p>
+                                <p>This unit is currently leased. Ensure the move-in date ({conversionData.startDate}) is after the current tenant vacates.</p>
+                            </div>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -852,7 +898,16 @@ export function LeadsPage() {
               >
                 Cancel
               </Button>
-              <Button onClick={handleConvert}>Convert to Tenant</Button>
+              <Button 
+                onClick={handleConvert}
+                disabled={(() => {
+                    const unitId = selectedLead?.interestedUnit || conversionData.unitId;
+                    const unit = units.find(u => String(u.id) === String(unitId));
+                    return unit?.status === 'maintenance';
+                })()}
+              >
+                Convert to Tenant
+              </Button>
             </div>
           </div>
         </DialogContent>
