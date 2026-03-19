@@ -2,21 +2,22 @@ import payoutModel from '../models/payoutModel.js';
 
 class PayoutService {
   async previewPayout(ownerId, startDate, endDate) {
-    if (!startDate || !endDate) {
-      throw new Error('Start date and end date are required');
+    if (!endDate) {
+      throw new Error('End date is required');
     }
     return await payoutModel.calculateNetPayout(ownerId, startDate, endDate);
   }
 
   async createPayout(ownerId, startDate, endDate) {
-    if (!startDate || !endDate) {
-      throw new Error('Start date and end date are required');
+    if (!endDate) {
+      throw new Error('End date is required');
     }
 
-    // Logic Fix: Prevent Overlapping Payouts (Period-based guard)
+    // Overlap Fix: New payout must not end before a previous one ends, 
+    // but we can have multiple payouts for different records in the same month.
     const hasOverlap = await payoutModel.checkOverlap(ownerId, startDate, endDate);
     if (hasOverlap) {
-      throw new Error('A payout record already exists for this period.');
+      throw new Error('A payout record already exists that covers part of this period.');
     }
 
     const { netPayout } = await payoutModel.calculateNetPayout(ownerId, startDate, endDate);

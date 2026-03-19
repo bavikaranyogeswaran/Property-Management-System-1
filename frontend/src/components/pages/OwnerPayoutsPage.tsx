@@ -10,7 +10,7 @@ const OwnerPayoutsPage: React.FC = () => {
 
   // Generation State
   const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
   const [previewData, setPreviewData] = useState<{
     totalIncome: number;
     totalExpenses: number;
@@ -37,8 +37,8 @@ const OwnerPayoutsPage: React.FC = () => {
   };
 
   const handlePreview = async () => {
-    if (!startDate || !endDate) {
-      setError('Please select both start and end dates.');
+    if (!endDate) {
+      setError('Please select an end date.');
       return;
     }
     setError('');
@@ -54,7 +54,7 @@ const OwnerPayoutsPage: React.FC = () => {
   };
 
   const handleCreate = async () => {
-    if (!startDate || !endDate) return;
+    if (!endDate) return;
     if (
       !confirm(
         'Are you sure you want to record this payout? This action is permanent.'
@@ -88,7 +88,10 @@ const OwnerPayoutsPage: React.FC = () => {
 
       {/* Payout Generator Card */}
       <div className="bg-white p-6 rounded-lg shadow-md mb-8">
-        <h2 className="text-xl font-semibold mb-4">Generate New Payout</h2>
+        <h2 className="text-xl font-semibold mb-2">Generate New Payout</h2>
+        <p className="text-sm text-gray-600 mb-4">
+          This will capture all verified payments and maintenance expenses that have not yet been paid out, up to the selected end date (<b>Cash-Basis Accounting</b>).
+        </p>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -99,7 +102,9 @@ const OwnerPayoutsPage: React.FC = () => {
               className="w-full border p-2 rounded"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
+              placeholder="Optional"
             />
+            <p className="text-[10px] text-gray-500 mt-1">Leave empty to include all previous unpaid items.</p>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">

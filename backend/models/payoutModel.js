@@ -41,11 +41,10 @@ class PayoutModel {
       `
             SELECT 1 FROM owner_payouts 
             WHERE owner_id = ? 
-            AND period_start <= ? 
             AND period_end >= ?
             LIMIT 1
         `,
-      [ownerId, endDate, startDate]
+      [ownerId, startDate] // If new payout starts before an old one ends, it's an overlap
     );
     return rows.length > 0;
   }
@@ -67,9 +66,9 @@ class PayoutModel {
             AND p.status = 'verified'
             AND ri.invoice_type != 'deposit'
             AND p.payout_id IS NULL
-            AND p.payment_date BETWEEN ? AND ?
+            AND p.payment_date <= ?
         `,
-      [ownerId, startDate, endDate]
+      [ownerId, endDate]
     );
 
     const totalIncome = parseFloat(incomeRows[0].total_income);
@@ -85,9 +84,9 @@ class PayoutModel {
             JOIN properties prop ON u.property_id = prop.property_id
             WHERE prop.owner_id = ?
             AND mc.payout_id IS NULL
-            AND mc.recorded_date BETWEEN ? AND ?
+            AND mc.recorded_date <= ?
         `,
-      [ownerId, startDate, endDate]
+      [ownerId, endDate]
     );
 
     const totalExpenses = parseFloat(expenseRows[0].total_expenses);
@@ -114,9 +113,9 @@ class PayoutModel {
             AND p.status = 'verified'
             AND ri.invoice_type != 'deposit'
             AND p.payout_id IS NULL
-            AND p.payment_date BETWEEN ? AND ?
+            AND p.payment_date <= ?
         `,
-      [payoutId, ownerId, startDate, endDate]
+      [payoutId, ownerId, endDate]
     );
 
     // Link maintenance costs to the new payout
@@ -129,9 +128,9 @@ class PayoutModel {
             SET mc.payout_id = ?
             WHERE prop.owner_id = ?
             AND mc.payout_id IS NULL
-            AND mc.recorded_date BETWEEN ? AND ?
+            AND mc.recorded_date <= ?
         `,
-      [payoutId, ownerId, startDate, endDate]
+      [payoutId, ownerId, endDate]
     );
     return true;
   }
