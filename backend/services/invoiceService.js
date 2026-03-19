@@ -7,7 +7,7 @@ import behaviorLogModel from '../models/behaviorLogModel.js';
 import tenantModel from '../models/tenantModel.js';
 import userModel from '../models/userModel.js';
 import emailService from '../utils/emailService.js';
-import { getCurrentDateString, getLocalTime } from '../utils/dateUtils.js';
+import { getCurrentDateString, getLocalTime, parseLocalDate, now } from '../utils/dateUtils.js';
 
 class InvoiceService {
     
@@ -35,7 +35,7 @@ class InvoiceService {
             if (lease) {
                 const tenant = await userModel.findById(lease.tenantId);
                 if (tenant && tenant.email) {
-                    const dueDate = new Date(data.dueDate);
+                    const dueDate = parseLocalDate(data.dueDate);
                     await emailService.sendInvoiceNotification(tenant.email, {
                         amount: data.amount,
                         dueDate: data.dueDate,
@@ -75,10 +75,10 @@ class InvoiceService {
         let skippedCount = 0;
 
         for (const lease of targetLeases) {
-            const leaseStart = new Date(lease.startDate);
+            const leaseStart = parseLocalDate(lease.startDate);
             leaseStart.setHours(0, 0, 0, 0);
 
-            const targetMonthStart = new Date(y, m - 1, 1);
+            const targetMonthStart = parseLocalDate(`${y}-${String(m).padStart(2, '0')}-01`);
             targetMonthStart.setHours(0, 0, 0, 0);
 
             if (leaseStart > targetMonthStart) {
@@ -133,12 +133,12 @@ class InvoiceService {
         const oldStatus = invoice.status;
 
         if (status === 'overdue') {
-            const dueDate = new Date(invoice.due_date);
-            const today = getLocalTime();
-            today.setHours(0, 0, 0, 0);
+            const dueDate = parseLocalDate(invoice.due_date);
+            const currentToday = now();
+            currentToday.setHours(0, 0, 0, 0);
             dueDate.setHours(0, 0, 0, 0);
 
-            if (today <= dueDate) {
+            if (currentToday <= dueDate) {
                 throw new Error('Cannot mark invoice as overdue before the due date.');
             }
 

@@ -6,7 +6,7 @@
 // ============================================================================
 
 import pool from '../config/db.js';
-import { getCurrentDateString } from '../utils/dateUtils.js';
+import { getCurrentDateString, parseLocalDate } from '../utils/dateUtils.js';
 
 class InvoiceModel {
   //  CREATE: Writing a new bill to the ledger.
@@ -14,9 +14,10 @@ class InvoiceModel {
   async create(data, connection = null) {
     const { leaseId, amount, dueDate, description, type } = data;
     // Need to determine year/month from dueDate
-    const date = new Date(dueDate);
+    const date = parseLocalDate(dueDate);
     const year = date.getFullYear();
     const month = date.getMonth() + 1; // 1-12
+
 
     const db = connection || pool;
     try {

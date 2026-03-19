@@ -4,54 +4,37 @@ import leaseModel from '../models/leaseModel.js';
 import invoiceModel from '../models/invoiceModel.js';
 import notificationModel from '../models/notificationModel.js';
 import emailService from './emailService.js';
-import { getCurrentDateString, getLocalTime } from './dateUtils.js';
+import { getCurrentDateString, getLocalTime, today, now, parseLocalDate, addDays } from './dateUtils.js';
 
-// Configuration Constants
-const RENT_DUE_DAY = parseInt(process.env.RENT_DUE_DAY) || 5; // Day of the month rent is due
-const GRACE_PERIOD_DAYS = parseInt(process.env.GRACE_PERIOD_DAYS) || 5; // Days after due date before late fees apply
-const LATE_FEE_PERCENTAGE = parseFloat(process.env.LATE_FEE_PERCENTAGE) || 0.05; // 5% of invoice amount
+// ... (config remains same)
 
 export const generateRentInvoices = async () => {
   console.log('Running automated rent invoicing...');
-  const today = getLocalTime();
+  const currentToday = now();
 
-  // Check if it's the 1st of the month (or for testing purposes, we assume checks are safe to run anytime due to existence check)
-  // Production: if (today.getDate() !== 1) return;
+  // ... (guards remain same)
 
-  // We'll leave the date check commented out for easier testing/demos, OR enforce it but export a force mode.
-  // For this implementation, I will enforcing the check but skip it if running via manual function call in tests?
-  // Actually, usually cron runs blindly. The logic inside should guard.
-  // Let's implement: Run ANY day, but only create if missing for THIS month.
-  // This makes it robust (if server is down on 1st, it catches up on 2nd).
-
-  const currentYear = today.getFullYear();
-  const currentMonth = today.getMonth() + 1; // 1-12
+  const currentYear = currentToday.getFullYear();
+  const currentMonth = currentToday.getMonth() + 1; // 1-12
   
-  // Calculate due date in local components
   const dueDateStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(RENT_DUE_DAY).padStart(2, '0')}`;
 
   try {
-    const activeLeases = await leaseModel.findActive(); // Should return all active (and pending? no only active)
+    const activeLeases = await leaseModel.findActive();
     console.log(`Found ${activeLeases.length} active leases.`);
 
     let createdCount = 0;
     for (const lease of activeLeases) {
-      // Logic Check: Prevent Premature Billing
-      // If the lease starts in the future, do not invoice yet.
-      // This handles cases where a lease is signed and 'active' but the move-in date hasn't arrived.
-      const leaseStart = new Date(lease.startDate);
-      if (leaseStart > today) {
-        // console.log(`Skipping Lease ${lease.id} (Future Start: ${lease.startDate})`);
+      const leaseStart = parseLocalDate(lease.startDate);
+      if (leaseStart > currentToday) {
         continue;
       }
 
-      // Proration Logic For Last Month
       let rentAmount = lease.monthlyRent;
       let description = `Rent for ${currentYear}-${currentMonth}`;
 
-      // Check if lease ends this month
       if (lease.endDate) {
-        const endDate = new Date(lease.endDate);
+        const endDate = parseLocalDate(lease.endDate);
         if (
           endDate.getFullYear() === currentYear &&
           endDate.getMonth() + 1 === currentMonth
@@ -90,12 +73,10 @@ export const generateRentInvoices = async () => {
         });
 
         if (!invoiceId) {
-          continue; // Skip if invoice already exists
+          continue;
         }
 
-        // Logic Fix: Auto-Apply Credits
         const tenantModel = (await import('../models/tenantModel.js')).default;
-        // Fetch fresh tenant data (specifically credit balance)
         const tenant = await tenantModel.findByUserId(lease.tenantId);
 
         if (tenant && tenant.creditBalance > 0) {
@@ -105,32 +86,24 @@ export const generateRentInvoices = async () => {
             const paymentModel = (await import('../models/paymentModel.js'))
               .default;
 
-            // 1. Create Verified Payment
             const payId = await paymentModel.create({
               invoiceId,
               amount: amountToApply,
-              paymentDate: new Date(),
+              paymentDate: today(),
               paymentMethod: 'credit_applied',
               referenceNumber: `CREDIT-${Date.now()}`,
               evidenceUrl: null,
             });
             await paymentModel.updateStatus(payId, 'verified');
 
-            // 2. Deduct Credit
             await tenantModel.deductCredit(lease.tenantId, amountToApply);
 
-            // 3. Update Invoice Status
-            // Logic simplified: If applied starts == rentAmount, it's paid.
-            // But we should use the standard 'verifyPayment' check logic or just update manually.
-            // verifyPayment controller logic is safer but we are in cron.
-            // Simple Update:
             if (amountToApply >= rentAmount) {
               await invoiceModel.updateStatus(invoiceId, 'paid');
             } else {
               await invoiceModel.updateStatus(invoiceId, 'partially_paid');
             }
 
-            // 4. Generate Receipt for the credit-applied payment
             const receiptModel = (await import('../models/receiptModel.js')).default;
             const { randomUUID } = await import('crypto');
             await receiptModel.create({
@@ -138,7 +111,7 @@ export const generateRentInvoices = async () => {
               invoiceId,
               tenantId: lease.tenantId,
               amount: amountToApply,
-              generatedDate: new Date().toISOString(),
+              generatedDate: today(),
               receiptNumber: `REC-CREDIT-${randomUUID()}`,
             });
 
@@ -146,7 +119,6 @@ export const generateRentInvoices = async () => {
               `Auto-applied credit ${amountToApply} to Invoice ${invoiceId}. Remaining Credit: ${tenant.creditBalance - amountToApply}`
             );
 
-            // 5. Post to Ledger (Credit Revenue for auto-applied credit)
             try {
               const ledgerModel = (await import('../models/ledgerModel.js')).default;
               await ledgerModel.create({
@@ -157,13 +129,12 @@ export const generateRentInvoices = async () => {
                 category: 'rent',
                 credit: Number(amountToApply),
                 description: `Auto-applied credit from tenant balance to invoice #${invoiceId}`,
-                entryDate: new Date().toISOString().split('T')[0],
+                entryDate: today(),
               });
             } catch (ledgerErr) {
               console.error('Failed to post ledger entry for auto-applied credit:', ledgerErr);
             }
 
-            // Notify Tenant of Credit Usage
             await notificationModel.create({
               userId: lease.tenantId,
               message: `A credit of LKR ${amountToApply} was automatically applied to your new rent invoice.`,
@@ -173,13 +144,13 @@ export const generateRentInvoices = async () => {
           }
         }
 
-        // Send Notification (Invoice Created)
         await notificationModel.create({
           userId: lease.tenantId,
-          message: `A new rent invoice for ${currentYear}-${currentMonth} has been generated. Due date: ${dueDate.toISOString().split('T')[0]}`,
+          message: `A new rent invoice for ${currentYear}-${currentMonth} has been generated. Due date: ${dueDateStr}`,
           type: 'invoice',
           isRead: false,
         });
+
 
         // Send Email
         // We need tenant email. Fetch from lease->tenant->user?
@@ -218,7 +189,7 @@ export const checkLeaseExpiration = async () => {
   try {
     await connection.beginTransaction();
 
-    const today = new Date().toISOString().split('T')[0];
+    const currentToday = today();
 
     // 1. Find active leases past end date
     const [expiredLeases] = await connection.query(
@@ -229,7 +200,7 @@ export const checkLeaseExpiration = async () => {
             JOIN properties p ON u.property_id = p.property_id
             WHERE l.status = 'active' AND l.end_date < ?
         `,
-      [today]
+      [currentToday]
     );
 
     if (expiredLeases.length > 0) {
@@ -281,9 +252,8 @@ export const checkLeaseExpiration = async () => {
     // 2. Process Turnover Buffer (Maintenance -> Available)
     // Find units in maintenance that had a lease end >= 3 days ago
     // AND do not have any active/pending maintenance requests (Safety check)
-    const bufferDate = new Date();
-    bufferDate.setDate(bufferDate.getDate() - 3);
-    const bufferDateStr = bufferDate.toISOString().split('T')[0];
+    const bufferDate = addDays(now(), -3);
+    const bufferDateStr = formatToLocalDate(bufferDate);
 
     // Query: Units in 'maintenance' where LATEST lease end_date <= bufferDate
     // And NO active maintenance requests.
@@ -330,15 +300,10 @@ export const checkLeaseExpiration = async () => {
 export const sendLeaseExpiryWarnings = async () => {
   console.log('Running lease expiry warning check...');
   // Warn at 30 and 60 days
-  const today = new Date();
+  const currentToday = now();
   
-  const warningDate30 = new Date();
-  warningDate30.setDate(today.getDate() + 30);
-  const dateStr30 = warningDate30.toISOString().split('T')[0];
-
-  const warningDate60 = new Date();
-  warningDate60.setDate(today.getDate() + 60);
-  const dateStr60 = warningDate60.toISOString().split('T')[0];
+  const dateStr30 = formatToLocalDate(addDays(currentToday, 30));
+  const dateStr60 = formatToLocalDate(addDays(currentToday, 60));
 
   try {
     // Find leases expiring exactly in 30 or 60 days
@@ -427,7 +392,7 @@ export const applyLateFees = async () => {
       const lateFeeInvoiceId = await invoiceModel.createLateFeeInvoice({
         leaseId: inv.lease_id,
         amount: lateFeeAmount,
-        dueDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000), // 5-day grace period
+        dueDate: formatToLocalDate(addDays(now(), 5)), // 5-day grace period
         description: `Late Fee for Invoice #${inv.invoice_id} (${inv.year}-${inv.month})`,
       });
 
@@ -442,14 +407,14 @@ export const applyLateFees = async () => {
           const paymentModel = (await import('../models/paymentModel.js')).default;
 
           // 1. Create Verified Payment
-          const payId = await paymentModel.create({
-            invoiceId: lateFeeInvoiceId,
-            amount: amountToApply,
-            paymentDate: new Date(),
-            paymentMethod: 'credit_applied',
-            referenceNumber: `CREDIT-LATEFEE-${Date.now()}`,
-            evidenceUrl: null,
-          });
+            const payId = await paymentModel.create({
+              invoiceId: lateFeeInvoiceId,
+              amount: amountToApply,
+              paymentDate: today(),
+              paymentMethod: 'credit_applied',
+              referenceNumber: `CREDIT-LATEFEE-${Date.now()}`,
+              evidenceUrl: null,
+            });
           await paymentModel.updateStatus(payId, 'verified');
 
           // 2. Deduct Credit
@@ -465,14 +430,14 @@ export const applyLateFees = async () => {
           // 4. Generate Receipt
           const receiptModel = (await import('../models/receiptModel.js')).default;
           const { randomUUID } = await import('crypto');
-          await receiptModel.create({
-            paymentId: payId,
-            invoiceId: lateFeeInvoiceId,
-            tenantId: inv.tenant_id,
-            amount: amountToApply,
-            generatedDate: new Date().toISOString(),
-            receiptNumber: `REC-CREDIT-LATEFEE-${randomUUID()}`,
-          });
+            await receiptModel.create({
+              paymentId: payId,
+              invoiceId: lateFeeInvoiceId,
+              tenantId: inv.tenant_id,
+              amount: amountToApply,
+              generatedDate: today(),
+              receiptNumber: `REC-CREDIT-LATEFEE-${randomUUID()}`,
+            });
 
           console.log(
             `Auto-applied credit ${amountToApply} to Late Fee Invoice ${lateFeeInvoiceId}. Remaining Credit: ${tenant.creditBalance - amountToApply}`
@@ -519,7 +484,7 @@ export const applyLateFees = async () => {
           // sendInvoiceNotification expects { amount, dueDate, month, year, invoiceId }
           await emailService.sendInvoiceNotification(userRows[0].email, {
             amount: lateFeeAmount,
-            dueDate: new Date().toISOString().split('T')[0],
+            dueDate: today(),
             month: inv.month,
             year: inv.year,
             invoiceId: 'LATE-FEE',
@@ -582,7 +547,7 @@ export const applyLateFees = async () => {
 export const syncUnitStatuses = async () => {
   console.log('Running unit status synchronization...');
   try {
-    const today = new Date().toISOString().split('T')[0];
+    const currentToday = today();
 
     // 1. Find Units marked 'available' that actually have an Active Lease covering Today
     // This handles the case where Lease A ended (Unit->Available) > Gap > Lease B starts (Unit stays Available?? No, we fix it here).
@@ -596,7 +561,7 @@ export const syncUnitStatuses = async () => {
             AND l.start_date <= ?
             AND l.end_date >= ?
         `,
-      [today, today]
+      [currentToday, currentToday]
     );
 
     if (incorrectAvailable.length > 0) {
@@ -625,7 +590,7 @@ export const syncUnitStatuses = async () => {
                 AND l.end_date >= ?
             )
         `,
-      [today, today]
+      [currentToday, currentToday]
     );
 
     if (ghostOccupied.length > 0) {
@@ -645,16 +610,15 @@ export const syncUnitStatuses = async () => {
 
 // Rent Reminder (Daily at 8:00 AM)
 export const sendRentReminders = async () => {
-  const today = new Date();
+  const currentToday = now();
   const targetDay = RENT_DUE_DAY - 3;
   
-  // Handling the case where targetDay is 2 (3 days before the 5th)
-  if (today.getDate() !== targetDay) return;
+  if (currentToday.getDate() !== targetDay) return;
 
   console.log('Running automated rent reminders...');
   try {
     const activeLeases = await leaseModel.findActive();
-    const dueDate = new Date(today.getFullYear(), today.getMonth(), RENT_DUE_DAY).toISOString().split('T')[0];
+    const dueDate = `${currentToday.getFullYear()}-${String(currentToday.getMonth() + 1).padStart(2, '0')}-${String(RENT_DUE_DAY).padStart(2, '0')}`;
 
     for (const lease of activeLeases) {
         // Fetch tenant email

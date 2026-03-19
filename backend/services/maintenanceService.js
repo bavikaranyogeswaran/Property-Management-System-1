@@ -139,7 +139,7 @@ class MaintenanceService {
         const invoiceId = await invoiceModel.create({
             leaseId: activeLease.id,
             amount,
-            dueDate: dueDate || getCurrentDateString(),
+            dueDate: dueDate || today(),
             description: proposedDescription,
             type: 'maintenance',
         });
@@ -154,11 +154,12 @@ class MaintenanceService {
         try {
             const tenant = await userModel.findById(request.tenant_id);
             if (tenant && tenant.email) {
+                const currentNow = now();
                 await emailService.sendInvoiceNotification(tenant.email, {
                     amount,
-                    dueDate: dueDate || getCurrentDateString(),
-                    month: getLocalTime().getMonth() + 1,
-                    year: getLocalTime().getFullYear(),
+                    dueDate: dueDate || today(),
+                    month: currentNow.getMonth() + 1,
+                    year: currentNow.getFullYear(),
                     invoiceId: invoiceId,
                     description: proposedDescription
                 });

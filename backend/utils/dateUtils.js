@@ -47,8 +47,58 @@ export const getLocalTime = (timezone = DEFAULT_TIMEZONE) => {
     return new Date(new Date().toLocaleString('en-US', { timeZone: timezone }));
 };
 
+/**
+ * Returns a new Date object representing the current time in the target timezone.
+ */
+export const now = (timezone = DEFAULT_TIMEZONE) => {
+  return getLocalTime(timezone);
+};
+
+/**
+ * Returns the current date as an ISO string (YYYY-MM-DD) in the target timezone.
+ */
+export const today = (timezone = DEFAULT_TIMEZONE) => {
+  return getCurrentDateString(timezone);
+};
+
+/**
+ * Safely parses a YYYY-MM-DD string into a Date object at midnight in the target timezone.
+ * Avoids the "one day off" bug common with new Date('YYYY-MM-DD').
+ * @param {string} dateStr 
+ * @param {string} timezone 
+ * @returns {Date}
+ */
+export const parseLocalDate = (dateStr, timezone = DEFAULT_TIMEZONE) => {
+  if (!dateStr) return null;
+  // If it's already a Date object, just return it
+  if (dateStr instanceof Date) return dateStr;
+  
+  // If it's YYYY-MM-DD, append time to ensure local interpretation
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    return new Date(new Date(`${dateStr}T00:00:00`).toLocaleString('en-US', { timeZone: timezone }));
+  }
+  return new Date(new Date(dateStr).toLocaleString('en-US', { timeZone: timezone }));
+};
+
+/**
+ * Adds a specified number of days to a Date object.
+ * @param {Date|string} date 
+ * @param {number} days 
+ * @returns {Date}
+ */
+export const addDays = (date, days) => {
+  const result = date instanceof Date ? new Date(date) : parseLocalDate(date);
+  result.setDate(result.getDate() + days);
+  return result;
+};
+
 export default {
   getCurrentDateString,
   formatToLocalDate,
-  getLocalTime
+  getLocalTime,
+  now,
+  today,
+  parseLocalDate,
+  addDays
 };
+

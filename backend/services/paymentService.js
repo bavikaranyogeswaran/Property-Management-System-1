@@ -11,7 +11,7 @@ import leaseModel from '../models/leaseModel.js';
 import auditLogger from '../utils/auditLogger.js';
 import ledgerModel from '../models/ledgerModel.js';
 import emailService from '../utils/emailService.js';
-import { getCurrentDateString, getLocalTime } from '../utils/dateUtils.js';
+import { getCurrentDateString, getLocalTime, today, now, parseLocalDate, addDays, formatToLocalDate } from '../utils/dateUtils.js';
 
 /**
  * Maps an invoice_type to the correct accounting ledger classification.
@@ -158,7 +158,7 @@ class PaymentService {
                     invoiceId,
                     tenantId: invoice.tenant_id,
                     amount,
-                    generatedDate: new Date().toISOString(),
+                    generatedDate: today(),
                     receiptNumber: `REC-CASH-${randomUUID()}`,
                 }, connection);
 
@@ -280,7 +280,7 @@ class PaymentService {
                             invoiceId: payment.invoiceId,
                             tenantId: invoice.tenant_id,
                             amount: payment.amount,
-                            generatedDate: new Date().toISOString(),
+                            generatedDate: today(),
                             receiptNumber: `REC-${randomUUID()}`,
                         }, connection);
 
@@ -328,10 +328,10 @@ class PaymentService {
 
                         // Behavior Score
                         try {
-                            const paymentDate = new Date(payment.paymentDate);
-                            const dueDate = new Date(invoice.due_date);
-                            const payStr = paymentDate.toISOString().split('T')[0];
-                            const dueStr = dueDate.toISOString().split('T')[0];
+                            const paymentDate = parseLocalDate(payment.paymentDate);
+                            const dueDate = parseLocalDate(invoice.due_date);
+                            const payStr = formatToLocalDate(paymentDate);
+                            const dueStr = formatToLocalDate(dueDate);
 
                             if (payStr <= dueStr) {
                                  await behaviorLogModel.logPositivePayment(invoice.tenant_id, 5, connection);
@@ -357,7 +357,7 @@ class PaymentService {
                              if (totalVerified > 0) {
                                  newStatus = 'partially_paid';
                              } else {
-                                 const isOverdue = new Date() > new Date(invoice.due_date);
+                                 const isOverdue = now() > parseLocalDate(invoice.due_date);
                                  newStatus = isOverdue ? 'overdue' : 'pending';
                              }
                              await invoiceModel.updateStatus(invoice.invoice_id, newStatus, connection);
