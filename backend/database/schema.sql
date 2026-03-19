@@ -260,6 +260,19 @@ CREATE TABLE leases (
 );
 
 -- =========================
+-- LEASE RENT ADJUSTMENTS (Addendums)
+-- =========================
+CREATE TABLE lease_rent_adjustments (
+    adjustment_id INT AUTO_INCREMENT PRIMARY KEY,
+    lease_id INT NOT NULL,
+    effective_date DATE NOT NULL,
+    new_monthly_rent DECIMAL(10,2) NOT NULL,
+    notes TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (lease_id) REFERENCES leases(lease_id) ON DELETE CASCADE
+);
+
+-- =========================
 -- RENT INVOICES
 -- =========================
 CREATE TABLE rent_invoices (

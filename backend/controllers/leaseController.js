@@ -168,6 +168,44 @@ class LeaseController {
       res.status(500).json({ error: error.message });
     }
   }
+
+  async addRentAdjustment(req, res) {
+    try {
+      const { id } = req.params;
+      const { effectiveDate, newMonthlyRent, notes } = req.body;
+
+      if (!effectiveDate || !newMonthlyRent) {
+        return res.status(400).json({ error: 'effectiveDate and newMonthlyRent are required' });
+      }
+
+      const adjustmentId = await leaseService.addRentAdjustment(id, {
+        effectiveDate,
+        newMonthlyRent,
+        notes
+      }, req.user);
+
+      res.status(201).json({ 
+        message: 'Rent adjustment added successfully', 
+        adjustmentId 
+      });
+    } catch (error) {
+      if (error.message.includes('not found')) return res.status(404).json({ error: error.message });
+      if (error.message.includes('Access denied')) return res.status(403).json({ error: error.message });
+      res.status(500).json({ error: error.message });
+    }
+  }
+
+  async getRentAdjustments(req, res) {
+    try {
+      const { id } = req.params;
+      const adjustments = await leaseService.getRentAdjustments(id, req.user);
+      res.json(adjustments);
+    } catch (error) {
+      if (error.message.includes('not found')) return res.status(404).json({ error: error.message });
+      if (error.message.includes('Access denied')) return res.status(403).json({ error: error.message });
+      res.status(500).json({ error: error.message });
+    }
+  }
 }
 
 export default new LeaseController();

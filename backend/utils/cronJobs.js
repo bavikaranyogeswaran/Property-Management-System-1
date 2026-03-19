@@ -6,7 +6,10 @@ import notificationModel from '../models/notificationModel.js';
 import emailService from './emailService.js';
 import { getCurrentDateString, getLocalTime, today, now, parseLocalDate, addDays } from './dateUtils.js';
 
-// ... (config remains same)
+// --- CONFIGURATION ---
+const RENT_DUE_DAY = 1; // 1st of each month
+const GRACE_PERIOD_DAYS = 5;
+const LATE_FEE_PERCENTAGE = 0.05;
 
 export const generateRentInvoices = async () => {
   console.log('Running automated rent invoicing...');
@@ -30,7 +33,11 @@ export const generateRentInvoices = async () => {
         continue;
       }
 
-      let rentAmount = lease.monthlyRent;
+      // Calculate effective rent for the billing month
+      const billingDate = `${currentYear}-${String(currentMonth).padStart(2, '0')}-01`;
+      const baseRent = await leaseModel.getEffectiveRent(lease.id, billingDate);
+      
+      let rentAmount = baseRent;
       let description = `Rent for ${currentYear}-${currentMonth}`;
 
       if (lease.endDate) {
@@ -44,7 +51,7 @@ export const generateRentInvoices = async () => {
 
           if (endDay < daysInMonth) {
             rentAmount =
-              Math.round((lease.monthlyRent / daysInMonth) * endDay * 100) /
+              Math.round((baseRent / daysInMonth) * endDay * 100) /
               100;
             description += ` (Prorated: ${endDay}/${daysInMonth} days)`;
             console.log(
@@ -164,7 +171,7 @@ export const generateRentInvoices = async () => {
           if (userRows.length > 0) {
             await emailService.sendInvoiceNotification(userRows[0].email, {
               amount: rentAmount,
-              dueDate: dueDate.toISOString().split('T')[0],
+              dueDate: dueDateStr,
               month: currentMonth,
               year: currentYear,
               invoiceId: invoiceId,

@@ -221,6 +221,56 @@ class LeaseModel {
   formatDate(date) {
     return formatToLocalDate(date);
   }
+
+  // ============================================================================
+  //  RENT ADJUSTMENTS (Addendums)
+  // ============================================================================
+  
+  async getEffectiveRent(leaseId, date, connection = null) {
+    const dbConn = connection || db;
+    const [adjustments] = await dbConn.query(
+      `SELECT new_monthly_rent FROM lease_rent_adjustments 
+       WHERE lease_id = ? AND effective_date <= ? 
+       ORDER BY effective_date DESC LIMIT 1`,
+      [leaseId, date]
+    );
+    
+    if (adjustments.length > 0) {
+      return parseFloat(adjustments[0].new_monthly_rent);
+    }
+    
+    const [leases] = await dbConn.query(
+      `SELECT monthly_rent FROM leases WHERE lease_id = ?`,
+      [leaseId]
+    );
+    return leases.length > 0 ? parseFloat(leases[0].monthly_rent) : 0;
+  }
+
+  async createAdjustment(data, connection = null) {
+    const { leaseId, effectiveDate, newMonthlyRent, notes } = data;
+    const dbConn = connection || db;
+    const [result] = await dbConn.query(
+      `INSERT INTO lease_rent_adjustments (lease_id, effective_date, new_monthly_rent, notes)
+       VALUES (?, ?, ?, ?)`,
+      [leaseId, effectiveDate, newMonthlyRent, notes]
+    );
+    return result.insertId;
+  }
+
+  async findAdjustmentsByLeaseId(leaseId) {
+    const [rows] = await db.query(
+      `SELECT * FROM lease_rent_adjustments WHERE lease_id = ? ORDER BY effective_date ASC`,
+      [leaseId]
+    );
+    return rows.map(r => ({
+      id: r.adjustment_id.toString(),
+      leaseId: r.lease_id.toString(),
+      effectiveDate: formatToLocalDate(r.effective_date),
+      newMonthlyRent: parseFloat(r.new_monthly_rent),
+      notes: r.notes,
+      createdAt: r.created_at
+    }));
+  }
 }
 
 export default new LeaseModel();

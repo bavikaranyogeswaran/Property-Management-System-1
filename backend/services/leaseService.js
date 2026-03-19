@@ -657,14 +657,13 @@ class LeaseService {
 
     // [FIX] Lease Notice Paradox: Automatically create a draft lease if renewing
     if (status === 'renewing' && lease.status === 'active' && lease.endDate) {
-        const nextStartDate = new Date(lease.endDate);
-        nextStartDate.setDate(nextStartDate.getDate() + 1);
+        const nextStartDate = addDays(parseLocalDate(lease.endDate), 1);
         
         const nextEndDate = new Date(nextStartDate);
         nextEndDate.setFullYear(nextEndDate.getFullYear() + 1); // Default to 1 year
         
-        const nextStartDateStr = nextStartDate.toISOString().split('T')[0];
-        const nextEndDateStr = nextEndDate.toISOString().split('T')[0];
+        const nextStartDateStr = formatToLocalDate(nextStartDate);
+        const nextEndDateStr = formatToLocalDate(nextEndDate);
 
         // Check if a draft or active lease already exists for this next period
         const hasOverlap = await leaseModel.checkOverlap(
@@ -690,6 +689,32 @@ class LeaseService {
     }
 
     return true;
+  }
+
+  async addRentAdjustment(leaseId, data, user) {
+    const lease = await this.getLeaseById(leaseId, user);
+    if (!lease) throw new Error('Lease not found');
+    if (user.role !== 'owner' && user.role !== 'treasurer') throw new Error('Access denied');
+
+    const { effectiveDate, newMonthlyRent, notes } = data;
+    const start = parseLocalDate(lease.startDate);
+    const eff = parseLocalDate(effectiveDate);
+
+    if (eff < start) throw new Error('Adjustment date cannot be before lease start');
+    if (lease.endDate && eff > parseLocalDate(lease.endDate)) throw new Error('Adjustment date cannot be after lease end');
+
+    return await leaseModel.createAdjustment({
+      leaseId,
+      effectiveDate,
+      newMonthlyRent,
+      notes
+    });
+  }
+
+  async getRentAdjustments(leaseId, user) {
+    const lease = await this.getLeaseById(leaseId, user);
+    if (!lease) throw new Error('Lease not found');
+    return await leaseModel.findAdjustmentsByLeaseId(leaseId);
   }
 }
 

@@ -40,6 +40,7 @@ import {
   CheckCircle,
   RotateCcw,
   AlertCircle,
+  TrendingUp,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -251,6 +252,18 @@ export function LeasesPage() {
                 >
                   <XCircle className="size-4" />
                 </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    setAdjustmentsLeaseId(lease.id);
+                    fetchAdjustments(lease.id);
+                  }}
+                  className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                  title="Manage Rent Adjustments"
+                >
+                  <TrendingUp className="size-4" />
+                </Button>
               </>
             )}
 
@@ -316,6 +329,45 @@ export function LeasesPage() {
   const [refundAmount, setRefundAmount] = useState('');
   const [refundNotes, setRefundNotes] = useState('');
   const [refundType, setRefundType] = useState<'request' | 'approve' | 'dispute'>('request');
+
+  // Rent Adjustment State
+  const [adjustmentsLeaseId, setAdjustmentsLeaseId] = useState<string | null>(null);
+  const [adjustments, setAdjustments] = useState<any[]>([]);
+  const [adjDate, setAdjDate] = useState('');
+  const [adjRent, setAdjRent] = useState('');
+  const [adjNotes, setAdjNotes] = useState('');
+  const [isLoadingAdjustments, setIsLoadingAdjustments] = useState(false);
+
+  const fetchAdjustments = async (leaseId: string) => {
+    try {
+      setIsLoadingAdjustments(true);
+      const res = await apiClient.get(`/leases/${leaseId}/adjustments`);
+      setAdjustments(res.data);
+    } catch (err) {
+      toast.error('Failed to fetch rent adjustments');
+    } finally {
+      setIsLoadingAdjustments(false);
+    }
+  };
+
+  const handleAddAdjustment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!adjustmentsLeaseId) return;
+    try {
+      await apiClient.post(`/leases/${adjustmentsLeaseId}/adjustments`, {
+        effectiveDate: adjDate,
+        newMonthlyRent: parseFloat(adjRent),
+        notes: adjNotes,
+      });
+      toast.success('Rent adjustment scheduled');
+      fetchAdjustments(adjustmentsLeaseId);
+      setAdjDate('');
+      setAdjRent('');
+      setAdjNotes('');
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed to add adjustment');
+    }
+  };
 
   const handleRenew = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -868,6 +920,107 @@ export function LeasesPage() {
               </Button>
             </div>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Rent Adjustment Dialog */}
+      <Dialog
+        open={!!adjustmentsLeaseId}
+        onOpenChange={(open) => !open && setAdjustmentsLeaseId(null)}
+      >
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Manage Rent Adjustments (Lease Addendums)</DialogTitle>
+            <p className="text-sm text-gray-500 mt-1">
+              Schedule mid-lease rent hikes or adjustments without renewing the contract.
+            </p>
+          </DialogHeader>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+            {/* Current Adjustments List */}
+            <div className="space-y-4">
+              <h4 className="font-semibold text-sm flex items-center gap-2">
+                <Calendar className="size-4" />
+                Scheduled Adjustments
+              </h4>
+              <div className="border rounded-lg overflow-hidden">
+                <Table>
+                  <TableHeader className="bg-gray-50">
+                    <TableRow>
+                      <TableHead className="py-2">Effective</TableHead>
+                      <TableHead className="py-2">New Rent</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {isLoadingAdjustments ? (
+                      <TableRow>
+                        <TableCell colSpan={2} className="text-center py-4">Loading...</TableCell>
+                      </TableRow>
+                    ) : adjustments.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={2} className="text-center py-4 text-gray-500 text-sm">
+                          No adjustments scheduled.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      adjustments.map((adj) => (
+                        <TableRow key={adj.id}>
+                          <TableCell className="py-2 text-sm font-medium">{adj.effectiveDate}</TableCell>
+                          <TableCell className="py-2 text-sm">LKR {adj.newMonthlyRent}</TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+
+            {/* Add New Adjustment Form */}
+            <div className="bg-emerald-50/50 p-4 rounded-lg border border-emerald-100">
+              <h4 className="font-semibold text-sm text-emerald-900 mb-4 flex items-center gap-2">
+                <TrendingUp className="size-4" />
+                Schedule New Hike
+              </h4>
+              <form onSubmit={handleAddAdjustment} className="space-y-4">
+                <div className="space-y-2">
+                  <Label className="text-emerald-900">Effective Date</Label>
+                  <Input
+                    type="date"
+                    value={adjDate}
+                    onChange={(e) => setAdjDate(e.target.value)}
+                    required
+                    className="bg-white"
+                  />
+                  <p className="text-[10px] text-emerald-700">The first day the new rent applies.</p>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-emerald-900">New Monthly Rent (LKR)</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="1"
+                    value={adjRent}
+                    onChange={(e) => setAdjRent(e.target.value)}
+                    required
+                    className="bg-white"
+                    placeholder="e.g. 55000"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-emerald-900">Notes (Addendum Reason)</Label>
+                  <Input
+                    value={adjNotes}
+                    onChange={(e) => setAdjNotes(e.target.value)}
+                    className="bg-white"
+                    placeholder="e.g. Annual 10% increase"
+                  />
+                </div>
+                <Button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700">
+                  Schedule Adjustment
+                </Button>
+              </form>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
