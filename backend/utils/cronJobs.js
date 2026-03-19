@@ -4,7 +4,7 @@ import leaseModel from '../models/leaseModel.js';
 import invoiceModel from '../models/invoiceModel.js';
 import notificationModel from '../models/notificationModel.js';
 import emailService from './emailService.js';
-import { getCurrentDateString, getLocalTime, today, now, parseLocalDate, addDays } from './dateUtils.js';
+import { getCurrentDateString, getLocalTime, today, now, parseLocalDate, addDays, formatToLocalDate } from './dateUtils.js';
 
 // --- CONFIGURATION ---
 const RENT_DUE_DAY = 1; // 1st of each month

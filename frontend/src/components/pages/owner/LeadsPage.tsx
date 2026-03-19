@@ -694,10 +694,12 @@ export function LeadsPage() {
       </Dialog>
 
       <Dialog open={isConvertDialogOpen} onOpenChange={setIsConvertDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Convert Lead to Tenant</DialogTitle>
-          </DialogHeader>
+        <DialogContent className="max-w-md p-0 overflow-hidden">
+          <div className="flex flex-col max-h-[90vh]">
+            <DialogHeader className="p-6 pb-2">
+              <DialogTitle>Convert Lead to Tenant</DialogTitle>
+            </DialogHeader>
+            <div className="flex-1 overflow-y-auto p-6 pt-2">
           <div className="space-y-4 mt-4">
             <p className="text-sm text-gray-600">
               Are you sure you want to convert{' '}
@@ -908,6 +910,8 @@ export function LeadsPage() {
               >
                 Convert to Tenant
               </Button>
+            </div>
+            </div>
             </div>
           </div>
         </DialogContent>

@@ -274,14 +274,18 @@ export function OwnerInvoicesPage() {
                             Cash Pay
                           </Button>
                         </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Record Cash Payment</DialogTitle>
-                          </DialogHeader>
-                          <RecordCashPaymentForm
-                            invoice={invoice}
-                            tenantName={tenant?.name}
-                          />
+                        <DialogContent className="max-w-md p-0 overflow-hidden">
+                          <div className="flex flex-col max-h-[90vh]">
+                            <DialogHeader className="p-6 pb-2">
+                              <DialogTitle>Record Cash Payment</DialogTitle>
+                            </DialogHeader>
+                            <div className="flex-1 overflow-y-auto p-6 pt-2">
+                              <RecordCashPaymentForm
+                                invoice={invoice}
+                                tenantName={tenant?.name}
+                              />
+                            </div>
+                          </div>
                         </DialogContent>
                       </Dialog>
                     )}

@@ -694,7 +694,7 @@ class LeaseService {
   async addRentAdjustment(leaseId, data, user) {
     const lease = await this.getLeaseById(leaseId, user);
     if (!lease) throw new Error('Lease not found');
-    if (user.role !== 'owner' && user.role !== 'treasurer') throw new Error('Access denied');
+    if (user.role !== 'owner') throw new Error('Access denied: Only owners can perform rent adjustments');
 
     const { effectiveDate, newMonthlyRent, notes } = data;
     const start = parseLocalDate(lease.startDate);

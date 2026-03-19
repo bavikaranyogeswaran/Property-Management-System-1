@@ -252,6 +252,7 @@ export function LeasesPage() {
                 >
                   <XCircle className="size-4" />
                 </Button>
+                {user?.role === 'owner' && (
                 <Button
                   size="sm"
                   variant="ghost"
@@ -264,6 +265,7 @@ export function LeasesPage() {
                 >
                   <TrendingUp className="size-4" />
                 </Button>
+              )}
               </>
             )}
 
@@ -571,10 +573,12 @@ export function LeasesPage() {
         open={!!selectedLease}
         onOpenChange={(open) => !open && setSelectedLease(null)}
       >
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Lease Agreement Details</DialogTitle>
-          </DialogHeader>
+        <DialogContent className="max-w-2xl p-0 overflow-hidden">
+          <div className="flex flex-col max-h-[90vh]">
+            <DialogHeader className="p-6 pb-2">
+              <DialogTitle>Lease Agreement Details</DialogTitle>
+            </DialogHeader>
+            <div className="flex-1 overflow-y-auto p-6 pt-2">
           {selectedLease &&
             (() => {
               const tenant = tenants.find(
@@ -598,49 +602,53 @@ export function LeasesPage() {
               }
 
               return (
-                <div className="space-y-6 mt-4">
-                  {/* Lease Status */}
-                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                    <div>
-                      <p className="text-sm text-gray-600">Lease Status</p>
-                      <p className="text-lg font-semibold">
+                <div className="space-y-6">
+                  {/* Status & Deposit Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Lease Status */}
+                    <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                      <div>
+                        <p className="text-sm text-gray-600">Lease Status</p>
+                        <p className="text-lg font-semibold capitalize">
+                          {selectedLease.status}
+                        </p>
+                      </div>
+                      <Badge
+                        variant={
+                          selectedLease.status === 'active'
+                            ? 'secondary'
+                            : 'outline'
+                        }
+                        className={
+                          selectedLease.status === 'active'
+                            ? 'bg-green-100 text-green-700'
+                            : ''
+                        }
+                      >
                         {selectedLease.status}
-                      </p>
+                      </Badge>
                     </div>
-                    <Badge
-                      variant={
-                        selectedLease.status === 'active'
-                          ? 'secondary'
-                          : 'outline'
-                      }
-                      className={
-                        selectedLease.status === 'active'
-                          ? 'bg-green-100 text-green-700 text-base px-4 py-2'
-                          : 'text-base px-4 py-2'
-                      }
-                    >
-                      {selectedLease.status}
-                    </Badge>
+
+                    {/* Deposit Info */}
+                    <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                      <div>
+                        <p className="text-sm text-gray-600">Deposit Status</p>
+                        <p className="text-lg font-semibold flex items-center gap-2 capitalize">
+                          {selectedLease.depositStatus?.replace('_', ' ')}
+                        </p>
+                      </div>
+                      {selectedLease.depositStatus === 'awaiting_approval' && (
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-orange-600 bg-orange-100 px-2 py-1 rounded">Action Required</span>
+                      )}
+                    </div>
                   </div>
 
-                  {/* Deposit Info */}
-                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                    <div>
-                      <p className="text-sm text-gray-600">Deposit Status</p>
-                      <p className="text-lg font-semibold flex items-center gap-2">
-                        {selectedLease.depositStatus?.replace('_', ' ')}
-                        {selectedLease.depositStatus === 'awaiting_approval' && (
-                           <span className="text-xs text-orange-600 bg-orange-100 px-2 py-1 rounded">Action Required</span>
-                        )}
-                      </p>
+                  {(selectedLease.depositStatus === 'awaiting_approval' || selectedLease.depositStatus === 'disputed') && (
+                    <div className="p-4 bg-orange-50 border border-orange-100 rounded-lg flex justify-between items-center">
+                       <p className="text-sm text-orange-800 font-medium">Proposed Refund Amount</p>
+                       <p className="text-lg font-bold text-orange-600">LKR {selectedLease.proposedRefundAmount}</p>
                     </div>
-                    {(selectedLease.depositStatus === 'awaiting_approval' || selectedLease.depositStatus === 'disputed') && (
-                      <div className="text-right">
-                         <p className="text-sm text-gray-600">Proposed Refund</p>
-                         <p className="text-lg font-semibold text-orange-600">LKR {selectedLease.proposedRefundAmount}</p>
-                      </div>
-                    )}
-                  </div>
+                  )}
 
                   {(selectedLease.refundNotes) && (
                     <div className="p-4 bg-blue-50 rounded-lg text-sm text-blue-900">
@@ -760,6 +768,8 @@ export function LeasesPage() {
                 </div>
               );
             })()}
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 
@@ -936,7 +946,7 @@ export function LeasesPage() {
             </p>
           </DialogHeader>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+          <div className={`grid grid-cols-1 ${user?.role === 'owner' ? 'md:grid-cols-2' : ''} gap-6 mt-4`}>
             {/* Current Adjustments List */}
             <div className="space-y-4">
               <h4 className="font-semibold text-sm flex items-center gap-2">
@@ -975,51 +985,53 @@ export function LeasesPage() {
               </div>
             </div>
 
-            {/* Add New Adjustment Form */}
-            <div className="bg-emerald-50/50 p-4 rounded-lg border border-emerald-100">
-              <h4 className="font-semibold text-sm text-emerald-900 mb-4 flex items-center gap-2">
-                <TrendingUp className="size-4" />
-                Schedule New Hike
-              </h4>
-              <form onSubmit={handleAddAdjustment} className="space-y-4">
-                <div className="space-y-2">
-                  <Label className="text-emerald-900">Effective Date</Label>
-                  <Input
-                    type="date"
-                    value={adjDate}
-                    onChange={(e) => setAdjDate(e.target.value)}
-                    required
-                    className="bg-white"
-                  />
-                  <p className="text-[10px] text-emerald-700">The first day the new rent applies.</p>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-emerald-900">New Monthly Rent (LKR)</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    min="1"
-                    value={adjRent}
-                    onChange={(e) => setAdjRent(e.target.value)}
-                    required
-                    className="bg-white"
-                    placeholder="e.g. 55000"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-emerald-900">Notes (Addendum Reason)</Label>
-                  <Input
-                    value={adjNotes}
-                    onChange={(e) => setAdjNotes(e.target.value)}
-                    className="bg-white"
-                    placeholder="e.g. Annual 10% increase"
-                  />
-                </div>
-                <Button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700">
-                  Schedule Adjustment
-                </Button>
-              </form>
-            </div>
+            {/* Add New Adjustment Form - Only for Owners */}
+            {user?.role === 'owner' && (
+              <div className="bg-emerald-50/50 p-4 rounded-lg border border-emerald-100">
+                <h4 className="font-semibold text-sm text-emerald-900 mb-4 flex items-center gap-2">
+                  <TrendingUp className="size-4" />
+                  Schedule New Hike
+                </h4>
+                <form onSubmit={handleAddAdjustment} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label className="text-emerald-900">Effective Date</Label>
+                    <Input
+                      type="date"
+                      value={adjDate}
+                      onChange={(e) => setAdjDate(e.target.value)}
+                      required
+                      className="bg-white"
+                    />
+                    <p className="text-[10px] text-emerald-700">The first day the new rent applies.</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-emerald-900">New Monthly Rent (LKR)</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="1"
+                      value={adjRent}
+                      onChange={(e) => setAdjRent(e.target.value)}
+                      required
+                      className="bg-white"
+                      placeholder="e.g. 55000"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-emerald-900">Notes (Addendum Reason)</Label>
+                    <Input
+                      value={adjNotes}
+                      onChange={(e) => setAdjNotes(e.target.value)}
+                      className="bg-white"
+                      placeholder="e.g. Annual 10% increase"
+                    />
+                  </div>
+                  <Button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700">
+                    Schedule Adjustment
+                  </Button>
+                </form>
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>
