@@ -304,8 +304,10 @@ CREATE TABLE payments (
     status ENUM('pending','verified','rejected') DEFAULT 'pending',
     verified_by INT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    payout_id INT,
     FOREIGN KEY (invoice_id) REFERENCES rent_invoices(invoice_id) ON DELETE RESTRICT,
     FOREIGN KEY (verified_by) REFERENCES users(user_id) ON DELETE SET NULL,
+    FOREIGN KEY (payout_id) REFERENCES owner_payouts(payout_id) ON DELETE SET NULL,
     UNIQUE KEY unique_payment_ref (reference_number)
 );
 
@@ -354,8 +356,10 @@ CREATE TABLE maintenance_costs (
     description VARCHAR(255),
     amount DECIMAL(10,2) NOT NULL,
     recorded_date DATE NOT NULL,
+    payout_id INT,
     status ENUM('active', 'voided') DEFAULT 'active',
     FOREIGN KEY (request_id) REFERENCES maintenance_requests(request_id) ON DELETE CASCADE,
+    FOREIGN KEY (payout_id) REFERENCES owner_payouts(payout_id) ON DELETE SET NULL,
     UNIQUE KEY unique_cost_entry (request_id, description(255), amount, recorded_date)
 );
 
