@@ -11,7 +11,7 @@ export interface Lease {
   startDate: string;
   endDate: string | null;
   monthlyRent: number;
-  status: 'active' | 'ended' | 'cancelled';
+  status: 'draft' | 'active' | 'expired' | 'ended' | 'cancelled';
   securityDeposit?: number;
   depositStatus?: 'pending' | 'paid' | 'awaiting_approval' | 'disputed' | 'partially_refunded' | 'refunded';
   proposedRefundAmount?: number;
@@ -50,6 +50,7 @@ interface LeaseContextType {
   addLeaseTerm: (term: Omit<LeaseTerm, 'leaseTermId' | 'ownerId' | 'createdAt'>) => Promise<void>;
   updateLeaseTerm: (id: number, term: Partial<LeaseTerm>) => Promise<void>;
   deleteLeaseTerm: (id: number) => Promise<void>;
+  finalizeCheckout: (id: string) => Promise<void>;
 }
 
 const LeaseContext = createContext<LeaseContextType | undefined>(undefined);
@@ -230,6 +231,20 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const finalizeCheckout = async (id: string) => {
+    try {
+      await apiClient.post(`/leases/${id}/finalize-checkout`);
+      setLeases(prev => prev.map(l => (l.id === id ? { ...l, status: 'ended' } : l)));
+      const lease = leases.find(l => l.id === id);
+      if (lease) await updateUnit(lease.unitId, { status: 'available' });
+      toast.success('Lease checkout finalized. Unit is now available.');
+    } catch (e: any) {
+      const msg = e.response?.data?.error || 'Failed to finalize checkout';
+      toast.error(msg);
+      throw new Error(msg);
+    }
+  };
+
   return (
     <LeaseContext.Provider value={{ 
       leases, 
@@ -244,7 +259,8 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
       leaseTerms,
       addLeaseTerm,
       updateLeaseTerm,
-      deleteLeaseTerm
+      deleteLeaseTerm,
+      finalizeCheckout
     }}>
       {children}
     </LeaseContext.Provider>

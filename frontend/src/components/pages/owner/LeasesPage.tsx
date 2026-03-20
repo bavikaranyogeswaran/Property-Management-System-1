@@ -65,31 +65,39 @@ export function LeasesPage() {
     approveRefund,
     disputeRefund,
     updateLeaseDocument,
+    finalizeCheckout,
   } = useApp();
   const { user } = useAuth();
+  // --- State Hooks ---
   const [selectedLease, setSelectedLease] = useState<Lease | null>(null);
+  const [endLeaseId, setEndLeaseId] = useState<string | null>(null);
+  const [renewLeaseId, setRenewLeaseId] = useState<string | null>(null);
+  const [renewDate, setRenewDate] = useState('');
+  const [renewRent, setRenewRent] = useState('');
+  const [refundLeaseId, setRefundLeaseId] = useState<string | null>(null);
+  const [refundAmount, setRefundAmount] = useState('');
+  const [refundNotes, setRefundNotes] = useState('');
+  const [refundType, setRefundType] = useState<'request' | 'approve' | 'dispute'>('request');
+  const [adjustmentsLeaseId, setAdjustmentsLeaseId] = useState<string | null>(null);
+  const [adjustments, setAdjustments] = useState<any[]>([]);
+  const [adjDate, setAdjDate] = useState('');
+  const [adjRent, setAdjRent] = useState('');
+  const [adjNotes, setAdjNotes] = useState('');
+  const [isLoadingAdjustments, setIsLoadingAdjustments] = useState(false);
+  const [finalizeLeaseId, setFinalizeLeaseId] = useState<string | null>(null);
 
-
+  // --- Helper Functions ---
   const handleDocumentUpdate = async (leaseId: string, e: React.ChangeEvent<HTMLInputElement>) => {
     try {
       if (!e.target.files || !e.target.files[0]) return;
-      
       const loadingToastId = toast.loading("Uploading document...");
-      
       const formData = new FormData();
       formData.append('file', e.target.files[0]);
-      
       const uploadRes = await apiClient.post('/upload/private', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
+        headers: { 'Content-Type': 'multipart/form-data' },
       });
-      
       await updateLeaseDocument(leaseId, uploadRes.data.url);
-      
-      // Update selected lease state so modal reflects it directly without closing
       setSelectedLease((prev) => prev ? { ...prev, documentUrl: uploadRes.data.url } : null);
-      
       toast.dismiss(loadingToastId);
     } catch(err) {
       toast.dismiss();
@@ -97,16 +105,86 @@ export function LeasesPage() {
     }
   };
 
+  const handleEndLease = (leaseId: string) => setEndLeaseId(leaseId);
+  
+  const confirmEndLease = async () => {
+    if (endLeaseId) {
+      try {
+        await endLease(endLeaseId);
+        setSelectedLease(null);
+        setEndLeaseId(null);
+      } catch (e) {}
+    }
+  };
+
+  const fetchAdjustments = async (leaseId: string) => {
+    try {
+      setIsLoadingAdjustments(true);
+      const res = await apiClient.get(`/leases/${leaseId}/adjustments`);
+      setAdjustments(res.data);
+    } catch (err) {
+      toast.error('Failed to fetch rent adjustments');
+    } finally {
+      setIsLoadingAdjustments(false);
+    }
+  };
+
+  const handleAddAdjustment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!adjustmentsLeaseId) return;
+    try {
+      await apiClient.post(`/leases/${adjustmentsLeaseId}/adjustments`, {
+        effectiveDate: adjDate,
+        newMonthlyRent: parseFloat(adjRent),
+        notes: adjNotes,
+      });
+      toast.success('Rent adjustment scheduled');
+      fetchAdjustments(adjustmentsLeaseId);
+      setAdjDate('');
+      setAdjRent('');
+      setAdjNotes('');
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed to add adjustment');
+    }
+  };
+
+  const handleRenew = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!renewLeaseId) return;
+    try {
+      await renewLease(renewLeaseId, renewDate, renewRent ? parseFloat(renewRent) : undefined);
+      setRenewLeaseId(null);
+      setRenewDate('');
+      setRenewRent('');
+    } catch (e) {}
+  };
+
+  const handleRefundAction = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!refundLeaseId) return;
+    try {
+      if (refundType === 'request') {
+        await refundDeposit(refundLeaseId, parseFloat(refundAmount), refundNotes);
+      } else if (refundType === 'approve') {
+        await approveRefund(refundLeaseId);
+      } else if (refundType === 'dispute') {
+        await disputeRefund(refundLeaseId, refundNotes);
+      }
+      setRefundLeaseId(null);
+      setRefundAmount('');
+      setRefundNotes('');
+      setRefundType('request');
+    } catch (e) {}
+  };
+
+  // --- Filtered Data & Stats ---
   const activeLeases = leases.filter((l) => l.status === 'active');
-  const endedLeases = leases.filter((l) => l.status !== 'active');
+  const expiredLeases = leases.filter((l) => l.status === 'expired');
+  const endedLeases = leases.filter((l) => l.status === 'ended' || l.status === 'cancelled');
+  const draftLeases = leases.filter((l) => l.status === 'draft');
 
-  // ... (keep existing calculations)
-
-  // Calculate expiring soon (within 30 days)
   const today = new Date();
-  const thirtyDaysFromNow = new Date(
-    today.getTime() + 30 * 24 * 60 * 60 * 1000
-  );
+  const thirtyDaysFromNow = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
   const expiringSoon = activeLeases.filter((lease) => {
     if (!lease.endDate) return false;
     const endDate = new Date(lease.endDate);
@@ -114,31 +192,21 @@ export function LeasesPage() {
   });
 
   const stats = [
-    {
-      label: 'Total Leases',
-      value: leases.length,
-      icon: FileText,
-      color: 'bg-blue-50 text-blue-700',
-    },
-    {
-      label: 'Active Leases',
-      value: activeLeases.length,
-      icon: CheckCircle,
-      color: 'bg-green-50 text-green-700',
-    },
-    {
-      label: 'Expiring Soon',
-      value: expiringSoon.length,
-      icon: Calendar,
-      color: 'bg-orange-50 text-orange-700',
-    },
-    {
-      label: 'Ended Leases',
-      value: endedLeases.length,
-      icon: XCircle,
-      color: 'bg-gray-50 text-gray-700',
-    },
+    { label: 'Total Leases', value: leases.length, icon: FileText, color: 'bg-blue-50 text-blue-700' },
+    { label: 'Active Leases', value: activeLeases.length, icon: CheckCircle, color: 'bg-green-50 text-green-700' },
+    { label: 'Expiring Soon', value: expiringSoon.length, icon: Calendar, color: 'bg-orange-50 text-orange-700' },
+    { label: 'Expired (Move-Out)', value: expiredLeases.length, icon: AlertCircle, color: 'bg-amber-50 text-amber-700' },
+    { label: 'Ended Leases', value: endedLeases.length, icon: XCircle, color: 'bg-gray-50 text-gray-700' },
   ];
+
+  const confirmFinalizeCheckout = async () => {
+    if (finalizeLeaseId) {
+      try {
+        await finalizeCheckout(finalizeLeaseId);
+        setFinalizeLeaseId(null);
+      } catch (e) {}
+    }
+  };
 
   const LeaseRow = ({ lease }: { lease: Lease }) => {
     // ... (keep existing LeaseRow component logic)
@@ -206,9 +274,16 @@ export function LeasesPage() {
         </TableCell>
         <TableCell>
           <Badge
-            variant={lease.status === 'active' ? 'secondary' : 'outline'}
+            variant={
+              lease.status === 'active' ? 'secondary' : 
+              lease.status === 'expired' ? 'outline' : 
+              'outline'
+            }
             className={
-              lease.status === 'active' ? 'bg-green-100 text-green-700' : ''
+              lease.status === 'active' ? 'bg-green-100 text-green-700' : 
+              lease.status === 'expired' ? 'bg-amber-100 text-amber-700 border-amber-200' :
+              lease.status === 'draft' ? 'bg-gray-100 text-gray-700 border-gray-200' :
+              ''
             }
           >
             {lease.status}
@@ -224,6 +299,17 @@ export function LeasesPage() {
             >
               <Eye className="size-4" />
             </Button>
+            {lease.status === 'expired' && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setFinalizeLeaseId(lease.id)}
+                className="text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                title="Finalize Move-Out"
+              >
+                <CheckCircle className="size-4" />
+              </Button>
+            )}
             {lease.status === 'active' && (
               <>
                 <Button
@@ -297,116 +383,6 @@ export function LeasesPage() {
     );
   };
 
-  // Helper for End Lease - Trigger Dialog
-  const handleEndLease = (leaseId: string) => {
-    setEndLeaseId(leaseId);
-  };
-
-  const onEndLeaseClick = (leaseId: string) => {
-    setEndLeaseId(leaseId);
-  };
-
-  const confirmEndLease = async () => {
-    if (endLeaseId) {
-      try {
-        await endLease(endLeaseId);
-        setSelectedLease(null);
-        setEndLeaseId(null);
-      } catch (e) {
-        // Error toast is handled by context
-      }
-    }
-  };
-
-  // End Lease State
-  const [endLeaseId, setEndLeaseId] = useState<string | null>(null);
-
-  // Renewal State
-  const [renewLeaseId, setRenewLeaseId] = useState<string | null>(null);
-  const [renewDate, setRenewDate] = useState('');
-  const [renewRent, setRenewRent] = useState('');
-
-  // Refund State
-  const [refundLeaseId, setRefundLeaseId] = useState<string | null>(null);
-  const [refundAmount, setRefundAmount] = useState('');
-  const [refundNotes, setRefundNotes] = useState('');
-  const [refundType, setRefundType] = useState<'request' | 'approve' | 'dispute'>('request');
-
-  // Rent Adjustment State
-  const [adjustmentsLeaseId, setAdjustmentsLeaseId] = useState<string | null>(null);
-  const [adjustments, setAdjustments] = useState<any[]>([]);
-  const [adjDate, setAdjDate] = useState('');
-  const [adjRent, setAdjRent] = useState('');
-  const [adjNotes, setAdjNotes] = useState('');
-  const [isLoadingAdjustments, setIsLoadingAdjustments] = useState(false);
-
-  const fetchAdjustments = async (leaseId: string) => {
-    try {
-      setIsLoadingAdjustments(true);
-      const res = await apiClient.get(`/leases/${leaseId}/adjustments`);
-      setAdjustments(res.data);
-    } catch (err) {
-      toast.error('Failed to fetch rent adjustments');
-    } finally {
-      setIsLoadingAdjustments(false);
-    }
-  };
-
-  const handleAddAdjustment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!adjustmentsLeaseId) return;
-    try {
-      await apiClient.post(`/leases/${adjustmentsLeaseId}/adjustments`, {
-        effectiveDate: adjDate,
-        newMonthlyRent: parseFloat(adjRent),
-        notes: adjNotes,
-      });
-      toast.success('Rent adjustment scheduled');
-      fetchAdjustments(adjustmentsLeaseId);
-      setAdjDate('');
-      setAdjRent('');
-      setAdjNotes('');
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Failed to add adjustment');
-    }
-  };
-
-  const handleRenew = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!renewLeaseId) return;
-    try {
-      await renewLease(
-        renewLeaseId,
-        renewDate,
-        renewRent ? parseFloat(renewRent) : undefined
-      );
-      setRenewLeaseId(null);
-      setRenewDate('');
-      setRenewRent('');
-    } catch (e) {
-      // toast handled in context
-    }
-  };
-
-  const handleRefundAction = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!refundLeaseId) return;
-    try {
-      if (refundType === 'request') {
-        await refundDeposit(refundLeaseId, parseFloat(refundAmount), refundNotes);
-      } else if (refundType === 'approve') {
-        await approveRefund(refundLeaseId);
-      } else if (refundType === 'dispute') {
-        await disputeRefund(refundLeaseId, refundNotes);
-      }
-      setRefundLeaseId(null);
-      setRefundAmount('');
-      setRefundNotes('');
-      setRefundType('request');
-    } catch (e) {
-      // toast handled in context
-    }
-  };
 
   return (
     <div className="space-y-6">
@@ -453,18 +429,26 @@ export function LeasesPage() {
         <CardContent className="p-0">
           <Tabs defaultValue="active" className="w-full">
             <div className="border-b px-6 pt-6">
-              <TabsList>
+              <TabsList className="grid w-full grid-cols-5 mb-6">
                 <TabsTrigger value="active">
                   <FileText className="size-4 mr-2" />
-                  Active Leases ({activeLeases.length})
+                  Active ({activeLeases.length})
                 </TabsTrigger>
                 <TabsTrigger value="expiring">
                   <Calendar className="size-4 mr-2" />
-                  Expiring Soon ({expiringSoon.length})
+                  Expiring ({expiringSoon.length})
+                </TabsTrigger>
+                <TabsTrigger value="expired">
+                  <AlertCircle className="size-4 mr-2" />
+                  Expired ({expiredLeases.length})
                 </TabsTrigger>
                 <TabsTrigger value="ended">
                   <XCircle className="size-4 mr-2" />
-                  Ended Leases ({endedLeases.length})
+                  Ended ({endedLeases.length})
+                </TabsTrigger>
+                <TabsTrigger value="draft">
+                  <FileText className="size-4 mr-2" />
+                  Draft ({draftLeases.length})
                 </TabsTrigger>
               </TabsList>
             </div>
@@ -535,6 +519,36 @@ export function LeasesPage() {
               </div>
             </TabsContent>
 
+            {/* Expired Leases Tab */}
+            <TabsContent value="expired" className="m-0">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Tenant</TableHead>
+                      <TableHead>Property & Unit</TableHead>
+                      <TableHead>Start Date</TableHead>
+                      <TableHead>End Date</TableHead>
+                      <TableHead>Monthly Rent</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {expiredLeases.map((lease) => (
+                      <LeaseRow key={lease.id} lease={lease} />
+                    ))}
+                  </TableBody>
+                </Table>
+                {expiredLeases.length === 0 && (
+                  <div className="py-12 text-center">
+                    <AlertCircle className="size-12 text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-600">No expired leases requiring move-out</p>
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+
             {/* Ended Leases Tab */}
             <TabsContent value="ended" className="m-0">
               <div className="overflow-x-auto">
@@ -560,6 +574,36 @@ export function LeasesPage() {
                   <div className="py-12 text-center">
                     <FileText className="size-12 text-gray-400 mx-auto mb-4" />
                     <p className="text-gray-600">No ended leases</p>
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+
+            {/* Draft Leases Tab */}
+            <TabsContent value="draft" className="m-0">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Tenant</TableHead>
+                      <TableHead>Property & Unit</TableHead>
+                      <TableHead>Start Date</TableHead>
+                      <TableHead>End Date</TableHead>
+                      <TableHead>Monthly Rent</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {draftLeases.map((lease) => (
+                      <LeaseRow key={lease.id} lease={lease} />
+                    ))}
+                  </TableBody>
+                </Table>
+                {draftLeases.length === 0 && (
+                  <div className="py-12 text-center">
+                    <FileText className="size-12 text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-600">No draft leases</p>
                   </div>
                 )}
               </div>
@@ -1032,6 +1076,42 @@ export function LeasesPage() {
                 </form>
               </div>
             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Finalize Checkout Confirmation Dialog */}
+      <Dialog
+        open={!!finalizeLeaseId}
+        onOpenChange={(open) => !open && setFinalizeLeaseId(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Finalize Move-Out</DialogTitle>
+            <div className="text-sm text-gray-500 mt-2 space-y-2">
+              <p>Are you sure you want to finalize the move-out for this lease?</p>
+              <ul className="list-disc pl-5 space-y-1">
+                <li>The lease status will be changed to <strong>Ended</strong>.</li>
+                <li>The unit status will be changed from Maintenance to <strong>Available</strong> for new tenants.</li>
+                <li>An actual checkout timestamp will be recorded.</li>
+              </ul>
+            </div>
+          </DialogHeader>
+          <div className="flex justify-end gap-2 mt-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setFinalizeLeaseId(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+              onClick={confirmFinalizeCheckout}
+            >
+              Confirm & Release Unit
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

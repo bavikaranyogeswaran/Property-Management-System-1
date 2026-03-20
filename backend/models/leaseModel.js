@@ -45,6 +45,7 @@ class LeaseModel {
     'monthly_rent', 'status', 'security_deposit',
     'deposit_status', 'refunded_amount', 'document_url',
     'proposed_refund_amount', 'refund_notes', 'notice_status',
+    'actual_checkout_at',
   ];
 
   async update(id, data, connection = null) {

@@ -214,9 +214,9 @@ export const checkLeaseExpiration = async () => {
       console.log(`Found ${expiredLeases.length} expired leases.`);
 
       for (const lease of expiredLeases) {
-        // Update Lease to 'ended'
+        // Update Lease to 'expired' (System Auto-Expiry)
         await connection.query(
-          "UPDATE leases SET status = 'ended' WHERE lease_id = ?",
+          "UPDATE leases SET status = 'expired' WHERE lease_id = ?",
           [lease.lease_id]
         );
 
@@ -228,14 +228,14 @@ export const checkLeaseExpiration = async () => {
         );
 
         console.log(
-          `Lease ${lease.lease_id} ended. Unit ${lease.unit_id} set to Maintenance (Turnover).`
+          `Lease ${lease.lease_id} is now EXPIRED. Unit ${lease.unit_id} set to Maintenance (Turnover).`
         );
 
         // Notify Owner
         if (lease.owner_id) {
           await notificationModel.create({
             userId: lease.owner_id,
-            message: `Lease for Unit ${lease.unit_id} has ended. Unit is now in Maintenance for turnover.`,
+            message: `Lease for Unit ${lease.unit_id} has EXPIRED. Unit is now in Maintenance for turnover. Please process checkout.`,
             type: 'lease',
             severity: 'info',
           });
@@ -248,7 +248,7 @@ export const checkLeaseExpiration = async () => {
         for (const t of treasurers) {
           await notificationModel.create({
             userId: t.user_id,
-            message: `Lease #${lease.lease_id} has ended. Please process the Security Deposit Refund.`,
+            message: `Lease #${lease.lease_id} has EXPIRED. Please prepare for Security Deposit Refund.`,
             type: 'lease',
             severity: 'warning',
           });

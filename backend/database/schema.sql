@@ -246,7 +246,7 @@ CREATE TABLE leases (
     start_date DATE NOT NULL,
     end_date DATE,
     monthly_rent DECIMAL(10,2) NOT NULL,
-    status ENUM('active','ended','cancelled') DEFAULT 'active',
+    status ENUM('draft', 'active', 'expired', 'ended', 'cancelled') DEFAULT 'active',
     notice_status ENUM('undecided', 'vacating', 'renewing') DEFAULT 'undecided', -- [ADDED] Tenant's intent
     security_deposit DECIMAL(10, 2) DEFAULT 0.00,
     deposit_status ENUM('pending', 'paid', 'awaiting_approval', 'disputed', 'partially_refunded', 'refunded') DEFAULT 'pending',
@@ -254,6 +254,7 @@ CREATE TABLE leases (
     refund_notes TEXT,
     refunded_amount DECIMAL(10, 2) DEFAULT 0.00,
     document_url VARCHAR(500), -- [ADDED] Lease document URL
+    actual_checkout_at DATETIME, -- [ADDED] Actual checkout time
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (tenant_id) REFERENCES users(user_id) ON DELETE RESTRICT,
     FOREIGN KEY (unit_id) REFERENCES units(unit_id) ON DELETE RESTRICT

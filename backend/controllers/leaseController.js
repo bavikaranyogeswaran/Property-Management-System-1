@@ -206,6 +206,21 @@ class LeaseController {
       res.status(500).json({ error: error.message });
     }
   }
+
+  async finalizeCheckout(req, res) {
+    try {
+      if (req.user.role !== 'owner' && req.user.role !== 'treasurer') {
+        return res.status(403).json({ error: 'Access denied.' });
+      }
+      const { id } = req.params;
+      const result = await leaseService.finalizeLeaseCheckout(id, req.user);
+      res.json({ message: 'Lease checkout finalized successfully', ...result });
+    } catch (error) {
+      if (error.message.includes('not found')) return res.status(404).json({ error: error.message });
+      if (error.message.includes('Only expired')) return res.status(400).json({ error: error.message });
+      res.status(500).json({ error: error.message });
+    }
+  }
 }
 
 export default new LeaseController();

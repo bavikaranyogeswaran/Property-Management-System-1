@@ -618,6 +618,56 @@ class LeaseService {
     }
   }
 
+  async finalizeLeaseCheckout(leaseId, user) {
+    const lease = await leaseModel.findById(leaseId);
+    if (!lease) throw new Error('Lease not found');
+
+    if (lease.status !== 'expired') {
+      throw new Error('Only expired leases can be finalized for checkout');
+    }
+
+    // Check if security deposit is settled (refunded or offset)
+    if (!['refunded', 'partially_refunded', 'offset'].includes(lease.depositStatus)) {
+        // We allow finalizing even if not fully refunded, but we should log/warn
+        // For this state machine, ending the lease is the final step.
+    }
+
+    const connection = await pool.getConnection();
+
+    try {
+      await connection.beginTransaction();
+
+      const today = getLocalTime();
+      const actualCheckoutAt = today.toISOString().slice(0, 19).replace('T', ' ');
+
+      // 1. Update lease status to 'ended' and set actual_checkout_at
+      await leaseModel.update(leaseId, {
+        status: 'ended',
+        actual_checkout_at: actualCheckoutAt
+      }, connection);
+
+      // 2. Update unit status back to 'available' (from 'maintenance')
+      await unitModel.update(lease.unitId, { status: 'available' }, connection);
+
+      // 3. Audit Log
+      const auditLogger = (await import('../utils/auditLogger.js')).default;
+      await auditLogger.log({
+        userId: user.id,
+        actionType: 'LEASE_CHECKOUT_FINALIZED',
+        entityId: leaseId,
+        details: { actualCheckoutAt, unitId: lease.unitId },
+      }, null, connection);
+
+      await connection.commit();
+      return { status: 'ended', actualCheckoutAt };
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+
   async getLeases(user) {
     if (user.role === 'owner') return await leaseModel.findAll(user.id);
     if (user.role === 'treasurer') {
