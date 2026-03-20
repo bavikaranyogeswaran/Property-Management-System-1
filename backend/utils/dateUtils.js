@@ -73,6 +73,12 @@ export const parseLocalDate = (dateStr, timezone = DEFAULT_TIMEZONE) => {
   // If it's already a Date object, just return it
   if (dateStr instanceof Date) return dateStr;
   
+  // Robustness check: Ensure we have a string
+  if (typeof dateStr !== 'string') {
+    console.warn(`[dateUtils] parseLocalDate received non-string/non-date value:`, dateStr);
+    return null;
+  }
+  
   // If it's YYYY-MM-DD, append time to ensure local interpretation
   if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
     return new Date(new Date(`${dateStr}T00:00:00`).toLocaleString('en-US', { timeZone: timezone }));

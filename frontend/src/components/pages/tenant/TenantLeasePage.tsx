@@ -19,7 +19,7 @@ import { Button } from '@/components/ui/button';
 
 export function TenantLeasePage() {
   const { user } = useAuth();
-  const { leases, units, properties, updateNoticeStatus } = useApp();
+  const { leases, units, properties, updateNoticeStatus, renewalRequests } = useApp();
 
   // Separate active and past leases
   const activeLeases = leases.filter((l) => l.status === 'active');
@@ -222,9 +222,40 @@ export function TenantLeasePage() {
                       )}
                     </div>
                     {currentLease.noticeStatus === 'renewing' && (
-                      <p className="text-xs text-green-700 font-medium">
-                        ✓ We've noted your interest in renewing. We'll be in touch with the updated contract.
-                      </p>
+                      <div className="space-y-3">
+                        <p className="text-xs text-green-700 font-medium">
+                          ✓ We've noted your interest in renewing.
+                        </p>
+                        {(() => {
+                           const request = renewalRequests.find(r => r.lease_id === parseInt(currentLease.id));
+                           if (request) {
+                             return (
+                               <div className="p-3 bg-white border border-blue-100 rounded-md shadow-sm space-y-2">
+                                 <div className="flex justify-between items-start">
+                                   <p className="text-sm font-semibold text-blue-900">Renewal Request Status</p>
+                                   <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                                     {request.status.toUpperCase()}
+                                   </Badge>
+                                 </div>
+                                 {request.proposed_monthly_rent ? (
+                                   <div className="text-sm text-gray-700">
+                                     <p>Proposed Rent: <span className="font-bold text-emerald-600">LKR {request.proposed_monthly_rent}</span></p>
+                                     <p>Proposed End Date: <span className="font-medium">{formatDate(request.proposed_end_date)}</span></p>
+                                   </div>
+                                 ) : (
+                                   <p className="text-xs text-gray-500 italic">Owner is reviewing your renewal request. You'll see the proposed terms here shortly.</p>
+                                 )}
+                                 {request.negotiation_notes && (
+                                   <div className="mt-2 pt-2 border-t text-xs text-gray-600 italic">
+                                     " {request.negotiation_notes} "
+                                   </div>
+                                 )}
+                               </div>
+                             );
+                           }
+                           return null;
+                        })()}
+                      </div>
                     )}
                     {currentLease.noticeStatus === 'vacating' && (
                       <p className="text-xs text-red-700 font-medium">

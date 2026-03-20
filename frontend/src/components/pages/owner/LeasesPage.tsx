@@ -41,6 +41,7 @@ import {
   RotateCcw,
   AlertCircle,
   TrendingUp,
+  AlertTriangle
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -66,6 +67,10 @@ export function LeasesPage() {
     disputeRefund,
     updateLeaseDocument,
     finalizeCheckout,
+    renewalRequests,
+    proposeRenewalTerms,
+    approveRenewal: approveLeaseRenewal,
+    rejectRenewal,
   } = useApp();
   const { user } = useAuth();
   // --- State Hooks ---
@@ -85,6 +90,11 @@ export function LeasesPage() {
   const [adjNotes, setAdjNotes] = useState('');
   const [isLoadingAdjustments, setIsLoadingAdjustments] = useState(false);
   const [finalizeLeaseId, setFinalizeLeaseId] = useState<string | null>(null);
+  const [selectedRenewal, setSelectedRenewal] = useState<any | null>(null);
+  const [isRenewalDialogOpen, setIsRenewalDialogOpen] = useState(false);
+  const [newRenewalRent, setNewRenewalRent] = useState('');
+  const [newRenewalEndDate, setNewRenewalEndDate] = useState('');
+  const [renewalNotes, setRenewalNotes] = useState('');
 
   // --- Helper Functions ---
   const handleDocumentUpdate = async (leaseId: string, e: React.ChangeEvent<HTMLInputElement>) => {
@@ -156,6 +166,43 @@ export function LeasesPage() {
       setRenewLeaseId(null);
       setRenewDate('');
       setRenewRent('');
+    } catch (e) {}
+  };
+
+  const handleOpenRenewalNegotiation = (request: any) => {
+    setSelectedRenewal(request);
+    setNewRenewalRent(request.proposed_monthly_rent?.toString() || request.current_monthly_rent.toString());
+    setNewRenewalEndDate(request.proposed_end_date || '');
+    setRenewalNotes(request.negotiation_notes || '');
+    setIsRenewalDialogOpen(true);
+  };
+
+  const handleSubmitRenewalProposal = async () => {
+    if (!selectedRenewal) return;
+    // Get the current lease being renewed to find its end date
+    const currentLease = leases.find(l => String(l.id) === String(selectedRenewal?.lease_id));
+    const expectedStartDateStr = currentLease?.endDate 
+      ? new Date(new Date(currentLease.endDate).getTime() + 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+      : today.toISOString().split('T')[0];
+
+    if (new Date(newRenewalEndDate) <= new Date(expectedStartDateStr)) {
+      toast.error(`The renewal end date must be after the renewal start date (${expectedStartDateStr})`);
+      return;
+    }
+
+    try {
+      await proposeRenewalTerms(selectedRenewal.request_id, {
+        proposedMonthlyRent: parseFloat(newRenewalRent),
+        proposedEndDate: newRenewalEndDate,
+        notes: renewalNotes
+      });
+      setIsRenewalDialogOpen(false);
+    } catch (e) {}
+  };
+
+  const handleApproveRenewal = async (id: number) => {
+    try {
+      await approveLeaseRenewal(id);
     } catch (e) {}
   };
 
@@ -429,7 +476,7 @@ export function LeasesPage() {
         <CardContent className="p-0">
           <Tabs defaultValue="active" className="w-full">
             <div className="border-b px-6 pt-6">
-              <TabsList className="grid w-full grid-cols-5 mb-6">
+              <TabsList className="grid w-full grid-cols-6 mb-6">
                 <TabsTrigger value="active">
                   <FileText className="size-4 mr-2" />
                   Active ({activeLeases.length})
@@ -450,12 +497,22 @@ export function LeasesPage() {
                   <FileText className="size-4 mr-2" />
                   Draft ({draftLeases.length})
                 </TabsTrigger>
+                <TabsTrigger value="renewals" className="relative">
+                  <RotateCcw className="size-4 mr-2" />
+                  Renewals ({renewalRequests.filter(r => r.status === 'pending' || r.status === 'negotiating').length})
+                  {renewalRequests.some(r => r.status === 'pending') && (
+                    <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-orange-500"></span>
+                    </span>
+                  )}
+                </TabsTrigger>
               </TabsList>
             </div>
 
             {/* Active Leases Tab */}
             <TabsContent value="active" className="m-0">
-              <div className="overflow-x-auto">
+                <div className="overflow-x-auto px-6 pb-6">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -488,7 +545,7 @@ export function LeasesPage() {
 
             {/* Expiring Soon Tab */}
             <TabsContent value="expiring" className="m-0">
-              <div className="overflow-x-auto">
+                <div className="overflow-x-auto px-6 pb-6">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -521,7 +578,7 @@ export function LeasesPage() {
 
             {/* Expired Leases Tab */}
             <TabsContent value="expired" className="m-0">
-              <div className="overflow-x-auto">
+                <div className="overflow-x-auto px-6 pb-6">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -551,7 +608,7 @@ export function LeasesPage() {
 
             {/* Ended Leases Tab */}
             <TabsContent value="ended" className="m-0">
-              <div className="overflow-x-auto">
+                <div className="overflow-x-auto px-6 pb-6">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -581,7 +638,7 @@ export function LeasesPage() {
 
             {/* Draft Leases Tab */}
             <TabsContent value="draft" className="m-0">
-              <div className="overflow-x-auto">
+                <div className="overflow-x-auto px-6 pb-6">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -606,6 +663,106 @@ export function LeasesPage() {
                     <p className="text-gray-600">No draft leases</p>
                   </div>
                 )}
+              </div>
+            </TabsContent>
+            {/* Draft Leases Tab Content... (omitted for brevity) */}
+            <TabsContent value="renewals" className="m-0">
+                <div className="overflow-x-auto px-6 pb-6">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Tenant</TableHead>
+                      <TableHead>Property & Unit</TableHead>
+                      <TableHead>Current Rent</TableHead>
+                      <TableHead>Proposed Terms</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {renewalRequests.map((request) => (
+                      <TableRow key={request.request_id}>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <User className="size-4 text-gray-400" />
+                            <span className="font-medium">{request.tenant_name}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm">
+                            <div className="font-medium">{request.property_name}</div>
+                            <div className="text-gray-500">Unit {request.unit_number}</div>
+                          </div>
+                        </TableCell>
+                        <TableCell>LKR {request.current_monthly_rent}</TableCell>
+                        <TableCell>
+                          {request.proposed_monthly_rent ? (
+                            <div className="text-sm">
+                              <div className="font-medium text-emerald-600">LKR {request.proposed_monthly_rent}</div>
+                              <div className="text-gray-500">Until {request.proposed_end_date}</div>
+                            </div>
+                          ) : (
+                            <span className="text-gray-400 italic text-sm">Not proposed yet</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Badge 
+                            variant="outline"
+                            className={
+                              request.status === 'pending' ? 'bg-orange-100 text-orange-700 border-orange-200' :
+                              request.status === 'negotiating' ? 'bg-blue-100 text-blue-700 border-blue-200' :
+                              request.status === 'approved' ? 'bg-green-100 text-green-700 border-green-200' :
+                              'bg-gray-100 text-gray-700'
+                            }
+                          >
+                            {request.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex gap-2 justify-end">
+                            {(request.status === 'pending' || request.status === 'negotiating') && (
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleOpenRenewalNegotiation(request)}
+                                  className="text-blue-600 border-blue-200 hover:bg-blue-50"
+                                >
+                                  Propose/Edit
+                                </Button>
+                                {request.proposed_monthly_rent && request.proposed_end_date && (
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handleApproveRenewal(request.request_id)}
+                                    className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                                  >
+                                    Approve & Create Lease
+                                  </Button>
+                                )}
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => rejectRenewal(request.request_id)}
+                                  className="text-red-600 hover:bg-red-50"
+                                >
+                                  Reject
+                                </Button>
+                              </>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {renewalRequests.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={6} className="py-12 text-center text-gray-500">
+                          <RotateCcw className="size-12 mx-auto mb-4 opacity-20" />
+                          No renewal requests found
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
               </div>
             </TabsContent>
           </Tabs>
@@ -746,7 +903,11 @@ export function LeasesPage() {
                       </div>
                       <div>
                         <p className="text-sm text-gray-600">Lease Duration</p>
-                        <p className="font-medium">{durationMonths !== null ? `${durationMonths} months` : 'Periodic (Indefinite)'}</p>
+                        <p className={`font-medium ${durationMonths !== null && durationMonths < 0 ? 'text-red-600' : ''}`}>
+                          {durationMonths !== null 
+                            ? (durationMonths < 0 ? `Invalid (${durationMonths} months)` : `${durationMonths} months`) 
+                            : 'Periodic (Indefinite)'}
+                        </p>
                       </div>
                       <div>
                         <p className="text-sm text-gray-600">Monthly Rent</p>
@@ -1112,6 +1273,84 @@ export function LeasesPage() {
             >
               Confirm & Release Unit
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      {/* Renewal Negotiation Dialog */}
+      <Dialog open={isRenewalDialogOpen} onOpenChange={setIsRenewalDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Negotiate Lease Renewal</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="p-3 bg-blue-50 rounded text-sm text-blue-800 border border-blue-100">
+              Negotiating renewal for <strong>{selectedRenewal?.tenant_name}</strong> at {selectedRenewal?.property_name}.
+              {(() => {
+                const currentLease = leases.find(l => String(l.id) === String(selectedRenewal?.lease_id));
+                if (!currentLease?.endDate) return null;
+                const nextStartDate = new Date(new Date(currentLease.endDate).getTime() + 24 * 60 * 60 * 1000);
+                const nextStartDateStr = nextStartDate.toISOString().split('T')[0];
+                const isFarFuture = nextStartDate > new Date(today.getTime() + 365 * 24 * 60 * 60 * 1000 * 2); // 2 years
+                
+                return (
+                  <div className="mt-2 text-xs">
+                    <span className="font-semibold">Expected Renewal Start:</span> {nextStartDateStr}
+                    {isFarFuture && (
+                      <div className="text-amber-600 mt-1 font-medium flex items-center gap-1">
+                        <AlertTriangle className="size-3" />
+                        Warning: This start date is far in the future! Check the original lease dates.
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>New Monthly Rent (LKR)</Label>
+                <div className="relative">
+                  <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-gray-400" />
+                  <Input 
+                    className="pl-9"
+                    type="number" 
+                    value={newRenewalRent} 
+                    onChange={(e) => setNewRenewalRent(e.target.value)} 
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Proposed End Date</Label>
+                <div className="relative">
+                  <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-gray-400" />
+                  <Input 
+                    className="pl-9"
+                    type="date" 
+                    value={newRenewalEndDate} 
+                    onChange={(e) => setNewRenewalEndDate(e.target.value)} 
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Negotiation Notes</Label>
+              <textarea
+                className="w-full min-h-[100px] p-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Message for the tenant or internal notes..."
+                value={renewalNotes}
+                onChange={(e) => setRenewalNotes(e.target.value)}
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-4">
+              <Button variant="outline" onClick={() => setIsRenewalDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleSubmitRenewalProposal}>
+                Submit Proposal
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

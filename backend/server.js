@@ -98,6 +98,7 @@ import messageRoutes from './routes/messageRoutes.js';
 import leaseTermRoutes from './routes/leaseTermRoutes.js';
 import documentRoutes from './routes/documentRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
+import renewalRoutes from './routes/renewalRoutes.js';
 
 // Lead Portal (public, no auth) — MUST be mounted before imageRoutes
 app.use('/api/lead-portal', leadPortalRoutes);
@@ -124,6 +125,7 @@ app.use('/api/payouts', payoutRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/lease-terms', leaseTermRoutes);
 app.use('/api/documents', documentRoutes);
+app.use('/api/renewal-requests', renewalRoutes);
 app.use('/api', imageRoutes);
 
 app.get('/api/health', (req, res) => {

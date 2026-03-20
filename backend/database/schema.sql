@@ -483,3 +483,18 @@ CREATE INDEX idx_leases_status_end_date ON leases(status, end_date);
 CREATE INDEX idx_invoices_status_due_date ON rent_invoices(status, due_date);
 
 
+-- =========================
+-- RENEWAL REQUESTS (Negotiation flow)
+-- =========================
+CREATE TABLE IF NOT EXISTS renewal_requests (
+    request_id INT AUTO_INCREMENT PRIMARY KEY,
+    lease_id INT NOT NULL,
+    current_monthly_rent DECIMAL(10,2) NOT NULL,
+    proposed_monthly_rent DECIMAL(10,2) NULL,
+    proposed_end_date DATE NULL,
+    status ENUM('pending', 'negotiating', 'approved', 'rejected', 'cancelled') DEFAULT 'pending',
+    negotiation_notes TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (lease_id) REFERENCES leases(lease_id) ON DELETE CASCADE
+);

@@ -25,6 +25,20 @@ export interface Lease {
   createdAt: string;
 }
 
+export interface RenewalRequest {
+  request_id: number;
+  lease_id: number;
+  current_monthly_rent: number;
+  proposed_monthly_rent: number | null;
+  proposed_end_date: string | null;
+  status: 'pending' | 'negotiating' | 'approved' | 'rejected' | 'cancelled';
+  negotiation_notes: string | null;
+  unit_number?: string;
+  property_name?: string;
+  tenant_name?: string;
+  created_at: string;
+}
+
 export interface LeaseTerm {
   leaseTermId: number;
   ownerId: number;
@@ -51,6 +65,13 @@ interface LeaseContextType {
   updateLeaseTerm: (id: number, term: Partial<LeaseTerm>) => Promise<void>;
   deleteLeaseTerm: (id: number) => Promise<void>;
   finalizeCheckout: (id: string) => Promise<void>;
+
+  // Renewal operations
+  renewalRequests: RenewalRequest[];
+  fetchRenewalRequests: () => Promise<void>;
+  proposeRenewalTerms: (id: number, data: { proposedMonthlyRent: number; proposedEndDate: string; notes?: string }) => Promise<void>;
+  approveRenewal: (id: number) => Promise<void>;
+  rejectRenewal: (id: number) => Promise<void>;
 }
 
 const LeaseContext = createContext<LeaseContextType | undefined>(undefined);
@@ -60,6 +81,7 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
   const { updateUnit } = useProperty();
   const [leases, setLeases] = useState<Lease[]>([]);
   const [leaseTerms, setLeaseTerms] = useState<LeaseTerm[]>([]);
+  const [renewalRequests, setRenewalRequests] = useState<RenewalRequest[]>([]);
 
   const fetchLeaseTerms = async () => {
     try {
@@ -94,7 +116,10 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (user) {
       fetchLeases();
-      if (user.role === 'owner') fetchLeaseTerms();
+      fetchRenewalRequests();
+      if (user.role === 'owner' || user.role === 'treasurer') {
+        fetchLeaseTerms();
+      }
     }
   }, [user]);
 
@@ -245,6 +270,49 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const fetchRenewalRequests = async () => {
+    try {
+      const response = await apiClient.get('/renewal-requests');
+      setRenewalRequests(response.data);
+    } catch (e) {
+      console.error('Failed to fetch renewal requests', e);
+    }
+  };
+
+  const proposeRenewalTerms = async (id: number, data: { proposedMonthlyRent: number; proposedEndDate: string; notes?: string }) => {
+    try {
+      await apiClient.post(`/renewal-requests/${id}/propose`, data);
+      toast.success('Renewal terms proposed successfully');
+      fetchRenewalRequests();
+    } catch (e: any) {
+      toast.error(e.response?.data?.error || 'Failed to propose renewal terms');
+      throw e;
+    }
+  };
+
+  const approveRenewal = async (id: number) => {
+    try {
+      await apiClient.post(`/renewal-requests/${id}/approve`);
+      toast.success('Renewal approved. New draft lease created.');
+      fetchRenewalRequests();
+      fetchLeases(); // New draft lease should appear
+    } catch (e: any) {
+      toast.error(e.response?.data?.error || 'Failed to approve renewal');
+      throw e;
+    }
+  };
+
+  const rejectRenewal = async (id: number) => {
+    try {
+      await apiClient.post(`/renewal-requests/${id}/reject`);
+      toast.success('Renewal request rejected');
+      fetchRenewalRequests();
+    } catch (e: any) {
+      toast.error(e.response?.data?.error || 'Failed to reject renewal');
+      throw e;
+    }
+  };
+
   return (
     <LeaseContext.Provider value={{ 
       leases, 
@@ -260,7 +328,12 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
       addLeaseTerm,
       updateLeaseTerm,
       deleteLeaseTerm,
-      finalizeCheckout
+      finalizeCheckout,
+      renewalRequests,
+      fetchRenewalRequests,
+      proposeRenewalTerms,
+      approveRenewal,
+      rejectRenewal
     }}>
       {children}
     </LeaseContext.Provider>
