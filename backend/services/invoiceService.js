@@ -7,6 +7,7 @@ import behaviorLogModel from '../models/behaviorLogModel.js';
 import tenantModel from '../models/tenantModel.js';
 import userModel from '../models/userModel.js';
 import emailService from '../utils/emailService.js';
+import billingEngine from '../utils/billingEngine.js';
 import { getCurrentDateString, getLocalTime, parseLocalDate, now } from '../utils/dateUtils.js';
 
 class InvoiceService {
@@ -92,13 +93,17 @@ class InvoiceService {
                 continue;
             }
 
-            const dueDateStr = `${y}-${String(m).padStart(2, '0')}-05`; // Standard due date
+            const billingInfo = billingEngine.calculateMonthlyRent(lease, y, m);
+            if (!billingInfo) {
+                skippedCount++;
+                continue;
+            }
 
             const invoiceId = await invoiceModel.create({
                 leaseId: lease.id,
-                amount: lease.monthlyRent,
-                dueDate: dueDateStr,
-                description: `Rent for ${y}-${m}`,
+                amount: billingInfo.amount,
+                dueDate: billingInfo.dueDate,
+                description: billingInfo.description,
             });
 
             // Notify Tenant via Email
@@ -106,8 +111,8 @@ class InvoiceService {
                 const tenant = await userModel.findById(lease.tenantId);
                 if (tenant && tenant.email) {
                     await emailService.sendInvoiceNotification(tenant.email, {
-                        amount: lease.monthlyRent,
-                        dueDate: dueDateStr,
+                        amount: billingInfo.amount,
+                        dueDate: billingInfo.dueDate,
                         month: m,
                         year: y,
                         invoiceId: invoiceId,

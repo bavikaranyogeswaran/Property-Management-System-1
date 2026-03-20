@@ -4,23 +4,18 @@ import leaseModel from '../models/leaseModel.js';
 import invoiceModel from '../models/invoiceModel.js';
 import notificationModel from '../models/notificationModel.js';
 import emailService from './emailService.js';
+import billingEngine from './billingEngine.js';
 import { getCurrentDateString, getLocalTime, today, now, parseLocalDate, addDays, formatToLocalDate } from './dateUtils.js';
 
 // --- CONFIGURATION ---
-const RENT_DUE_DAY = 1; // 1st of each month
-const GRACE_PERIOD_DAYS = 5;
 const LATE_FEE_PERCENTAGE = 0.05;
 
 export const generateRentInvoices = async () => {
   console.log('Running automated rent invoicing...');
   const currentToday = now();
 
-  // ... (guards remain same)
-
   const currentYear = currentToday.getFullYear();
   const currentMonth = currentToday.getMonth() + 1; // 1-12
-  
-  const dueDateStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(RENT_DUE_DAY).padStart(2, '0')}`;
 
   try {
     const activeLeases = await leaseModel.findActive();
@@ -28,38 +23,8 @@ export const generateRentInvoices = async () => {
 
     let createdCount = 0;
     for (const lease of activeLeases) {
-      const leaseStart = parseLocalDate(lease.startDate);
-      if (leaseStart > currentToday) {
-        continue;
-      }
-
-      // Calculate effective rent for the billing month
-      const billingDate = `${currentYear}-${String(currentMonth).padStart(2, '0')}-01`;
-      const baseRent = await leaseModel.getEffectiveRent(lease.id, billingDate);
-      
-      let rentAmount = baseRent;
-      let description = `Rent for ${currentYear}-${currentMonth}`;
-
-      if (lease.endDate) {
-        const endDate = parseLocalDate(lease.endDate);
-        if (
-          endDate.getFullYear() === currentYear &&
-          endDate.getMonth() + 1 === currentMonth
-        ) {
-          const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
-          const endDay = endDate.getDate();
-
-          if (endDay < daysInMonth) {
-            rentAmount =
-              Math.round((baseRent / daysInMonth) * endDay * 100) /
-              100;
-            description += ` (Prorated: ${endDay}/${daysInMonth} days)`;
-            console.log(
-              `Prorating Final Month for Lease ${lease.id}: ${rentAmount}`
-            );
-          }
-        }
-      }
+      const billingInfo = billingEngine.calculateMonthlyRent(lease, currentYear, currentMonth);
+      if (!billingInfo) continue;
 
       const exists = await invoiceModel.exists(
         lease.id,
@@ -73,9 +38,9 @@ export const generateRentInvoices = async () => {
         );
         const invoiceId = await invoiceModel.create({
           leaseId: lease.id,
-          amount: rentAmount,
-          dueDate: dueDateStr,
-          description: description,
+          amount: billingInfo.amount,
+          dueDate: billingInfo.dueDate,
+          description: billingInfo.description,
           type: 'rent',
         });
 
@@ -256,44 +221,6 @@ export const checkLeaseExpiration = async () => {
       }
     }
 
-    // 2. Process Turnover Buffer (Maintenance -> Available)
-    // Find units in maintenance that had a lease end >= 3 days ago
-    // AND do not have any active/pending maintenance requests (Safety check)
-    const bufferDate = addDays(now(), -3);
-    const bufferDateStr = formatToLocalDate(bufferDate);
-
-    // Query: Units in 'maintenance' where LATEST lease end_date <= bufferDate
-    // And NO active maintenance requests.
-    const [turnoverUnits] = await connection.query(
-      `
-            SELECT u.unit_id 
-            FROM units u
-            JOIN leases l ON u.unit_id = l.unit_id
-            WHERE u.status = 'maintenance'
-            AND l.status = 'ended'
-            AND l.end_date <= ?
-            AND l.end_date = (SELECT MAX(end_date) FROM leases WHERE unit_id = u.unit_id)
-            AND NOT EXISTS (
-                SELECT 1 FROM maintenance_requests mr 
-                WHERE mr.unit_id = u.unit_id 
-                AND mr.status IN ('submitted', 'in_progress')
-            )
-        `,
-      [bufferDateStr]
-    );
-
-    if (turnoverUnits.length > 0) {
-      console.log(
-        `Found ${turnoverUnits.length} units ready for Turnover (Maintenance -> Available).`
-      );
-      for (const u of turnoverUnits) {
-        await connection.query(
-          "UPDATE units SET status = 'available' WHERE unit_id = ?",
-          [u.unit_id]
-        );
-      }
-    }
-
     await connection.commit();
   } catch (error) {
     await connection.rollback();
@@ -385,10 +312,12 @@ export const sendLeaseExpiryWarnings = async () => {
 export const applyLateFees = async () => {
   console.log('Running late fee automation...');
   try {
-    const overdueInvoices = await invoiceModel.findOverdue(GRACE_PERIOD_DAYS);
+    const overdueInvoices = await invoiceModel.findOverdue(billingEngine.GRACE_PERIOD_DAYS);
     console.log(
       `Found ${overdueInvoices.length} overdue invoices eligible for late fees.`
     );
+
+    const LATE_FEE_PERCENTAGE = 0.05;
 
     let appliedCount = 0;
     for (const inv of overdueInvoices) {
@@ -618,7 +547,7 @@ export const syncUnitStatuses = async () => {
 // Rent Reminder (Daily at 8:00 AM)
 export const sendRentReminders = async () => {
   const currentToday = now();
-  const targetDay = RENT_DUE_DAY - 3;
+  const targetDay = billingEngine.RENT_DUE_DAY - 3;
   
   if (currentToday.getDate() !== targetDay) return;
 
