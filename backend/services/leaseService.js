@@ -735,6 +735,50 @@ class LeaseService {
     });
   }
 
+  async activateLease(leaseId, user) {
+    const lease = await leaseModel.findById(leaseId);
+    if (!lease) throw new Error('Lease not found');
+
+    if (lease.status !== 'draft') {
+      throw new Error('Only draft leases can be activated.');
+    }
+
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      // 1. Activate the lease
+      await leaseModel.update(leaseId, { status: 'active' }, connection);
+
+      // 2. Update unit to 'occupied' if lease has started
+      const todayStr = today();
+      if (parseLocalDate(lease.startDate) <= parseLocalDate(todayStr)) {
+        await unitModel.update(lease.unitId, { status: 'occupied' }, connection);
+      }
+
+      // 3. Audit log
+      const auditLogger = (await import('../utils/auditLogger.js')).default;
+      await auditLogger.log(
+        {
+          userId: user?.id || null,
+          actionType: 'LEASE_ACTIVATED',
+          entityId: leaseId,
+          details: { activatedBy: user?.id, unitId: lease.unitId, startDate: lease.startDate },
+        },
+        null,
+        connection
+      );
+
+      await connection.commit();
+      return { leaseId, status: 'active' };
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+
   async getRentAdjustments(leaseId, user) {
     const lease = await this.getLeaseById(leaseId, user);
     if (!lease) throw new Error('Lease not found');

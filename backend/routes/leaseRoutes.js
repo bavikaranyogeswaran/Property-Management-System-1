@@ -21,5 +21,6 @@ router.patch('/:id/notice-status', authenticateToken, leaseController.updateNoti
 router.get('/:id/adjustments', authenticateToken, leaseController.getRentAdjustments);
 router.post('/:id/adjustments', authenticateToken, leaseController.addRentAdjustment);
 router.post('/:id/finalize-checkout', authenticateToken, leaseController.finalizeCheckout);
+router.patch('/:id/activate', authenticateToken, leaseController.activateLease);
 
 export default router;

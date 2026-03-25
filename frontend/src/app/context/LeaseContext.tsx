@@ -65,6 +65,7 @@ interface LeaseContextType {
   updateLeaseTerm: (id: number, term: Partial<LeaseTerm>) => Promise<void>;
   deleteLeaseTerm: (id: number) => Promise<void>;
   finalizeCheckout: (id: string) => Promise<void>;
+  activateLease: (id: string) => Promise<void>;
 
   // Renewal operations
   renewalRequests: RenewalRequest[];
@@ -270,6 +271,18 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const activateLease = async (id: string) => {
+    try {
+      await apiClient.patch(`/leases/${id}/activate`);
+      setLeases(prev => prev.map(l => (l.id === id ? { ...l, status: 'active' } : l)));
+      toast.success('Lease activated successfully.');
+    } catch (e: any) {
+      const msg = e.response?.data?.error || 'Failed to activate lease';
+      toast.error(msg);
+      throw new Error(msg);
+    }
+  };
+
   const fetchRenewalRequests = async () => {
     try {
       const response = await apiClient.get('/renewal-requests');
@@ -329,6 +342,7 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
       updateLeaseTerm,
       deleteLeaseTerm,
       finalizeCheckout,
+      activateLease,
       renewalRequests,
       fetchRenewalRequests,
       proposeRenewalTerms,

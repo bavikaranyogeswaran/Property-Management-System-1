@@ -539,6 +539,34 @@ export const syncUnitStatuses = async () => {
         [ids]
       );
     }
+
+    // 3. Renewal Handover Fix: Find units in 'maintenance' that have an active
+    //    lease covering today. This handles the case where a draft was activated
+    //    before the new lease start date, the old lease expired setting the unit
+    //    to 'maintenance', and the new lease has now begun.
+    const [maintenanceWithActiveLease] = await db.query(
+      `
+          SELECT u.unit_id
+          FROM units u
+          JOIN leases l ON u.unit_id = l.unit_id
+          WHERE u.status = 'maintenance'
+          AND l.status = 'active'
+          AND l.start_date <= ?
+          AND l.end_date >= ?
+      `,
+      [currentToday, currentToday]
+    );
+
+    if (maintenanceWithActiveLease.length > 0) {
+      console.log(
+        `Found ${maintenanceWithActiveLease.length} units stuck in 'maintenance' with a live active lease. Correcting to 'occupied'...`
+      );
+      const ids = maintenanceWithActiveLease.map((u) => u.unit_id);
+      await db.query(
+        `UPDATE units SET status = 'occupied' WHERE unit_id IN (?)`,
+        [ids]
+      );
+    }
   } catch (error) {
     console.error('Error syncing unit statuses:', error);
   }

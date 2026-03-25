@@ -41,7 +41,8 @@ import {
   RotateCcw,
   AlertCircle,
   TrendingUp,
-  AlertTriangle
+  AlertTriangle,
+  PlayCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -67,6 +68,7 @@ export function LeasesPage() {
     disputeRefund,
     updateLeaseDocument,
     finalizeCheckout,
+    activateLease,
     renewalRequests,
     proposeRenewalTerms,
     approveRenewal: approveLeaseRenewal,
@@ -90,6 +92,7 @@ export function LeasesPage() {
   const [adjNotes, setAdjNotes] = useState('');
   const [isLoadingAdjustments, setIsLoadingAdjustments] = useState(false);
   const [finalizeLeaseId, setFinalizeLeaseId] = useState<string | null>(null);
+  const [activateLeaseId, setActivateLeaseId] = useState<string | null>(null);
   const [selectedRenewal, setSelectedRenewal] = useState<any | null>(null);
   const [isRenewalDialogOpen, setIsRenewalDialogOpen] = useState(false);
   const [newRenewalRent, setNewRenewalRent] = useState('');
@@ -123,6 +126,15 @@ export function LeasesPage() {
         await endLease(endLeaseId);
         setSelectedLease(null);
         setEndLeaseId(null);
+      } catch (e) {}
+    }
+  };
+
+  const confirmActivateLease = async () => {
+    if (activateLeaseId) {
+      try {
+        await activateLease(activateLeaseId);
+        setActivateLeaseId(null);
       } catch (e) {}
     }
   };
@@ -346,6 +358,17 @@ export function LeasesPage() {
             >
               <Eye className="size-4" />
             </Button>
+            {lease.status === 'draft' && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setActivateLeaseId(lease.id)}
+                className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                title="Activate Lease"
+              >
+                <PlayCircle className="size-4" />
+              </Button>
+            )}
             {lease.status === 'expired' && (
               <Button
                 size="sm"
@@ -1272,6 +1295,42 @@ export function LeasesPage() {
               onClick={confirmFinalizeCheckout}
             >
               Confirm & Release Unit
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      {/* Activate Lease Confirmation Dialog */}
+      <Dialog
+        open={!!activateLeaseId}
+        onOpenChange={(open) => !open && setActivateLeaseId(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Activate Lease</DialogTitle>
+            <div className="text-sm text-gray-500 mt-2 space-y-2">
+              <p>Are you sure you want to activate this draft lease?</p>
+              <ul className="list-disc pl-5 space-y-1">
+                <li>The lease status will change to <strong>Active</strong>.</li>
+                <li>The unit will be marked as <strong>Occupied</strong> if the lease has already started.</li>
+                <li>Rent invoices will begin generating on the next billing cycle.</li>
+              </ul>
+            </div>
+          </DialogHeader>
+          <div className="flex justify-end gap-2 mt-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setActivateLeaseId(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              className="bg-green-600 hover:bg-green-700 text-white"
+              onClick={confirmActivateLease}
+            >
+              <PlayCircle className="size-4 mr-2" />
+              Activate Lease
             </Button>
           </div>
         </DialogContent>
