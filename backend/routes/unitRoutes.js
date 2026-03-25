@@ -34,7 +34,7 @@ router.delete(
 router.patch(
   '/:id/mark-available',
   authenticateToken,
-  authorizeRoles('owner', 'treasurer'),
+  authorizeRoles('owner'),
   unitController.markAvailable
 );
 

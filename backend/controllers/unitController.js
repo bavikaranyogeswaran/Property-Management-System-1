@@ -132,7 +132,7 @@ class UnitController {
   // Mark a maintenance unit as available so leads can submit interest
   async markAvailable(req, res) {
     try {
-      if (req.user.role !== 'owner' && req.user.role !== 'treasurer') {
+      if (req.user.role !== 'owner') {
         return res.status(403).json({ error: 'Access denied.' });
       }
 
