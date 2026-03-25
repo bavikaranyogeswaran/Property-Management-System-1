@@ -118,11 +118,12 @@ class LeaseService {
 
       // 4. Update Unit Status
       const today = new Date().toISOString().split('T')[0];
+
+      // CLEANUP: Cancel ALL future visits for this unit (lease is signed, regardless of start date)
+      await visitModel.cancelVisitsForUnit(unitId, today, conn);
+
       if (new Date(startDate) <= new Date(today)) {
         await unitModel.update(unitId, { status: 'occupied' }, conn);
-
-        // CLEANUP: Cancel conflicting future/current visits
-        await visitModel.cancelVisitsForUnit(unitId, today, conn);
 
         // Mark the tenant's own lead as 'converted' BEFORE dropping others
         try {

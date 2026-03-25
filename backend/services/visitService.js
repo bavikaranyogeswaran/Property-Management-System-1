@@ -27,7 +27,13 @@ class VisitService {
             scheduledDate.setMinutes(0, 0, 0);
         }
 
-        // 2. Lead Time Validation (Min 2 hours)
+        // 2a. Business Hours Validation (9 AM - 6 PM)
+        const hour = scheduledDate.getHours();
+        if (hour < 9 || hour >= 18) {
+            throw new Error('Visits can only be scheduled between 9:00 AM and 6:00 PM.');
+        }
+
+        // 2b. Lead Time Validation (Min 2 hours)
         const now = new Date();
         const twoHoursFromNow = new Date(now.getTime() + 2 * 60 * 60 * 1000);
         if (scheduledDate < twoHoursFromNow) {
@@ -149,6 +155,10 @@ class VisitService {
     }
 
     async updateStatus(id, status, user) {
+        if (!user || (user.role !== 'owner' && user.role !== 'treasurer')) {
+            throw new Error('Access denied. Only owners and treasurers can update visit status.');
+        }
+
         if (!['pending', 'confirmed', 'cancelled', 'completed'].includes(status)) {
             throw new Error('Invalid status');
         }

@@ -679,6 +679,46 @@ class EmailService {
     }
   }
 
+  async sendVisitReminder(visitorEmail, visitDetails) {
+    const { visitorName, propertyName, unitNumber, scheduledDate } = visitDetails;
+    const dateStr = new Date(scheduledDate).toLocaleString();
+
+    if (!this.transporter) {
+      console.log('==================================================');
+      console.log(`[EMAIL MOCK] Visit Reminder to: ${visitorEmail}`);
+      console.log(`Property/Unit: ${propertyName}${unitNumber ? ' (Unit ' + unitNumber + ')' : ''}`);
+      console.log(`Date: ${dateStr}`);
+      console.log('==================================================');
+      return true;
+    }
+
+    try {
+      await this.transporter.sendMail({
+        from: `"Property Management System" <${process.env.SMTP_USER}>`,
+        to: visitorEmail,
+        subject: `Reminder: Visit Tomorrow - ${propertyName}`,
+        html: this._getTemplate(
+          'Visit Reminder',
+          `
+                <p>Hi ${visitorName},</p>
+                <p>This is a friendly reminder that your visit to <strong>${propertyName}</strong> ${unitNumber ? '(Unit ' + unitNumber + ')' : ''} is scheduled for tomorrow.</p>
+                
+                <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; margin: 24px 0; border: 1px solid #e2e8f0;">
+                    <p style="margin: 4px 0; color: #475569;"><strong>Scheduled For:</strong> ${dateStr}</p>
+                    ${unitNumber ? `<p style="margin: 4px 0; color: #475569;"><strong>Unit:</strong> ${unitNumber}</p>` : ''}
+                </div>
+
+                <p>Please arrive 5 minutes early. If your plans have changed, please contact us to cancel or reschedule.</p>
+                `
+        ),
+      });
+      return true;
+    } catch (e) {
+      console.error('Error sending visit reminder:', e);
+      return false;
+    }
+  }
+
   _getTemplate(title, content) {
     return `
             <!DOCTYPE html>

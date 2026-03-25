@@ -137,6 +137,19 @@ class VisitModel {
     );
     return rows.length > 0;
   }
+
+  async findUpcoming(hoursAhead = 24) {
+    const [rows] = await db.query(
+      `SELECT v.*, p.name as property_name, u.unit_number
+       FROM property_visits v
+       JOIN properties p ON v.property_id = p.property_id
+       LEFT JOIN units u ON v.unit_id = u.unit_id
+       WHERE v.status IN ('pending', 'confirmed')
+       AND v.scheduled_date BETWEEN NOW() AND DATE_ADD(NOW(), INTERVAL ? HOUR)`,
+      [hoursAhead]
+    );
+    return rows;
+  }
 }
 
 export default new VisitModel();

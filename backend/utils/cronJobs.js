@@ -592,6 +592,34 @@ export const expireStaleLeads = async () => {
   }
 };
 
+// Visit Reminders (Daily at 7:00 AM)
+// Sends 24h reminder emails to visitors with upcoming visits
+export const sendVisitReminders = async () => {
+  console.log('Running visit reminders...');
+  try {
+    const visitModel = (await import('../models/visitModel.js')).default;
+    const upcoming = await visitModel.findUpcoming(24);
+
+    for (const visit of upcoming) {
+      try {
+        if (visit.visitor_email) {
+          await emailService.sendVisitReminder(visit.visitor_email, {
+            visitorName: visit.visitor_name,
+            propertyName: visit.property_name,
+            unitNumber: visit.unit_number,
+            scheduledDate: visit.scheduled_date,
+          });
+        }
+      } catch (emailErr) {
+        console.error(`Failed to send visit reminder for visit ${visit.visit_id}:`, emailErr);
+      }
+    }
+    console.log(`Sent ${upcoming.length} visit reminders.`);
+  } catch (error) {
+    console.error('Error in visit reminders:', error);
+  }
+};
+
 const initCronJobs = () => {
   // Run every day at 0:30 AM (Expiry Warnings)
   cron.schedule('30 0 * * *', sendLeaseExpiryWarnings);
@@ -613,6 +641,9 @@ const initCronJobs = () => {
 
   // Run every day at 4:30 AM (Stale Lead Expiry)
   cron.schedule('30 4 * * *', expireStaleLeads);
+
+  // Run every day at 7:00 AM (Visit Reminders)
+  cron.schedule('0 7 * * *', sendVisitReminders);
 
   // Run every day at 8:00 AM (Rent Reminders)
   cron.schedule('0 8 * * *', sendRentReminders);
