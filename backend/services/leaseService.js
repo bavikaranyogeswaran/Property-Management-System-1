@@ -124,7 +124,26 @@ class LeaseService {
         // CLEANUP: Cancel conflicting future/current visits
         await visitModel.cancelVisitsForUnit(unitId, today, conn);
 
-        // CLEANUP: Mark specific-unit leads as dropped
+        // Mark the tenant's own lead as 'converted' BEFORE dropping others
+        try {
+          const tenantUser = await (await import('../models/userModel.js')).default.findById(tenantId, conn);
+          if (tenantUser?.email) {
+            const unit = await unitModel.findById(unitId, conn);
+            if (unit?.propertyId) {
+              const [matchingLeads] = await conn.query(
+                `SELECT lead_id, status FROM leads WHERE email = ? AND property_id = ? AND status = 'interested' LIMIT 1`,
+                [tenantUser.email, unit.propertyId]
+              );
+              if (matchingLeads.length > 0) {
+                await leadModel.update(matchingLeads[0].lead_id, { status: 'converted' }, conn);
+              }
+            }
+          }
+        } catch (leadErr) {
+          console.error('Failed to mark lead as converted:', leadErr);
+        }
+
+        // CLEANUP: Mark remaining specific-unit leads as dropped
         await leadModel.dropLeadsForUnit(unitId, conn);
       }
 

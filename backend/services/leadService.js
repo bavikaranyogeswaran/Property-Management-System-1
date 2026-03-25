@@ -1,6 +1,7 @@
 
 import leadModel from '../models/leadModel.js';
 import unitModel from '../models/unitModel.js';
+import visitModel from '../models/visitModel.js';
 import propertyModel from '../models/propertyModel.js';
 import userModel from '../models/userModel.js';
 import leadStageHistoryModel from '../models/leadStageHistoryModel.js';
@@ -137,10 +138,12 @@ class LeadService {
     }
 
     async getLeads(user) {
-        if (user.role !== 'owner') {
-             throw new Error('Access denied.');
+        if (user.role === 'owner') {
+            return await leadModel.findAll(user.id);
+        } else if (user.role === 'treasurer') {
+            return await leadModel.findByTreasurerId(user.id);
         }
-        return await leadModel.findAll(user.id);
+        throw new Error('Access denied.');
     }
 
     async getMyLead(email) {
@@ -181,6 +184,12 @@ class LeadService {
 
         const success = await leadModel.update(id, data);
         if (!success) throw new Error('Lead update failed');
+
+        // Cancel pending visits when lead is dropped
+        if (data.status === 'dropped') {
+            await visitModel.cancelVisitsForLead(id);
+        }
+
         return success;
     }
 

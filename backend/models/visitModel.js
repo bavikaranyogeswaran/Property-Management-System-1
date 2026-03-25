@@ -118,6 +118,16 @@ class VisitModel {
     );
   }
 
+  async cancelVisitsForLead(leadId, connection = null) {
+    const dbConn = connection || db;
+    await dbConn.query(
+      `UPDATE property_visits
+       SET status = 'cancelled', notes = CONCAT(COALESCE(notes, ''), ' [System: Lead dropped]')
+       WHERE lead_id = ? AND status IN ('pending', 'confirmed')`,
+      [leadId]
+    );
+  }
+
   async existsInSlot(unitId, scheduledDate) {
     if (!unitId) return false;
     const [rows] = await db.query(

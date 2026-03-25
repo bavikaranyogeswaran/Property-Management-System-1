@@ -579,6 +579,19 @@ export const cleanupOldNotifications = async () => {
   }
 };
 
+// Stale Lead Auto-Expiry (Daily at 4:30 AM)
+// Drops leads that have been 'interested' for 90+ days with no activity
+export const expireStaleLeads = async () => {
+  console.log('Running stale lead expiry...');
+  try {
+    const leadModel = (await import('../models/leadModel.js')).default;
+    const count = await leadModel.expireStaleLeads(90);
+    console.log(`Expired ${count} stale leads.`);
+  } catch (error) {
+    console.error('Error expiring stale leads:', error);
+  }
+};
+
 const initCronJobs = () => {
   // Run every day at 0:30 AM (Expiry Warnings)
   cron.schedule('30 0 * * *', sendLeaseExpiryWarnings);
@@ -597,6 +610,9 @@ const initCronJobs = () => {
 
   // Run every day at 4:00 AM (Notification Cleanup)
   cron.schedule('0 4 * * *', cleanupOldNotifications);
+
+  // Run every day at 4:30 AM (Stale Lead Expiry)
+  cron.schedule('30 4 * * *', expireStaleLeads);
 
   // Run every day at 8:00 AM (Rent Reminders)
   cron.schedule('0 8 * * *', sendRentReminders);

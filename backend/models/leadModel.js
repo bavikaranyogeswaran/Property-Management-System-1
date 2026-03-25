@@ -296,6 +296,53 @@ class LeadModel {
     );
     return rows[0];
   }
+
+  async findByTreasurerId(treasurerId) {
+    const [rows] = await db.query(`
+      SELECT l.lead_id as id, l.property_id as propertyId, l.unit_id as interestedUnit,
+             l.name, l.email, l.phone, l.notes, l.internal_notes as internalNotes,
+             l.move_in_date as moveInDate, l.occupants_count as occupantsCount,
+             l.preferred_term_months as preferredTermMonths, l.lease_term_id as leaseTermId,
+             l.status, l.created_at as createdAt, l.last_contacted_at as lastContactedAt
+      FROM leads l
+      INNER JOIN properties p ON l.property_id = p.property_id
+      INNER JOIN staff_property_assignments spa ON p.property_id = spa.property_id
+      WHERE spa.user_id = ?
+      ORDER BY l.created_at DESC`, [treasurerId]);
+    return rows;
+  }
+
+  async expireStaleLeads(daysThreshold = 90) {
+    // Find stale leads before updating (for stage history)
+    const [staleLeads] = await db.query(
+      `SELECT lead_id, status FROM leads
+       WHERE status = 'interested'
+       AND created_at < DATE_SUB(NOW(), INTERVAL ? DAY)
+       AND (last_contacted_at IS NULL OR last_contacted_at < DATE_SUB(NOW(), INTERVAL ? DAY))`,
+      [daysThreshold, daysThreshold]
+    );
+
+    if (staleLeads.length === 0) return 0;
+
+    // Bulk update
+    const ids = staleLeads.map(l => l.lead_id);
+    await db.query(
+      `UPDATE leads SET status = 'dropped',
+       notes = CONCAT(COALESCE(notes, ''), ' [System: Auto-expired after ${daysThreshold} days of inactivity]')
+       WHERE lead_id IN (?)`,
+      [ids]
+    );
+
+    // Log stage history for each
+    for (const lead of staleLeads) {
+      await leadStageHistoryModel.create(
+        lead.lead_id, lead.status, 'dropped',
+        `System: Auto-expired after ${daysThreshold} days`
+      );
+    }
+
+    return staleLeads.length;
+  }
 }
 
 export default new LeadModel();
