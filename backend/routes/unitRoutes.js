@@ -30,4 +30,12 @@ router.delete(
   unitController.deleteUnit
 );
 
+// Mark a maintenance unit as available (owner or treasurer)
+router.patch(
+  '/:id/mark-available',
+  authenticateToken,
+  authorizeRoles('owner', 'treasurer'),
+  unitController.markAvailable
+);
+
 export default router;

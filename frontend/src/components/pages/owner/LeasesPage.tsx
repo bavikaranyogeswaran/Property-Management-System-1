@@ -43,6 +43,7 @@ import {
   TrendingUp,
   AlertTriangle,
   PlayCircle,
+  Unlock,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -69,6 +70,7 @@ export function LeasesPage() {
     updateLeaseDocument,
     finalizeCheckout,
     activateLease,
+    markUnitAvailable,
     renewalRequests,
     proposeRenewalTerms,
     approveRenewal: approveLeaseRenewal,
@@ -93,6 +95,7 @@ export function LeasesPage() {
   const [isLoadingAdjustments, setIsLoadingAdjustments] = useState(false);
   const [finalizeLeaseId, setFinalizeLeaseId] = useState<string | null>(null);
   const [activateLeaseId, setActivateLeaseId] = useState<string | null>(null);
+  const [markAvailableUnitId, setMarkAvailableUnitId] = useState<string | null>(null);
   const [selectedRenewal, setSelectedRenewal] = useState<any | null>(null);
   const [isRenewalDialogOpen, setIsRenewalDialogOpen] = useState(false);
   const [newRenewalRent, setNewRenewalRent] = useState('');
@@ -267,6 +270,18 @@ export function LeasesPage() {
     }
   };
 
+  const confirmMarkUnitAvailable = async () => {
+    if (markAvailableUnitId) {
+      try {
+        await markUnitAvailable(markAvailableUnitId);
+        toast.success('Unit is now available for new leads');
+        setMarkAvailableUnitId(null);
+      } catch (e: any) {
+        toast.error(e.response?.data?.error || 'Failed to mark unit as available');
+      }
+    }
+  };
+
   const LeaseRow = ({ lease }: { lease: Lease }) => {
     // ... (keep existing LeaseRow component logic)
     const tenant = tenants.find((t) => t.id === lease.tenantId);
@@ -378,6 +393,18 @@ export function LeasesPage() {
                 title="Finalize Move-Out"
               >
                 <CheckCircle className="size-4" />
+              </Button>
+            )}
+            {/* Mark Available: shown on ended/expired leases where unit is still in maintenance */}
+            {(lease.status === 'ended' || lease.status === 'expired') && unit?.status === 'maintenance' && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => unit && setMarkAvailableUnitId(unit.id)}
+                className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                title="Mark Unit as Available"
+              >
+                <Unlock className="size-4" />
               </Button>
             )}
             {lease.status === 'active' && (
@@ -1408,6 +1435,38 @@ export function LeasesPage() {
               </Button>
               <Button onClick={handleSubmitRenewalProposal}>
                 Submit Proposal
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Mark Unit Available Confirmation Dialog */}
+      <Dialog open={!!markAvailableUnitId} onOpenChange={(open) => !open && setMarkAvailableUnitId(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-emerald-700">
+              <Unlock className="size-5" />
+              Mark Unit as Available
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <p className="text-sm text-gray-600">
+              This will set the unit status to <span className="font-semibold text-emerald-700">Available</span>, allowing new leads to submit interest for this unit.
+            </p>
+            <p className="text-xs text-gray-500 bg-gray-50 rounded-md p-3 border">
+              Only do this once maintenance or turnover work is complete and the unit is ready for a new tenant.
+            </p>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setMarkAvailableUnitId(null)}>
+                Cancel
+              </Button>
+              <Button
+                className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                onClick={confirmMarkUnitAvailable}
+              >
+                <Unlock className="size-4 mr-2" />
+                Mark as Available
               </Button>
             </div>
           </div>

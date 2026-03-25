@@ -61,6 +61,7 @@ interface PropertyContextType {
   addUnit: (unit: Omit<Unit, 'id' | 'createdAt'>) => Promise<Unit | undefined>;
   updateUnit: (id: string, unit: Partial<Unit>) => Promise<void>;
   deleteUnit: (id: string) => Promise<void>;
+  markUnitAvailable: (unitId: string) => Promise<void>;
   uploadUnitImages: (unitId: string, files: File[]) => Promise<any>;
   getUnitImages: (unitId: string) => Promise<any[]>;
   setUnitPrimaryImage: (unitId: string, imageId: string) => Promise<void>;
@@ -286,6 +287,17 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const markUnitAvailable = async (unitId: string) => {
+    try {
+      await apiClient.patch(`/units/${unitId}/mark-available`);
+      // Optimistically update local state
+      setUnits(prev => prev.map(u => u.id === unitId ? { ...u, status: 'available' } : u));
+    } catch (e) {
+      console.error('Failed to mark unit as available', e);
+      throw e;
+    }
+  };
+
   const uploadUnitImages = async (unitId: string, files: File[]) => {
     try {
       const formData = new FormData();
@@ -376,7 +388,7 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
     <PropertyContext.Provider value={{
       properties, propertyTypes, unitTypes, units,
       addProperty, updateProperty, deleteProperty, uploadPropertyImages, getPropertyImages, setPropertyPrimaryImage, deletePropertyImage,
-      addUnit, updateUnit, deleteUnit, uploadUnitImages, getUnitImages, setUnitPrimaryImage, deleteUnitImage,
+      addUnit, updateUnit, deleteUnit, markUnitAvailable, uploadUnitImages, getUnitImages, setUnitPrimaryImage, deleteUnitImage,
       addPropertyType, deletePropertyType, addUnitType, deleteUnitType
     }}>
       {children}
