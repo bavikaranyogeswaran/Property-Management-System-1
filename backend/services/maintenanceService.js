@@ -7,7 +7,7 @@ import leaseModel from '../models/leaseModel.js';
 import invoiceModel from '../models/invoiceModel.js';
 import userModel from '../models/userModel.js';
 import emailService from '../utils/emailService.js';
-import { getCurrentDateString, getLocalTime } from '../utils/dateUtils.js';
+import { getCurrentDateString, getLocalTime, today, now } from '../utils/dateUtils.js';
 
 class MaintenanceService {
 

@@ -25,6 +25,7 @@ export const generateRentInvoices = async () => {
     for (const lease of activeLeases) {
       const billingInfo = billingEngine.calculateMonthlyRent(lease, currentYear, currentMonth);
       if (!billingInfo) continue;
+      const dueDateStr = billingInfo.dueDate;
 
       const exists = await invoiceModel.exists(
         lease.id,
@@ -52,7 +53,7 @@ export const generateRentInvoices = async () => {
         const tenant = await tenantModel.findByUserId(lease.tenantId);
 
         if (tenant && tenant.creditBalance > 0) {
-          const amountToApply = Math.min(tenant.creditBalance, rentAmount);
+          const amountToApply = Math.min(tenant.creditBalance, billingInfo.amount);
 
           if (amountToApply > 0) {
             const paymentModel = (await import('../models/paymentModel.js'))
@@ -70,7 +71,7 @@ export const generateRentInvoices = async () => {
 
             await tenantModel.deductCredit(lease.tenantId, amountToApply);
 
-            if (amountToApply >= rentAmount) {
+            if (amountToApply >= billingInfo.amount) {
               await invoiceModel.updateStatus(invoiceId, 'paid');
             } else {
               await invoiceModel.updateStatus(invoiceId, 'partially_paid');
@@ -135,7 +136,7 @@ export const generateRentInvoices = async () => {
           );
           if (userRows.length > 0) {
             await emailService.sendInvoiceNotification(userRows[0].email, {
-              amount: rentAmount,
+              amount: billingInfo.amount,
               dueDate: dueDateStr,
               month: currentMonth,
               year: currentYear,
@@ -430,45 +431,8 @@ export const applyLateFees = async () => {
         console.error('Failed to send late fee email:', emailErr);
       }
 
-      // Logic Fix: Sync Behavior Score (Deduct 10 points)
-      try {
-        const scoreChange = -10;
-        // Import locally if not at top, or assume available.
-        // We need to dynamic import if not readily available or add to top.
-        // Let's add dynamic imports for safety inside the loop/function or better yet, just use pool/db if models aren't easy.
-        // But we used invoiceModel so models should be fine.
-        // We'll use the raw queries or models. Let's use models pattern if possible.
-        // But cronJobs.js has imports at top. Let's check imports.
-        // I will add the logic using DB queries directly for speed/safety like in the controller example.
-
-        // 1. Create Log
-        // We need behaviorLogModel. Let's use direct DB insert to avoid circular dep issues or import mess.
-        await db.query(
-          `
-                    INSERT INTO tenant_behavior_logs (tenant_id, type, category, score_change, description, recorded_by, created_at)
-                    VALUES (?, 'negative', 'Payment', ?, ?, NULL, NOW())
-                `,
-          [
-            inv.tenant_id,
-            scoreChange,
-            `Late Fee applied for Invoice #${inv.invoice_id}`,
-          ]
-        );
-
-        // 2. Update Tenant Score
-        await db.query(
-          'UPDATE tenants SET behavior_score = LEAST(100, GREATEST(0, behavior_score + ?)) WHERE user_id = ?',
-          [scoreChange, inv.tenant_id]
-        );
-        console.log(
-          `Auto-deducted 10 points for Tenant ${inv.tenant_id} due to late fee.`
-        );
-      } catch (scoreErr) {
-        console.error(
-          'Failed to update behavior score on auto-late fee:',
-          scoreErr
-        );
-      }
+      // [B4 FIX] Removed duplicate behavior score deduction block.
+      // The deduction at lines 393-406 (behaviorLogModel + tenantModel.incrementBehaviorScore) is the single source of truth.
 
       appliedCount++;
     }
@@ -523,7 +487,7 @@ export const syncUnitStatuses = async () => {
                 WHERE l.unit_id = u.unit_id
                 AND l.status = 'active'
                 AND l.start_date <= ?
-                AND l.end_date >= ?
+                AND (l.end_date >= ? OR l.end_date IS NULL)
             )
         `,
       [currentToday, currentToday]
@@ -582,7 +546,7 @@ export const sendRentReminders = async () => {
   console.log('Running automated rent reminders...');
   try {
     const activeLeases = await leaseModel.findActive();
-    const dueDate = `${currentToday.getFullYear()}-${String(currentToday.getMonth() + 1).padStart(2, '0')}-${String(RENT_DUE_DAY).padStart(2, '0')}`;
+    const dueDate = `${currentToday.getFullYear()}-${String(currentToday.getMonth() + 1).padStart(2, '0')}-${String(billingEngine.RENT_DUE_DAY).padStart(2, '0')}`;
 
     for (const lease of activeLeases) {
         // Fetch tenant email

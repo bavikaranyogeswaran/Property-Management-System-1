@@ -25,7 +25,7 @@ function getLedgerClassification(invoiceType) {
         case 'late_fee':
             return { accountType: 'revenue', category: 'late_fee' };
         case 'maintenance':
-            return { accountType: 'expense', category: 'maintenance' };
+            return { accountType: 'revenue', category: 'maintenance' };
         default:
             return { accountType: 'revenue', category: 'other' };
     }
@@ -131,7 +131,7 @@ class PaymentService {
             const allPayments = await paymentModel.findByInvoiceId(invoiceId, connection);
             const totalVerified = allPayments
                 .filter((p) => p.status === 'verified')
-                .reduce((sum, p) => sum + Number(p.amount), 0) + Number(amount); 
+                .reduce((sum, p) => sum + Number(p.amount), 0);
 
             const invoice = await invoiceModel.findById(invoiceId, connection);
 
