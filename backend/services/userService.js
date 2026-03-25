@@ -308,7 +308,8 @@ class UserService {
               securityDeposit: unit.monthlyRent, // Default 1 month deposit
               documentUrl: tenantData.documentUrl || null,
             },
-            connection
+            connection,
+            null // System action — no acting user
           );
         }
       }

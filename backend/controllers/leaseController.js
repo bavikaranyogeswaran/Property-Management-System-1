@@ -35,7 +35,7 @@ class LeaseController {
         return res.status(403).json({ error: 'Access denied.' });
       }
 
-      const leaseId = await leaseService.createLease(req.body);
+      const leaseId = await leaseService.createLease(req.body, null, req.user);
       res
         .status(201)
         .json({ id: leaseId, message: 'Lease created successfully' });
@@ -127,7 +127,7 @@ class LeaseController {
       const { id } = req.params;
       const { terminationDate, terminationFee } = req.body; // Fee optional
 
-      const result = await leaseService.terminateLease(id, terminationDate, terminationFee);
+      const result = await leaseService.terminateLease(id, terminationDate, terminationFee, req.user);
       res.json({ message: 'Lease terminated successfully', ...result });
     } catch (error) {
        if (error.message.includes('not found')) return res.status(404).json({ error: error.message });

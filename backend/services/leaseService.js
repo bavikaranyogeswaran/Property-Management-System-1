@@ -15,9 +15,10 @@ class LeaseService {
    * Creates a new lease.
    * @param {Object} data - { tenantId, unitId, startDate, endDate, monthlyRent, securityDeposit }
    * @param {Object} [connection] - Optional database connection for transactions
+   * @param {Object} [user] - The acting user for audit logging
    * @returns {Promise<number>} - The ID of the created lease
    */
-  async createLease(data, connection = null) {
+  async createLease(data, connection = null, user = null) {
     const {
       tenantId,
       unitId,
@@ -172,7 +173,7 @@ class LeaseService {
       const auditLogger = (await import('../utils/auditLogger.js')).default;
       await auditLogger.log(
         {
-          userId: null,
+          userId: user?.id || null,
           actionType: 'LEASE_CREATED',
           entityId: leaseId,
           details: { tenantId, unitId, startDate, endDate, monthlyRent },
@@ -546,7 +547,7 @@ class LeaseService {
     }
   }
 
-  async terminateLease(leaseId, terminationDate, terminationFee = 0) {
+  async terminateLease(leaseId, terminationDate, terminationFee = 0, user = null) {
     const lease = await leaseModel.findById(leaseId);
     if (!lease) throw new Error('Lease not found');
 
@@ -584,7 +585,7 @@ class LeaseService {
 
       const auditLogger = (await import('../utils/auditLogger.js')).default;
       await auditLogger.log({
-        userId: null,
+        userId: user?.id || null,
         actionType: 'LEASE_TERMINATION',
         entityId: leaseId,
         details: { terminationDate, status: lease.status },
@@ -756,14 +757,40 @@ class LeaseService {
         await unitModel.update(lease.unitId, { status: 'occupied' }, connection);
       }
 
-      // 3. Audit log
+      // 3. Generate First Month Rent Invoice (mirrors createLease logic)
+      const start = parseLocalDate(lease.startDate);
+      const year = start.getFullYear();
+      const month = start.getMonth() + 1;
+      const daysInMonth = new Date(year, month, 0).getDate();
+      const startDay = start.getDate();
+
+      let rentAmount = lease.monthlyRent;
+      let invoiceDescription = `Rent for ${year}-${month}`;
+
+      if (startDay > 1) {
+        const daysRemaining = daysInMonth - startDay + 1;
+        rentAmount = Math.round((lease.monthlyRent / daysInMonth) * daysRemaining * 100) / 100;
+        invoiceDescription += ` (Prorated: ${daysRemaining}/${daysInMonth} days)`;
+      }
+
+      const dueDateStr = formatToLocalDate(addDays(start, 5));
+
+      await invoiceModel.create({
+        leaseId,
+        amount: rentAmount,
+        dueDate: dueDateStr,
+        description: invoiceDescription,
+        type: 'rent',
+      }, connection);
+
+      // 4. Audit log
       const auditLogger = (await import('../utils/auditLogger.js')).default;
       await auditLogger.log(
         {
           userId: user?.id || null,
           actionType: 'LEASE_ACTIVATED',
           entityId: leaseId,
-          details: { activatedBy: user?.id, unitId: lease.unitId, startDate: lease.startDate },
+          details: { activatedBy: user?.id, unitId: lease.unitId, startDate: lease.startDate, invoiceGenerated: true },
         },
         null,
         connection
