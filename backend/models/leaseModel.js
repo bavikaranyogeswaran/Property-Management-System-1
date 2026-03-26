@@ -23,8 +23,8 @@ class LeaseModel {
     } = data;
     const dbConn = connection || db;
     const [result] = await dbConn.query(
-      `INSERT INTO leases (tenant_id, unit_id, start_date, end_date, monthly_rent, status, security_deposit, deposit_status, document_url)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO leases (tenant_id, unit_id, start_date, end_date, monthly_rent, status, security_deposit, deposit_status, document_url, target_deposit)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         tenantId,
         unitId,
@@ -35,6 +35,7 @@ class LeaseModel {
         securityDeposit || 0.0,
         depositStatus || 'pending',
         data.documentUrl || null,
+        data.targetDeposit || 0.0,
       ]
     );
     return result.insertId;
@@ -45,7 +46,7 @@ class LeaseModel {
     'monthly_rent', 'status', 'security_deposit',
     'deposit_status', 'refunded_amount', 'document_url',
     'proposed_refund_amount', 'refund_notes', 'notice_status',
-    'actual_checkout_at',
+    'actual_checkout_at', 'target_deposit', 'signed_at',
   ];
 
   async update(id, data, connection = null) {
@@ -212,6 +213,8 @@ class LeaseModel {
       refundNotes: row.refund_notes,
       refundedAmount: parseFloat(row.refunded_amount || 0),
       documentUrl: row.document_url,
+      targetDeposit: parseFloat(row.target_deposit || 0),
+      signedAt: row.signed_at,
       createdAt: row.created_at,
       // Extra info useful for frontend listing
       unitNumber: row.unit_number,

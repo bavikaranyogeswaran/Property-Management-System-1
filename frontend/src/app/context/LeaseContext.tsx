@@ -273,11 +273,11 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
 
   const activateLease = async (id: string) => {
     try {
-      await apiClient.patch(`/leases/${id}/activate`);
-      setLeases(prev => prev.map(l => (l.id === id ? { ...l, status: 'active' } : l)));
-      toast.success('Lease activated successfully.');
+      await apiClient.post(`/leases/${id}/sign`);
+      await fetchLeases();
+      toast.success('Lease signed and activated successfully.');
     } catch (e: any) {
-      const msg = e.response?.data?.error || 'Failed to activate lease';
+      const msg = e.response?.data?.error || 'Failed to sign lease';
       toast.error(msg);
       throw new Error(msg);
     }

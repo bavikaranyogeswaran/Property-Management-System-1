@@ -379,7 +379,7 @@ export function LeasesPage() {
                 variant="ghost"
                 onClick={() => setActivateLeaseId(lease.id)}
                 className="text-green-600 hover:text-green-700 hover:bg-green-50"
-                title="Activate Lease"
+                title="Sign & Activate Lease"
               >
                 <PlayCircle className="size-4" />
               </Button>
@@ -1326,20 +1326,21 @@ export function LeasesPage() {
           </div>
         </DialogContent>
       </Dialog>
-      {/* Activate Lease Confirmation Dialog */}
+      {/* Activate & Sign Lease Confirmation Dialog */}
       <Dialog
         open={!!activateLeaseId}
         onOpenChange={(open) => !open && setActivateLeaseId(null)}
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Activate Lease</DialogTitle>
+            <DialogTitle>Sign & Activate Lease</DialogTitle>
             <div className="text-sm text-gray-500 mt-2 space-y-2">
-              <p>Are you sure you want to activate this draft lease?</p>
+              <p>Are you sure you want to sign and activate this draft lease?</p>
               <ul className="list-disc pl-5 space-y-1">
                 <li>The lease status will change to <strong>Active</strong>.</li>
-                <li>The unit will be marked as <strong>Occupied</strong> if the lease has already started.</li>
-                <li>Rent invoices will begin generating on the next billing cycle.</li>
+                <li>The unit will be reserved or marked as <strong>Occupied</strong> if the lease has started.</li>
+                <li>The <strong>Security Deposit</strong> and <strong>First Month Rent</strong> invoices will be generated immediately.</li>
+                <li>Any pending lead conversions or visits for this unit will be automatically cancelled.</li>
               </ul>
             </div>
           </DialogHeader>
@@ -1357,7 +1358,7 @@ export function LeasesPage() {
               onClick={confirmActivateLease}
             >
               <PlayCircle className="size-4 mr-2" />
-              Activate Lease
+              Sign & Activate
             </Button>
           </div>
         </DialogContent>

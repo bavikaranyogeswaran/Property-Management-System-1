@@ -128,10 +128,21 @@ export const validateEmail = (email) => {
  */
 export const validateLeaseDuration = (startDate, endDate, minDays = 90) => {
   const start = new Date(startDate);
+  
+  if (isNaN(start.getTime())) {
+    return { isValid: false, error: 'Invalid start date' };
+  }
+
+  // If no end date is provided (open-ended lease), the duration logic is technically indefinite.
+  // We bypass duration diff math if endDate is null or undefined.
+  if (!endDate) {
+      return { isValid: true, error: null };
+  }
+
   const end = new Date(endDate);
   
-  if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-    return { isValid: false, error: 'Invalid start or end date' };
+  if (isNaN(end.getTime())) {
+    return { isValid: false, error: 'Invalid end date' };
   }
 
   const diffTime = end.getTime() - start.getTime();

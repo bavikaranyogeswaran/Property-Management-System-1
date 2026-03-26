@@ -54,6 +54,20 @@ class LeaseController {
     }
   }
 
+  async signLease(req, res) {
+    try {
+      const { id } = req.params;
+      const result = await leaseService.signLease(id, req.user);
+      res.json({ message: 'Lease signed successfully', status: result.status });
+    } catch (error) {
+      console.error('Sign Lease Error:', error);
+      if (error.message.includes('not found')) return res.status(404).json({ error: error.message });
+      if (error.message.includes('draft')) return res.status(400).json({ error: error.message });
+      if (error.message.includes('available') || error.message.includes('already leased')) return res.status(409).json({ error: error.message });
+      res.status(500).json({ error: error.message });
+    }
+  }
+
   async renewLease(req, res) {
     try {
       if (req.user.role !== 'owner' && req.user.role !== 'treasurer') {
@@ -222,20 +236,6 @@ class LeaseController {
     }
   }
 
-  async activateLease(req, res) {
-    try {
-      if (req.user.role !== 'owner' && req.user.role !== 'treasurer') {
-        return res.status(403).json({ error: 'Access denied.' });
-      }
-      const { id } = req.params;
-      const result = await leaseService.activateLease(id, req.user);
-      res.json({ message: 'Lease activated successfully', ...result });
-    } catch (error) {
-      if (error.message.includes('not found')) return res.status(404).json({ error: error.message });
-      if (error.message.includes('Only draft')) return res.status(400).json({ error: error.message });
-      res.status(500).json({ error: error.message });
-    }
-  }
 }
 
 export default new LeaseController();

@@ -89,6 +89,23 @@ class LeaseService {
         throw new Error('Unit is no longer available (trashed).');
       }
 
+      // 2a. Check for Same-tenant overlap
+      const activeLeases = await leaseModel.findByTenantId(tenantId);
+      const hasOverlappingActiveLease = activeLeases.some(l => {
+        if (l.status !== 'active' && l.status !== 'draft') return false;
+        
+        const lStart = parseLocalDate(l.startDate);
+        const lEnd = l.endDate ? parseLocalDate(l.endDate) : new Date('2099-12-31');
+        const reqStart = parseLocalDate(startDate);
+        const reqEnd = endDate ? parseLocalDate(endDate) : new Date('2099-12-31');
+        
+        return reqStart <= lEnd && reqEnd >= lStart;
+      });
+
+      if (hasOverlappingActiveLease) {
+        throw new Error('Tenant already holds an overlapping active or draft lease.');
+      }
+
       // 2. Check for Date Overlaps
       const hasOverlap = await leaseModel.checkOverlap(
         unitId,
@@ -108,7 +125,8 @@ class LeaseService {
         endDate,
         monthlyRent,
         securityDeposit: 0, // Held amount starts at 0. Target is in Invoice.
-        status: 'active',
+        status: 'draft',
+        targetDeposit: securityDeposit || 0.0,
         documentUrl: documentUrl || null,
         lease_term_id: data.leaseTermId || null,
       };
@@ -116,86 +134,14 @@ class LeaseService {
       // 3. Create Lease
       const leaseId = await leaseModel.create(leaseParams, conn);
 
-      // 4. Update Unit Status
-      const todayDate = today();
-
-      // CLEANUP: Cancel ALL future visits for this unit (lease is signed, regardless of start date)
-      await visitModel.cancelVisitsForUnit(unitId, todayDate, conn);
-
-      if (parseLocalDate(startDate) <= getLocalTime()) {
-        await unitModel.update(unitId, { status: 'occupied' }, conn);
-
-        // Mark the tenant's own lead as 'converted' BEFORE dropping others
-        try {
-          const tenantUser = await (await import('../models/userModel.js')).default.findById(tenantId, conn);
-          if (tenantUser?.email) {
-            const unit = await unitModel.findById(unitId, conn);
-            if (unit?.propertyId) {
-              const [matchingLeads] = await conn.query(
-                `SELECT lead_id, status FROM leads WHERE email = ? AND property_id = ? AND status = 'interested' LIMIT 1`,
-                [tenantUser.email, unit.propertyId]
-              );
-              if (matchingLeads.length > 0) {
-                await leadModel.update(matchingLeads[0].lead_id, { status: 'converted' }, conn);
-              }
-            }
-          }
-        } catch (leadErr) {
-          console.error('Failed to mark lead as converted:', leadErr);
-        }
-
-        // CLEANUP: Mark remaining specific-unit leads as dropped
-        await leadModel.dropLeadsForUnit(unitId, conn);
-      }
-
-      if (securityDeposit > 0) {
-        await invoiceModel.create(
-          {
-            leaseId,
-            amount: securityDeposit,
-            dueDate: formatToLocalDate(addDays(startDate, 5)),
-            description: 'Security Deposit',
-            type: 'deposit',
-          },
-          conn
-        );
-      }
-
-      // B. First Month Rent (with proration if mid-month start)
-      const start = new Date(startDate);
-      const year = start.getFullYear();
-      const month = start.getMonth() + 1;
-      const daysInMonth = new Date(year, month, 0).getDate();
-      const startDay = start.getDate();
-
-      let initialRentAmount = monthlyRent;
-      let invoiceDescription = `Rent for ${year}-${month}`;
-
-      if (startDay > 1) {
-        const daysRemaining = daysInMonth - startDay + 1;
-        initialRentAmount =
-          Math.round((monthlyRent / daysInMonth) * daysRemaining * 100) / 100;
-        invoiceDescription += ` (Prorated: ${daysRemaining}/${daysInMonth} days)`;
-      }
-
-      await invoiceModel.create(
-        {
-          leaseId,
-          amount: initialRentAmount,
-          dueDate: formatToLocalDate(addDays(startDate, 5)),
-          description: invoiceDescription,
-        },
-        conn
-      );
-
       // Audit Log
       const auditLogger = (await import('../utils/auditLogger.js')).default;
       await auditLogger.log(
         {
           userId: user?.id || null,
-          actionType: 'LEASE_CREATED',
+          actionType: 'LEASE_CREATED_DRAFT',
           entityId: leaseId,
-          details: { tenantId, unitId, startDate, endDate, monthlyRent },
+          details: { tenantId, unitId, startDate, endDate, monthlyRent, targetDeposit: securityDeposit },
         },
         null,
         conn
@@ -210,11 +156,127 @@ class LeaseService {
       if (isOwnTransaction) {
         await conn.rollback();
       }
-      throw error;
+      throw new Error(`Database transaction failed: ${error.message}`);
     } finally {
       if (isOwnTransaction) {
         conn.release();
       }
+    }
+  }
+
+  /**
+   * Signs and activates a draft lease.
+   */
+  async signLease(leaseId, user) {
+    const conn = await pool.getConnection();
+
+    try {
+      await conn.beginTransaction();
+
+      const lease = await leaseModel.findById(leaseId, conn);
+      if (!lease) throw new Error('Lease not found');
+      if (lease.status !== 'draft') throw new Error('Only draft leases can be signed');
+
+      const unit = await unitModel.findByIdForUpdate(lease.unitId, conn);
+      if (!unit || unit.status === 'maintenance' || unit.status === 'trashed') {
+         throw new Error('Unit is no longer available for occupancy.');
+      }
+
+      const hasOverlap = await leaseModel.checkOverlap(
+        lease.unitId,
+        lease.startDate,
+        lease.endDate,
+        leaseId,
+        conn
+      );
+      if (hasOverlap) {
+        throw new Error('Unit is already leased for the selected dates.');
+      }
+
+      const todayDate = today();
+      await leaseModel.update(leaseId, { status: 'active', signed_at: getLocalTime() }, conn);
+
+      await visitModel.cancelVisitsForUnit(lease.unitId, todayDate, conn);
+
+      if (parseLocalDate(lease.startDate) <= getLocalTime()) {
+        await unitModel.update(lease.unitId, { status: 'occupied' }, conn);
+
+        try {
+          const tenantUser = await (await import('../models/userModel.js')).default.findById(lease.tenantId, conn);
+          if (tenantUser?.email) {
+            const [matchingLeads] = await conn.query(
+              `SELECT lead_id, status FROM leads WHERE email = ? AND property_id = ? AND status = 'interested' LIMIT 1`,
+              [tenantUser.email, unit.propertyId]
+            );
+            if (matchingLeads.length > 0) {
+              await leadModel.update(matchingLeads[0].lead_id, { status: 'converted' }, conn);
+            }
+          }
+        } catch (err) {
+            console.error('Failed to mark lead as converted:', err);
+        }
+        
+        await leadModel.dropLeadsForUnit(lease.unitId, conn);
+      }
+      
+      if (lease.targetDeposit > 0) {
+        await invoiceModel.create(
+          {
+            leaseId,
+            amount: lease.targetDeposit,
+            dueDate: formatToLocalDate(addDays(todayDate, 5)),
+            description: 'Security Deposit',
+            type: 'deposit',
+          },
+          conn
+        );
+      }
+
+      const start = new Date(lease.startDate);
+      const year = start.getFullYear();
+      const month = start.getMonth() + 1;
+      const daysInMonth = new Date(year, month, 0).getDate();
+      const startDay = start.getDate();
+
+      let initialRentAmount = lease.monthlyRent;
+      let invoiceDescription = `Rent for ${year}-${month}`;
+
+      if (startDay > 1) {
+        const daysRemaining = daysInMonth - startDay + 1;
+        initialRentAmount =
+          Math.round((lease.monthlyRent / daysInMonth) * daysRemaining * 100) / 100;
+        invoiceDescription += ` (Prorated: ${daysRemaining}/${daysInMonth} days)`;
+      }
+
+      await invoiceModel.create(
+        {
+          leaseId,
+          amount: initialRentAmount,
+          dueDate: formatToLocalDate(addDays(lease.startDate, 5)),
+          description: invoiceDescription,
+        },
+        conn
+      );
+
+      const auditLogger = (await import('../utils/auditLogger.js')).default;
+      await auditLogger.log(
+        {
+           userId: user?.id || null,
+           actionType: 'LEASE_SIGNED_ACTIVATED',
+           entityId: leaseId,
+           details: { },
+        },
+        null,
+        conn
+      );
+
+      await conn.commit();
+      return { status: 'active', signedAt: getLocalTime() };
+    } catch (error) {
+       await conn.rollback();
+       throw new Error(`Transaction failed: ${error.message}`);
+    } finally {
+       conn.release();
     }
   }
 
@@ -755,75 +817,6 @@ class LeaseService {
     });
   }
 
-  async activateLease(leaseId, user) {
-    const lease = await leaseModel.findById(leaseId);
-    if (!lease) throw new Error('Lease not found');
-
-    if (lease.status !== 'draft') {
-      throw new Error('Only draft leases can be activated.');
-    }
-
-    const connection = await pool.getConnection();
-    try {
-      await connection.beginTransaction();
-
-      // 1. Activate the lease
-      await leaseModel.update(leaseId, { status: 'active' }, connection);
-
-      // 2. Update unit to 'occupied' if lease has started
-      const todayStr = today();
-      if (parseLocalDate(lease.startDate) <= parseLocalDate(todayStr)) {
-        await unitModel.update(lease.unitId, { status: 'occupied' }, connection);
-      }
-
-      // 3. Generate First Month Rent Invoice (mirrors createLease logic)
-      const start = parseLocalDate(lease.startDate);
-      const year = start.getFullYear();
-      const month = start.getMonth() + 1;
-      const daysInMonth = new Date(year, month, 0).getDate();
-      const startDay = start.getDate();
-
-      let rentAmount = lease.monthlyRent;
-      let invoiceDescription = `Rent for ${year}-${month}`;
-
-      if (startDay > 1) {
-        const daysRemaining = daysInMonth - startDay + 1;
-        rentAmount = Math.round((lease.monthlyRent / daysInMonth) * daysRemaining * 100) / 100;
-        invoiceDescription += ` (Prorated: ${daysRemaining}/${daysInMonth} days)`;
-      }
-
-      const dueDateStr = formatToLocalDate(addDays(start, 5));
-
-      await invoiceModel.create({
-        leaseId,
-        amount: rentAmount,
-        dueDate: dueDateStr,
-        description: invoiceDescription,
-        type: 'rent',
-      }, connection);
-
-      // 4. Audit log
-      const auditLogger = (await import('../utils/auditLogger.js')).default;
-      await auditLogger.log(
-        {
-          userId: user?.id || null,
-          actionType: 'LEASE_ACTIVATED',
-          entityId: leaseId,
-          details: { activatedBy: user?.id, unitId: lease.unitId, startDate: lease.startDate, invoiceGenerated: true },
-        },
-        null,
-        connection
-      );
-
-      await connection.commit();
-      return { leaseId, status: 'active' };
-    } catch (error) {
-      await connection.rollback();
-      throw error;
-    } finally {
-      connection.release();
-    }
-  }
 
   async getRentAdjustments(leaseId, user) {
     const lease = await this.getLeaseById(leaseId, user);
