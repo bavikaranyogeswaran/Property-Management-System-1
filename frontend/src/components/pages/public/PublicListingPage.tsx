@@ -136,8 +136,8 @@ export function PublicListingPage({
     e.preventDefault();
 
     // Term validation
-    if (!interestFormData.leaseTermId && parseInt(interestFormData.preferredTermMonths) < 3) {
-      toast.error('Minimum lease duration is 3 months');
+    if (!interestFormData.leaseTermId) {
+      toast.error('Please select a lease term');
       return;
     }
 
@@ -447,32 +447,14 @@ export function PublicListingPage({
                 }}
                 required
               >
-                <option value="">Custom / Undecided</option>
+                <option value="" disabled>Select a Lease Term</option>
                 {leaseTerms.map(t => (
                   <option key={t.leaseTermId} value={t.leaseTermId.toString()}>
-                    {t.name} ({t.type === 'periodic' ? 'Periodic' : `${t.durationMonths} months`})
+                    {t.name} ({t.durationMonths} months)
                   </option>
                 ))}
               </select>
             </div>
-
-            {!interestFormData.leaseTermId && (
-              <div className="space-y-2">
-                <Label htmlFor="lead-term-custom">Custom Duration (Months)</Label>
-                <Input
-                  id="lead-term-custom"
-                  type="number"
-                  min="3"
-                  value={interestFormData.preferredTermMonths}
-                  onChange={(e) =>
-                    setInterestFormData({
-                      ...interestFormData,
-                      preferredTermMonths: e.target.value,
-                    })
-                  }
-                />
-              </div>
-            )}
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">

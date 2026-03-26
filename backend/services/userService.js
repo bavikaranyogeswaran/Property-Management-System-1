@@ -285,11 +285,9 @@ class UserService {
             leaseTerm = await leaseTermModel.findById(leaseTermId, connection);
           }
 
-          if (leaseTerm && leaseTerm.type === 'periodic') {
-            leaseEnd = null; // Periodic leases have no fixed end date
-          } else if (endDate) {
+          if (endDate) {
             leaseEnd = new Date(endDate);
-          } else if (leaseTerm && leaseTerm.type === 'fixed' && leaseTerm.durationMonths) {
+          } else if (leaseTerm && leaseTerm.durationMonths) {
             leaseEnd = new Date(leaseStart);
             leaseEnd.setMonth(leaseStart.getMonth() + leaseTerm.durationMonths);
           } else {

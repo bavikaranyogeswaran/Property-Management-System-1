@@ -714,10 +714,10 @@ export function LeadsPage() {
                 value={conversionData.leaseTermId}
                 onChange={(e) => setConversionData({ ...conversionData, leaseTermId: e.target.value })}
               >
-                <option value="">Custom / Manual</option>
+                <option value="" disabled>Select a Lease Term</option>
                 {leaseTerms.map(term => (
                   <option key={term.leaseTermId} value={term.leaseTermId}>
-                    {term.name} ({term.type})
+                    {term.name} ({term.durationMonths} months)
                   </option>
                 ))}
               </select>
@@ -755,11 +755,9 @@ export function LeadsPage() {
                   />
                 </div>
                 <p className="text-[10px] text-gray-500">
-                  {conversionData.leaseTermId && leaseTerms.find(t => String(t.leaseTermId) === String(conversionData.leaseTermId))?.type === 'periodic'
-                    ? 'Please specify a mutually agreed end date for this periodic term.'
-                    : selectedLead?.preferredTermMonths 
-                      ? `Pre-filled with lead's ${selectedLead.preferredTermMonths}mo preference`
-                      : 'Required (Min 90 days recommended)'}
+                  {selectedLead?.preferredTermMonths 
+                    ? `Pre-filled with lead's ${selectedLead.preferredTermMonths}mo preference`
+                    : 'Required (Min 90 days recommended)'}
                 </p>
               </div>
             </div>

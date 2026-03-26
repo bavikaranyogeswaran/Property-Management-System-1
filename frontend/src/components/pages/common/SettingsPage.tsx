@@ -474,10 +474,10 @@ function LeaseTermManager() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="font-medium text-sm text-gray-900">Lease Terms</h3>
-        <Badge variant="outline">Fixed & Periodic</Badge>
+        <Badge variant="outline">Fixed Terms Only</Badge>
       </div>
 
-      <form onSubmit={handleAddTerm} className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+      <form onSubmit={handleAddTerm} className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className="sm:col-span-1">
           <Input
             placeholder="Name (e.g. 1 Year Fixed)"
@@ -486,26 +486,14 @@ function LeaseTermManager() {
           />
         </div>
         <div className="sm:col-span-1">
-          <select
-            className="w-full h-10 px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            value={newTerm.type}
-            onChange={(e) => setNewTerm({ ...newTerm, type: e.target.value as 'fixed' | 'periodic' })}
-          >
-            <option value="fixed">Fixed</option>
-            <option value="periodic">Periodic</option>
-          </select>
+          <Input
+            type="number"
+            placeholder="Months"
+            min="3"
+            value={newTerm.durationMonths}
+            onChange={(e) => setNewTerm({ ...newTerm, durationMonths: parseInt(e.target.value) })}
+          />
         </div>
-        {newTerm.type === 'fixed' && (
-          <div className="sm:col-span-1">
-            <Input
-              type="number"
-              placeholder="Months"
-              min="3"
-              value={newTerm.durationMonths}
-              onChange={(e) => setNewTerm({ ...newTerm, durationMonths: parseInt(e.target.value) })}
-            />
-          </div>
-        )}
         <div className="sm:col-span-1 flex gap-2">
           <Button type="submit" className="flex-1">
             Add Term
@@ -521,12 +509,7 @@ function LeaseTermManager() {
           >
             <div className="flex items-center gap-3">
               <span className="font-medium">{term.name}</span>
-              <Badge variant={term.type === 'fixed' ? 'default' : 'secondary'} className="text-[10px] h-5">
-                {term.type}
-              </Badge>
-              {term.type === 'fixed' && (
-                <span className="text-gray-500 text-xs">({term.durationMonths} months)</span>
-              )}
+              <span className="text-gray-500 text-xs">({term.durationMonths} months)</span>
             </div>
             <Button
               variant="ghost"
