@@ -200,7 +200,7 @@ export function LeasesPage() {
       ? new Date(new Date(currentLease.endDate).getTime() + 24 * 60 * 60 * 1000).toISOString().split('T')[0]
       : today.toISOString().split('T')[0];
 
-    if (new Date(newRenewalEndDate) <= new Date(expectedStartDateStr)) {
+    if (newRenewalEndDate && new Date(newRenewalEndDate) <= new Date(expectedStartDateStr)) {
       toast.error(`The renewal end date must be after the renewal start date (${expectedStartDateStr})`);
       return;
     }
@@ -328,7 +328,7 @@ export function LeasesPage() {
           <div className="text-sm">
             <div className="flex items-center gap-1">
               <Calendar className="size-3 text-gray-400" />
-              {lease.endDate}
+              {lease.endDate || <span className="text-blue-600 font-medium italic italic">Month-to-Month</span>}
             </div>
             {isExpiringSoon && (
               <Badge
@@ -780,7 +780,7 @@ export function LeasesPage() {
                                 >
                                   Propose/Edit
                                 </Button>
-                                {request.proposed_monthly_rent && request.proposed_end_date && (
+                                {request.proposed_monthly_rent && (request.proposed_end_date || true) && (
                                   <Button
                                     size="sm"
                                     onClick={() => handleApproveRenewal(request.request_id)}
@@ -1412,14 +1412,26 @@ export function LeasesPage() {
               </div>
               <div className="space-y-2">
                 <Label>Proposed End Date</Label>
-                <div className="relative">
-                  <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-gray-400" />
-                  <Input 
-                    className="pl-9"
-                    type="date" 
-                    value={newRenewalEndDate} 
-                    onChange={(e) => setNewRenewalEndDate(e.target.value)} 
-                  />
+                <div className="flex flex-col gap-2">
+                    <div className="relative">
+                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-gray-400" />
+                        <Input 
+                            className="pl-9"
+                            type="date" 
+                            disabled={!newRenewalEndDate && newRenewalEndDate !== ''} // fallback safety
+                            value={newRenewalEndDate} 
+                            onChange={(e) => setNewRenewalEndDate(e.target.value)} 
+                        />
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <input 
+                            type="checkbox" 
+                            id="m2m-renewal"
+                            checked={!newRenewalEndDate}
+                            onChange={(e) => setNewRenewalEndDate(e.target.checked ? '' : (selectedRenewal?.proposed_end_date || ''))}
+                        />
+                        <Label htmlFor="m2m-renewal" className="text-xs text-gray-600">Month-to-Month (No End Date)</Label>
+                    </div>
                 </div>
               </div>
             </div>

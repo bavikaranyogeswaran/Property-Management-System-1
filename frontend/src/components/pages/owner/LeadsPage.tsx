@@ -740,18 +740,31 @@ export function LeadsPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="conv-end-date">Lease End Date</Label>
-                <Input
-                  id="conv-end-date"
-                  type="date"
-                  value={conversionData.endDate}
-                  disabled={!!(conversionData.leaseTermId && leaseTerms.find(t => String(t.leaseTermId) === String(conversionData.leaseTermId))?.type === 'periodic')}
-                  onChange={(e) =>
-                    setConversionData({
-                      ...conversionData,
-                      endDate: e.target.value,
-                    })
-                  }
-                />
+                <div className="flex flex-col gap-2">
+                  <Input
+                    id="conv-end-date"
+                    type="date"
+                    value={conversionData.endDate}
+                    disabled={!!(conversionData.leaseTermId && leaseTerms.find(t => String(t.leaseTermId) === String(conversionData.leaseTermId))?.type === 'periodic') || !conversionData.endDate && conversionData.endDate !== ''}
+                    onChange={(e) =>
+                      setConversionData({
+                        ...conversionData,
+                        endDate: e.target.value,
+                      })
+                    }
+                  />
+                  {!conversionData.leaseTermId && (
+                    <div className="flex items-center gap-2">
+                      <input 
+                        type="checkbox" 
+                        id="conv-m2m"
+                        checked={!conversionData.endDate}
+                        onChange={(e) => setConversionData({ ...conversionData, endDate: e.target.checked ? '' : (selectedLead?.moveInDate || '') })}
+                      />
+                      <Label htmlFor="conv-m2m" className="text-xs text-gray-600">Month-to-Month</Label>
+                    </div>
+                  )}
+                </div>
                 <p className="text-[10px] text-gray-500">
                   {conversionData.leaseTermId && leaseTerms.find(t => String(t.leaseTermId) === String(conversionData.leaseTermId))?.type === 'periodic'
                     ? 'Periodic lease has no fixed end date'

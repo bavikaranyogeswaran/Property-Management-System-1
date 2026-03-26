@@ -459,7 +459,7 @@ export const syncUnitStatuses = async () => {
             WHERE u.status = 'available'
             AND l.status = 'active'
             AND l.start_date <= ?
-            AND l.end_date >= ?
+            AND (l.end_date >= ? OR l.end_date IS NULL)
         `,
       [currentToday, currentToday]
     );
@@ -516,7 +516,7 @@ export const syncUnitStatuses = async () => {
           WHERE u.status = 'maintenance'
           AND l.status = 'active'
           AND l.start_date <= ?
-          AND l.end_date >= ?
+          AND (l.end_date >= ? OR l.end_date IS NULL)
       `,
       [currentToday, currentToday]
     );
