@@ -133,10 +133,8 @@ export const validateLeaseDuration = (startDate, endDate, minDays = 90) => {
     return { isValid: false, error: 'Invalid start date' };
   }
 
-  // If no end date is provided (open-ended lease), the duration logic is technically indefinite.
-  // We bypass duration diff math if endDate is null or undefined.
   if (!endDate) {
-      return { isValid: true, error: null };
+      return { isValid: false, error: 'End date is required.' };
   }
 
   const end = new Date(endDate);

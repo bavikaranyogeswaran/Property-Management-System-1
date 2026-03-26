@@ -34,26 +34,22 @@ class LeaseService {
       !tenantId ||
       !unitId ||
       !startDate ||
+      !endDate ||
       (monthlyRent === undefined || monthlyRent === null)
     ) {
       throw new Error('All fields are required for lease creation.');
     }
 
-    if (endDate && new Date(startDate) >= new Date(endDate)) {
+    if (new Date(startDate) >= new Date(endDate)) {
       throw new Error('End date must be after start date');
     }
 
-    if (endDate) {
-        const durationCheck = validateLeaseDuration(startDate, endDate);
-        if (!durationCheck.isValid) {
-            throw new Error(durationCheck.error);
-        }
+    const durationCheck = validateLeaseDuration(startDate, endDate);
+    if (!durationCheck.isValid) {
+        throw new Error(durationCheck.error);
     }
 
-    if (
-      isNaN(new Date(startDate).getTime()) ||
-      (endDate && isNaN(new Date(endDate).getTime()))
-    ) {
+    if (isNaN(new Date(startDate).getTime()) || isNaN(new Date(endDate).getTime())) {
       throw new Error('Invalid date format');
     }
 
