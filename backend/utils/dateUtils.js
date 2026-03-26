@@ -98,6 +98,26 @@ export const addDays = (date, days) => {
   return result;
 };
 
+/**
+ * Adds a specified number of months to a Date object.
+ * Correctly handles end-of-month dates (e.g. Jan 31 + 1 month = Feb 28/29).
+ * @param {Date|string} date 
+ * @param {number} months 
+ * @returns {Date}
+ */
+export const addMonths = (date, months) => {
+  const result = date instanceof Date ? new Date(date) : parseLocalDate(date);
+  const day = result.getDate();
+  result.setMonth(result.getMonth() + months);
+  
+  // If the day changed (e.g. Jan 31 -> Mar 3 because Feb has only 28 days),
+  // clamp it to the last day of the previous month.
+  if (result.getDate() !== day) {
+    result.setDate(0);
+  }
+  return result;
+};
+
 export default {
   getCurrentDateString,
   formatToLocalDate,
@@ -105,6 +125,7 @@ export default {
   now,
   today,
   parseLocalDate,
-  addDays
+  addDays,
+  addMonths
 };
 

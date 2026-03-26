@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import paymentController from '../controllers/paymentController.js';
 
-import authenticateToken from '../middleware/authMiddleware.js';
+import { authenticateToken } from '../middleware/authMiddleware.js';
 import validateRequest from '../middleware/validateRequest.js';
 import {
   submitPaymentSchema,

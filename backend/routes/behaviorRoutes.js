@@ -4,7 +4,7 @@ import {
   getTenantBehavior,
   getMyBehavior,
 } from '../controllers/behaviorController.js';
-import authenticateToken, { authorizeRoles } from '../middleware/authMiddleware.js';
+import { authenticateToken, authorizeRoles } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 

@@ -10,6 +10,45 @@ import { getCurrentDateString, getLocalTime, today, now, parseLocalDate, addDays
 // --- CONFIGURATION ---
 const LATE_FEE_PERCENTAGE = 0.05;
 
+/**
+ * In-Memory Mutex Lock for Cron Jobs (Coding Level)
+ */
+const activeLocks = new Set();
+
+const runWithLock = async (jobName, taskFn) => {
+  if (activeLocks.has(jobName)) {
+    console.warn(`[Cron] Job "${jobName}" is already locked (in-memory). Aborting.`);
+    return;
+  }
+
+  activeLocks.add(jobName);
+  console.log(`[Cron] Locked job: ${jobName} (in-memory)`);
+  
+  try {
+    await taskFn();
+  } catch (err) {
+    console.error(`[Cron] Error in locked job "${jobName}":`, err);
+  } finally {
+    activeLocks.delete(jobName);
+    console.log(`[Cron] Unlocked job: ${jobName} (in-memory)`);
+  }
+};
+
+/**
+ * Log Cron Execution outcome
+ */
+const logCronExecution = async (jobName, executionDate, status, message = null) => {
+  try {
+    await db.query(
+      `INSERT INTO cron_logs (job_name, execution_date, status, message, ended_at) 
+       VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+      [jobName, executionDate, status, message]
+    );
+  } catch (err) {
+    console.error('[Cron] Failed to log execution:', err);
+  }
+};
+
 export const generateRentInvoices = async () => {
   console.log('Running automated rent invoicing...');
   const currentToday = now();
@@ -23,6 +62,14 @@ export const generateRentInvoices = async () => {
 
     let createdCount = 0;
     for (const lease of activeLeases) {
+      // EDGE CASE: If lease ends exactly on the billing date (the 1st),
+      // we generate a 1-day prorated invoice or skip it to avoid full month charge.
+      if (lease.end_date === formatToLocalDate(currentToday)) {
+        console.log(`Lease ${lease.id} ends today (${lease.end_date}). Skipping full rent generation.`);
+        // Note: Move-out proration logic could create a 1-day invoice here if desired.
+        continue;
+      }
+
       const billingInfo = billingEngine.calculateMonthlyRent(lease, currentYear, currentMonth);
       if (!billingInfo) continue;
       const dueDateStr = billingInfo.dueDate;
@@ -318,11 +365,19 @@ export const applyLateFees = async () => {
       `Found ${overdueInvoices.length} overdue invoices eligible for late fees.`
     );
 
-    const LATE_FEE_PERCENTAGE = 0.05;
-
     let appliedCount = 0;
     for (const inv of overdueInvoices) {
-      // Fix 2: Calculate based on the Historical Invoice Amount, not current lease rent.
+      // DUPLICATION GUARD: Ensure a late fee hasn't already been created for this invoice/month
+      const [feeExists] = await db.query(
+        "SELECT 1 FROM rent_invoices WHERE lease_id = ? AND description LIKE ? AND invoice_type = 'late_fee' LIMIT 1",
+        [inv.lease_id, `%Late Fee for Invoice #${inv.invoice_id}%`]
+      );
+
+      if (feeExists.length > 0) {
+        console.log(`Late fee already exists for Invoice #${inv.invoice_id}. Skipping.`);
+        continue;
+      }
+
       const lateFeeAmount = inv.amount * LATE_FEE_PERCENTAGE;
 
       // Create Late Fee Invoice
@@ -373,7 +428,7 @@ export const applyLateFees = async () => {
               tenantId: inv.tenant_id,
               amount: amountToApply,
               generatedDate: today(),
-              receiptNumber: `REC-CREDIT-LATEFEE-${randomUUID()}`,
+              receiptNumber: `RLF-${randomUUID().slice(0, 8)}`,
             });
 
           console.log(
@@ -642,35 +697,72 @@ export const expireStaleRenewals = async () => {
   }
 };
 
+/**
+ * Unified Nightly Cron Job (Locking + Backfill)
+ */
+export const runNightlyCron = async (targetDate = null) => {
+  const executionDate = targetDate || today();
+  console.log(`--- Starting Nightly Cron Activities for ${executionDate} ---`);
+
+  try {
+    // 1. Warnings & Expiries
+    await sendLeaseExpiryWarnings();
+    await checkLeaseExpiration();
+
+    // 2. Billing (Rent)
+    await generateRentInvoices();
+
+    // 3. Billing (Late Fees)
+    await applyLateFees();
+
+    // 4. Maintenance / Lead Expiries
+    await syncUnitStatuses();
+    await cleanupOldNotifications();
+    await expireStaleLeads();
+    await expireStaleRenewals();
+
+    await logCronExecution('nightly_billing', executionDate, 'success');
+  } catch (err) {
+    await logCronExecution('nightly_billing', executionDate, 'failed', err.message);
+    throw err;
+  }
+};
+
+/**
+ * Main Entry Point with Backfill Logic
+ */
+export const executeNightlyPayload = async () => {
+  await runWithLock('nightly_billing', async () => {
+    // BACKFILL LOGIC: Check last successful run
+    const [lastRun] = await db.query(
+      "SELECT execution_date FROM cron_logs WHERE job_name = 'nightly_billing' AND status = 'success' ORDER BY execution_date DESC LIMIT 1"
+    );
+
+    const todayDate = parseLocalDate(today());
+    let startDate;
+
+    if (lastRun.length > 0) {
+      startDate = addDays(lastRun[0].execution_date, 1);
+    } else {
+      startDate = todayDate;
+    }
+
+    // Process all missed days up to today
+    let current = startDate;
+    while (current <= todayDate) {
+      const dateStr = formatToLocalDate(current);
+      await runNightlyCron(dateStr);
+      current = addDays(current, 1);
+    }
+  });
+};
+
 const initCronJobs = () => {
-  // Run every day at 0:30 AM (Expiry Warnings)
-  cron.schedule('30 0 * * *', sendLeaseExpiryWarnings);
+  // Main Nightly Cron (Run at 1:00 AM)
+  cron.schedule('0 1 * * *', executeNightlyPayload);
 
-  // Run every day at midnight (Lease Expiry)
-  cron.schedule('0 0 * * *', checkLeaseExpiration);
-
-  // Run every day at 1:00 AM (Invoicing)
-  cron.schedule('0 1 * * *', generateRentInvoices);
-
-  // Run every day at 2:00 AM (Late Fees)
-  cron.schedule('0 2 * * *', applyLateFees);
-
-  // Run every day at 3:00 AM (Unit Status Sync)
-  cron.schedule('0 3 * * *', syncUnitStatuses);
-
-  // Run every day at 4:00 AM (Notification Cleanup)
-  cron.schedule('0 4 * * *', cleanupOldNotifications);
-
-  // Run every day at 4:30 AM (Stale Lead Expiry)
-  cron.schedule('30 4 * * *', expireStaleLeads);
-
-  // Run every day at 4:45 AM (Stale Renewal Expiry)
-  cron.schedule('45 4 * * *', expireStaleRenewals);
-
-  // Run every day at 7:00 AM (Visit Reminders)
+  // Reminders (Non-critical, don't need full locking/backfill for now)
   cron.schedule('0 7 * * *', sendVisitReminders);
-
-  // Run every day at 8:00 AM (Rent Reminders)
   cron.schedule('0 8 * * *', sendRentReminders);
 };
 

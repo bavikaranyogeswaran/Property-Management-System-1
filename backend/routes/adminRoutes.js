@@ -1,6 +1,6 @@
 import express from 'express';
 import { applyLateFees } from '../utils/cronJobs.js';
-import authenticateToken from '../middleware/authMiddleware.js';
+import { authenticateToken } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 

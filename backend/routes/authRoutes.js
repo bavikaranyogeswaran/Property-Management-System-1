@@ -2,7 +2,7 @@ import { Router } from 'express';
 import authController from '../controllers/authController.js';
 
 import passwordController from '../controllers/passwordController.js';
-import authenticateToken from '../middleware/authMiddleware.js';
+import { authenticateToken } from '../middleware/authMiddleware.js';
 import validateRequest from '../middleware/validateRequest.js';
 import forgotPasswordLimiter from '../middleware/forgotPasswordLimiter.js';
 import {

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import userController from '../controllers/userController.js';
-import authenticateToken, { authorizeRoles } from '../middleware/authMiddleware.js';
+import { authenticateToken, authorizeRoles } from '../middleware/authMiddleware.js';
 import validateRequest from '../middleware/validateRequest.js';
 import {
   createTreasurerSchema,

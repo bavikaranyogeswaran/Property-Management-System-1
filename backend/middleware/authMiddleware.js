@@ -1,7 +1,7 @@
 import jwt from 'jsonwebtoken';
 const { verify } = jwt;
 
-const authenticateToken = (req, res, next) => {
+export const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
@@ -54,4 +54,3 @@ export const authorizeRoles = (...roles) => {
   };
 };
 
-export default authenticateToken;
