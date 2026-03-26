@@ -173,8 +173,8 @@ class RenewalService {
     }
 
     async getRequests(user) {
-        if (user.role === 'owner') return await renewalRequestModel.findAll(user.id);
-        if (user.role === 'treasurer') return await renewalRequestModel.findAll();
+        if (user.role === 'owner') return await renewalRequestModel.findAll({ ownerId: user.id });
+        if (user.role === 'treasurer') return await renewalRequestModel.findAll({ treasurerId: user.id });
         if (user.role === 'tenant') {
             // Find renewal requests for this tenant's leases
             const tenantLeases = await leaseModel.findByTenantId(user.id);

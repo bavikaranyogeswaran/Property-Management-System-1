@@ -1,5 +1,5 @@
 import pool from '../config/db.js';
-import { getLocalTime } from '../utils/dateUtils.js';
+import { getLocalTime, parseLocalDate } from '../utils/dateUtils.js';
 
 class ReceiptModel {
   async create(data, connection = null) {

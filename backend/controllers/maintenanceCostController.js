@@ -12,12 +12,13 @@ class MaintenanceCostController {
         return res.status(403).json({ error: 'Access denied' });
       }
 
-      const costId = await maintenanceCostModel.create({
+      const maintenanceService = (await import('../services/maintenanceService.js')).default;
+      const costId = await maintenanceService.recordCost({
         requestId,
         amount,
         description,
-        recordedDate,
-      });
+        recordedDate
+      }, req.user);
 
       // Logic Check: Billable Maintenance
       // If flagged, generate an Invoice for the tenant.

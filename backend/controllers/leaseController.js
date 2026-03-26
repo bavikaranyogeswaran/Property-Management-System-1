@@ -237,6 +237,16 @@ class LeaseController {
     }
   }
 
+  async resolveRefundDispute(req, res) {
+    try {
+      const { id } = req.params;
+      const result = await leaseService.resolveRefundDispute(id, req.user);
+      res.json(result);
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: error.message });
+    }
+  }
 }
 
 export default new LeaseController();

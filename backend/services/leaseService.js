@@ -321,7 +321,7 @@ class LeaseService {
     const lease = await leaseModel.findById(leaseId);
     if (!lease) throw new Error('Lease not found');
 
-    if (lease.depositStatus !== 'awaiting_approval') {
+    if (!lease.proposedRefundAmount || Number(lease.proposedRefundAmount) <= 0) {
       throw new Error('No refund request awaiting approval.');
     }
 
@@ -474,6 +474,7 @@ class LeaseService {
 
       await leaseModel.update(leaseId, {
         refunded_amount: Number(lease.refundedAmount || 0) + Number(amount),
+        security_deposit: 0, // Decrement to zero as it's fully disbursed/withheld
         deposit_status: status,
         proposed_refund_amount: 0,
         refund_notes: null
@@ -513,6 +514,10 @@ class LeaseService {
     const lease = await leaseModel.findById(leaseId);
     if (!lease) throw new Error('Lease not found');
 
+    if (lease.deposit_status !== 'pending') {
+      throw new Error('Only pending refund requests can be disputed.');
+    }
+
     await leaseModel.update(leaseId, {
       deposit_status: 'disputed',
       refund_notes: notes 
@@ -527,6 +532,33 @@ class LeaseService {
     });
 
     return { status: 'disputed' };
+  }
+
+  async resolveRefundDispute(leaseId, user) {
+    if (user.role !== 'owner' && user.role !== 'treasurer') {
+      throw new Error('Access denied');
+    }
+
+    const lease = await leaseModel.findById(leaseId);
+    if (!lease) throw new Error('Lease not found');
+
+    if (lease.deposit_status !== 'disputed') {
+      throw new Error('Only disputed refunds can be resolved.');
+    }
+
+    await leaseModel.update(leaseId, {
+      deposit_status: 'pending' // Move back to pending for re-approval
+    });
+
+    const auditLogger = (await import('../utils/auditLogger.js')).default;
+    await auditLogger.log({
+      userId: user.id,
+      actionType: 'DEPOSIT_REFUND_RESOLVED',
+      entityId: leaseId,
+      details: { previousStatus: 'disputed' },
+    });
+
+    return { status: 'pending' };
   }
 
   async refundDeposit(leaseId, amount, user) {

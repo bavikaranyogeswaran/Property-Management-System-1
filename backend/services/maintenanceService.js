@@ -7,6 +7,9 @@ import leaseModel from '../models/leaseModel.js';
 import invoiceModel from '../models/invoiceModel.js';
 import userModel from '../models/userModel.js';
 import emailService from '../utils/emailService.js';
+import maintenanceCostModel from '../models/maintenanceCostModel.js';
+import ledgerModel from '../models/ledgerModel.js';
+import pool from '../config/db.js';
 import { getCurrentDateString, getLocalTime, today, now } from '../utils/dateUtils.js';
 
 class MaintenanceService {
@@ -171,6 +174,60 @@ class MaintenanceService {
         return invoiceId;
     }
     
+    async recordCost(data, user) {
+        if (user.role !== 'owner' && user.role !== 'treasurer') {
+            throw new Error('Access denied');
+        }
+
+        const { requestId, amount, description, recordedDate } = data;
+        const request = await maintenanceRequestModel.findById(requestId);
+        if (!request) throw new Error('Maintenance Request not found');
+
+        const connection = await pool.getConnection();
+        try {
+            await connection.beginTransaction();
+
+            // 1. Record the cost
+            const costId = await maintenanceCostModel.create({
+                requestId,
+                amount,
+                description,
+                recordedDate: recordedDate || getLocalTime()
+            }, connection);
+
+            // 2. Identify lease to link ledger entry
+            // Note: If no active lease, we might link to property or use special ID, 
+            // but for accounting integrity, we prefer linking to a lease if possible.
+            const leases = await leaseModel.findByTenantId(request.tenantId);
+            const activeLease = leases.find(
+                (l) => l.unitId === request.unitId && l.status === 'active'
+            );
+
+            if (activeLease) {
+                // 3. Post to Ledger as an Expense
+                await ledgerModel.create({
+                    leaseId: activeLease.id,
+                    accountType: 'expense',
+                    category: 'maintenance_repair',
+                    credit: Number(amount), // In our system, expenses increase with CREDIT (payments made by owner) 
+                    // Wait, let's check ledgerModel.js logic again. 
+                    // summary[name].expense += Number(row.total_credit) - Number(row.total_debit);
+                    // Yes, expenses are treated as positive credits in the summary.
+                    description: `Maintenance Cost: ${description || request.title} (Req #${requestId})`,
+                    entryDate: recordedDate || getCurrentDateString(),
+                }, connection);
+            }
+
+            await connection.commit();
+            return costId;
+        } catch (error) {
+            await connection.rollback();
+            throw error;
+        } finally {
+            connection.release();
+        }
+    }
+
     async getRequests(user) {
          if (user.role === 'tenant') {
              return await maintenanceRequestModel.findByTenantId(user.id);

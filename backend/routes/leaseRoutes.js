@@ -11,6 +11,7 @@ router.post('/:id/instant-renew', authenticateToken, leaseController.instantRene
 router.post('/:id/refund', authenticateToken, leaseController.refundDeposit);
 router.post('/:id/refund/approve', authenticateToken, leaseController.approveRefund);
 router.post('/:id/refund/dispute', authenticateToken, leaseController.disputeRefund);
+router.post('/:id/refund/resolve', authenticateToken, leaseController.resolveRefundDispute);
 router.patch('/:id/document', authenticateToken, leaseController.updateLeaseDocument);
 router.post(
   '/:id/terminate',

@@ -215,8 +215,8 @@ class PaymentService {
     }
 
     async verifyPayment(paymentId, status, user) {
-        if (user.role !== 'treasurer' && user.role !== 'owner') {
-            throw new Error('Access denied');
+        if (user.role !== 'treasurer') {
+            throw new Error('Access denied. Only Treasurers can verify payments.');
         }
 
         const connection = await pool.getConnection();

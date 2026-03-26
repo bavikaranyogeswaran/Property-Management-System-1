@@ -36,7 +36,8 @@ class RenewalRequestModel {
         return rows[0];
     }
 
-    async findAll(ownerId = null) {
+    async findAll(filter = {}) {
+        const { ownerId, treasurerId } = filter;
         let query = `
             SELECT rr.*, l.unit_id, u.unit_number, p.name as property_name, usr.name as tenant_name
             FROM renewal_requests rr
@@ -46,10 +47,23 @@ class RenewalRequestModel {
             JOIN users usr ON l.tenant_id = usr.user_id
         `;
         const params = [];
+        const conditions = [];
+
         if (ownerId) {
-            query += ` WHERE p.owner_id = ?`;
+            conditions.push(`p.owner_id = ?`);
             params.push(ownerId);
         }
+
+        if (treasurerId) {
+            query += ` JOIN staff_property_assignments spa ON p.property_id = spa.property_id`;
+            conditions.push(`spa.user_id = ?`);
+            params.push(treasurerId);
+        }
+
+        if (conditions.length > 0) {
+            query += ` WHERE ` + conditions.join(' AND ');
+        }
+
         query += ` ORDER BY rr.created_at DESC`;
         const [rows] = await pool.query(query, params);
         return rows;
