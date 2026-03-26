@@ -81,19 +81,32 @@ export function OwnerMaintenancePage() {
     dueDate: '',
   });
 
+  // Filter States
+  const [filterCategory, setFilterCategory] = useState<string>('all');
+  const [filterPriority, setFilterPriority] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+
   // Deletion States
   const [isDeleteCostDialogOpen, setIsDeleteCostDialogOpen] = useState(false);
   const [costToDelete, setCostToDelete] = useState<MaintenanceCost | null>(
     null
   );
 
-  const submittedRequests = maintenanceRequests.filter(
+  const filteredRequests = maintenanceRequests.filter((r) => {
+    const matchesCategory = filterCategory === 'all' || r.category === filterCategory;
+    const matchesPriority = filterPriority === 'all' || r.priority === filterPriority;
+    const matchesSearch = r.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          r.description.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesCategory && matchesPriority && matchesSearch;
+  });
+
+  const submittedRequests = filteredRequests.filter(
     (r) => r.status === 'submitted'
   );
-  const inProgressRequests = maintenanceRequests.filter(
+  const inProgressRequests = filteredRequests.filter(
     (r) => r.status === 'in_progress'
   );
-  const completedRequests = maintenanceRequests.filter(
+  const completedRequests = filteredRequests.filter(
     (r) => r.status === 'completed'
   );
 
@@ -221,7 +234,7 @@ export function OwnerMaintenancePage() {
         <TableHeader>
           <TableRow>
             <TableHead>Submitted</TableHead>
-            <TableHead>Title</TableHead>
+            <TableHead>Title & Category</TableHead>
             <TableHead>Tenant</TableHead>
             <TableHead>Property/Unit</TableHead>
             <TableHead>Priority</TableHead>
@@ -245,9 +258,11 @@ export function OwnerMaintenancePage() {
               <TableRow key={request.id}>
                 <TableCell>{request.submittedDate}</TableCell>
                 <TableCell className="font-medium max-w-xs">
-                  <div>{request.title}</div>
-                  <div className="text-xs text-gray-500 truncate">
-                    {request.description}
+                  <div className="flex flex-col">
+                    <span>{request.title}</span>
+                    <Badge variant="secondary" className="w-fit text-[10px] h-4 px-1 mt-1 capitalize">
+                      {request.category}
+                    </Badge>
                   </div>
                 </TableCell>
                 <TableCell>{tenant?.name}</TableCell>
@@ -350,6 +365,50 @@ export function OwnerMaintenancePage() {
         <p className="text-sm text-gray-500 mt-1">
           Track and manage maintenance requests
         </p>
+      </div>
+
+      {/* Filters */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="space-y-2">
+          <Label>Category</Label>
+          <Select value={filterCategory} onValueChange={setFilterCategory}>
+            <SelectTrigger>
+              <SelectValue placeholder="All Categories" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Categories</SelectItem>
+              <SelectItem value="general">General</SelectItem>
+              <SelectItem value="plumbing">Plumbing</SelectItem>
+              <SelectItem value="electrical">Electrical</SelectItem>
+              <SelectItem value="appliance">Appliance</SelectItem>
+              <SelectItem value="hvac">HVAC</SelectItem>
+              <SelectItem value="structural">Structural</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label>Priority</Label>
+          <Select value={filterPriority} onValueChange={setFilterPriority}>
+            <SelectTrigger>
+              <SelectValue placeholder="All Priorities" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Priorities</SelectItem>
+              <SelectItem value="low">Low</SelectItem>
+              <SelectItem value="medium">Medium</SelectItem>
+              <SelectItem value="high">High</SelectItem>
+              <SelectItem value="urgent">Urgent</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label>Search</Label>
+          <Input 
+            placeholder="Search by title or description..." 
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
       </div>
 
       {/* Stats */}

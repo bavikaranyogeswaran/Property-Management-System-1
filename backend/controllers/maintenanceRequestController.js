@@ -27,7 +27,10 @@ class MaintenanceRequestController {
       if (error.message.includes('Access denied')) {
           return res.status(403).json({ error: error.message });
       }
-      res.status(500).json({ error: 'Failed to create request' });
+      if (error.message.includes('reached')) {
+          return res.status(429).json({ error: error.message });
+      }
+      res.status(500).json({ error: error.message });
     }
   }
 
@@ -54,6 +57,9 @@ class MaintenanceRequestController {
     } catch (error) {
       console.error(error);
       if (error.message.includes('Only owners')) {
+           return res.status(403).json({ error: error.message });
+      }
+      if (error.message.includes('Access denied')) {
            return res.status(403).json({ error: error.message });
       }
       res.status(500).json({ error: 'Failed to update status' });

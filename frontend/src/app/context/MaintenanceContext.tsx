@@ -11,6 +11,7 @@ export interface MaintenanceRequest {
   title: string;
   description: string;
   priority: 'low' | 'medium' | 'high' | 'urgent';
+  category: string;
   status: 'submitted' | 'in_progress' | 'completed' | 'cancelled';
   submittedDate: string;
   completedDate?: string;
@@ -29,7 +30,7 @@ export interface MaintenanceCost {
 interface MaintenanceContextType {
   maintenanceRequests: MaintenanceRequest[];
   maintenanceCosts: MaintenanceCost[];
-  addMaintenanceRequest: (request: Omit<MaintenanceRequest, 'id' | 'submittedDate'>) => Promise<void>;
+  addMaintenanceRequest: (request: Omit<MaintenanceRequest, 'id' | 'submittedDate'> | FormData) => Promise<void>;
   updateMaintenanceRequest: (id: string, request: Partial<MaintenanceRequest>) => Promise<void>;
   addMaintenanceCost: (cost: Omit<MaintenanceCost, 'id' | 'recordedDate'>) => Promise<void>;
   deleteMaintenanceCost: (id: string) => Promise<void>;
@@ -54,8 +55,9 @@ export function MaintenanceProvider({ children }: { children: ReactNode }) {
           title: r.title,
           description: r.description,
           priority: r.priority,
+          category: r.category || 'general',
           status: r.status,
-          submittedDate: (r.created_at || r.createdAt || '').split('T')[0],
+          submittedDate: (r.created_at || r.createdAt || r.submittedDate || '').split('T')[0],
           images: r.images,
         })));
       }
@@ -81,13 +83,13 @@ export function MaintenanceProvider({ children }: { children: ReactNode }) {
     if (user) fetchMaintenanceData();
   }, [user]);
 
-  const addMaintenanceRequest = async (request: Omit<MaintenanceRequest, 'id' | 'submittedDate'>) => {
+  const addMaintenanceRequest = async (request: Omit<MaintenanceRequest, 'id' | 'submittedDate'> | FormData) => {
     try {
       await maintenanceApi.createRequest(request);
       toast.success('Maintenance request submitted');
       await fetchMaintenanceData();
-    } catch (e) {
-      toast.error('Failed to submit request');
+    } catch (e: any) {
+      toast.error(e.response?.data?.error || 'Failed to submit request');
     }
   };
 

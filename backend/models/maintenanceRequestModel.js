@@ -90,6 +90,7 @@ class MaintenanceRequestModel {
       title: row.title,
       description: row.description,
       priority: row.priority,
+      category: row.category,
       status: row.status,
       createdAt: row.created_at,
       images: row.images, // Already JSON
@@ -137,7 +138,7 @@ class MaintenanceRequestModel {
 
   //  CREATE REQUEST: Writing down a new complaint card.
   async create(data) {
-    const { unitId, tenantId, title, description, priority, images } = data;
+    const { unitId, tenantId, title, description, priority, category, images } = data;
 
     const connection = await pool.getConnection();
     try {
@@ -146,13 +147,14 @@ class MaintenanceRequestModel {
       let result;
       try {
         [result] = await connection.query(
-          'INSERT INTO maintenance_requests (unit_id, tenant_id, title, description, priority, status) VALUES (?, ?, ?, ?, ?, ?)',
+          'INSERT INTO maintenance_requests (unit_id, tenant_id, title, description, priority, category, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
           [
             unitId,
             tenantId,
             title,
             description,
             priority || 'medium',
+            category || 'general',
             'submitted',
           ]
         );
@@ -201,6 +203,14 @@ class MaintenanceRequestModel {
       );
     }
     return this.findById(id);
+  }
+
+  async countOpenByUnitId(unitId) {
+    const [rows] = await pool.query(
+      "SELECT COUNT(*) as count FROM maintenance_requests WHERE unit_id = ? AND status IN ('submitted', 'in_progress')",
+      [unitId]
+    );
+    return rows[0].count;
   }
 }
 

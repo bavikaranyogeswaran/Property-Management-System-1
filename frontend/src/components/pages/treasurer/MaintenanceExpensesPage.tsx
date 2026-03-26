@@ -144,7 +144,7 @@ export function MaintenanceExpensesPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Date</TableHead>
-                  <TableHead>Request</TableHead>
+                  <TableHead>Request & Category</TableHead>
                   <TableHead>Property / Unit</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Recorded Costs</TableHead>
@@ -175,9 +175,9 @@ export function MaintenanceExpensesPage() {
                         </TableCell>
                         <TableCell className="align-top">
                           <div className="font-medium">{request.title}</div>
-                          <div className="text-sm text-gray-500 line-clamp-1">
-                            {request.description}
-                          </div>
+                          <Badge variant="secondary" className="text-[10px] h-4 px-1 mt-1 capitalize">
+                            {request.category}
+                          </Badge>
                         </TableCell>
                         <TableCell className="align-top">
                           <div className="text-sm">

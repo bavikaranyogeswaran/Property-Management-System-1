@@ -27,12 +27,19 @@ class MaintenanceService {
             throw new Error('Access denied. You do not have an active lease for this unit.');
         }
 
+        // Flood Protection: Max 5 open requests per unit
+        const openCount = await maintenanceRequestModel.countOpenByUnitId(unitId);
+        if (openCount >= 5) {
+            throw new Error('Maximum number of open maintenance requests (5) reached for this unit.');
+        }
+
         const requestId = await maintenanceRequestModel.create({
             unitId,
             tenantId,
             title,
             description,
             priority,
+            category: data.category || 'general',
             images,
         });
 
@@ -58,8 +65,23 @@ class MaintenanceService {
     }
 
     async updateStatus(id, status, user) {
-        if (user.role !== 'owner') {
-             throw new Error('Only owners can update status');
+        if (user.role !== 'owner' && user.role !== 'treasurer') {
+             throw new Error('Only owners and treasurers can update status');
+        }
+
+        // Treasurer RBAC: Check assigned property
+        if (user.role === 'treasurer') {
+            const request = await maintenanceRequestModel.findById(id);
+            if (!request) throw new Error('Request not found');
+            
+            const unit = await unitModel.findById(request.unitId);
+            const staffModel = (await import('../models/staffModel.js')).default;
+            const assigned = await staffModel.getAssignedProperties(user.id);
+            const assignedPropertyIds = assigned.map((p) => p.property_id.toString());
+            
+            if (!assignedPropertyIds.includes(unit.propertyId.toString())) {
+                throw new Error('Access denied. You are not assigned to this property.');
+            }
         }
 
         const updated = await maintenanceRequestModel.updateStatus(id, status);
@@ -147,6 +169,11 @@ class MaintenanceService {
             type: 'maintenance',
         });
 
+        // Link cost if provided
+        if (data.costId) {
+            await pool.query('UPDATE maintenance_costs SET invoice_id = ? WHERE cost_id = ?', [invoiceId, data.costId]);
+        }
+
         await notificationModel.create({
             userId: request.tenant_id,
             message: `You have been billed ${amount} for maintenance: ${request.title}`,
@@ -192,7 +219,8 @@ class MaintenanceService {
                 requestId,
                 amount,
                 description,
-                recordedDate: recordedDate || getLocalTime()
+                recordedDate: recordedDate || getLocalTime(),
+                invoiceId: data.invoiceId || null
             }, connection);
 
             // 2. Identify lease to link ledger entry
