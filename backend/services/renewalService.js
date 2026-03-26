@@ -1,6 +1,10 @@
 import renewalRequestModel from '../models/renewalRequestModel.js';
 import leaseModel from '../models/leaseModel.js';
+import userModel from '../models/userModel.js';
+import unitModel from '../models/unitModel.js';
+import propertyModel from '../models/propertyModel.js';
 import pool from '../config/db.js';
+import emailService from '../utils/emailService.js';
 import { addDays, parseLocalDate, formatToLocalDate } from '../utils/dateUtils.js';
 
 class RenewalService {
@@ -96,6 +100,19 @@ class RenewalService {
             }, null, connection);
 
             await connection.commit();
+
+            // Send Email Notification (non-blocking)
+            try {
+                const tenantUser = await userModel.findById(lease.tenantId);
+                const unit = await unitModel.findById(lease.unitId);
+                const property = await propertyModel.findById(unit.propertyId);
+                if (tenantUser && tenantUser.email) {
+                    await emailService.sendRenewalApproval(tenantUser.email, property.name, newLeaseId);
+                }
+            } catch (err) {
+                console.error('Failed to send renewal approval email:', err);
+            }
+
             return { newLeaseId };
         } catch (error) {
             await connection.rollback();
@@ -106,7 +123,13 @@ class RenewalService {
     }
 
     async reject(requestId, user) {
+        const request = await renewalRequestModel.findById(requestId);
+        if (!request) throw new Error('Renewal request not found');
+
         await renewalRequestModel.updateStatus(requestId, 'rejected');
+        
+        // Reset the lease notice_status
+        await leaseModel.update(request.lease_id, { notice_status: 'undecided' });
         
         const auditLogger = (await import('../utils/auditLogger.js')).default;
         await auditLogger.log({
@@ -114,6 +137,39 @@ class RenewalService {
             actionType: 'RENEWAL_REJECTED',
             entityId: requestId
         });
+
+        // Send Email Notification (non-blocking)
+        try {
+            const lease = await leaseModel.findById(request.lease_id);
+            const tenantUser = await userModel.findById(lease.tenantId);
+            const unit = await unitModel.findById(lease.unitId);
+            const property = await propertyModel.findById(unit.propertyId);
+            if (tenantUser && tenantUser.email) {
+                await emailService.sendRenewalRejection(tenantUser.email, property.name, null);
+            }
+        } catch (err) {
+            console.error('Failed to send renewal rejection email:', err);
+        }
+    }
+
+    async instantRenew(leaseId, newEndDate, newMonthlyRent, user) {
+        // 1. Create a renewal request from the lease automatically
+        const requestId = await this.createFromNotice(leaseId);
+        
+        const request = await renewalRequestModel.findById(requestId);
+        if (request.status === 'approved') {
+             throw new Error('This lease renewal has already been approved.');
+        }
+
+        // 2. Propose terms automatically
+        await this.proposeTerms(requestId, {
+            proposedMonthlyRent: newMonthlyRent,
+            proposedEndDate: newEndDate,
+            notes: 'Auto-renewed by property manager.'
+        }, user);
+
+        // 3. Approve automatically
+        return await this.approve(requestId, user);
     }
 
     async getRequests(user) {

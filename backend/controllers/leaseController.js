@@ -1,5 +1,6 @@
 
 import leaseService from '../services/leaseService.js';
+import renewalService from '../services/renewalService.js';
 
 
 class LeaseController {
@@ -68,7 +69,7 @@ class LeaseController {
     }
   }
 
-  async renewLease(req, res) {
+  async instantRenew(req, res) {
     try {
       if (req.user.role !== 'owner' && req.user.role !== 'treasurer') {
         return res.status(403).json({ error: 'Access denied.' });
@@ -77,12 +78,12 @@ class LeaseController {
       const { id } = req.params;
       const { newEndDate, newMonthlyRent } = req.body;
 
-      await leaseService.renewLease(id, newEndDate, newMonthlyRent);
-      res.json({ message: 'Lease renewed successfully' });
+      const result = await renewalService.instantRenew(id, newEndDate, newMonthlyRent, req.user);
+      res.json({ message: 'Lease instantly renewed successfully', ...result });
     } catch (error) {
       if (error.message.includes('not found')) return res.status(404).json({ error: error.message });
-      if (error.message.includes('Only active')) return res.status(400).json({ error: error.message });
-      if (error.message.includes('overlap') || error.message.includes('already booked')) return res.status(409).json({ error: error.message });
+      if (error.message.includes('approved')) return res.status(400).json({ error: error.message });
+      if (error.message.includes('AFTER')) return res.status(400).json({ error: error.message });
       res.status(500).json({ error: error.message });
     }
   }

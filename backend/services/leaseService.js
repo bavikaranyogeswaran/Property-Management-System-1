@@ -280,91 +280,6 @@ class LeaseService {
     }
   }
 
-  async renewLease(leaseId, newEndDate, newMonthlyRent = null) {
-    const lease = await leaseModel.findById(leaseId);
-    if (!lease) throw new Error('Lease not found');
-
-    if (lease.status !== 'active') {
-      throw new Error('Only active leases can be renewed');
-    }
-
-    const currentEndDate = new Date(lease.endDate);
-    const nextEndDate = new Date(newEndDate);
-
-    if (nextEndDate <= currentEndDate) {
-      throw new Error('New end date must be after current end date');
-    }
-
-    const extensionStartDate = new Date(currentEndDate);
-    extensionStartDate.setDate(extensionStartDate.getDate() + 1);
-
-    const connection = await pool.getConnection();
-
-    try {
-      await connection.beginTransaction();
-
-      const hasOverlap = await leaseModel.checkOverlap(
-        lease.unitId,
-        formatToLocalDate(extensionStartDate),
-        formatToLocalDate(nextEndDate),
-        leaseId,
-        connection
-      );
-
-      if (hasOverlap) {
-        throw new Error('Unit is already booked for the requested renewal period.');
-      }
-
-      const updateData = { end_date: newEndDate };
-      if (newMonthlyRent != null) {
-        updateData.monthly_rent = newMonthlyRent;
-      }
-
-      await leaseModel.update(leaseId, updateData, connection);
-
-      if (newMonthlyRent != null && newMonthlyRent > lease.monthlyRent) {
-        const diff = newMonthlyRent - lease.monthlyRent;
-        await invoiceModel.create({
-          leaseId,
-          amount: diff,
-          dueDate: formatToLocalDate(addDays(today(), 5)),
-          description: 'Security Deposit Top-Up (Rent Increase)',
-          type: 'deposit',
-        }, connection);
-
-        await leaseModel.update(leaseId, { deposit_status: 'pending' }, connection);
-      }
-
-      if (newMonthlyRent != null) {
-        const todayDate = today();
-        await invoiceModel.syncFutureRentInvoices(
-          leaseId,
-          newMonthlyRent,
-          todayDate,
-          connection
-        );
-      }
-
-      const auditLogger = (await import('../utils/auditLogger.js')).default;
-      await auditLogger.log({
-        userId: null,
-        actionType: 'LEASE_RENEWAL',
-        entityId: leaseId,
-        details: { newEndDate, newMonthlyRent },
-      }, null, connection);
-
-      await connection.commit();
-      return true;
-
-    } catch (error) {
-      await connection.rollback();
-      console.error('Renew Lease Transaction Failed:', error);
-      throw error;
-    } finally {
-      connection.release();
-    }
-  }
-
   async requestRefund(leaseId, amount, notes, user) {
     const lease = await leaseModel.findById(leaseId);
     if (!lease) throw new Error('Lease not found');
@@ -770,7 +685,7 @@ class LeaseService {
     if (user.role === 'owner') {
       const propertyModel = (await import('../models/propertyModel.js')).default;
       const property = await propertyModel.findById(lease.propertyId);
-      if (property && String(property.owner_id) === String(user.id)) return lease;
+      if (property && String(property.ownerId) === String(user.id)) return lease;
     }
     if (user.role === 'treasurer') {
       const staffModel = (await import('../models/staffModel.js')).default;

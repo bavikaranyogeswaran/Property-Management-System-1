@@ -1035,7 +1035,11 @@ export function LeasesPage() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Renew Lease</DialogTitle>
+            <DialogTitle>Renew Lease (Instant)</DialogTitle>
+            <p className="text-sm text-gray-500 mt-2">
+              This will automatically approve a renewal and generate a <strong>New Draft Lease</strong> for the selected dates.
+              The tenant will be notified via email to review the new draft.
+            </p>
           </DialogHeader>
           <form onSubmit={handleRenew} className="space-y-4">
             <div className="space-y-2">

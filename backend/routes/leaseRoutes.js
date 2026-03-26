@@ -7,7 +7,7 @@ const router = Router();
 router.get('/', authenticateToken, leaseController.getLeases);
 router.post('/', authenticateToken, leaseController.createLease);
 router.get('/:id', authenticateToken, leaseController.getLeaseById);
-router.put('/:id/renew', authenticateToken, leaseController.renewLease);
+router.post('/:id/instant-renew', authenticateToken, leaseController.instantRenew);
 router.post('/:id/refund', authenticateToken, leaseController.refundDeposit);
 router.post('/:id/refund/approve', authenticateToken, leaseController.approveRefund);
 router.post('/:id/refund/dispute', authenticateToken, leaseController.disputeRefund);

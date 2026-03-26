@@ -38,9 +38,9 @@ class MaintenanceService {
             const unit = await unitModel.findById(unitId);
             if (unit && unit.propertyId) {
                 const property = await propertyModel.findById(unit.propertyId);
-                if (property && property.owner_id) {
+                if (property && property.ownerId) {
                     await notificationModel.create({
-                        userId: property.owner_id,
+                        userId: property.ownerId,
                         message: `New Maintenance Request for Unit ${unit.unitNumber}: ${title}`,
                         type: 'maintenance',
                         severity: 'warning',

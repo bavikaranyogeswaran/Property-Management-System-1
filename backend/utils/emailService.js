@@ -719,6 +719,67 @@ class EmailService {
     }
   }
 
+  async sendRenewalApproval(email, propertyName, newLeaseId) {
+    if (!this.transporter) {
+      console.log('==================================================');
+      console.log(`[EMAIL MOCK] Renewal Approved: ${email}`);
+      console.log(`Property: ${propertyName}`);
+      console.log(`New Draft Lease ID: ${newLeaseId}`);
+      console.log('==================================================');
+      return true;
+    }
+    try {
+      await this.transporter.sendMail({
+        from: `"Property Management System" <${process.env.SMTP_USER}>`,
+        to: email,
+        subject: `Lease Renewal Approved - ${propertyName}`,
+        html: this._getTemplate(
+          'Renewal Approved',
+          `
+          <p>Great news! Your lease renewal request for <strong>${propertyName}</strong> has been approved.</p>
+          <p>A new draft lease has been generated and is ready. The property owner will activate it shortly, or you can log in to your tenant portal to review the proposed terms.</p>
+          <div style="text-align: center; margin: 32px 0;">
+            <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/login" style="background-color: #2563eb; color: white; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px; display: inline-block;">View Portal</a>
+          </div>
+          `
+        ),
+      });
+      return true;
+    } catch (e) {
+      console.error('Error sending renewal approval email:', e);
+      return false;
+    }
+  }
+
+  async sendRenewalRejection(email, propertyName, notes) {
+    if (!this.transporter) {
+      console.log('==================================================');
+      console.log(`[EMAIL MOCK] Renewal Rejected: ${email}`);
+      console.log(`Property: ${propertyName}`);
+      console.log('==================================================');
+      return true;
+    }
+    try {
+      await this.transporter.sendMail({
+        from: `"Property Management System" <${process.env.SMTP_USER}>`,
+        to: email,
+        subject: `Lease Renewal Update - ${propertyName}`,
+        html: this._getTemplate(
+          'Renewal Request Declined',
+          `
+          <p>Your recent lease renewal request for <strong>${propertyName}</strong> was not approved at this time.</p>
+          ${notes ? `<p style="padding: 12px; background-color: #f8fafc; border-left: 4px solid #ef4444; color: #475569;"><strong>Notes from management:</strong> ${notes}</p>` : ''}
+          <p>Please contact the property management office for further details or to discuss next steps regarding your end-of-lease procedures.</p>
+          `
+        ),
+      });
+      return true;
+    } catch (e) {
+      console.error('Error sending renewal rejection email:', e);
+      return false;
+    }
+  }
+
   _getTemplate(title, content) {
     return `
             <!DOCTYPE html>

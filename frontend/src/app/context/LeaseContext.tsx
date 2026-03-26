@@ -156,9 +156,9 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
 
   const renewLease = async (id: string, newEndDate: string, newMonthlyRent?: number) => {
     try {
-      await apiClient.put(`/leases/${id}/renew`, { newEndDate, newMonthlyRent });
-      setLeases(prev => prev.map(l => (l.id === id ? { ...l, endDate: newEndDate, monthlyRent: newMonthlyRent || l.monthlyRent } : l)));
-      toast.success('Lease renewed successfully');
+      await apiClient.post(`/leases/${id}/instant-renew`, { newEndDate, newMonthlyRent });
+      await fetchLeases();
+      toast.success('Renewal approved. A new draft lease is ready.');
     } catch (e: any) {
       const msg = e.response?.data?.error || 'Failed to renew lease';
       toast.error(msg);

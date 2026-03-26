@@ -620,6 +620,28 @@ export const sendVisitReminders = async () => {
   }
 };
 
+export const expireStaleRenewals = async () => {
+  console.log('Running stale renewal request cleanup...');
+  try {
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - 14);
+
+    const [result] = await db.query(
+      `UPDATE renewal_requests 
+       SET status = 'expired' 
+       WHERE status IN ('pending', 'negotiating') 
+       AND created_at < ?`,
+      [cutoffDate]
+    );
+
+    if (result.affectedRows > 0) {
+      console.log(`Expired ${result.affectedRows} stale renewal requests.`);
+    }
+  } catch (error) {
+    console.error('Error expiring stale renewal requests:', error);
+  }
+};
+
 const initCronJobs = () => {
   // Run every day at 0:30 AM (Expiry Warnings)
   cron.schedule('30 0 * * *', sendLeaseExpiryWarnings);
@@ -641,6 +663,9 @@ const initCronJobs = () => {
 
   // Run every day at 4:30 AM (Stale Lead Expiry)
   cron.schedule('30 4 * * *', expireStaleLeads);
+
+  // Run every day at 4:45 AM (Stale Renewal Expiry)
+  cron.schedule('45 4 * * *', expireStaleRenewals);
 
   // Run every day at 7:00 AM (Visit Reminders)
   cron.schedule('0 7 * * *', sendVisitReminders);
