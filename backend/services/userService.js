@@ -13,6 +13,7 @@ import leaseModel from '../models/leaseModel.js';
 import leaseService from '../services/leaseService.js';
 import emailService from '../utils/emailService.js';
 import leaseTermModel from '../models/leaseTermModel.js';
+import { getLocalTime } from '../utils/dateUtils.js';
 import pool from '../config/db.js';
 import unitLockService from '../services/unitLockService.js';
 
@@ -273,7 +274,7 @@ class UserService {
         const unit = await unitModel.findById(targetUnitId, connection);
 
         if (unit) {
-          const today = new Date();
+          const today = getLocalTime();
           const leaseStart = startDate ? new Date(startDate) : today;
           let leaseEnd;
           

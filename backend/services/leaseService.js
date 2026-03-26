@@ -117,12 +117,12 @@ class LeaseService {
       const leaseId = await leaseModel.create(leaseParams, conn);
 
       // 4. Update Unit Status
-      const today = new Date().toISOString().split('T')[0];
+      const todayDate = today();
 
       // CLEANUP: Cancel ALL future visits for this unit (lease is signed, regardless of start date)
-      await visitModel.cancelVisitsForUnit(unitId, today, conn);
+      await visitModel.cancelVisitsForUnit(unitId, todayDate, conn);
 
-      if (new Date(startDate) <= new Date(today)) {
+      if (parseLocalDate(startDate) <= getLocalTime()) {
         await unitModel.update(unitId, { status: 'occupied' }, conn);
 
         // Mark the tenant's own lead as 'converted' BEFORE dropping others
@@ -148,13 +148,12 @@ class LeaseService {
         await leadModel.dropLeadsForUnit(unitId, conn);
       }
 
-      // 5. Generate Initial Invoices
       if (securityDeposit > 0) {
         await invoiceModel.create(
           {
             leaseId,
             amount: securityDeposit,
-            dueDate: new Date(new Date(startDate).getTime() + 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            dueDate: formatToLocalDate(addDays(startDate, 5)),
             description: 'Security Deposit',
             type: 'deposit',
           },
@@ -183,7 +182,7 @@ class LeaseService {
         {
           leaseId,
           amount: initialRentAmount,
-          dueDate: new Date(new Date(startDate).getTime() + 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          dueDate: formatToLocalDate(addDays(startDate, 5)),
           description: invoiceDescription,
         },
         conn
@@ -244,8 +243,8 @@ class LeaseService {
 
       const hasOverlap = await leaseModel.checkOverlap(
         lease.unitId,
-        extensionStartDate.toISOString().split('T')[0],
-        nextEndDate.toISOString().split('T')[0],
+        formatToLocalDate(extensionStartDate),
+        formatToLocalDate(nextEndDate),
         leaseId,
         connection
       );
@@ -266,7 +265,7 @@ class LeaseService {
         await invoiceModel.create({
           leaseId,
           amount: diff,
-          dueDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          dueDate: formatToLocalDate(addDays(today(), 5)),
           description: 'Security Deposit Top-Up (Rent Increase)',
           type: 'deposit',
         }, connection);
@@ -275,11 +274,11 @@ class LeaseService {
       }
 
       if (newMonthlyRent != null) {
-        const today = new Date().toISOString().split('T')[0];
+        const todayDate = today();
         await invoiceModel.syncFutureRentInvoices(
           leaseId,
           newMonthlyRent,
-          today,
+          todayDate,
           connection
         );
       }
@@ -492,7 +491,7 @@ class LeaseService {
           category: 'deposit_withheld',
           debit: Number(withheldAmount),
           description: `Security deposit withheld for property damages`,
-          entryDate: new Date().toISOString().split('T')[0],
+          entryDate: today(),
         }, connection);
       }
 
@@ -519,7 +518,7 @@ class LeaseService {
           category: 'deposit_refund',
           debit: Number(amount),
           description: `Deposit refund approved by owner: ${amount}`,
-          entryDate: new Date().toISOString().split('T')[0],
+          entryDate: today(),
         }, connection);
       }
 
@@ -580,10 +579,10 @@ class LeaseService {
     try {
       await connection.beginTransaction();
 
-      const today = new Date();
+      const todayDate = getLocalTime();
       const start = new Date(lease.startDate);
 
-      if (today < start) {
+      if (todayDate < start) {
         await leaseModel.update(leaseId, { status: 'cancelled', end_date: terminationDate }, connection);
         await invoiceModel.voidPendingByLeaseId(leaseId, connection);
         await unitModel.update(lease.unitId, { status: 'available' }, connection);
@@ -592,7 +591,7 @@ class LeaseService {
           await invoiceModel.create({
             leaseId,
             amount: terminationFee,
-            dueDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            dueDate: formatToLocalDate(addDays(today(), 5)),
             description: 'Early Termination Fee',
             type: 'late_fee',
           }, connection);
@@ -631,7 +630,7 @@ class LeaseService {
       }
 
       await connection.commit();
-      return { status: today < start ? 'cancelled' : 'ended', terminationDate };
+      return { status: todayDate < start ? 'cancelled' : 'ended', terminationDate };
     } catch (error) {
       await connection.rollback();
       throw error;

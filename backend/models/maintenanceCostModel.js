@@ -1,4 +1,5 @@
 import pool from '../config/db.js';
+import { getLocalTime } from '../utils/dateUtils.js';
 
 class MaintenanceCostModel {
   async findByRequestId(requestId) {
@@ -27,7 +28,7 @@ class MaintenanceCostModel {
     const { requestId, description, amount, recordedDate } = data;
     const [result] = await pool.query(
       'INSERT INTO maintenance_costs (request_id, description, amount, recorded_date) VALUES (?, ?, ?, ?)',
-      [requestId, description, amount, recordedDate || new Date()]
+      [requestId, description, amount, recordedDate || getLocalTime()]
     );
     return result.insertId;
   }

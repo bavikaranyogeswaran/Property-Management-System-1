@@ -244,7 +244,7 @@ export const sendLeaseExpiryWarnings = async () => {
     // Find leases expiring exactly in 30 or 60 days
     const [expiringLeases] = await db.query(
       `
-            SELECT l.*, t.email as tenant_email, u_owner.email as owner_email, p.propertyName, un.unit_number
+            SELECT l.*, t.email as tenant_email, u_owner.email as owner_email, p.name as property_name, un.unit_number
             FROM leases l
             JOIN users t ON l.tenant_id = t.user_id
             JOIN units un ON l.unit_id = un.unit_id
@@ -276,7 +276,7 @@ export const sendLeaseExpiryWarnings = async () => {
             await emailService.sendLeaseExpiryReminder(lease.tenant_email, {
                 daysCount,
                 endDate: lease.end_date,
-                propertyName: lease.propertyName,
+                propertyName: lease.property_name,
                 unitNumber: lease.unit_number,
                 role: 'tenant'
             });
@@ -296,7 +296,7 @@ export const sendLeaseExpiryWarnings = async () => {
               await emailService.sendLeaseExpiryReminder(lease.owner_email, {
                   daysCount,
                   endDate: lease.end_date,
-                  propertyName: lease.propertyName,
+                  propertyName: lease.property_name,
                   unitNumber: lease.unit_number,
                   role: 'owner'
               });
