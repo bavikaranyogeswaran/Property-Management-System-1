@@ -9,9 +9,9 @@ interface BehaviorLog {
   id: string;
   type: 'positive' | 'negative';
   category: string;
-  score_change: number;
+  scoreChange: number;
   description: string;
-  created_at: string;
+  createdAt: string;
 }
 
 interface BehaviorData {
@@ -176,11 +176,11 @@ export function TenantBehaviorHistory() {
                     </div>
                     <div>
                       <p className="text-sm font-semibold text-gray-900">{log.description}</p>
-                      <p className="text-xs text-gray-500">{log.category} • {new Date(log.created_at).toLocaleDateString()}</p>
+                      <p className="text-xs text-gray-500">{log.category} • {new Date(log.createdAt).toLocaleDateString()}</p>
                     </div>
                   </div>
                   <div className={`font-bold ${log.type === 'positive' ? 'text-green-600' : 'text-red-600'}`}>
-                    {log.type === 'positive' ? '+' : ''}{log.score_change}
+                    {log.type === 'positive' ? '+' : ''}{log.scoreChange}
                   </div>
                 </div>
               ))

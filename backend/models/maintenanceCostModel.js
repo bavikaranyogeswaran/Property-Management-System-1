@@ -7,7 +7,16 @@ class MaintenanceCostModel {
       'SELECT * FROM maintenance_costs WHERE request_id = ? ORDER BY recorded_date DESC',
       [requestId]
     );
-    return rows;
+    return rows.map(row => ({
+      id: row.cost_id.toString(),
+      requestId: row.request_id.toString(),
+      description: row.description,
+      amount: parseFloat(row.amount),
+      recordedDate: row.recorded_date,
+      invoiceId: row.invoice_id,
+      isReimbursable: !!row.is_reimbursable,
+      status: row.status
+    }));
   }
 
   async findByTenantId(tenantId) {
@@ -21,7 +30,16 @@ class MaintenanceCostModel {
         `,
       [tenantId]
     );
-    return rows;
+    return rows.map(row => ({
+      id: row.cost_id.toString(),
+      requestId: row.request_id.toString(),
+      description: row.description,
+      amount: parseFloat(row.amount),
+      recordedDate: row.recorded_date,
+      invoiceId: row.invoice_id,
+      isReimbursable: !!row.is_reimbursable,
+      status: row.status
+    }));
   }
 
   async create(data, connection = null) {
@@ -38,13 +56,22 @@ class MaintenanceCostModel {
     const [rows] = await pool.query(
       'SELECT * FROM maintenance_costs ORDER BY recorded_date DESC'
     );
-    return rows;
+    return rows.map(row => ({
+      id: row.cost_id.toString(),
+      requestId: row.request_id.toString(),
+      description: row.description,
+      amount: parseFloat(row.amount),
+      recordedDate: row.recorded_date,
+      invoiceId: row.invoice_id,
+      isReimbursable: !!row.is_reimbursable,
+      status: row.status
+    }));
   }
 
   async getTotalCostByProperty(propertyId) {
     const [rows] = await pool.query(
       `
-            SELECT SUM(mc.amount) as total_cost
+            SELECT SUM(mc.amount) as totalCost
             FROM maintenance_costs mc
             JOIN maintenance_requests mr ON mc.request_id = mr.request_id
             JOIN units u ON mr.unit_id = u.unit_id
@@ -52,7 +79,7 @@ class MaintenanceCostModel {
         `,
       [propertyId]
     );
-    return rows[0].total_cost || 0;
+    return rows[0].totalCost || 0;
   }
   async void(id) {
     const [result] = await pool.query(
@@ -70,7 +97,18 @@ class MaintenanceCostModel {
             JOIN properties p ON u.property_id = p.property_id
             ORDER BY mc.recorded_date DESC
         `);
-    return rows;
+    return rows.map(row => ({
+      id: row.cost_id.toString(),
+      requestId: row.request_id.toString(),
+      description: row.description,
+      amount: parseFloat(row.amount),
+      recordedDate: row.recorded_date,
+      invoiceId: row.invoice_id,
+      isReimbursable: !!row.is_reimbursable,
+      status: row.status,
+      propertyName: row.property_name,
+      propertyId: row.property_id
+    }));
   }
 
   async findByTreasurerId(userId) {
@@ -87,7 +125,18 @@ class MaintenanceCostModel {
         `,
       [userId]
     );
-    return rows;
+    return rows.map(row => ({
+      id: row.cost_id.toString(),
+      requestId: row.request_id.toString(),
+      description: row.description,
+      amount: parseFloat(row.amount),
+      recordedDate: row.recorded_date,
+      invoiceId: row.invoice_id,
+      isReimbursable: !!row.is_reimbursable,
+      status: row.status,
+      propertyName: row.property_name,
+      propertyId: row.property_id
+    }));
   }
 
   async findByIdWithDetails(costId) {
@@ -101,7 +150,19 @@ class MaintenanceCostModel {
       `,
       [costId]
     );
-    return rows[0];
+    const row = rows[0];
+    if (!row) return null;
+    return {
+      id: row.cost_id.toString(),
+      requestId: row.request_id.toString(),
+      description: row.description,
+      amount: parseFloat(row.amount),
+      recordedDate: row.recorded_date,
+      invoiceId: row.invoice_id,
+      isReimbursable: !!row.is_reimbursable,
+      status: row.status,
+      propertyId: row.property_id
+    };
   }
 
   // Analytics optimized query to avoid O(N) memory buildup

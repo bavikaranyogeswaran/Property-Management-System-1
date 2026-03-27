@@ -212,13 +212,13 @@ const OwnerPayoutsPage: React.FC = () => {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {payouts.map((p) => (
-                <tr key={p.payout_id}>
+                <tr key={p.id}>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    #{p.payout_id}
+                    #{p.id}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {new Date(p.period_start).toLocaleDateString()} -{' '}
-                    {new Date(p.period_end).toLocaleDateString()}
+                    {new Date(p.periodStart).toLocaleDateString()} -{' '}
+                    {new Date(p.periodEnd).toLocaleDateString()}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
                     {Number(p.amount).toLocaleString('en-LK', {
@@ -238,7 +238,7 @@ const OwnerPayoutsPage: React.FC = () => {
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {new Date(p.generated_at).toLocaleDateString()}
+                    {new Date(p.generatedAt).toLocaleDateString()}
                   </td>
                 </tr>
               ))}

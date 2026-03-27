@@ -61,21 +61,21 @@ class VisitModel {
 
     const [rows] = await db.query(query, params);
     return rows.map((row) => ({
-      visit_id: row.visit_id.toString(),
-      property_id: row.property_id.toString(),
-      unit_id: row.unit_id ? row.unit_id.toString() : null,
-      lead_id: row.lead_id ? row.lead_id.toString() : null,
-      visitor_name: row.visitor_name,
-      visitor_email: row.visitor_email,
-      visitor_phone: row.visitor_phone,
-      scheduled_date: row.scheduled_date,
+      id: row.visit_id.toString(),
+      propertyId: row.property_id.toString(),
+      unitId: row.unit_id ? row.unit_id.toString() : null,
+      leadId: row.lead_id ? row.lead_id.toString() : null,
+      visitorName: row.visitor_name,
+      visitorEmail: row.visitor_email,
+      visitorPhone: row.visitor_phone,
+      scheduledDate: row.scheduled_date,
       status: row.status,
       notes: row.notes,
-      created_at: row.created_at,
+      createdAt: row.created_at,
       // Joined fields
-      property_name: row.property_name,
-      unit_number: row.unit_number,
-      lead_status: row.lead_status,
+      propertyName: row.property_name,
+      unitNumber: row.unit_number,
+      leadStatus: row.lead_status,
     }));
   }
 
@@ -95,17 +95,17 @@ class VisitModel {
     if (rows.length === 0) return null;
     const row = rows[0];
     return {
-      visit_id: row.visit_id.toString(),
-      property_id: row.property_id.toString(),
-      unit_id: row.unit_id ? row.unit_id.toString() : null,
-      lead_id: row.lead_id ? row.lead_id.toString() : null,
-      visitor_name: row.visitor_name,
-      visitor_email: row.visitor_email,
-      visitor_phone: row.visitor_phone,
-      scheduled_date: row.scheduled_date,
+      id: row.visit_id.toString(),
+      propertyId: row.property_id.toString(),
+      unitId: row.unit_id ? row.unit_id.toString() : null,
+      leadId: row.lead_id ? row.lead_id.toString() : null,
+      visitorName: row.visitor_name,
+      visitorEmail: row.visitor_email,
+      visitorPhone: row.visitor_phone,
+      scheduledDate: row.scheduled_date,
       status: row.status,
       notes: row.notes,
-      created_at: row.created_at,
+      createdAt: row.created_at,
     };
   }
   async cancelVisitsForUnit(unitId, date, connection = null) {

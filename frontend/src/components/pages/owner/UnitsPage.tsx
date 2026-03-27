@@ -116,7 +116,7 @@ export function UnitsPage() {
   const onSubmit = async (values: UnitFormValues) => {
     try {
       // Derive type name from ID
-      const unitType = unitTypes.find((t) => t.type_id === values.unitTypeId);
+      const unitType = unitTypes.find((t) => t.id === values.unitTypeId);
       const typeName = unitType?.name || '';
 
       if (editingUnit) {
@@ -125,7 +125,7 @@ export function UnitsPage() {
           ...values,
           type: typeName,
           monthlyRent: values.monthlyRent,
-          image: editingUnit.image,
+          imageUrl: editingUnit.imageUrl,
         });
 
         // Upload new images if any
@@ -141,7 +141,7 @@ export function UnitsPage() {
           ...values,
           type: typeName,
           monthlyRent: values.monthlyRent,
-          image: undefined,
+          imageUrl: undefined,
         });
 
         if (newUnit && uploadFiles.length > 0) {
@@ -184,9 +184,9 @@ export function UnitsPage() {
       const images = await getUnitImages(editingUnit.id);
       setExistingImages(
         images.map((img: any) => ({
-          id: img.image_id?.toString() || img.id?.toString(),
-          url: img.image_url,
-          isPrimary: Boolean(img.is_primary),
+          id: img.id?.toString(),
+          url: img.imageUrl,
+          isPrimary: Boolean(img.isPrimary),
         }))
       );
       toast.success('Image deleted');
@@ -206,9 +206,9 @@ export function UnitsPage() {
       const images = await getUnitImages(editingUnit.id);
       setExistingImages(
         images.map((img: any) => ({
-          id: img.image_id?.toString() || img.id?.toString(),
-          url: img.image_url,
-          isPrimary: Boolean(img.is_primary),
+          id: img.id?.toString(),
+          url: img.imageUrl,
+          isPrimary: Boolean(img.isPrimary),
         }))
       );
       toast.success('Primary image updated');
@@ -251,9 +251,9 @@ export function UnitsPage() {
       if (images) {
         setExistingImages(
           images.map((img: any) => ({
-            id: img.image_id?.toString() || img.id?.toString(),
-            url: img.image_url || img.url,
-            isPrimary: Boolean(img.is_primary),
+            id: img.id?.toString(),
+            url: img.imageUrl,
+            isPrimary: Boolean(img.isPrimary),
           }))
         );
       }
@@ -425,8 +425,8 @@ export function UnitsPage() {
                           <SelectContent>
                             {unitTypes.map((type) => (
                               <SelectItem
-                                key={type.type_id}
-                                value={type.type_id.toString()}
+                                key={type.id}
+                                value={type.id.toString()}
                               >
                                 {type.name}
                               </SelectItem>
@@ -604,9 +604,9 @@ export function UnitsPage() {
                     <TableRow key={unit.id}>
                       <TableCell>
                         <div className="size-10 rounded bg-gray-100 overflow-hidden">
-                          {unit.image ? (
+                          {unit.imageUrl ? (
                             <img
-                              src={unit.image}
+                              src={unit.imageUrl}
                               alt={unit.unitNumber}
                               className="w-full h-full object-cover"
                             />
@@ -686,9 +686,9 @@ export function UnitsPage() {
             <div className="space-y-6 mt-4">
               {/* Large Image View */}
               <div className="w-full aspect-video bg-gray-100 rounded-lg overflow-hidden border">
-                {viewUnit.image ? (
+                {viewUnit.imageUrl ? (
                   <img
-                    src={viewUnit.image}
+                    src={viewUnit.imageUrl}
                     alt={viewUnit.unitNumber}
                     className="w-full h-full object-cover"
                   />
@@ -712,7 +712,7 @@ export function UnitsPage() {
                         className="aspect-square rounded-md overflow-hidden bg-gray-100 border"
                       >
                         <img
-                          src={img.image_url}
+                          src={img.imageUrl}
                           alt=""
                           className="w-full h-full object-cover"
                         />

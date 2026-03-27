@@ -388,7 +388,7 @@ function TypeManager() {
         <div className="border rounded-md divide-y">
           {propertyTypes.map((type) => (
             <div
-              key={type.type_id}
+              key={type.id}
               className="p-2.5 flex justify-between items-center text-sm"
             >
               <span>{type.name}</span>
@@ -396,7 +396,7 @@ function TypeManager() {
                 variant="ghost"
                 size="sm"
                 className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
-                onClick={() => deletePropertyType(type.type_id)}
+                onClick={() => deletePropertyType(type.id)}
               >
                 <Trash className="size-3" />
                 <span className="sr-only">Delete</span>
@@ -427,7 +427,7 @@ function TypeManager() {
         <div className="border rounded-md divide-y">
           {unitTypes.map((type) => (
             <div
-              key={type.type_id}
+              key={type.id}
               className="p-2.5 flex justify-between items-center text-sm"
             >
               <span>{type.name}</span>
@@ -435,7 +435,7 @@ function TypeManager() {
                 variant="ghost"
                 size="sm"
                 className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
-                onClick={() => deleteUnitType(type.type_id)}
+                onClick={() => deleteUnitType(type.id)}
               >
                 <Trash className="size-3" />
               </Button>
@@ -558,8 +558,8 @@ function SystemTools() {
                   </thead>
                   <tbody className="divide-y">
                     {logs.map((log) => (
-                      <tr key={log.log_id} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-4 py-2 font-medium">{log.execution_date.split('T')[0]}</td>
+                      <tr key={log.id} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-4 py-2 font-medium">{log.executionDate.split('T')[0]}</td>
                         <td className="px-4 py-2">
                           {log.status === 'success' ? (
                             <Badge className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100 flex items-center gap-1 w-fit">
@@ -576,7 +576,7 @@ function SystemTools() {
                           )}
                         </td>
                         <td className="px-4 py-2 text-gray-500 text-xs">
-                          {log.ended_at ? new Date(log.ended_at).toLocaleString() : '-'}
+                          {log.endedAt ? new Date(log.endedAt).toLocaleString() : '-'}
                         </td>
                       </tr>
                     ))}
@@ -660,7 +660,7 @@ function LeaseTermManager() {
       <div className="border rounded-md divide-y overflow-hidden">
         {leaseTerms.map((term) => (
           <div
-            key={term.leaseTermId}
+            key={term.id}
             className="p-3 flex justify-between items-center text-sm bg-white hover:bg-gray-50 transition-colors"
           >
             <div className="flex items-center gap-3">
@@ -671,7 +671,7 @@ function LeaseTermManager() {
               variant="ghost"
               size="sm"
               className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
-              onClick={() => deleteLeaseTerm(term.leaseTermId)}
+              onClick={() => deleteLeaseTerm(term.id)}
             >
               <Trash className="size-3.5" />
             </Button>

@@ -53,15 +53,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
       try {
         const trRes = await apiClient.get('/users/treasurers');
         if (trRes.data) {
-          setTreasurers(trRes.data.map((u: any) => ({
-            id: (u.id || u.user_id).toString(),
-            name: u.name,
-            email: u.email,
-            phone: u.phone || '',
-            password: '',
-            createdAt: u.createdAt || u.created_at,
-            status: u.status,
-          })));
+          setTreasurers(trRes.data);
         }
       } catch (e) {
         console.error('Failed to fetch treasurers', e);
@@ -73,19 +65,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
       try {
         const tRes = await apiClient.get('/users/tenants');
         if (tRes.data) {
-          setTenants(tRes.data.map((u: any) => ({
-            id: (u.id || u.user_id).toString(),
-            name: u.name,
-            email: u.email,
-            phone: u.phone,
-            createdAt: u.createdAt,
-            status: u.status,
-            nic: u.nic,
-            nicUrl: u.nicUrl || u.nic_url,
-            monthlyIncome: u.monthlyIncome,
-            employmentStatus: u.employmentStatus,
-            permanentAddress: u.permanentAddress
-          })));
+          setTenants(tRes.data);
         }
       } catch (e) {
         console.error('Failed to fetch tenants', e);

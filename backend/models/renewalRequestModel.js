@@ -15,17 +15,16 @@ class RenewalRequestModel {
 
     async findById(id) {
         const [rows] = await pool.query(
-            `SELECT rr.*, l.unit_id, u.unit_number, p.name as property_name, t.user_id as tenant_id, usr.name as tenant_name
+            `SELECT rr.*, l.unit_id, u.unit_number, p.name as property_name, usr.name as tenant_name
              FROM renewal_requests rr
              JOIN leases l ON rr.lease_id = l.lease_id
              JOIN units u ON l.unit_id = u.unit_id
              JOIN properties p ON u.property_id = p.property_id
              JOIN users usr ON l.tenant_id = usr.user_id
-             JOIN tenants t ON usr.user_id = t.user_id
              WHERE rr.request_id = ?`,
             [id]
         );
-        return rows[0];
+        return rows[0] ? this.mapRow(rows[0]) : null;
     }
 
     async findByLeaseId(leaseId) {
@@ -33,7 +32,7 @@ class RenewalRequestModel {
             `SELECT * FROM renewal_requests WHERE lease_id = ? ORDER BY created_at DESC LIMIT 1`,
             [leaseId]
         );
-        return rows[0];
+        return rows[0] ? this.mapRow(rows[0]) : null;
     }
 
     async findAll(filter = {}) {
@@ -66,7 +65,25 @@ class RenewalRequestModel {
 
         query += ` ORDER BY rr.created_at DESC`;
         const [rows] = await pool.query(query, params);
-        return rows;
+        return rows.map(row => this.mapRow(row));
+    }
+
+    mapRow(row) {
+        return {
+            id: row.request_id.toString(),
+            leaseId: row.lease_id.toString(),
+            currentMonthlyRent: parseFloat(row.current_monthly_rent),
+            proposedMonthlyRent: row.proposed_monthly_rent ? parseFloat(row.proposed_monthly_rent) : null,
+            proposedEndDate: row.proposed_end_date,
+            status: row.status,
+            negotiationNotes: row.negotiation_notes,
+            unitId: row.unit_id?.toString(),
+            unitNumber: row.unit_number,
+            propertyName: row.property_name,
+            tenantName: row.tenant_name,
+            createdAt: row.created_at,
+            updatedAt: row.updated_at
+        };
     }
 
     async updateStatus(id, status, connection = null) {

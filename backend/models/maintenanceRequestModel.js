@@ -144,7 +144,18 @@ class MaintenanceRequestModel {
                 `,
       [propertyId]
     );
-    return rows;
+    return rows.map((row) => ({
+      id: row.request_id.toString(),
+      unitId: row.unit_id.toString(),
+      tenantId: row.tenant_id.toString(),
+      title: row.title,
+      description: row.description,
+      priority: row.priority,
+      category: row.category,
+      status: row.status,
+      createdAt: row.created_at,
+      images: row.images,
+    }));
   }
 
   async findByTenantId(tenantId) {
@@ -163,7 +174,18 @@ class MaintenanceRequestModel {
                 `,
       [tenantId]
     );
-    return rows;
+    return rows.map((row) => ({
+      id: row.request_id.toString(),
+      unitId: row.unit_id.toString(),
+      tenantId: row.tenant_id.toString(),
+      title: row.title,
+      description: row.description,
+      priority: row.priority,
+      category: row.category,
+      status: row.status,
+      createdAt: row.created_at,
+      images: row.images,
+    }));
   }
 
   //  CREATE REQUEST: Writing down a new complaint card.

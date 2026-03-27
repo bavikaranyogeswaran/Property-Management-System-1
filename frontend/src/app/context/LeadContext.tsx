@@ -35,20 +35,20 @@ export interface LeadStageHistory {
 }
 
 export interface Visit {
-  visit_id: string;
-  property_id: string;
-  unit_id: string | null;
-  lead_id: string | null;
-  visitor_name: string;
-  visitor_email: string;
-  visitor_phone: string;
-  scheduled_date: string;
+  id: string;
+  propertyId: string;
+  unitId: string | null;
+  leadId: string | null;
+  visitorName: string;
+  visitorEmail: string;
+  visitorPhone: string;
+  scheduledDate: string;
   status: 'pending' | 'confirmed' | 'cancelled' | 'completed';
   notes: string;
-  created_at: string;
-  property_name?: string;
-  unit_number?: string;
-  lead_status?: string;
+  createdAt: string;
+  propertyName?: string;
+  unitNumber?: string;
+  leadStatus?: string;
 }
 
 interface LeadContextType {
@@ -187,7 +187,7 @@ export function LeadProvider({ children }: { children: ReactNode }) {
   const updateVisitStatus = async (id: string, status: Visit['status']) => {
     try {
       await apiClient.patch(`/visits/${id}/status`, { status });
-      setVisits(prev => prev.map(v => v.visit_id === id ? { ...v, status } : v));
+      setVisits(prev => prev.map(v => v.id === id ? { ...v, status } : v));
       toast.success(`Visit ${status}`);
     } catch (error) {
       console.error('Failed to update visit status:', error);

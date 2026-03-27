@@ -221,7 +221,7 @@ class UnitModel {
         type: row.type_name,
         monthlyRent: parseFloat(row.monthly_rent),
         status: status,
-        image: row.image_url,
+        imageUrl: row.image_url,
         createdAt: row.created_at,
         propertyName: row.property_name,
       };

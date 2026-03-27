@@ -23,7 +23,16 @@ class PayoutModel {
       'SELECT * FROM owner_payouts WHERE owner_id = ? ORDER BY generated_at DESC',
       [ownerId]
     );
-    return rows;
+    return rows.map(row => ({
+      id: row.payout_id.toString(),
+      ownerId: row.owner_id.toString(),
+      amount: parseFloat(row.amount),
+      periodStart: row.period_start,
+      periodEnd: row.period_end,
+      generatedAt: row.generated_at,
+      status: row.status,
+      processedAt: row.processed_at
+    }));
   }
 
   async markAsProcessed(payoutId) {

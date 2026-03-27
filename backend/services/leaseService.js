@@ -124,7 +124,7 @@ class LeaseService {
         status: 'draft',
         targetDeposit: securityDeposit || 0.0,
         documentUrl: documentUrl || null,
-        lease_term_id: data.leaseTermId || null,
+        leaseTermId: data.leaseTermId || null,
       };
 
       // 3. Create Lease
@@ -190,7 +190,7 @@ class LeaseService {
       }
 
       const todayDate = today();
-      await leaseModel.update(leaseId, { status: 'active', signed_at: getLocalTime() }, conn);
+      await leaseModel.update(leaseId, { status: 'active', signedAt: getLocalTime() }, conn);
 
       await visitModel.cancelVisitsForUnit(lease.unitId, todayDate, conn);
 
@@ -297,9 +297,9 @@ class LeaseService {
     }
 
     await leaseModel.update(leaseId, {
-      deposit_status: 'awaiting_approval',
-      proposed_refund_amount: amount,
-      refund_notes: notes
+      depositStatus: 'awaiting_approval',
+      proposedRefundAmount: amount,
+      refundNotes: notes
     });
 
     const auditLogger = (await import('../utils/auditLogger.js')).default;
@@ -469,11 +469,11 @@ class LeaseService {
       }
 
       await leaseModel.update(leaseId, {
-        refunded_amount: Number(lease.refundedAmount || 0) + Number(amount),
-        security_deposit: 0, // Decrement to zero as it's fully disbursed/withheld
-        deposit_status: status,
-        proposed_refund_amount: 0,
-        refund_notes: null
+        refundedAmount: Number(lease.refundedAmount || 0) + Number(amount),
+        securityDeposit: 0, // Decrement to zero as it's fully disbursed/withheld
+        depositStatus: status,
+        proposedRefundAmount: 0,
+        refundNotes: null
       }, connection);
 
       const auditLogger = (await import('../utils/auditLogger.js')).default;
@@ -515,8 +515,8 @@ class LeaseService {
     }
 
     await leaseModel.update(leaseId, {
-      deposit_status: 'disputed',
-      refund_notes: notes 
+      depositStatus: 'disputed',
+      refundNotes: notes 
     });
 
     const auditLogger = (await import('../utils/auditLogger.js')).default;
@@ -543,7 +543,7 @@ class LeaseService {
     }
 
     await leaseModel.update(leaseId, {
-      deposit_status: 'pending' // Move back to pending for re-approval
+      depositStatus: 'pending' // Move back to pending for re-approval
     });
 
     const auditLogger = (await import('../utils/auditLogger.js')).default;
@@ -588,7 +588,7 @@ class LeaseService {
       const start = new Date(lease.startDate);
 
       if (todayDate < start) {
-        await leaseModel.update(leaseId, { status: 'cancelled', end_date: terminationDate }, connection);
+        await leaseModel.update(leaseId, { status: 'cancelled', endDate: terminationDate }, connection);
         await invoiceModel.voidPendingByLeaseId(leaseId, connection);
         await unitModel.update(lease.unitId, { status: 'available' }, connection);
       } else {
@@ -602,7 +602,7 @@ class LeaseService {
           }, connection);
         }
 
-        await leaseModel.update(leaseId, { status: 'ended', end_date: terminationDate }, connection);
+        await leaseModel.update(leaseId, { status: 'ended', endDate: terminationDate }, connection);
         await invoiceModel.voidFuturePendingByLeaseId(leaseId, terminationDate, connection);
         await unitModel.update(lease.unitId, { status: 'maintenance' }, connection);
       }
@@ -669,7 +669,7 @@ class LeaseService {
       // 1. Update lease status to 'ended' and set actual_checkout_at
       await leaseModel.update(leaseId, {
         status: 'ended',
-        actual_checkout_at: actualCheckoutAt
+        actualCheckoutAt: actualCheckoutAt
       }, connection);
 
       // 2. Update unit status back to 'available' (from 'maintenance')
@@ -725,7 +725,7 @@ class LeaseService {
     if (!lease) throw new Error('Lease not found');
     if (user.role === 'tenant' && String(lease.tenantId) !== String(user.id)) throw new Error('Access denied');
     if (!['undecided', 'vacating', 'renewing'].includes(status)) throw new Error('Invalid notice status');
-    await leaseModel.update(leaseId, { notice_status: status });
+    await leaseModel.update(leaseId, { noticeStatus: status });
 
     // [FIX] Negotiated Renewal Flow: Create a renewal request instead of a draft lease
     if (status === 'renewing' && lease.status === 'active' && lease.endDate) {
@@ -740,7 +740,7 @@ class LeaseService {
     const lease = await leaseModel.findById(id);
     if (!lease) throw new Error('Lease not found');
     
-    await leaseModel.update(id, { document_url: documentUrl });
+    await leaseModel.update(id, { documentUrl: documentUrl });
     
     const auditLogger = (await import('../utils/auditLogger.js')).default;
     await auditLogger.log({

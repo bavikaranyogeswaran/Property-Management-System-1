@@ -40,23 +40,35 @@ class LeaseModel {
     );
     return result.insertId;
   }
-  // Whitelist of columns that can be updated via the dynamic update method
-  static ALLOWED_UPDATE_FIELDS = [
-    'tenant_id', 'unit_id', 'start_date', 'end_date',
-    'monthly_rent', 'status', 'security_deposit',
-    'deposit_status', 'refunded_amount', 'document_url',
-    'proposed_refund_amount', 'refund_notes', 'notice_status',
-    'actual_checkout_at', 'target_deposit', 'signed_at',
-  ];
+  // Mapping of camelCase keys to snake_case columns
+  static UPDATE_KEY_MAP = {
+    tenantId: 'tenant_id',
+    unitId: 'unit_id',
+    startDate: 'start_date',
+    endDate: 'end_date',
+    monthlyRent: 'monthly_rent',
+    status: 'status',
+    securityDeposit: 'security_deposit',
+    depositStatus: 'deposit_status',
+    refundedAmount: 'refunded_amount',
+    documentUrl: 'document_url',
+    proposedRefundAmount: 'proposed_refund_amount',
+    refundNotes: 'refund_notes',
+    noticeStatus: 'notice_status',
+    actualCheckoutAt: 'actual_checkout_at',
+    targetDeposit: 'target_deposit',
+    signedAt: 'signed_at',
+  };
 
   async update(id, data, connection = null) {
     const dbConn = connection || db;
-    // Build dynamic query with whitelisted fields only
+    // Build dynamic query with mapped fields
     const fields = [];
     const values = [];
     Object.keys(data).forEach((key) => {
-      if (LeaseModel.ALLOWED_UPDATE_FIELDS.includes(key)) {
-        fields.push(`${key} = ?`);
+      const column = LeaseModel.UPDATE_KEY_MAP[key];
+      if (column && data[key] !== undefined) {
+        fields.push(`${column} = ?`);
         values.push(data[key]);
       }
     });

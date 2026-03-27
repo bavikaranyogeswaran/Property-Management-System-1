@@ -84,19 +84,9 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
       const invRes = await invoiceApi.getInvoices();
       if (invRes.data) {
         setInvoices(invRes.data.map((i: any) => ({
-          id: i.invoice_id?.toString() || i.id?.toString() || '',
-          leaseId: i.lease_id?.toString() || i.leaseId?.toString() || '',
-          tenantId: i.tenant_id?.toString() || i.tenantId?.toString() || '',
-          unitId: i.unit_id?.toString() || i.unitId?.toString() || '',
-          amount: parseFloat(i.amount),
-          amountPaid: parseFloat(i.amount_paid || i.amountPaid || 0),
-          tenantName: i.tenant_name || i.tenantName,
-          propertyName: i.property_name || i.propertyName,
-          unitNumber: i.unit_number || i.unitNumber,
-          dueDate: i.due_date || i.dueDate ? new Date(i.due_date || i.dueDate).toLocaleDateString('en-CA') : '',
-          status: i.status,
-          description: i.description,
-          generatedDate: i.created_at || i.createdAt ? new Date(i.created_at || i.createdAt).toLocaleDateString('en-CA') : '',
+          ...i,
+          dueDate: i.dueDate ? new Date(i.dueDate).toLocaleDateString('en-CA') : '',
+          generatedDate: i.createdAt ? new Date(i.createdAt).toLocaleDateString('en-CA') : '',
         })));
       }
 
@@ -104,16 +94,10 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
       const payRes = await paymentApi.getPayments();
       if (payRes.data) {
         setPayments(payRes.data.map((p: any) => ({
-          id: p.id || p.payment_id?.toString() || '',
-          invoiceId: p.invoiceId || p.invoice_id?.toString() || '',
-          tenantId: p.tenantId || p.tenant_id?.toString() || '',
-          amount: parseFloat(p.amount),
-          paymentDate: (p.paymentDate || p.payment_date || '').split('T')[0],
-          paymentMethod: p.paymentMethod || p.payment_method,
-          referenceNumber: p.referenceNumber || p.reference_number,
-          status: p.status,
-          submittedAt: p.createdAt || p.created_at || '',
-          proofUrl: p.receiptUrl || p.evidence_url || p.proof_url,
+          ...p,
+          paymentDate: (p.paymentDate || '').split('T')[0],
+          submittedAt: p.createdAt || '',
+          proofUrl: p.receiptUrl,
         })));
       }
 
@@ -121,20 +105,9 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
       const receiptRes = await receiptApi.getReceipts();
       if (receiptRes.data) {
         setReceipts(receiptRes.data.map((r: any) => ({
-          id: r.id || r.receipt_id?.toString(),
-          paymentId: r.paymentId,
-          invoiceId: r.invoiceId,
-          tenantId: r.tenantId,
-          amount: parseFloat(r.amount),
-          generatedDate: r.receiptDate || r.generatedDate || r.createdAt,
-          receiptNumber: r.receiptNumber,
-          propertyName: r.propertyName,
-          unitNumber: r.unitNumber,
-          tenantName: r.tenantName,
-          tenantEmail: r.tenantEmail,
-          paymentMethod: r.paymentMethod,
-          paymentDate: (r.paymentDate || '').split('T')[0] || r.generatedDate,
-          description: r.description,
+          ...r,
+          generatedDate: r.receiptDate || r.createdAt,
+          paymentDate: (r.paymentDate || '').split('T')[0] || r.receiptDate,
         })));
       }
     } catch (e) {

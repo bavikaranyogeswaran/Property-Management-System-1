@@ -49,16 +49,8 @@ export function MaintenanceProvider({ children }: { children: ReactNode }) {
       const mRes = await maintenanceApi.getRequests();
       if (mRes.data) {
         setMaintenanceRequests(mRes.data.map((r: any) => ({
-          id: (r.request_id || r.id).toString(),
-          tenantId: (r.tenant_id || r.tenantId).toString(),
-          unitId: (r.unit_id || r.unitId).toString(),
-          title: r.title,
-          description: r.description,
-          priority: r.priority,
-          category: r.category || 'general',
-          status: r.status,
-          submittedDate: (r.created_at || r.createdAt || r.submittedDate || '').split('T')[0],
-          images: r.images,
+          ...r,
+          submittedDate: (r.createdAt || '').split('T')[0],
         })));
       }
 
@@ -66,11 +58,8 @@ export function MaintenanceProvider({ children }: { children: ReactNode }) {
         const mcRes = await maintenanceApi.getCosts('');
         if (mcRes.data) {
           setMaintenanceCosts(mcRes.data.map((c: any) => ({
-            id: c.cost_id.toString(),
-            requestId: c.request_id.toString(),
-            amount: parseFloat(c.amount),
-            description: c.description,
-            recordedDate: (c.recorded_date || '').split('T')[0],
+            ...c,
+            recordedDate: (c.recordedDate || '').split('T')[0],
           })));
         }
       }

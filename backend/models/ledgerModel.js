@@ -48,6 +48,22 @@ class LedgerModel {
     }
   }
 
+  mapRow(row) {
+    if (!row) return null;
+    return {
+      id: row.entry_id.toString(),
+      paymentId: row.payment_id ? row.payment_id.toString() : null,
+      invoiceId: row.invoice_id ? row.invoice_id.toString() : null,
+      leaseId: row.lease_id.toString(),
+      accountType: row.account_type,
+      category: row.category,
+      debit: parseFloat(row.debit),
+      credit: parseFloat(row.credit),
+      description: row.description,
+      entryDate: row.entry_date
+    };
+  }
+
   /**
    * Get all ledger entries for a specific lease.
    */
@@ -56,7 +72,7 @@ class LedgerModel {
       `SELECT * FROM accounting_ledger WHERE lease_id = ? ORDER BY entry_date DESC, entry_id DESC`,
       [leaseId]
     );
-    return rows;
+    return rows.map(row => this.mapRow(row));
   }
 
   /**

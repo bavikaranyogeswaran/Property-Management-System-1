@@ -100,6 +100,7 @@ import documentRoutes from './routes/documentRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import renewalRoutes from './routes/renewalRoutes.js';
 import systemRoutes from './routes/systemRoutes.js';
+import auditRoutes from './routes/auditRoutes.js';
 
 // ... (rest of imports)
 app.use('/api/lead-portal', leadPortalRoutes);
@@ -143,6 +144,7 @@ app.use('/api/lease-terms', leaseTermRoutes);
 app.use('/api/documents', documentRoutes);
 app.use('/api/renewal-requests', renewalRoutes);
 app.use('/api/system', systemRoutes);
+app.use('/api/audit-logs', auditRoutes);
 app.use('/api', imageRoutes);
 
 // ============================================================================

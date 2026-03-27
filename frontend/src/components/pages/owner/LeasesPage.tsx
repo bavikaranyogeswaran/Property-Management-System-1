@@ -186,9 +186,9 @@ export function LeasesPage() {
 
   const handleOpenRenewalNegotiation = (request: any) => {
     setSelectedRenewal(request);
-    setNewRenewalRent(request.proposed_monthly_rent?.toString() || request.current_monthly_rent.toString());
-    setNewRenewalEndDate(request.proposed_end_date || '');
-    setRenewalNotes(request.negotiation_notes || '');
+    setNewRenewalRent(request.proposedMonthlyRent?.toString() || request.currentMonthlyRent.toString());
+    setNewRenewalEndDate(request.proposedEndDate || '');
+    setRenewalNotes(request.negotiationNotes || '');
     setIsRenewalDialogOpen(true);
   };
 
@@ -206,7 +206,7 @@ export function LeasesPage() {
     }
 
     try {
-      await proposeRenewalTerms(selectedRenewal.request_id, {
+      await proposeRenewalTerms(selectedRenewal.id, {
         proposedMonthlyRent: parseFloat(newRenewalRent),
         proposedEndDate: newRenewalEndDate,
         notes: renewalNotes
@@ -215,7 +215,7 @@ export function LeasesPage() {
     } catch (e) {}
   };
 
-  const handleApproveRenewal = async (id: number) => {
+  const handleApproveRenewal = async (id: string) => {
     try {
       await approveLeaseRenewal(id);
     } catch (e) {}
@@ -731,25 +731,25 @@ export function LeasesPage() {
                   </TableHeader>
                   <TableBody>
                     {renewalRequests.map((request) => (
-                      <TableRow key={request.request_id}>
+                      <TableRow key={request.id}>
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <User className="size-4 text-gray-400" />
-                            <span className="font-medium">{request.tenant_name}</span>
+                            <span className="font-medium">{request.tenantName}</span>
                           </div>
                         </TableCell>
                         <TableCell>
                           <div className="text-sm">
-                            <div className="font-medium">{request.property_name}</div>
-                            <div className="text-gray-500">Unit {request.unit_number}</div>
+                            <div className="font-medium">{request.propertyName}</div>
+                            <div className="text-gray-500">Unit {request.unitNumber}</div>
                           </div>
                         </TableCell>
-                        <TableCell>LKR {request.current_monthly_rent}</TableCell>
+                        <TableCell>LKR {request.currentMonthlyRent}</TableCell>
                         <TableCell>
-                          {request.proposed_monthly_rent ? (
+                          {request.proposedMonthlyRent ? (
                             <div className="text-sm">
-                              <div className="font-medium text-emerald-600">LKR {request.proposed_monthly_rent}</div>
-                              <div className="text-gray-500">Until {request.proposed_end_date}</div>
+                              <div className="font-medium text-emerald-600">LKR {request.proposedMonthlyRent}</div>
+                              <div className="text-gray-500">Until {request.proposedEndDate}</div>
                             </div>
                           ) : (
                             <span className="text-gray-400 italic text-sm">Not proposed yet</span>
@@ -780,10 +780,10 @@ export function LeasesPage() {
                                 >
                                   Propose/Edit
                                 </Button>
-                                {request.proposed_monthly_rent && (request.proposed_end_date || true) && (
+                                {request.proposedMonthlyRent && (request.proposedEndDate || true) && (
                                   <Button
                                     size="sm"
-                                    onClick={() => handleApproveRenewal(request.request_id)}
+                                    onClick={() => handleApproveRenewal(request.id)}
                                     className="bg-emerald-600 hover:bg-emerald-700 text-white"
                                   >
                                     Approve & Create Lease
@@ -792,7 +792,7 @@ export function LeasesPage() {
                                 <Button
                                   size="sm"
                                   variant="ghost"
-                                  onClick={() => rejectRenewal(request.request_id)}
+                                  onClick={() => rejectRenewal(request.id)}
                                   className="text-red-600 hover:bg-red-50"
                                 >
                                   Reject

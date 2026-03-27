@@ -42,16 +42,11 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       const res = await notificationApi.getNotifications();
       if (res.data && Array.isArray(res.data)) {
         const backendNotifs = res.data
-          .filter((n: any) => n && n.notification_id !== undefined && n.notification_id !== null)
+          .filter((n: any) => n && n.id !== undefined)
           .map((n: any) => ({
-            id: n.notification_id.toString(),
-            type: n.type || 'system',
-            title: n.type === 'maintenance' ? 'Maintenance Update' : 'Notification',
-            message: n.message || 'No message content',
-            targetRole: n.target_role || 'both',
-            severity: n.severity || 'info',
-            createdAt: n.created_at || new Date().toISOString(),
-            read: Boolean(n.is_read),
+            ...n,
+            id: n.id.toString(),
+            read: Boolean(n.isRead),
           }));
         setNotifications(prev => {
           const local = prev.filter(n => n.id.startsWith('notif-'));

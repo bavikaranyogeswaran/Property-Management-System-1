@@ -10,9 +10,10 @@ import pool from '../config/db.js';
 class UserModel {
   async findByEmail(email, connection = null) {
     const db = connection || pool;
-    const [rows] = await db.query('SELECT *, user_id as id FROM users WHERE email = ? AND is_archived = FALSE', [
-      email,
-    ]);
+    const [rows] = await db.query(
+      'SELECT user_id as id, name, email, phone, role, is_email_verified as isEmailVerified, status, created_at as createdAt FROM users WHERE email = ? AND is_archived = FALSE',
+      [email]
+    );
     return rows[0];
   }
 
@@ -110,13 +111,14 @@ class UserModel {
 
   async findById(id, connection = null) {
     const db = connection || pool;
-    // We first fetch the user to know the role, or we just LEFT JOIN everything.
-    // Joining everything is safer to fetch all data in one go.
     const query = `
-            SELECT u.*, u.user_id as id,
-                   t.nic as tenant_nic, t.monthly_income, t.nic_url as nicUrl,
-                   o.nic as owner_nic, o.tin, o.bank_name, o.account_number,
-                   s.employee_id, s.job_title
+            SELECT u.user_id as id, u.name, u.email, u.phone, u.role, u.status, u.created_at as createdAt,
+                   t.nic as tenantNic, t.nic_url as nicUrl, t.permanent_address as permanentAddress, 
+                   t.employment_status as employmentStatus, t.monthly_income as monthlyIncome, 
+                   t.behavior_score as behaviorScore, t.credit_balance as creditBalance,
+                   o.nic as ownerNic, o.tin, o.bank_name as bankName, o.branch_name as branchName, 
+                   o.account_holder_name as accountHolderName, o.account_number as accountNumber,
+                   s.employee_id as employeeId, s.job_title as jobTitle, s.shift_start as shiftStart, s.shift_end as shiftEnd
             FROM users u
             LEFT JOIN tenants t ON u.user_id = t.user_id
             LEFT JOIN owners o ON u.user_id = o.user_id

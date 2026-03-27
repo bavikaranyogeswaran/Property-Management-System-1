@@ -83,9 +83,31 @@ class InvoiceModel {
     return rows[0].total || 0;
   }
 
+  mapRow(row) {
+    if (!row) return null;
+    return {
+      id: row.invoice_id?.toString(),
+      leaseId: row.lease_id?.toString(),
+      year: row.year,
+      month: row.month,
+      amount: parseFloat(row.amount),
+      amountPaid: parseFloat(row.amount_paid || 0),
+      dueDate: row.due_date,
+      status: row.status,
+      invoiceType: row.invoice_type,
+      description: row.description,
+      createdAt: row.created_at,
+      // Joined fields
+      tenantId: row.tenant_id?.toString(),
+      unitId: row.unit_id?.toString(),
+      tenantName: row.tenant_name,
+      propertyName: row.property_name,
+      unitNumber: row.unit_number,
+    };
+  }
+
   async findById(id, connection = null) {
     const db = connection || pool;
-    // Join with leases to get tenant_id for scoring hooks
     const [rows] = await db.query(
       `
             SELECT ri.*, l.tenant_id,
@@ -96,7 +118,7 @@ class InvoiceModel {
         `,
       [id]
     );
-    return rows[0];
+    return this.mapRow(rows[0]);
   }
 
   async findByTenantId(tenantId) {
@@ -111,7 +133,7 @@ class InvoiceModel {
         `,
       [tenantId]
     );
-    return rows;
+    return rows.map(row => this.mapRow(row));
   }
 
   async findAll() {
@@ -125,7 +147,7 @@ class InvoiceModel {
             JOIN properties p ON un.property_id = p.property_id
             ORDER BY ri.due_date DESC
         `);
-    return rows;
+    return rows.map(row => this.mapRow(row));
   }
 
   async findByOwnerId(ownerId) {
@@ -143,7 +165,7 @@ class InvoiceModel {
         `,
       [ownerId]
     );
-    return rows;
+    return rows.map(row => this.mapRow(row));
   }
 
   async findByTreasurerId(treasurerId) {
@@ -162,7 +184,7 @@ class InvoiceModel {
         `,
       [treasurerId]
     );
-    return rows;
+    return rows.map(row => this.mapRow(row));
   }
 
   async updateStatus(id, status, connection = null) {
@@ -182,10 +204,6 @@ class InvoiceModel {
   }
 
   async findOverdue(gracePeriodDays = 5) {
-    // Find Pending invoices where due_date < (today - gracePeriodDays)
-    // AND description NOT LIKE 'Late Fee%' (to avoid compounding late fees on late fees?)
-    // Fix 1: Use Invoice Amount, not Lease Rent (Handles rent changes correctly)
-    // const [rows] = await pool.query(`SELECT ri.*, l.monthly_rent...`) -> ri.amount is what we want.
     const [rows] = await pool.query(
       `
             SELECT ri.*, l.tenant_id,
@@ -202,7 +220,7 @@ class InvoiceModel {
         `,
       [gracePeriodDays]
     );
-    return rows;
+    return rows.map(row => this.mapRow(row));
   }
 
   async findByLeaseAndDescription(leaseId, description) {
@@ -210,7 +228,7 @@ class InvoiceModel {
       'SELECT * FROM rent_invoices WHERE lease_id = ? AND description LIKE ?',
       [leaseId, `%${description}%`]
     );
-    return rows;
+    return rows.map(row => this.mapRow(row));
   }
   async syncFutureRentInvoices(leaseId, newAmount, fromDate, connection = null) {
     const db = connection || pool;
@@ -245,7 +263,7 @@ class InvoiceModel {
       `SELECT *, COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id = rent_invoices.invoice_id AND status = 'verified'), 0) AS amount_paid FROM rent_invoices WHERE lease_id = ? AND status IN ('pending', 'partially_paid') ORDER BY due_date ASC`,
       [leaseId]
     );
-    return rows;
+    return rows.map(row => this.mapRow(row));
   }
 
   // Analytics optimized query to avoid O(N) memory buildup

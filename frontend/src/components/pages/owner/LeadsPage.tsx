@@ -127,9 +127,9 @@ export function LeadsPage() {
       
       if (!autoUnitId) {
         // 1. Check if lead had a specific unit visit
-        const leadVisit = visits.find(v => String(v.lead_id) === String(selectedLead.id) && v.unit_id);
-        if (leadVisit && leadVisit.unit_id) {
-            autoUnitId = leadVisit.unit_id;
+        const leadVisit = visits.find(v => String(v.leadId) === String(selectedLead.id) && v.unitId);
+        if (leadVisit && leadVisit.unitId) {
+            autoUnitId = leadVisit.unitId;
         } else {
             // 2. Check if property has only one available unit
             const availableUnits = units.filter(u => String(u.propertyId) === String(selectedLead.propertyId) && u.status === 'available');
@@ -339,24 +339,24 @@ export function LeadsPage() {
         </TableHeader>
         <TableBody>
           {data.map((visit) => {
-            const visitDate = new Date(visit.scheduled_date).toLocaleString();
+            const visitDate = new Date(visit.scheduledDate).toLocaleString();
             return (
-              <TableRow key={visit.visit_id}>
+              <TableRow key={visit.id}>
                 <TableCell>
-                  <div className="font-medium">{visit.visitor_name}</div>
+                  <div className="font-medium">{visit.visitorName}</div>
                   <div className="text-xs text-gray-500">
-                    {visit.visitor_email}
+                    {visit.visitorEmail}
                   </div>
                   <div className="text-xs text-gray-500">
-                    {visit.visitor_phone}
+                    {visit.visitorPhone}
                   </div>
                 </TableCell>
                 <TableCell>{visitDate}</TableCell>
                 <TableCell>
-                  <div>{visit.property_name}</div>
-                  {visit.unit_number && (
+                  <div>{visit.propertyName}</div>
+                  {visit.unitNumber && (
                     <div className="text-xs text-gray-500">
-                      Unit: {visit.unit_number}
+                      Unit: {visit.unitNumber}
                     </div>
                   )}
                 </TableCell>
@@ -373,7 +373,7 @@ export function LeadsPage() {
                           variant="ghost"
                           className="text-green-600 hover:bg-green-50"
                           onClick={() =>
-                            handleVisitStatusChange(visit.visit_id, 'confirmed')
+                            handleVisitStatusChange(visit.id, 'confirmed')
                           }
                           title="Confirm Visit"
                         >
@@ -384,7 +384,7 @@ export function LeadsPage() {
                           variant="ghost"
                           className="text-red-600 hover:bg-red-50"
                           onClick={() =>
-                            handleVisitStatusChange(visit.visit_id, 'cancelled')
+                            handleVisitStatusChange(visit.id, 'cancelled')
                           }
                           title="Cancel Visit"
                         >
@@ -398,7 +398,7 @@ export function LeadsPage() {
                         variant="ghost"
                         className="text-blue-600 hover:bg-blue-50"
                         onClick={() =>
-                          handleVisitStatusChange(visit.visit_id, 'completed')
+                          handleVisitStatusChange(visit.id, 'completed')
                         }
                         title="Mark as Completed"
                       >

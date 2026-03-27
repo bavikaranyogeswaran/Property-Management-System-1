@@ -227,7 +227,7 @@ export function TenantLeasePage() {
                           ✓ We've noted your interest in renewing.
                         </p>
                         {(() => {
-                           const request = renewalRequests.find(r => r.lease_id === parseInt(currentLease.id));
+                           const request = renewalRequests.find(r => r.leaseId === currentLease.id);
                            if (request) {
                              return (
                                <div className="p-3 bg-white border border-blue-100 rounded-md shadow-sm space-y-2">
@@ -237,17 +237,17 @@ export function TenantLeasePage() {
                                      {request.status.toUpperCase()}
                                    </Badge>
                                  </div>
-                                 {request.proposed_monthly_rent ? (
+                                 {request.proposedMonthlyRent ? (
                                    <div className="text-sm text-gray-700">
-                                     <p>Proposed Rent: <span className="font-bold text-emerald-600">LKR {request.proposed_monthly_rent}</span></p>
-                                     <p>Proposed End Date: <span className="font-medium">{formatDate(request.proposed_end_date)}</span></p>
+                                     <p>Proposed Rent: <span className="font-bold text-emerald-600">LKR {request.proposedMonthlyRent}</span></p>
+                                     <p>Proposed End Date: <span className="font-medium">{formatDate(request.proposedEndDate)}</span></p>
                                    </div>
                                  ) : (
                                    <p className="text-xs text-gray-500 italic">Owner is reviewing your renewal request. You'll see the proposed terms here shortly.</p>
                                  )}
-                                 {request.negotiation_notes && (
+                                 {request.negotiationNotes && (
                                    <div className="mt-2 pt-2 border-t text-xs text-gray-600 italic">
-                                     " {request.negotiation_notes} "
+                                     " {request.negotiationNotes} "
                                    </div>
                                  )}
                                </div>

@@ -5,7 +5,7 @@ import pool from '../config/db.js';
 
 class PropertyService {
   async createProperty(data) {
-    // data contains: name, propertyTypeId, propertyNo, street, city, district, imageUrl, ownerId
+    // data contains: name, propertyTypeId, propertyNo, street, city, district, imageUrl, description, features
     if (
       !data.name ||
       !data.street ||

@@ -40,17 +40,12 @@ class PaymentModel {
     }
   }
 
-  async findById(id, connection = null) {
-    const db = connection || pool;
-    const [rows] = await db.query(
-      'SELECT * FROM payments WHERE payment_id = ?',
-      [id]
-    );
-    const row = rows[0];
+  mapRow(row) {
     if (!row) return null;
     return {
       id: row.payment_id.toString(),
       invoiceId: row.invoice_id.toString(),
+      tenantId: row.tenant_id?.toString(),
       amount: parseFloat(row.amount),
       paymentDate: row.payment_date,
       paymentMethod: row.payment_method,
@@ -58,7 +53,20 @@ class PaymentModel {
       receiptUrl: row.proof_url,
       referenceNumber: row.reference_number,
       createdAt: row.created_at,
+      // Joined fields
+      tenantName: row.tenant_name,
+      leaseId: row.lease_id?.toString(),
+      propertyId: row.property_id?.toString(),
     };
+  }
+
+  async findById(id, connection = null) {
+    const db = connection || pool;
+    const [rows] = await db.query(
+      'SELECT * FROM payments WHERE payment_id = ?',
+      [id]
+    );
+    return this.mapRow(rows[0]);
   }
 
   async findAll() {
@@ -126,7 +134,7 @@ class PaymentModel {
   async findByTreasurerId(treasurerId) {
     const [rows] = await pool.query(
       `
-            SELECT p.*, u.name, un.property_id, ri.lease_id, l.tenant_id
+            SELECT p.*, u.name as tenant_name, un.property_id, ri.lease_id, l.tenant_id
             FROM payments p
             JOIN rent_invoices ri ON p.invoice_id = ri.invoice_id
             JOIN leases l ON ri.lease_id = l.lease_id
@@ -138,7 +146,7 @@ class PaymentModel {
         `,
       [treasurerId]
     );
-    return rows;
+    return rows.map(row => this.mapRow(row));
   }
 
   async findByInvoiceId(invoiceId, connection = null) {
@@ -147,7 +155,7 @@ class PaymentModel {
       'SELECT * FROM payments WHERE invoice_id = ?',
       [invoiceId]
     );
-    return rows;
+    return rows.map(row => this.mapRow(row));
   }
 
   async findByInvoiceIds(invoiceIds, connection = null) {
@@ -157,7 +165,7 @@ class PaymentModel {
       'SELECT * FROM payments WHERE invoice_id IN (?)',
       [invoiceIds]
     );
-    return rows;
+    return rows.map(row => this.mapRow(row));
   }
 
   async findByTenantId(tenantId) {
@@ -172,7 +180,7 @@ class PaymentModel {
         `,
       [tenantId]
     );
-    return rows;
+    return rows.map(row => this.mapRow(row));
   }
 
   async updateStatus(id, status, verifiedBy = null, connection = null) {

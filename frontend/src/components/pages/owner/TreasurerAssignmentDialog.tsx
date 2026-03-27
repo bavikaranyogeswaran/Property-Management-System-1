@@ -48,7 +48,7 @@ export function TreasurerAssignmentDialog({
         `/users/${treasurer.id}/assigned-properties`
       );
       // Assuming response.data is an array of properties
-      const assignedIds = response.data.map((p: any) => p.property_id);
+      const assignedIds = response.data.map((p: any) => Number(p.id));
       setAssignedPropertyIds(assignedIds);
     } catch (error) {
       console.error('Failed to fetch assignments:', error);
@@ -88,7 +88,7 @@ export function TreasurerAssignmentDialog({
         `/users/${treasurer.id}/assigned-properties`
       );
       const serverAssignedIds: number[] = response.data.map(
-        (p: any) => p.property_id
+        (p: any) => Number(p.id)
       );
 
       const toAdd = assignedPropertyIds.filter(

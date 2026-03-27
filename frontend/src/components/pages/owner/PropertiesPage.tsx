@@ -207,7 +207,7 @@ export function PropertiesPage() {
                 if (targetImage) {
                   await setPropertyPrimaryImage(
                     newProperty.id,
-                    targetImage.image_id || targetImage.id
+                    targetImage.id
                   );
                 }
               }
@@ -232,7 +232,7 @@ export function PropertiesPage() {
             await addUnit({
               propertyId: savedPropertyId,
               unitNumber: 'Main',
-              unitTypeId: defaultType ? defaultType.type_id : 1,
+              unitTypeId: defaultType ? defaultType.id : 1,
               monthlyRent: singleUnitRent,
               status: 'available',
               type: defaultType ? defaultType.name : 'Standard',
@@ -247,7 +247,7 @@ export function PropertiesPage() {
           try {
             for (const unit of quickUnits) {
               const unitTypeName =
-                unitTypes.find((t) => t.type_id === unit.unitTypeId)?.name ||
+                unitTypes.find((t) => t.id === unit.unitTypeId)?.name ||
                 '';
               await addUnit({
                 propertyId: savedPropertyId,
@@ -296,9 +296,9 @@ export function PropertiesPage() {
       const images = await getPropertyImages(editingProperty.id);
       setExistingImages(
         images.map((img: any) => ({
-          id: img.image_id?.toString() || img.id?.toString(),
-          url: img.image_url || img.url,
-          isPrimary: Boolean(img.is_primary),
+          id: img.id?.toString(),
+          url: img.imageUrl || img.url,
+          isPrimary: Boolean(img.isPrimary),
         }))
       );
       toast.success('Primary image updated');
@@ -322,8 +322,8 @@ export function PropertiesPage() {
 
     // Initial state with just the primary image (better than nothing while loading)
     setExistingImages(
-      property.image
-        ? [{ id: 'primary-preview', url: property.image, isPrimary: true }]
+      property.imageUrl
+        ? [{ id: 'primary-preview', url: property.imageUrl, isPrimary: true }]
         : []
     );
     setIsAddDialogOpen(true);
@@ -334,9 +334,9 @@ export function PropertiesPage() {
       if (images && images.length > 0) {
         setExistingImages(
           images.map((img: any) => ({
-            id: img.image_id?.toString() || img.id?.toString(),
-            url: img.image_url || img.url,
-            isPrimary: Boolean(img.is_primary),
+            id: img.id?.toString(),
+            url: img.imageUrl,
+            isPrimary: Boolean(img.isPrimary),
           }))
         );
       }
@@ -449,9 +449,9 @@ export function PropertiesPage() {
       const images = await getPropertyImages(editingProperty.id);
       setExistingImages(
         images.map((img: any) => ({
-          id: img.image_id?.toString() || img.id?.toString(),
-          url: img.image_url || img.url, // Handle backend naming
-          isPrimary: Boolean(img.is_primary),
+          id: img.id?.toString(),
+          url: img.imageUrl,
+          isPrimary: Boolean(img.isPrimary),
         }))
       );
       toast.success('Image deleted');
@@ -471,9 +471,9 @@ export function PropertiesPage() {
       const images = await getPropertyImages(editingProperty.id);
       setExistingImages(
         images.map((img: any) => ({
-          id: img.image_id?.toString() || img.id?.toString(),
-          url: img.image_url,
-          isPrimary: Boolean(img.is_primary),
+          id: img.id?.toString(),
+          url: img.imageUrl,
+          isPrimary: Boolean(img.isPrimary),
         }))
       );
       toast.success('Primary image updated');
@@ -585,8 +585,8 @@ export function PropertiesPage() {
                                   <option value={0}>Select Type</option>
                                   {propertyTypes.map((type) => (
                                     <option
-                                      key={type.type_id}
-                                      value={type.type_id}
+                                      key={type.id}
+                                      value={type.id}
                                     >
                                       {type.name}
                                     </option>
@@ -816,8 +816,8 @@ export function PropertiesPage() {
                                 <option value={0}>Select Type</option>
                                 {unitTypes?.map((type) => (
                                   <option
-                                    key={type.type_id}
-                                    value={type.type_id}
+                                    key={type.id}
+                                    value={type.id}
                                   >
                                     {type.name}
                                   </option>
@@ -873,7 +873,7 @@ export function PropertiesPage() {
                                       </td>
                                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                         {unitTypes?.find(
-                                          (t) => t.type_id === unit.unitTypeId
+                                          (t) => t.id === unit.unitTypeId
                                         )?.name || 'Unknown'}
                                       </td>
                                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -922,10 +922,10 @@ export function PropertiesPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {properties.map((property) => (
           <Card key={property.id} className="overflow-hidden flex flex-col">
-            {property.image && (
+            {property.imageUrl && (
               <div className="h-48 w-full bg-gray-100 relative">
                 <img
-                  src={property.image}
+                  src={property.imageUrl}
                   alt={property.name}
                   className="w-full h-full object-cover transition-transform hover:scale-105 duration-300"
                 />
@@ -934,17 +934,17 @@ export function PropertiesPage() {
                 </div>
               </div>
             )}
-            <CardHeader className={property.image ? 'pt-4' : ''}>
+            <CardHeader className={property.imageUrl ? 'pt-4' : ''}>
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-3">
-                  {!property.image && (
+                  {!property.imageUrl && (
                     <div className="p-2 bg-blue-50 rounded-lg">
                       <Building2 className="size-5 text-blue-600" />
                     </div>
                   )}
                   <div>
                     <CardTitle className="text-lg">{property.name}</CardTitle>
-                    {!property.image && (
+                    {!property.imageUrl && (
                       <p className="text-xs text-gray-500 mt-1">
                         {property.typeName}
                       </p>
@@ -1063,9 +1063,9 @@ export function PropertiesPage() {
             <div className="space-y-6 mt-4">
               {/* Large Image View */}
               <div className="w-full aspect-video bg-gray-100 rounded-lg overflow-hidden border">
-                {viewProperty.image ? (
+                {viewProperty.imageUrl ? (
                   <img
-                    src={viewProperty.image}
+                    src={viewProperty.imageUrl}
                     alt={viewProperty.name}
                     className="w-full h-full object-cover"
                   />
@@ -1250,11 +1250,11 @@ export function PropertiesPage() {
                   className="relative aspect-square rounded-lg overflow-hidden border border-gray-100 group"
                 >
                   <img
-                    src={img.image_url || img.url}
+                    src={img.imageUrl}
                     alt={`Gallery ${idx}`}
                     className="w-full h-full object-cover"
                   />
-                  {img.is_primary && (
+                  {img.isPrimary && (
                     <div className="absolute top-2 right-2 bg-blue-600 text-white text-xs px-2 py-1 rounded-full shadow-sm">
                       Primary
                     </div>
