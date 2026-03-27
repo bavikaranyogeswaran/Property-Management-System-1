@@ -99,14 +99,20 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
       if (lRes.data) {
         setLeases(lRes.data.map((l: any) => ({
           ...l,
-          id: l.id?.toString() || l.lease_id?.toString(),
-          tenantId: l.tenantId?.toString() || l.tenant_id?.toString(),
-          unitId: l.unitId?.toString() || l.unit_id?.toString(),
+          id: (l.id || l.lease_id).toString(),
+          tenantId: (l.tenantId || l.tenant_id).toString(),
+          unitId: (l.unitId || l.unit_id).toString(),
+          startDate: l.startDate || l.start_date,
+          endDate: l.endDate || l.end_date,
+          monthlyRent: l.monthlyRent !== undefined ? l.monthlyRent : parseFloat(l.monthly_rent),
+          securityDeposit: l.securityDeposit !== undefined ? l.securityDeposit : parseFloat(l.security_deposit || 0),
+          targetDeposit: l.targetDeposit !== undefined ? l.targetDeposit : parseFloat(l.target_deposit || 0),
           depositStatus: l.depositStatus || l.deposit_status,
-          proposedRefundAmount: l.proposedRefundAmount || l.proposed_refund_amount || 0,
+          proposedRefundAmount: l.proposedRefundAmount !== undefined ? l.proposedRefundAmount : parseFloat(l.proposed_refund_amount || 0),
           refundNotes: l.refundNotes || l.refund_notes,
           documentUrl: l.documentUrl || l.document_url,
           noticeStatus: l.noticeStatus || l.notice_status,
+          createdAt: l.createdAt || l.created_at,
         })));
       }
     } catch (e) {
