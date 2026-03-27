@@ -698,6 +698,68 @@ export const expireStaleRenewals = async () => {
 };
 
 /**
+ * Audit #9: Automatically revoke portal access for former tenants.
+ * Deactivates accounts 30 days after their last lease has ended,
+ * provided they have no active or future (draft) leases.
+ */
+export const deactivateFormerTenants = async (targetDate = null) => {
+  const referenceDate = targetDate ? parseLocalDate(targetDate) : getLocalTime();
+  const gracePeriodCutoff = formatToLocalDate(addDays(referenceDate, -30));
+  
+  console.log(`Running former tenant deactivation check (Cutoff: ${gracePeriodCutoff})...`);
+  
+  try {
+    const [formerTenants] = await db.query(
+      `
+      SELECT u.user_id, u.email
+      FROM users u
+      WHERE u.role = 'tenant' AND u.status = 'active'
+      AND NOT EXISTS (
+        SELECT 1 FROM leases l 
+        WHERE l.tenant_id = u.user_id 
+        AND (l.status = 'active' OR l.status = 'draft')
+      )
+      AND (
+        SELECT MAX(l2.end_date) 
+        FROM leases l2 
+        WHERE l2.tenant_id = u.user_id
+      ) < ?
+      `,
+      [gracePeriodCutoff]
+    );
+
+    if (formerTenants.length > 0) {
+      console.log(`Found ${formerTenants.length} former tenants eligible for deactivation.`);
+      const ids = formerTenants.map(t => t.user_id);
+      
+      await db.query(
+        "UPDATE users SET status = 'inactive' WHERE user_id IN (?)",
+        [ids]
+      );
+
+      for (const tenant of formerTenants) {
+        console.log(`[Revocation] Deactivated account for former tenant: ${tenant.email} (User ID: ${tenant.user_id})`);
+        
+        // Log to Audit trail
+        try {
+          const auditLogger = (await import('./auditLogger.js')).default;
+          await auditLogger.log({
+            userId: null, // System action
+            actionType: 'TENANT_ACCESS_REVOKED',
+            entityId: tenant.user_id,
+            details: { reason: 'Lease ended > 30 days ago', cutoffDate: gracePeriodCutoff }
+          });
+        } catch (auditErr) {
+          console.error(`Failed to log audit for revocation of ${tenant.user_id}:`, auditErr);
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Error in former tenant deactivation:', error);
+  }
+};
+
+/**
  * Unified Nightly Cron Job (Locking + Backfill)
  */
 export const runNightlyCron = async (targetDate = null) => {
@@ -720,6 +782,7 @@ export const runNightlyCron = async (targetDate = null) => {
     await cleanupOldNotifications();
     await expireStaleLeads();
     await expireStaleRenewals();
+    await deactivateFormerTenants(executionDate);
 
     await logCronExecution('nightly_billing', executionDate, 'success');
   } catch (err) {
