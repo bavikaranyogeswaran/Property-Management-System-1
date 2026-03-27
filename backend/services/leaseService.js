@@ -697,11 +697,7 @@ class LeaseService {
   async getLeases(user) {
     if (user.role === 'owner') return await leaseModel.findAll(user.id);
     if (user.role === 'treasurer') {
-      const results = await leaseModel.findAll();
-      const staffModel = (await import('../models/staffModel.js')).default;
-      const assigned = await staffModel.getAssignedProperties(user.id);
-      const assignedIds = assigned.map((p) => String(p.property_id));
-      return results.filter((l) => assignedIds.includes(String(l.propertyId)));
+      return await leaseModel.findAll(null, user.id);
     }
     if (user.role === 'tenant') return await leaseModel.findByTenantId(user.id);
     throw new Error('Access denied');
@@ -733,10 +729,27 @@ class LeaseService {
 
     // [FIX] Negotiated Renewal Flow: Create a renewal request instead of a draft lease
     if (status === 'renewing' && lease.status === 'active' && lease.endDate) {
-        await renewalService.createFromNotice(leaseId);
+        await renewalService.createFromNotice(leaseId, user);
         console.log(`[RENEWAL] Created renewal request for Lease ${leaseId}`);
     }
 
+    return true;
+  }
+
+  async updateLeaseDocument(id, documentUrl, user = null) {
+    const lease = await leaseModel.findById(id);
+    if (!lease) throw new Error('Lease not found');
+    
+    await leaseModel.update(id, { document_url: documentUrl });
+    
+    const auditLogger = (await import('../utils/auditLogger.js')).default;
+    await auditLogger.log({
+      userId: user?.id || null,
+      actionType: 'LEASE_DOCUMENT_UPDATED',
+      entityId: id,
+      details: { documentUrl }
+    });
+    
     return true;
   }
 
@@ -752,12 +765,22 @@ class LeaseService {
     if (eff < start) throw new Error('Adjustment date cannot be before lease start');
     if (lease.endDate && eff > parseLocalDate(lease.endDate)) throw new Error('Adjustment date cannot be after lease end');
 
-    return await leaseModel.createAdjustment({
+    const adjustmentId = await leaseModel.createAdjustment({
       leaseId,
       effectiveDate,
       newMonthlyRent,
       notes
     });
+
+    const auditLogger = (await import('../utils/auditLogger.js')).default;
+    await auditLogger.log({
+      userId: user.id,
+      actionType: 'LEASE_RENT_ADJUSTED',
+      entityId: leaseId,
+      details: { adjustmentId, newMonthlyRent, effectiveDate }
+    });
+
+    return adjustmentId;
   }
 
 

@@ -71,7 +71,7 @@ class LeaseModel {
     return result.affectedRows > 0;
   }
 
-  async findAll(ownerId = null) {
+  async findAll(ownerId = null, treasurerId = null) {
     let query = `
             SELECT l.*, 
                    u.unit_number,
@@ -86,6 +86,14 @@ class LeaseModel {
     if (ownerId) {
       query += ` AND p.owner_id = ?`;
       params.push(ownerId);
+    }
+    
+    if (treasurerId) {
+      query += ` AND EXISTS (
+        SELECT 1 FROM staff_property_assignments spa 
+        WHERE spa.property_id = p.property_id AND spa.user_id = ?
+      )`;
+      params.push(treasurerId);
     }
 
     query += ` ORDER BY l.created_at DESC`;

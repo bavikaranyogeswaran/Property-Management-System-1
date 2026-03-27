@@ -30,15 +30,12 @@ export const optionalAuthenticateToken = (req, res, next) => {
 
   verify(token, process.env.JWT_SECRET, (err, user) => {
     if (err) {
-      // Token invalid/expired - treat as unauthenticated or error?
-      // For optional, usually we can just ignore and treat as public,
-      // but if the client SENT a token, they probably expect it to work or fail.
-      // Let's log and treat as unauthenticated to avoid blocking public page access due to stale token.
-      console.log('Optional Auth: Invalid token, proceeding as guest.');
-      req.user = null;
-    } else {
-      req.user = user;
+      // If a token was provided but is invalid/expired, return 401
+      // instead of silently failing and treating as guest.
+      console.warn('[Auth] Optional Auth: Invalid token provided. Rejecting.');
+      return res.status(401).json({ error: 'Session expired or invalid token. Please log in again.' });
     }
+    req.user = user;
     next();
   });
 };

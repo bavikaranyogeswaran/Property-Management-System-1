@@ -101,12 +101,27 @@ import adminRoutes from './routes/adminRoutes.js';
 import renewalRoutes from './routes/renewalRoutes.js';
 import systemRoutes from './routes/systemRoutes.js';
 
-// Lead Portal (public, no auth) — MUST be mounted before imageRoutes
+// ... (rest of imports)
 app.use('/api/lead-portal', leadPortalRoutes);
+
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', message: 'PMS Backend is running' });
+});
 
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/users', userRoutes);
+app.use(express.urlencoded({ extended: true }));
+
+// --- RATE LIMITING ---
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per windowMs
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later.' }
+});
+app.use('/api/', globalLimiter);
 app.use('/api/leads', leadRoutes);
 app.use('/api/properties', propertyRoutes);
 app.use('/api/property-types', propertyTypeRoutes);
@@ -129,10 +144,6 @@ app.use('/api/documents', documentRoutes);
 app.use('/api/renewal-requests', renewalRoutes);
 app.use('/api/system', systemRoutes);
 app.use('/api', imageRoutes);
-
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', message: 'PMS Backend is running' });
-});
 
 // ============================================================================
 //  ERROR HANDLING (The Complaint Department)

@@ -246,6 +246,14 @@ class MaintenanceService {
                 }, connection);
             }
 
+            const auditLogger = (await import('../utils/auditLogger.js')).default;
+            await auditLogger.log({
+                userId: user.id,
+                actionType: 'MAINTENANCE_COST_RECORDED',
+                entityId: requestId,
+                details: { amount, description, costId }
+            }, null, connection);
+
             await connection.commit();
             return costId;
         } catch (error) {
@@ -262,31 +270,7 @@ class MaintenanceService {
          } else if (user.role === 'owner') {
              return await maintenanceRequestModel.findByOwnerId(user.id);
          } else if (user.role === 'treasurer') {
-             const results = await maintenanceRequestModel.findAll();
-             // Filter by assigned properties
-             const staffModel = (await import('../models/staffModel.js')).default;
-             const assigned = await staffModel.getAssignedProperties(user.id);
-             const assignedPropertyIds = assigned.map((p) => p.property_id.toString());
-             
-             // Extract unique unit IDs from the requests
-             const unitIds = [...new Set(results.map(r => r.unitId))];
-             
-             // Find properties for these units
-             if (unitIds.length === 0) return [];
-             const units = await Promise.all(unitIds.map(id => unitModel.findById(id)));
-             const unitIdToPropertyId = {};
-             units.forEach(u => {
-                 if (u) unitIdToPropertyId[u.id] = u.propertyId.toString();
-             });
-             
-             console.log('Treasurer assignedPropertyIds:', assignedPropertyIds);
-             console.log('Treasurer unitIdToPropertyId:', unitIdToPropertyId);
-
-             return results.filter((r) => {
-                 const propId = unitIdToPropertyId[r.unitId];
-                 console.log(`Checking request ${r.id} for unit ${r.unitId} -> propId: ${propId}`);
-                 return assignedPropertyIds.includes(propId);
-             });
+             return await maintenanceRequestModel.findByTreasurerId(user.id);
          } else {
              throw new Error('Access denied');
          }

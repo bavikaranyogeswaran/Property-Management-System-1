@@ -50,7 +50,8 @@ class UserController {
         email,
         phone,
         null,
-        staffData
+        staffData,
+        req.user
       );
       res.status(201).json(result);
     } catch (error) {
@@ -208,6 +209,15 @@ class UserController {
       }
       const { userId, propertyId } = req.body;
       await staffModel.assignProperty(userId, propertyId);
+      
+      const auditLogger = (await import('../utils/auditLogger.js')).default;
+      await auditLogger.log({
+        userId: req.user.id,
+        actionType: 'PROPERTY_ASSIGNED_TO_STAFF',
+        entityId: propertyId,
+        details: { staffUserId: userId }
+      }, req);
+
       res.json({ message: 'Property assigned successfully' });
     } catch (error) {
       if (error.message.includes('already assigned')) {
@@ -229,6 +239,15 @@ class UserController {
       }
       const { userId, propertyId } = req.params;
       await staffModel.removePropertyAssignment(userId, propertyId);
+      
+      const auditLogger = (await import('../utils/auditLogger.js')).default;
+      await auditLogger.log({
+        userId: req.user.id,
+        actionType: 'PROPERTY_REMOVED_FROM_STAFF',
+        entityId: propertyId,
+        details: { staffUserId: userId }
+      }, req);
+
       res.json({ message: 'Property assignment removed' });
     } catch (error) {
       res.status(500).json({ error: error.message });

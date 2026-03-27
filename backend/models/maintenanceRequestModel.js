@@ -59,6 +59,36 @@ class MaintenanceRequestModel {
       description: row.description,
       priority: row.priority,
       status: row.status,
+      images: row.images,
+    }));
+  }
+
+  async findByTreasurerId(treasurerId) {
+    const [rows] = await pool.query(
+      `
+            SELECT mr.*, 
+            COALESCE(
+                (SELECT JSON_ARRAYAGG(JSON_OBJECT('id', mi.image_id, 'url', mi.image_url)) 
+                 FROM maintenance_images mi 
+                 WHERE mi.request_id = mr.request_id),
+                JSON_ARRAY()
+            ) as images
+            FROM maintenance_requests mr
+            JOIN units u ON mr.unit_id = u.unit_id
+            JOIN staff_property_assignments spa ON u.property_id = spa.property_id
+            WHERE spa.user_id = ?
+            ORDER BY mr.created_at DESC
+        `,
+      [treasurerId]
+    );
+    return rows.map((row) => ({
+      id: row.request_id.toString(),
+      unitId: row.unit_id.toString(),
+      tenantId: row.tenant_id.toString(),
+      title: row.title,
+      description: row.description,
+      priority: row.priority,
+      status: row.status,
       createdAt: row.created_at,
       images: row.images,
     }));

@@ -20,7 +20,7 @@ import unitLockService from '../services/unitLockService.js';
 const SALT_ROUNDS = 10;
 
 class UserService {
-  async createTreasurer(name, email, phone, password, staffData = {}) {
+  async createTreasurer(name, email, phone, password, staffData = {}, user = null) {
     const connection = await pool.getConnection();
     try {
       await connection.beginTransaction();
@@ -58,6 +58,14 @@ class UserService {
         },
         connection
       );
+
+      const auditLogger = (await import('../utils/auditLogger.js')).default;
+      await auditLogger.log({
+        userId: user?.id || null,
+        actionType: 'STAFF_ACCOUNT_CREATED',
+        entityId: userId,
+        details: { name, email, role: 'treasurer' }
+      }, null, connection);
 
       await connection.commit();
 
@@ -156,7 +164,7 @@ class UserService {
   }
 
   // Convert lead to tenant
-  async convertLeadToTenant(leadId, startDate, endDate, tenantData = {}) {
+  async convertLeadToTenant(leadId, startDate, endDate, tenantData = {}, user = null) {
     const connection = await pool.getConnection();
     try {
       await connection.beginTransaction();
@@ -308,7 +316,7 @@ class UserService {
               documentUrl: tenantData.documentUrl || null,
             },
             connection,
-            null // System action — no acting user
+            user // Pass the acting user here
           );
         }
       }

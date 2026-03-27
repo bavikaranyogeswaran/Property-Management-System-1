@@ -8,7 +8,7 @@ import emailService from '../utils/emailService.js';
 import { addDays, parseLocalDate, formatToLocalDate } from '../utils/dateUtils.js';
 
 class RenewalService {
-    async createFromNotice(leaseId) {
+    async createFromNotice(leaseId, user = null) {
         const lease = await leaseModel.findById(leaseId);
         if (!lease) throw new Error('Lease not found');
 
@@ -26,7 +26,7 @@ class RenewalService {
 
         const auditLogger = (await import('../utils/auditLogger.js')).default;
         await auditLogger.log({
-            userId: null,
+            userId: user?.id || null,
             actionType: 'RENEWAL_REQUEST_CREATED',
             entityId: requestId,
             details: { leaseId, unitId: lease.unitId }
@@ -38,6 +38,15 @@ class RenewalService {
     async proposeTerms(requestId, data, user) {
         const request = await renewalRequestModel.findById(requestId);
         if (!request) throw new Error('Renewal request not found');
+
+        // RBAC: Treasurer assignment check
+        if (user.role === 'treasurer') {
+            const staffModel = (await import('../models/staffModel.js')).default;
+            const assigned = await staffModel.getAssignedProperties(user.id);
+            if (!assigned.some(p => String(p.property_id) === String(request.property_id))) {
+                throw new Error('Access denied. You are not assigned to this property.');
+            }
+        }
 
         await renewalRequestModel.updateTerms(requestId, {
             proposedMonthlyRent: data.proposedMonthlyRent,
@@ -58,6 +67,15 @@ class RenewalService {
     async approve(requestId, user) {
         const request = await renewalRequestModel.findById(requestId);
         if (!request) throw new Error('Renewal request not found');
+
+        // RBAC: Treasurer assignment check
+        if (user.role === 'treasurer') {
+            const staffModel = (await import('../models/staffModel.js')).default;
+            const assigned = await staffModel.getAssignedProperties(user.id);
+            if (!assigned.some(p => String(p.property_id) === String(request.property_id))) {
+                throw new Error('Access denied. You are not assigned to this property.');
+            }
+        }
 
         if (!request.proposed_monthly_rent || !request.proposed_end_date) {
             throw new Error('Proposed terms (rent and end date) are required for approval');
@@ -126,6 +144,15 @@ class RenewalService {
         const request = await renewalRequestModel.findById(requestId);
         if (!request) throw new Error('Renewal request not found');
 
+        // RBAC: Treasurer assignment check
+        if (user.role === 'treasurer') {
+            const staffModel = (await import('../models/staffModel.js')).default;
+            const assigned = await staffModel.getAssignedProperties(user.id);
+            if (!assigned.some(p => String(p.property_id) === String(request.property_id))) {
+                throw new Error('Access denied. You are not assigned to this property.');
+            }
+        }
+
         await renewalRequestModel.updateStatus(requestId, 'rejected');
         
         // Reset the lease notice_status
@@ -154,7 +181,7 @@ class RenewalService {
 
     async instantRenew(leaseId, newEndDate, newMonthlyRent, user) {
         // 1. Create a renewal request from the lease automatically
-        const requestId = await this.createFromNotice(leaseId);
+        const requestId = await this.createFromNotice(leaseId, user);
         
         const request = await renewalRequestModel.findById(requestId);
         if (request.status === 'approved') {

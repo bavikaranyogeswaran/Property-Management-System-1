@@ -162,7 +162,7 @@ class LeaseController {
         return res.status(400).json({ error: 'documentUrl is required' });
       }
 
-      await leaseService.updateLeaseDocument(id, documentUrl);
+      await leaseService.updateLeaseDocument(id, documentUrl, req.user);
       res.json({ message: 'Lease document updated successfully', documentUrl });
     } catch (error) {
       if (error.message.includes('not found')) return res.status(404).json({ error: error.message });
