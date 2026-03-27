@@ -162,7 +162,7 @@ export function LeadsPage() {
 
   useEffect(() => {
     if (conversionData.leaseTermId) {
-        const term = leaseTerms.find(t => String(t.leaseTermId) === String(conversionData.leaseTermId));
+        const term = leaseTerms.find(t => String(t.id) === String(conversionData.leaseTermId));
         if (term) {
             if (term.type === 'periodic') {
                 setConversionData(prev => ({ ...prev, endDate: '' }));
@@ -484,7 +484,7 @@ export function LeadsPage() {
                     <div>
                       <span className="font-medium">Term:</span>{' '}
                       {lead.leaseTermId 
-                        ? leaseTerms.find(t => String(t.leaseTermId) === String(lead.leaseTermId))?.name 
+                        ? leaseTerms.find(t => String(t.id) === String(lead.leaseTermId))?.name 
                         : (lead.preferredTermMonths ? `${lead.preferredTermMonths} months` : '-')}
                     </div>
                     <div>
@@ -716,7 +716,7 @@ export function LeadsPage() {
               >
                 <option value="" disabled>Select a Lease Term</option>
                 {leaseTerms.map(term => (
-                  <option key={term.leaseTermId} value={term.leaseTermId}>
+                  <option key={term.id} value={term.id}>
                     {term.name} ({term.durationMonths} months)
                   </option>
                 ))}
