@@ -25,11 +25,11 @@ class MaintenanceCostModel {
   }
 
   async create(data, connection = null) {
-    const { requestId, description, amount, recordedDate, invoiceId } = data;
+    const { requestId, description, amount, recordedDate, invoiceId, isReimbursable } = data;
     const db = connection || pool;
     const [result] = await db.query(
-      'INSERT INTO maintenance_costs (request_id, description, amount, recorded_date, invoice_id) VALUES (?, ?, ?, ?, ?)',
-      [requestId, description, amount, recordedDate || getLocalTime(), invoiceId || null]
+      'INSERT INTO maintenance_costs (request_id, description, amount, recorded_date, invoice_id, is_reimbursable) VALUES (?, ?, ?, ?, ?, ?)',
+      [requestId, description, amount, recordedDate || getLocalTime(), invoiceId || null, isReimbursable || false]
     );
     return result.insertId;
   }

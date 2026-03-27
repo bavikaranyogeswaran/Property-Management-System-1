@@ -142,9 +142,9 @@ class MaintenanceService {
         const request = await maintenanceRequestModel.findById(requestId);
         if (!request) throw new Error('Maintenance Request not found');
 
-        const leases = await leaseModel.findByTenantId(request.tenant_id);
+        const leases = await leaseModel.findByTenantId(request.tenantId);
         const activeLease = leases.find(
-            (l) => l.unitId === request.unit_id.toString() && l.status === 'active'
+            (l) => l.unitId === request.unitId.toString() && l.status === 'active'
         );
 
         if (!activeLease) {
@@ -169,20 +169,20 @@ class MaintenanceService {
             type: 'maintenance',
         });
 
-        // Link cost if provided
+        // Link cost if provided and mark as reimbursable if not already
         if (data.costId) {
-            await pool.query('UPDATE maintenance_costs SET invoice_id = ? WHERE cost_id = ?', [invoiceId, data.costId]);
+            await pool.query('UPDATE maintenance_costs SET invoice_id = ?, is_reimbursable = TRUE WHERE cost_id = ?', [invoiceId, data.costId]);
         }
 
         await notificationModel.create({
-            userId: request.tenant_id,
+            userId: request.tenantId,
             message: `You have been billed ${amount} for maintenance: ${request.title}`,
             type: 'invoice',
         });
 
         // Notify Tenant via Email
         try {
-            const tenant = await userModel.findById(request.tenant_id);
+            const tenant = await userModel.findById(request.tenantId);
             if (tenant && tenant.email) {
                 const currentNow = now();
                 await emailService.sendInvoiceNotification(tenant.email, {
@@ -220,7 +220,8 @@ class MaintenanceService {
                 amount,
                 description,
                 recordedDate: recordedDate || getLocalTime(),
-                invoiceId: data.invoiceId || null
+                invoiceId: data.invoiceId || null,
+                isReimbursable: data.isReimbursable || false
             }, connection);
 
             // 2. Identify lease to link ledger entry

@@ -150,10 +150,16 @@ class TenantModel {
   }
   async incrementBehaviorScore(userId, scoreChange, connection = null) {
     const db = connection || pool;
+    const currentScore = await this.getBehaviorScore(userId, db);
+    if (currentScore === null) return null;
+
+    const newScore = Math.min(100, Math.max(0, currentScore + scoreChange));
+
     await db.query(
-      'UPDATE tenants SET behavior_score = LEAST(100, GREATEST(0, behavior_score + ?)) WHERE user_id = ?',
-      [scoreChange, userId]
+      'UPDATE tenants SET behavior_score = ? WHERE user_id = ?',
+      [newScore, userId]
     );
+    return newScore;
   }
 
   async getBehaviorScore(userId, connection = null) {

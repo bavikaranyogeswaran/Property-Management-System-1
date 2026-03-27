@@ -75,6 +75,8 @@ class PayoutModel {
 
     // 2. Total Maintenance Costs (Expenses)
     // Join: MaintCosts -> MaintRequests -> Units -> Properties
+    // We include all maintenance_costs (both reimbursable and owner-absorbed) 
+    // to maintain cash-basis integrity. Reimbursements appear as Income once paid.
     const [expenseRows] = await db.query(
       `
             SELECT COALESCE(SUM(mc.amount), 0) as total_expenses
@@ -83,6 +85,7 @@ class PayoutModel {
             JOIN units u ON mr.unit_id = u.unit_id
             JOIN properties prop ON u.property_id = prop.property_id
             WHERE prop.owner_id = ?
+            AND mc.status = 'active'
             AND mc.payout_id IS NULL
             AND mc.recorded_date <= ?
         `,
