@@ -119,11 +119,9 @@ class LeadService {
             isNew = true;
         }
 
-        // Generate portal access token (create new or reuse existing)
-        let portalToken = await leadTokenModel.findByLeadId(leadId);
-        if (!portalToken) {
-            portalToken = await leadTokenModel.create(leadId);
-        }
+        // Generate portal access token (ALWAYS rotate on re-inquiry)
+        await leadTokenModel.invalidateForLead(leadId);
+        const portalToken = await leadTokenModel.create(leadId);
 
         // Email Notification with portal link
         try {
@@ -185,9 +183,10 @@ class LeadService {
         const success = await leadModel.update(id, data);
         if (!success) throw new Error('Lead update failed');
 
-        // Cancel pending visits when lead is dropped
+        // Cancel pending visits and revoke tokens when lead is dropped
         if (data.status === 'dropped') {
             await visitModel.cancelVisitsForLead(id);
+            await leadTokenModel.invalidateForLead(id);
         }
 
         return success;

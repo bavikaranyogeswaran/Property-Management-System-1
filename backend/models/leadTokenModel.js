@@ -4,9 +4,9 @@ import crypto from 'crypto';
 class LeadTokenModel {
   /**
    * Create a new access token for a lead.
-   * Token expires in 90 days by default.
+   * Token expires in 30 days by default.
    */
-  async create(leadId, expiryDays = 90) {
+  async create(leadId, expiryDays = 30) {
     const token = crypto.randomUUID();
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + expiryDays);
