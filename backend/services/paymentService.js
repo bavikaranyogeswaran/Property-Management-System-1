@@ -38,48 +38,68 @@ class PaymentService {
         let evidenceUrl = data.evidenceUrl;
 
         if (file) {
+            if (!file.path && !file.secure_url) {
+                throw new Error('Payment evidence file is corrupted or missing path.');
+            }
             evidenceUrl = file.path || file.secure_url;
         }
 
-        // Integrity Check: Is invoice already paid?
-        const invoice = await invoiceModel.findById(invoiceId);
-        if (!invoice) {
-            throw new Error('Invoice not found');
-        }
-
-        // Authorization: Verify this invoice belongs to the requesting tenant
-        if (String(invoice.tenant_id) !== String(tenantId)) {
-            throw new Error('Access denied. This invoice does not belong to you.');
-        }
-
-        if (invoice.status === 'paid') {
-            throw new Error('This invoice has already been paid.');
-        }
-
-        const paymentId = await paymentModel.create({
-            invoiceId,
-            amount,
-            paymentDate,
-            paymentMethod,
-            referenceNumber,
-            evidenceUrl,
-        });
-
-        // Notify Treasurers
+        const connection = await pool.getConnection();
         try {
-            const treasurers = await userModel.findByRole('treasurer');
+            await connection.beginTransaction();
+
+            // Integrity Check: Is invoice already paid?
+            const [invoices] = await connection.query("SELECT * FROM rent_invoices WHERE invoice_id = ?", [invoiceId]);
+            const invoice = invoices[0];
+            
+            if (!invoice) throw new Error('Invoice not found');
+            if (String(invoice.lease_id) && invoice.status === 'paid') {
+                throw new Error('This invoice has already been paid.');
+            }
+
+            // Authorization
+            const [leases] = await connection.query("SELECT tenant_id FROM leases WHERE lease_id = ?", [invoice.lease_id]);
+            if (!leases[0] || String(leases[0].tenant_id) !== String(tenantId)) {
+                throw new Error('Access denied. This invoice does not belong to you.');
+            }
+
+            // Concurrency Control: One pending payment at a time
+            const [pendingPayments] = await connection.query(
+                "SELECT payment_id FROM payments WHERE invoice_id = ? AND status = 'pending'",
+                [invoiceId]
+            );
+            if (pendingPayments.length > 0) {
+                throw new Error('You already have a pending payment for this invoice. Please wait for verification.');
+            }
+
+            const paymentId = await paymentModel.create({
+                invoiceId,
+                amount,
+                paymentDate,
+                paymentMethod,
+                referenceNumber,
+                evidenceUrl,
+            }, connection);
+
+            // Notify Treasurers
+            const [treasurers] = await connection.query("SELECT user_id FROM users WHERE role = 'treasurer' AND status = 'active'");
             for (const t of treasurers) {
                 await notificationModel.create({
                     userId: t.user_id,
                     message: `New Payment submitted for Invoice #${invoiceId} (Amount: ${amount}).`,
                     type: 'payment',
-                });
+                }, connection);
             }
-        } catch (noteErr) {
-            console.error('Failed to notify treasurers', noteErr);
-        }
 
-        return paymentId;
+            await connection.commit();
+            return paymentId;
+
+        } catch (error) {
+            await connection.rollback();
+            throw error;
+        } finally {
+            connection.release();
+        }
     }
 
     async _postToLedger(paymentId, invoice, amount, description, connection) {
@@ -103,13 +123,10 @@ class PaymentService {
 
         const { invoiceId, amount, paymentDate, referenceNumber } = data;
 
-        // Integrity Check: Is invoice already paid?
+        // Integrity Check
         const invoiceCheck = await invoiceModel.findById(invoiceId);
         if (!invoiceCheck) {
             throw new Error('Invoice not found');
-        }
-        if (invoiceCheck.status === 'paid') {
-            throw new Error('This invoice has already been paid.');
         }
 
         const connection = await pool.getConnection();
@@ -136,16 +153,19 @@ class PaymentService {
             const invoice = await invoiceModel.findById(invoiceId, connection);
 
             if (invoice) {
+                const previousVerified = totalVerified - Number(amount);
+                const amountAppliedToInvoice = Math.min(Number(amount), Math.max(0, invoice.amount - previousVerified));
+                const incrementalOverpayment = Number(amount) - amountAppliedToInvoice;
+
                 if (totalVerified >= invoice.amount) {
                     await invoiceModel.updateStatus(invoiceId, 'paid', connection);
 
-                    // Overpayment Logic: Credit excess to tenant account
-                    const overpayment = totalVerified - invoice.amount;
-                    if (overpayment > 0) {
-                        await tenantModel.addCredit(invoice.tenant_id, overpayment, connection);
+                    // Overpayment Logic: Credit excess to tenant account (Bug B5 Fix)
+                    if (incrementalOverpayment > 0) {
+                        await tenantModel.addCredit(invoice.tenant_id, incrementalOverpayment, connection);
                         await notificationModel.create({
                             userId: invoice.tenant_id,
-                            message: `Overpayment of ${overpayment} has been credited to your account balance.`,
+                            message: `Overpayment of ${incrementalOverpayment} has been credited to your account balance.`,
                             type: 'payment',
                         }, connection);
                     }
@@ -214,7 +234,7 @@ class PaymentService {
         }
     }
 
-    async verifyPayment(paymentId, status, user) {
+    async verifyPayment(paymentId, status, user, reason = null) {
         if (user.role !== 'treasurer') {
             throw new Error('Access denied. Only Treasurers can verify payments.');
         }
@@ -247,25 +267,27 @@ class PaymentService {
                         throw new Error('Invoice not found for verification');
                     }
 
+                    // Lease Status Warning
+                    const lease = await leaseModel.findById(invoice.lease_id, connection);
+                    if (lease && lease.status === 'ended') {
+                        console.warn(`Verified payment ${paymentId} for invoice linked to ENDED lease ${lease.lease_id}`);
+                    }
+
+                    const previousVerified = totalVerified - Number(payment.amount);
+                    const amountAppliedToInvoice = Math.min(Number(payment.amount), Math.max(0, invoice.amount - previousVerified));
+                    const incrementalOverpayment = Number(payment.amount) - amountAppliedToInvoice;
+
                     if (totalVerified >= invoice.amount) {
                         await invoiceModel.updateStatus(payment.invoiceId, 'paid', connection);
                         
-                        // Overpayment Logic
-                        const overpayment = totalVerified - invoice.amount;
-                        if (overpayment > 0) {
-                             const previousTotal = totalVerified - Number(payment.amount);
-                             const remainingDue = Math.max(0, invoice.amount - previousTotal);
-                             const amountUsed = Math.min(Number(payment.amount), remainingDue);
-                             const amountExcess = Number(payment.amount) - amountUsed;
-
-                             if (amountExcess > 0) {
-                                await tenantModel.addCredit(invoice.tenant_id, amountExcess, connection);
-                                await notificationModel.create({
-                                    userId: invoice.tenant_id,
-                                    message: `Overpayment of ${amountExcess} has been credited to your account balance.`,
-                                    type: 'payment',
-                                }, connection);
-                             }
+                        // Overpayment Logic (Bug B5 Fix)
+                        if (incrementalOverpayment > 0) {
+                            await tenantModel.addCredit(invoice.tenant_id, incrementalOverpayment, connection);
+                            await notificationModel.create({
+                                userId: invoice.tenant_id,
+                                message: `Overpayment of ${incrementalOverpayment} has been credited to your account balance.`,
+                                type: 'payment',
+                            }, connection);
                         }
 
                     } else if (totalVerified > 0) {
@@ -286,13 +308,7 @@ class PaymentService {
 
                         // Deposit Status Logic
                         if (invoice.invoice_type === 'deposit') {
-                             const previousTotal = totalVerified - Number(payment.amount);
-                             const remainingDue = Math.max(0, Number(invoice.amount) - previousTotal);
-                             const amountUsed = Math.min(Number(payment.amount), remainingDue);
-                             
-                             const lease = await leaseModel.findById(invoice.lease_id, connection);
-                             const currentHeld = Number(lease.securityDeposit || 0);
-                             const newHeld = currentHeld + amountUsed;
+                             const newHeld = Number(lease.security_deposit || 0) + amountAppliedToInvoice;
                              
                              const finalInvoice = await invoiceModel.findById(payment.invoiceId, connection);
                              const finalStatus = finalInvoice.status === 'paid' ? 'paid' : 'pending';
@@ -369,19 +385,23 @@ class PaymentService {
                               }, connection);
                          }
                          
+                         const rejectMessage = reason 
+                            ? `Payment of ${payment.amount} for Invoice #${payment.invoiceId} was rejected. Reason: ${reason}`
+                            : `Payment of ${payment.amount} for Invoice #${payment.invoiceId} was rejected. Please contact support.`;
+
                           await notificationModel.create({
                              userId: invoice.tenant_id,
-                             message: `Payment of ${payment.amount} for Invoice #${payment.invoiceId} was rejected. Please contact support.`,
+                             message: rejectMessage,
                              type: 'payment',
                              severity: 'urgent',
-                         });
+                          }, connection);
 
-                         await auditLogger.log({
-                            userId: user.id,
-                            actionType: 'PAYMENT_REJECTED',
-                            entityId: paymentId,
-                            details: { invoiceId: payment.invoiceId, amount: payment.amount },
-                        }, { user: user }, connection);
+                          await auditLogger.log({
+                             userId: user.id,
+                             actionType: 'PAYMENT_REJECTED',
+                             entityId: paymentId,
+                             details: { invoiceId: payment.invoiceId, amount: payment.amount, reason },
+                         }, { user: user }, connection);
                      }
                  }
             }
@@ -412,7 +432,7 @@ class PaymentService {
                         await emailService.sendPaymentRejection(tenant.email, {
                             amount: updatedPayment.amount,
                             invoiceId: updatedPayment.invoiceId,
-                            reason: null
+                            reason: reason
                         });
                     }
                 } catch (emailErr) {

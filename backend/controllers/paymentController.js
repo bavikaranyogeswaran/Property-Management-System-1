@@ -53,9 +53,9 @@ class PaymentController {
   async verifyPayment(req, res) {
     try {
       const { id } = req.params;
-      const { status } = req.body; // 'verified' or 'rejected'
+      const { status, reason } = req.body; // 'verified' or 'rejected'
 
-      const updatedPayment = await paymentService.verifyPayment(id, status, req.user);
+      const updatedPayment = await paymentService.verifyPayment(id, status, req.user, reason);
 
       res.json({ message: `Payment ${status}`, payment: updatedPayment });
     } catch (error) {
