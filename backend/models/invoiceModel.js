@@ -104,6 +104,7 @@ class InvoiceModel {
       propertyName: row.property_name,
       unitNumber: row.unit_number,
       unitStatus: row.unit_status,
+      magicToken: row.magic_token,
     };
   }
 
@@ -300,7 +301,10 @@ class InvoiceModel {
       `,
       [year]
     );
-    return rows;
+    return rows.map(row => ({
+      propertyName: row.property_name,
+      totalIncome: parseFloat(row.total_income || 0)
+    }));
   }
 }
 

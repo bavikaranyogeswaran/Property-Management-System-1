@@ -50,7 +50,7 @@ class PaymentModel {
       paymentDate: row.payment_date,
       paymentMethod: row.payment_method,
       status: row.status,
-      receiptUrl: row.proof_url,
+      proofUrl: row.proof_url,
       referenceNumber: row.reference_number,
       createdAt: row.created_at,
       // Joined fields
@@ -81,22 +81,7 @@ class PaymentModel {
             JOIN users u ON l.tenant_id = u.user_id
             ORDER BY p.payment_date DESC
         `);
-    return rows.map((row) => ({
-      id: row.payment_id.toString(),
-      invoiceId: row.invoice_id.toString(),
-      tenantId: row.tenant_id.toString(),
-      amount: parseFloat(row.amount),
-      paymentDate: row.payment_date,
-      paymentMethod: row.payment_method,
-      status: row.status,
-      receiptUrl: row.proof_url,
-      referenceNumber: row.reference_number, // Added for completeness if needed
-      createdAt: row.created_at,
-      // Extra fields for UI convenience
-      tenantName: row.tenant_name,
-      leaseId: row.lease_id.toString(),
-      propertyId: row.property_id.toString(),
-    }));
+    return rows.map((row) => this.mapRow(row));
   }
 
   async findByOwnerId(ownerId) {
@@ -122,7 +107,7 @@ class PaymentModel {
       paymentDate: row.payment_date,
       paymentMethod: row.payment_method,
       status: row.status,
-      receiptUrl: row.proof_url,
+      proofUrl: row.proof_url,
       referenceNumber: row.reference_number,
       createdAt: row.created_at,
       tenantName: row.tenant_name,

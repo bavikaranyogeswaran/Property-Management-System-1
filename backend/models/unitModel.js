@@ -249,7 +249,7 @@ class UnitModel {
     const [rows] = await db.query(
       `
       SELECT 
-        COALESCE(p.name, CONCAT('Property ', u.property_id)) AS property_name,
+        COALESCE(p.name, CONCAT('Property ', u.property_id)) AS propertyName,
         COUNT(u.unit_id) AS total,
         SUM(CASE WHEN u.status = 'occupied' THEN 1 ELSE 0 END) AS occupied,
         GROUP_CONCAT(CASE WHEN u.status != 'occupied' THEN u.unit_number ELSE NULL END) AS vacancies
@@ -264,7 +264,7 @@ class UnitModel {
     // Transform string vacancies back into array mapping Report Service expectations
     const propertyStats = {};
     rows.forEach(row => {
-      propertyStats[row.property_name] = {
+      propertyStats[row.propertyName] = {
         total: row.total,
         occupied: row.occupied,
         vacancies: row.vacancies ? row.vacancies.split(',') : []

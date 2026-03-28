@@ -122,7 +122,7 @@ class UserModel {
     const db = connection || pool;
     const query = `
             SELECT u.user_id as id, u.name, u.email, u.phone, u.role, u.status, u.created_at as createdAt,
-                   t.nic as tenantNic, t.nic_url as nicUrl, t.permanent_address as permanentAddress, 
+                   t.nic, t.nic_url as nicUrl, t.permanent_address as permanentAddress, 
                    t.employment_status as employmentStatus, t.monthly_income as monthlyIncome, 
                    t.behavior_score as behaviorScore, t.credit_balance as creditBalance,
                    o.nic as ownerNic, o.tin, o.bank_name as bankName, o.branch_name as branchName, 

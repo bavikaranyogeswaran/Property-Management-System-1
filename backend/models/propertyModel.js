@@ -90,7 +90,6 @@ class PropertyModel {
       imageUrl: row.image_url,
       description: row.description,
       features: row.features || [],
-      uniqueId: row.unique_id,
       status: row.status,
       createdAt: row.created_at,
     }));
@@ -137,7 +136,6 @@ class PropertyModel {
       imageUrl: rows[0].image_url,
       description: rows[0].description,
       features: rows[0].features || [],
-      uniqueId: rows[0].unique_id,
       status: rows[0].status,
       createdAt: rows[0].created_at,
     };
@@ -221,11 +219,10 @@ class PropertyModel {
     return rows.map(row => ({
       id: row.image_id.toString(),
       propertyId: row.property_id.toString(),
-      unitId: row.unit_id ? row.unit_id.toString() : null,
       imageUrl: row.image_url,
       isPrimary: !!row.is_primary,
       displayOrder: row.display_order,
-      uploadedAt: row.uploaded_at
+      uploadedAt: row.created_at
     }));
   }
   async findOwnerDetails(propertyId) {
@@ -236,7 +233,12 @@ class PropertyModel {
              WHERE p.property_id = ?`,
       [propertyId]
     );
-    return rows[0];
+    if (!rows[0]) return null;
+    return {
+        propertyName: rows[0].property_name,
+        ownerEmail: rows[0].owner_email,
+        ownerId: rows[0].owner_id.toString()
+    };
   }
 
   async clearPrimaryImages(propertyId) {
