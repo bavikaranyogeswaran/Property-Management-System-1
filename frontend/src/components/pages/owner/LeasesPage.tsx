@@ -323,7 +323,7 @@ export function LeasesPage() {
         <TableCell>
           <div className="flex items-center gap-2">
             <User className="size-4 text-gray-400" />
-            <span className="font-medium">{tenant?.name || 'Unknown'}</span>
+            <span className="font-medium">{lease.tenantName || tenant?.name || 'Unknown'}</span>
           </div>
         </TableCell>
         <TableCell>

@@ -16,6 +16,7 @@ import leaseTermModel from '../models/leaseTermModel.js';
 import { getLocalTime } from '../utils/dateUtils.js';
 import pool from '../config/db.js';
 import unitLockService from '../services/unitLockService.js';
+import leadTokenModel from '../models/leadTokenModel.js';
 
 const SALT_ROUNDS = 10;
 
@@ -92,7 +93,7 @@ class UserService {
 
     // Check if email is being changed and if it's taken
     const existingUser = await userModel.findByEmail(email);
-    if (existingUser && existingUser.user_id !== parseInt(id)) {
+    if (existingUser && existingUser.id !== parseInt(id)) {
       throw new Error('Email already in use');
     }
 
@@ -181,7 +182,7 @@ class UserService {
         const existingUser = await userModel.findByEmail(lead.email, connection);
         return { 
             message: 'Lead already converted', 
-            tenantId: existingUser ? existingUser.user_id : null,
+            tenantId: existingUser ? existingUser.id : null,
             alreadyConverted: true 
         };
       }
@@ -204,7 +205,7 @@ class UserService {
         if (existingUser.role === 'tenant') {
           // User is already an active tenant applying for another property.
           // They already have an account and password, so we just proceed with lease creation.
-          userId = existingUser.user_id;
+          userId = existingUser.id;
           console.log(`Lead ${leadId} is already a tenant (User ID: ${userId}). Proceeding with new lease creation.`);
         } else {
           throw new Error(`Email ${lead.email} is already associated with a ${existingUser.role} account. Cannot convert to tenant.`);

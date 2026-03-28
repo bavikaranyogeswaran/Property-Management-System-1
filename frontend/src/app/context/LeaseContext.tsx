@@ -22,6 +22,7 @@ export interface Lease {
   unitNumber?: string;
   propertyId?: string;
   propertyName?: string;
+  tenantName?: string;
   createdAt: string;
 }
 

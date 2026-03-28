@@ -11,7 +11,7 @@ class UserModel {
   async findByEmail(email, connection = null) {
     const db = connection || pool;
     const [rows] = await db.query(
-      'SELECT user_id as id, name, email, phone, role, is_email_verified as isEmailVerified, status, created_at as createdAt FROM users WHERE email = ? AND is_archived = FALSE',
+      'SELECT user_id as id, name, email, phone, role, password_hash as passwordHash, is_email_verified as isEmailVerified, status, created_at as createdAt FROM users WHERE email = ? AND is_archived = FALSE',
       [email]
     );
     return rows[0];

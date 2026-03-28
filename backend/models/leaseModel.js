@@ -88,10 +88,12 @@ class LeaseModel {
             SELECT l.*, 
                    u.unit_number,
                    u.property_id,
-                   p.name as property_name
+                   p.name as property_name,
+                   t_usr.name as tenant_name
             FROM leases l
             JOIN units u ON l.unit_id = u.unit_id
             JOIN properties p ON u.property_id = p.property_id
+            JOIN users t_usr ON l.tenant_id = t_usr.user_id
             WHERE l.deleted_at IS NULL`;
     const params = [];
 
@@ -121,10 +123,12 @@ class LeaseModel {
             SELECT l.*, 
                    u.unit_number,
                    u.property_id,
-                   p.name as property_name
+                   p.name as property_name,
+                   t_usr.name as tenant_name
             FROM leases l
             JOIN units u ON l.unit_id = u.unit_id
             JOIN properties p ON u.property_id = p.property_id
+            JOIN users t_usr ON l.tenant_id = t_usr.user_id
             WHERE l.lease_id = ? AND l.deleted_at IS NULL
         `,
       [id]
@@ -139,10 +143,12 @@ class LeaseModel {
             SELECT l.*, 
                    u.unit_number,
                    u.property_id,
-                   p.name as property_name
+                   p.name as property_name,
+                   t_usr.name as tenant_name
             FROM leases l
             JOIN units u ON l.unit_id = u.unit_id
             JOIN properties p ON u.property_id = p.property_id
+            JOIN users t_usr ON l.tenant_id = t_usr.user_id
             WHERE l.tenant_id = ? AND l.deleted_at IS NULL
         `,
       [tenantId]
@@ -155,10 +161,12 @@ class LeaseModel {
             SELECT l.*, 
                    u.unit_number,
                    u.property_id,
-                   p.name as property_name
+                   p.name as property_name,
+                   t_usr.name as tenant_name
             FROM leases l
             JOIN units u ON l.unit_id = u.unit_id
             JOIN properties p ON u.property_id = p.property_id
+            JOIN users t_usr ON l.tenant_id = t_usr.user_id
             WHERE l.status = 'active' AND l.deleted_at IS NULL
         `);
     return this.mapRows(rows);
@@ -268,6 +276,7 @@ class LeaseModel {
       unitNumber: row.unit_number,
       propertyId: row.property_id.toString(),
       propertyName: row.property_name,
+      tenantName: row.tenant_name,
     }));
   }
 

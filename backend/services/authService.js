@@ -15,14 +15,14 @@ class AuthService {
       throw new Error('Invalid credentials');
     }
 
-    const isValid = await compare(password, user.password_hash);
+    const isValid = await compare(password, user.passwordHash);
 
     if (!isValid) {
       throw new Error('Invalid credentials');
     }
 
     const token = sign(
-      { id: user.user_id, role: user.role, name: user.name, email: user.email },
+      { id: user.id, role: user.role, name: user.name, email: user.email },
       JWT_SECRET,
       { expiresIn: '24h' }
     );
@@ -30,7 +30,7 @@ class AuthService {
     return {
       token,
       user: {
-        id: user.user_id,
+        id: user.id,
         name: user.name,
         email: user.email,
         role: user.role,
