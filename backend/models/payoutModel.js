@@ -58,14 +58,13 @@ class PayoutModel {
     return rows.length > 0;
   }
 
-  // Core Logic: Rent - Expenses (Captures un-linked records)
+  // Core Logic: Rent - Expenses (Captures snapshot of IDs to prevent race conditions)
   async calculateNetPayout(ownerId, startDate, endDate, connection) {
     const db = connection || pool;
-    // 1. Total Verified Payments (Income)
-    // Join: Payments -> Invoices -> Leases -> Units -> Properties
+    // 1. Snapshot Income IDs and Total
     const [incomeRows] = await db.query(
       `
-            SELECT COALESCE(SUM(p.amount), 0) as total_income
+            SELECT p.payment_id as paymentId, p.amount
             FROM payments p
             JOIN rent_invoices ri ON p.invoice_id = ri.invoice_id
             JOIN leases l ON ri.lease_id = l.lease_id
@@ -80,15 +79,13 @@ class PayoutModel {
       [ownerId, endDate]
     );
 
-    const totalIncome = parseFloat(incomeRows[0].total_income);
+    const incomeIds = incomeRows.map(r => r.paymentId);
+    const totalIncome = incomeRows.reduce((sum, r) => sum + parseFloat(r.amount), 0);
 
-    // 2. Total Maintenance Costs (Expenses)
-    // Join: MaintCosts -> MaintRequests -> Units -> Properties
-    // We include all maintenance_costs (both reimbursable and owner-absorbed) 
-    // to maintain cash-basis integrity. Reimbursements appear as Income once paid.
+    // 2. Snapshot Expense IDs and Total
     const [expenseRows] = await db.query(
       `
-            SELECT COALESCE(SUM(mc.amount), 0) as total_expenses
+            SELECT mc.cost_id as costId, mc.amount
             FROM maintenance_costs mc
             JOIN maintenance_requests mr ON mc.request_id = mr.request_id
             JOIN units u ON mr.unit_id = u.unit_id
@@ -101,49 +98,36 @@ class PayoutModel {
       [ownerId, endDate]
     );
 
-    const totalExpenses = parseFloat(expenseRows[0].total_expenses);
+    const expenseIds = expenseRows.map(r => r.costId);
+    const totalExpenses = expenseRows.reduce((sum, r) => sum + parseFloat(r.amount), 0);
 
     return {
       totalIncome,
       totalExpenses,
       netPayout: totalIncome - totalExpenses,
+      incomeIds,
+      expenseIds,
     };
   }
 
-  async linkRecordsToPayout(payoutId, ownerId, startDate, endDate, connection) {
+  async linkRecordsToPayout(payoutId, incomeIds, expenseIds, connection) {
     const db = connection || pool;
-    // Link payments to the new payout
-    await db.query(
-      `
-            UPDATE payments p
-            JOIN rent_invoices ri ON p.invoice_id = ri.invoice_id
-            JOIN leases l ON ri.lease_id = l.lease_id
-            JOIN units u ON l.unit_id = u.unit_id
-            JOIN properties prop ON u.property_id = prop.property_id
-            SET p.payout_id = ?
-            WHERE prop.owner_id = ? 
-            AND p.status = 'verified'
-            AND ri.invoice_type != 'deposit'
-            AND p.payout_id IS NULL
-            AND p.payment_date <= ?
-        `,
-      [payoutId, ownerId, endDate]
-    );
+    
+    // Link payments to the new payout IF there are any IDs
+    if (incomeIds && incomeIds.length > 0) {
+      await db.query(
+        'UPDATE payments SET payout_id = ? WHERE payment_id IN (?)',
+        [payoutId, incomeIds]
+      );
+    }
 
-    // Link maintenance costs to the new payout
-    await db.query(
-      `
-            UPDATE maintenance_costs mc
-            JOIN maintenance_requests mr ON mc.request_id = mr.request_id
-            JOIN units u ON mr.unit_id = u.unit_id
-            JOIN properties prop ON u.property_id = prop.property_id
-            SET mc.payout_id = ?
-            WHERE prop.owner_id = ?
-            AND mc.payout_id IS NULL
-            AND mc.recorded_date <= ?
-        `,
-      [payoutId, ownerId, endDate]
-    );
+    // Link maintenance costs to the new payout IF there are any IDs
+    if (expenseIds && expenseIds.length > 0) {
+      await db.query(
+        'UPDATE maintenance_costs SET payout_id = ? WHERE cost_id IN (?)',
+        [payoutId, expenseIds]
+      );
+    }
     return true;
   }
 }
