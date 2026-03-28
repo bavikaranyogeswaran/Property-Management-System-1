@@ -103,15 +103,15 @@ class PaymentService {
     }
 
     async _postToLedger(paymentId, invoice, amount, description, connection) {
-        const { accountType, category } = getLedgerClassification(invoice.invoice_type);
+        const { accountType, category } = getLedgerClassification(invoice.invoiceType || invoice.invoice_type);
         return await ledgerModel.create({
             paymentId: Number(paymentId),
-            invoiceId: invoice.invoice_id,
-            leaseId: invoice.lease_id,
+            invoiceId: invoice.id || invoice.invoice_id,
+            leaseId: invoice.leaseId || invoice.lease_id,
             accountType,
             category,
             credit: Number(amount),
-            description: description || `Payment for ${invoice.invoice_type}`,
+            description: description || `Payment for ${invoice.description || invoice.invoice_type}`,
             entryDate: getCurrentDateString(),
         }, connection);
     }
@@ -162,9 +162,9 @@ class PaymentService {
 
                     // Overpayment Logic: Credit excess to tenant account (Bug B5 Fix)
                     if (incrementalOverpayment > 0) {
-                        await tenantModel.addCredit(invoice.tenant_id, incrementalOverpayment, connection);
+                        await tenantModel.addCredit(invoice.tenantId || invoice.tenant_id, incrementalOverpayment, connection);
                         await notificationModel.create({
-                            userId: invoice.tenant_id,
+                            userId: invoice.tenantId || invoice.tenant_id,
                             message: `Overpayment of ${incrementalOverpayment} has been credited to your account balance.`,
                             type: 'payment',
                         }, connection);
@@ -206,7 +206,7 @@ class PaymentService {
 
                 // Fire-and-forget emails outside transaction
                 try {
-                    const tenant = await userModel.findById(invoice.tenant_id);
+                    const tenant = await userModel.findById(invoice.tenantId || invoice.tenant_id);
                     if (tenant && tenant.email) {
                         await emailService.sendPaymentConfirmation(tenant.email, {
                             amount: amount,
@@ -300,7 +300,7 @@ class PaymentService {
                         await receiptModel.create({
                             paymentId: paymentId,
                             invoiceId: payment.invoiceId,
-                            tenantId: invoice.tenant_id,
+                            tenantId: invoice.tenantId || invoice.tenant_id,
                             amount: payment.amount,
                             generatedDate: today(),
                             receiptNumber: `REC-${randomUUID()}`,
@@ -321,7 +321,7 @@ class PaymentService {
 
                         // Notify Tenant
                         await notificationModel.create({
-                            userId: invoice.tenant_id,
+                            userId: invoice.tenantId || invoice.tenant_id,
                             message: `Payment of ${payment.amount} for Invoice #${payment.invoiceId} has been verified.`,
                             type: 'payment',
                         }, connection);
@@ -390,7 +390,7 @@ class PaymentService {
                             : `Payment of ${payment.amount} for Invoice #${payment.invoiceId} was rejected. Please contact support.`;
 
                           await notificationModel.create({
-                             userId: invoice.tenant_id,
+                             userId: invoice.tenantId || invoice.tenant_id,
                              message: rejectMessage,
                              type: 'payment',
                              severity: 'urgent',
@@ -412,7 +412,7 @@ class PaymentService {
             if (status === 'verified') {
                 const invoice = await invoiceModel.findById(updatedPayment.invoiceId);
                 try {
-                    const tenant = await userModel.findById(invoice.tenant_id);
+                    const tenant = await userModel.findById(invoice.tenantId || invoice.tenant_id);
                     if (tenant && tenant.email) {
                         await emailService.sendPaymentConfirmation(tenant.email, {
                             amount: updatedPayment.amount,
@@ -427,7 +427,7 @@ class PaymentService {
             } else if (status === 'rejected') {
                 const invoice = await invoiceModel.findById(updatedPayment.invoiceId);
                 try {
-                    const tenant = await userModel.findById(invoice.tenant_id);
+                    const tenant = await userModel.findById(invoice.tenantId || invoice.tenant_id);
                     if (tenant && tenant.email) {
                         await emailService.sendPaymentRejection(tenant.email, {
                             amount: updatedPayment.amount,
@@ -461,6 +461,113 @@ class PaymentService {
          } else {
              throw new Error('Access denied');
          }
+    }
+
+    /**
+     * Automatically applies any existing credit balance from the tenant's record
+     * to a specific invoice. Reduces the "Balance Due" by creating a 'credit_applied' payment.
+     */
+    async applyTenantCredit(invoiceId, connection = null) {
+        const db = connection || pool;
+        const isExternalConn = !!connection;
+        const conn = isExternalConn ? connection : await pool.getConnection();
+
+        try {
+            if (!isExternalConn) await conn.beginTransaction();
+
+            // 1. Fetch Invoice
+            const invoice = await invoiceModel.findById(invoiceId, conn);
+            if (!invoice) throw new Error(`Invoice #${invoiceId} not found`);
+            if (invoice.status === 'paid') {
+                if (!isExternalConn) await conn.rollback();
+                return null;
+            }
+
+            // 2. Fetch Tenant Credit Balance
+            const tenant = await tenantModel.findByUserId(invoice.tenantId, conn);
+            if (!tenant || tenant.creditBalance <= 0) {
+                if (!isExternalConn) await conn.rollback();
+                return null;
+            }
+
+            // 3. Calculate Amount to Apply (Balance Due check)
+            const allPayments = await paymentModel.findByInvoiceId(invoiceId, conn);
+            const totalVerified = allPayments
+                .filter((p) => p.status === 'verified')
+                .reduce((sum, p) => sum + Number(p.amount), 0);
+            
+            const remainingDue = Math.max(0, invoice.amount - totalVerified);
+            if (remainingDue <= 0) {
+                if (!isExternalConn) await conn.rollback();
+                return null;
+            }
+
+            const amountToApply = Math.min(tenant.creditBalance, remainingDue);
+            if (amountToApply <= 0) {
+                if (!isExternalConn) await conn.rollback();
+                return null;
+            }
+
+            // 4. Create Verified 'credit_applied' Payment
+            const payId = await paymentModel.create({
+                invoiceId,
+                amount: amountToApply,
+                paymentDate: today(),
+                paymentMethod: 'credit_applied',
+                referenceNumber: `CREDIT-${Date.now()}`,
+                evidenceUrl: null,
+            }, conn);
+            await paymentModel.updateStatus(payId, 'verified', null, conn);
+
+            // 5. Update Tenant Balance
+            await tenantModel.deductCredit(invoice.tenantId, amountToApply, conn);
+
+            // 6. Update Invoice Status
+            const newTotalVerified = totalVerified + amountToApply;
+            if (newTotalVerified >= invoice.amount) {
+                await invoiceModel.updateStatus(invoiceId, 'paid', conn);
+            } else {
+                await invoiceModel.updateStatus(invoiceId, 'partially_paid', conn);
+            }
+
+            // 7. Generate Receipt
+            await receiptModel.create({
+                paymentId: payId,
+                invoiceId,
+                tenantId: invoice.tenantId,
+                amount: amountToApply,
+                generatedDate: today(),
+                receiptNumber: `REC-CREDIT-${randomUUID()}`,
+            }, conn);
+
+            // 8. Post Ledger Entry (Centralized classification)
+            await this._postToLedger(
+                payId,
+                invoice,
+                amountToApply,
+                `Auto-applied credit from tenant balance to invoice #${invoiceId}`,
+                conn
+            );
+
+            // 9. Notify Tenant
+            await notificationModel.create({
+                userId: invoice.tenantId,
+                message: `LKR ${amountToApply} from your account balance was automatically applied to Invoice #${invoiceId}.`,
+                type: 'payment',
+            }, conn);
+
+            if (!isExternalConn) await conn.commit();
+            console.log(`[PaymentService] Auto-applied ${amountToApply} credit to Invoice #${invoiceId} for Tenant ${invoice.tenantId}`);
+
+            return { paymentId: payId, amountApplied: amountToApply };
+
+        } catch (error) {
+            if (!isExternalConn) await conn.rollback();
+            console.error(`[PaymentService] Failed to apply tenant credit to Invoice #${invoiceId}:`, error);
+            throw error;
+        } finally {
+            if (!isExternalConn) conn.release();
+        }
     }
 }
 

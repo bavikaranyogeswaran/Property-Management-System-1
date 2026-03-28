@@ -5,6 +5,7 @@ import invoiceModel from '../models/invoiceModel.js';
 import notificationModel from '../models/notificationModel.js';
 import emailService from './emailService.js';
 import billingEngine from './billingEngine.js';
+import paymentService from '../services/paymentService.js';
 import { getCurrentDateString, getLocalTime, today, now, parseLocalDate, addDays, formatToLocalDate } from './dateUtils.js';
 
 // --- CONFIGURATION ---
@@ -96,72 +97,11 @@ export const generateRentInvoices = async () => {
           continue;
         }
 
-        const tenantModel = (await import('../models/tenantModel.js')).default;
-        const tenant = await tenantModel.findByUserId(lease.tenantId);
-
-        if (tenant && tenant.creditBalance > 0) {
-          const amountToApply = Math.min(tenant.creditBalance, billingInfo.amount);
-
-          if (amountToApply > 0) {
-            const paymentModel = (await import('../models/paymentModel.js'))
-              .default;
-
-            const payId = await paymentModel.create({
-              invoiceId,
-              amount: amountToApply,
-              paymentDate: today(),
-              paymentMethod: 'credit_applied',
-              referenceNumber: `CREDIT-${Date.now()}`,
-              evidenceUrl: null,
-            });
-            await paymentModel.updateStatus(payId, 'verified');
-
-            await tenantModel.deductCredit(lease.tenantId, amountToApply);
-
-            if (amountToApply >= billingInfo.amount) {
-              await invoiceModel.updateStatus(invoiceId, 'paid');
-            } else {
-              await invoiceModel.updateStatus(invoiceId, 'partially_paid');
-            }
-
-            const receiptModel = (await import('../models/receiptModel.js')).default;
-            const { randomUUID } = await import('crypto');
-            await receiptModel.create({
-              paymentId: payId,
-              invoiceId,
-              tenantId: lease.tenantId,
-              amount: amountToApply,
-              generatedDate: today(),
-              receiptNumber: `REC-CREDIT-${randomUUID()}`,
-            });
-
-            console.log(
-              `Auto-applied credit ${amountToApply} to Invoice ${invoiceId}. Remaining Credit: ${tenant.creditBalance - amountToApply}`
-            );
-
-            try {
-              const ledgerModel = (await import('../models/ledgerModel.js')).default;
-              await ledgerModel.create({
-                paymentId: payId,
-                invoiceId,
-                leaseId: lease.id,
-                accountType: 'revenue',
-                category: 'rent',
-                credit: Number(amountToApply),
-                description: `Auto-applied credit from tenant balance to invoice #${invoiceId}`,
-                entryDate: today(),
-              });
-            } catch (ledgerErr) {
-              console.error('Failed to post ledger entry for auto-applied credit:', ledgerErr);
-            }
-
-            await notificationModel.create({
-              userId: lease.tenantId,
-              message: `A credit of LKR ${amountToApply} was automatically applied to your new rent invoice.`,
-              type: 'payment',
-              isRead: false,
-            });
-          }
+        // Auto-apply credit if exists
+        try {
+          await paymentService.applyTenantCredit(invoiceId);
+        } catch (err) {
+          console.error(`[Cron] Failed to auto-apply credit to generated rent invoice ${invoiceId}:`, err);
         }
 
         await notificationModel.create({
@@ -389,52 +329,11 @@ export const applyLateFees = async () => {
       });
 
       // Auto-Apply Credits to Late Fee (consistent with rent invoice logic)
-      const tenantModel = (await import('../models/tenantModel.js')).default;
-      const tenant = await tenantModel.findByUserId(inv.tenant_id);
-
-      if (tenant && tenant.creditBalance > 0) {
-        const amountToApply = Math.min(tenant.creditBalance, lateFeeAmount);
-
-        if (amountToApply > 0) {
-          const paymentModel = (await import('../models/paymentModel.js')).default;
-
-          // 1. Create Verified Payment
-            const payId = await paymentModel.create({
-              invoiceId: lateFeeInvoiceId,
-              amount: amountToApply,
-              paymentDate: today(),
-              paymentMethod: 'credit_applied',
-              referenceNumber: `CREDIT-LATEFEE-${Date.now()}`,
-              evidenceUrl: null,
-            });
-          await paymentModel.updateStatus(payId, 'verified');
-
-          // 2. Deduct Credit
-          await tenantModel.deductCredit(inv.tenant_id, amountToApply);
-
-          // 3. Update Invoice Status
-          if (amountToApply >= lateFeeAmount) {
-            await invoiceModel.updateStatus(lateFeeInvoiceId, 'paid');
-          } else {
-            await invoiceModel.updateStatus(lateFeeInvoiceId, 'partially_paid');
-          }
-
-          // 4. Generate Receipt
-          const receiptModel = (await import('../models/receiptModel.js')).default;
-          const { randomUUID } = await import('crypto');
-            await receiptModel.create({
-              paymentId: payId,
-              invoiceId: lateFeeInvoiceId,
-              tenantId: inv.tenant_id,
-              amount: amountToApply,
-              generatedDate: today(),
-              receiptNumber: `RLF-${randomUUID().slice(0, 8)}`,
-            });
-
-          console.log(
-            `Auto-applied credit ${amountToApply} to Late Fee Invoice ${lateFeeInvoiceId}. Remaining Credit: ${tenant.creditBalance - amountToApply}`
-          );
-        }
+      // Auto-Apply Credits to Late Fee (consistent with rent invoice logic)
+      try {
+        await paymentService.applyTenantCredit(lateFeeInvoiceId);
+      } catch (err) {
+        console.error(`[Cron] Failed to auto-apply credit to late fee invoice ${lateFeeInvoiceId}:`, err);
       }
 
       // Notify Tenant

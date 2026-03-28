@@ -3,6 +3,7 @@ import invoiceModel from '../models/invoiceModel.js';
 import leaseModel from '../models/leaseModel.js';
 import staffModel from '../models/staffModel.js';
 import paymentModel from '../models/paymentModel.js';
+import paymentService from './paymentService.js';
 import behaviorLogModel from '../models/behaviorLogModel.js';
 import tenantModel from '../models/tenantModel.js';
 import userModel from '../models/userModel.js';
@@ -29,6 +30,13 @@ class InvoiceService {
             throw new Error('Denied. Only Treasurers can create invoices.');
         }
         const invoiceId = await invoiceModel.create(data);
+        
+        // Auto-apply credit if exists
+        try {
+            await paymentService.applyTenantCredit(invoiceId);
+        } catch (err) {
+            console.error(`[InvoiceService] Failed to auto-apply credit to new invoice ${invoiceId}:`, err);
+        }
         
         // Notify Tenant via Email
         try {
@@ -105,6 +113,13 @@ class InvoiceService {
                 dueDate: billingInfo.dueDate,
                 description: billingInfo.description,
             });
+
+            // Auto-apply credit if exists
+            try {
+                await paymentService.applyTenantCredit(invoiceId);
+            } catch (err) {
+                console.error(`[InvoiceService] Failed to auto-apply credit to generated invoice ${invoiceId}:`, err);
+            }
 
             // Notify Tenant via Email
             try {
