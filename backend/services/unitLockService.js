@@ -1,50 +1,73 @@
-class UnitLockService {
-  constructor() {
-    // Map<unitId, { leadId, expiresAt }>
-    this.locks = new Map();
-    
-    // Periodically clean up expired locks every minute
-    setInterval(() => this.autoCleanup(), 60 * 1000);
-  }
+import pool from '../config/db.js';
 
+class UnitLockService {
   /**
-   * Attempt to acquire a lock for a unit.
+   * Attempt to acquire a lock for a unit in the database.
    * @param {string|number} unitId 
    * @param {string|number} leadId 
-   * @returns {boolean} True if lock acquired or already held by this lead
+   * @returns {Promise<boolean>} True if lock acquired or already held by this lead
    */
-  acquireLock(unitId, leadId) {
-    const id = unitId.toString();
-    const existing = this.locks.get(id);
+  async acquireLock(unitId, leadId) {
+    const id = parseInt(unitId);
+    const lid = parseInt(leadId);
+    const now = new Date();
+    const expiry = new Date(now.getTime() + 10 * 60 * 1000); // 10 minute lock
 
-    if (existing && existing.expiresAt > Date.now()) {
-      // If locked by someone else, fail
-      if (existing.leadId.toString() !== leadId.toString()) {
-        return false;
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      // 1. Clean up expired locks for THIS unit first or check existing
+      const [existing] = await connection.query(
+        "SELECT * FROM unit_locks WHERE unit_id = ?",
+        [id]
+      );
+
+      if (existing.length > 0) {
+        const lock = existing[0];
+        const isExpired = new Date(lock.expires_at) <= now;
+
+        if (!isExpired) {
+          // If locked by someone else, fail
+          if (parseInt(lock.lead_id) !== lid) {
+            await connection.rollback();
+            return false;
+          }
+          // If locked by same lead, refresh expiry below
+        }
       }
-      // If locked by same lead, just refresh expiry
-    }
 
-    this.locks.set(id, {
-      leadId: leadId.toString(),
-      expiresAt: Date.now() + 10 * 60 * 1000 // 10 minute lock
-    });
-    return true;
+      // 2. Upsert lock (using REPLACE for simplicity in MySQL, or delete then insert)
+      // Since unit_id is PK, we can just replace.
+      await connection.query(
+        "REPLACE INTO unit_locks (unit_id, lead_id, expires_at) VALUES (?, ?, ?)",
+        [id, lid, expiry]
+      );
+
+      await connection.commit();
+      return true;
+    } catch (error) {
+      await connection.rollback();
+      console.error("UnitLockService Error:", error);
+      return false;
+    } finally {
+      connection.release();
+    }
   }
 
   /**
-   * Check if a unit is locked by someone ELSE.
-   * @param {string|number} unitId 
-   * @param {string|number} excludeLeadId 
-   * @returns {Object|null} The lock info if locked, else null
+   * Check if a unit is locked by someone ELSE in the database.
    */
-  isLocked(unitId, excludeLeadId = null) {
-    const id = unitId.toString();
-    const existing = this.locks.get(id);
+  async isLocked(unitId, excludeLeadId = null) {
+    const [rows] = await pool.query(
+      "SELECT * FROM unit_locks WHERE unit_id = ? AND expires_at > NOW()",
+      [unitId]
+    );
 
-    if (existing && existing.expiresAt > Date.now()) {
-      if (!excludeLeadId || existing.leadId.toString() !== excludeLeadId.toString()) {
-        return existing;
+    if (rows.length > 0) {
+      const lock = rows[0];
+      if (!excludeLeadId || parseInt(lock.lead_id) !== parseInt(excludeLeadId)) {
+        return { leadId: lock.lead_id, expiresAt: lock.expires_at };
       }
     }
     return null;
@@ -52,21 +75,27 @@ class UnitLockService {
 
   /**
    * Manually release a lock.
-   * @param {string|number} unitId 
    */
-  releaseLock(unitId) {
-    this.locks.delete(unitId.toString());
+  async releaseLock(unitId) {
+    await pool.query("DELETE FROM unit_locks WHERE unit_id = ?", [unitId]);
   }
 
-  autoCleanup() {
-    const now = Date.now();
-    for (const [id, lock] of this.locks.entries()) {
-      if (lock.expiresAt <= now) {
-        this.locks.delete(id);
-      }
+  /**
+   * Background cleanup of all expired locks.
+   */
+  async autoCleanup() {
+    try {
+      await pool.query("DELETE FROM unit_locks WHERE expires_at <= NOW()");
+    } catch (err) {
+      console.error("Lock Cleanup Failed:", err);
     }
   }
 }
 
 // Singleton instance
-export default new UnitLockService();
+const unitLockService = new UnitLockService();
+
+// Periodically clean up expired locks every 5 minutes (less aggressive as we clean on-demand too)
+setInterval(() => unitLockService.autoCleanup(), 5 * 60 * 1000);
+
+export default unitLockService;

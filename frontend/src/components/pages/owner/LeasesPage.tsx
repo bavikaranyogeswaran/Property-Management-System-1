@@ -45,6 +45,7 @@ import {
   PlayCircle,
   Unlock,
   Share2,
+  ShieldCheck,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -71,6 +72,7 @@ export function LeasesPage() {
     updateLeaseDocument,
     finalizeCheckout,
     activateLease,
+    verifyLeaseDocuments,
     markUnitAvailable,
     renewalRequests,
     proposeRenewalTerms,
@@ -382,8 +384,15 @@ export function LeasesPage() {
               ''
             }
           >
-            {lease.status === 'draft' ? 'Awaiting Deposit' : lease.status}
+            {lease.status === 'draft' ? (
+              lease.depositStatus === 'paid' ? 'Awaiting Verification' : 'Awaiting Deposit'
+            ) : lease.status}
           </Badge>
+          {lease.status === 'draft' && lease.isDocumentsVerified && (
+            <Badge variant="outline" className="ml-1 bg-blue-50 text-blue-700 border-blue-200">
+              Docs OK
+            </Badge>
+          )}
         </TableCell>
         <TableCell className="text-right">
           <div className="flex gap-2 justify-end">
@@ -396,15 +405,32 @@ export function LeasesPage() {
               <Eye className="size-4" />
             </Button>
             {lease.status === 'draft' && (
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setActivateLeaseId(lease.id)}
-                className="text-green-600 hover:text-green-700 hover:bg-green-50"
-                title="Sign & Activate Lease"
-              >
-                <PlayCircle className="size-4" />
-              </Button>
+              <>
+                {!lease.isDocumentsVerified && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={async () => {
+                      if (window.confirm('Have you reviewed and verified all required documents for this tenant?')) {
+                        await verifyLeaseDocuments(lease.id);
+                      }
+                    }}
+                    className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                    title="Verify Documents"
+                  >
+                    <ShieldCheck className="size-4" />
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setActivateLeaseId(lease.id)}
+                  className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                  title="Sign & Activate Lease"
+                >
+                  <PlayCircle className="size-4" />
+                </Button>
+              </>
             )}
             {lease.status === 'draft' && lease.magicToken && (
               <Button
@@ -1380,6 +1406,15 @@ export function LeasesPage() {
               
               <div className="p-3 bg-gray-50 border rounded-lg space-y-3">
                 <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-gray-500">
+                  <span>Document Verification</span>
+                  {leases.find(l => String(l.id) === String(activateLeaseId))?.isDocumentsVerified ? (
+                    <Badge className="bg-blue-100 text-blue-700 border-none">Verified OK</Badge>
+                  ) : (
+                    <Badge className="bg-amber-100 text-amber-700 border-none">Pending Review</Badge>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-gray-500">
                   <span>Security Deposit Verification</span>
                   {isLoadingDeposit ? (
                     <span className="animate-pulse">Checking Ledger...</span>
@@ -1413,7 +1448,14 @@ export function LeasesPage() {
               {!isLoadingDeposit && depositStatus && !depositStatus.isFullyPaid && (
                 <div className="p-2 bg-red-50 border border-red-100 rounded text-[10px] text-red-700 flex gap-2">
                   <AlertCircle className="size-3 mt-0.5" />
-                  <p><strong>Warning:</strong> Direct activation is a fallback. The system will <strong>automatically activate</strong> this lease and onboard the tenant as soon as the Treasurer verifies the deposit in the ledger.</p>
+                  <p><strong>Warning:</strong> The security deposit has not been fully verified in the ledger. Automatic onboarding will trigger once the Treasurer verifies the payment.</p>
+                </div>
+              )}
+
+              {activateLeaseId && !leases.find(l => String(l.id) === String(activateLeaseId))?.isDocumentsVerified && (
+                <div className="p-2 bg-amber-50 border border-amber-100 rounded text-[10px] text-amber-700 flex gap-2">
+                  <AlertTriangle className="size-3 mt-0.5" />
+                  <p><strong>Required:</strong> You must manually verify the tenant's documents (ID, Proof of Income, etc.) before this lease can be activated. Use the <ShieldCheck className="inline size-3" /> icon in the Drafts tab.</p>
                 </div>
               )}
 
@@ -1436,7 +1478,11 @@ export function LeasesPage() {
                 type="button"
                 className="bg-green-600 hover:bg-green-700 text-white"
                 onClick={confirmActivateLease}
-                disabled={isLoadingDeposit || (depositStatus && !depositStatus.isFullyPaid)}
+                disabled={
+                  isLoadingDeposit || 
+                  (depositStatus && !depositStatus.isFullyPaid) || 
+                  !leases.find(l => String(l.id) === String(activateLeaseId))?.isDocumentsVerified
+                }
               >
               <PlayCircle className="size-4 mr-2" />
               Sign & Activate

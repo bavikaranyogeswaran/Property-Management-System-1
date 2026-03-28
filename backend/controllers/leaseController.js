@@ -65,7 +65,25 @@ class LeaseController {
       if (error.message.includes('not found')) return res.status(404).json({ error: error.message });
       if (error.message.includes('draft')) return res.status(400).json({ error: error.message });
       if (error.message.includes('available') || error.message.includes('already leased')) return res.status(409).json({ error: error.message });
-      if (error.message.includes('not fully paid')) return res.status(402).json({ error: error.message });
+      if (error.message.includes('not fully paid') || error.message.includes('not been verified')) return res.status(400).json({ error: error.message });
+      res.status(500).json({ error: error.message });
+    }
+  }
+
+  async verifyLeaseDocuments(req, res) {
+    try {
+      const { id } = req.params;
+      const result = await leaseService.verifyLeaseDocuments(id, req.user);
+      res.json({ 
+          message: result.activated 
+            ? 'Documents verified and lease activated (deposit was already paid).' 
+            : 'Documents verified. Awaiting deposit payment for activation.', 
+          ...result 
+      });
+    } catch (error) {
+      console.error('Verify Lease Documents Error:', error);
+      if (error.message.includes('not found')) return res.status(404).json({ error: error.message });
+      if (error.message.includes('Access denied')) return res.status(403).json({ error: error.message });
       res.status(500).json({ error: error.message });
     }
   }

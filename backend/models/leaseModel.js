@@ -58,6 +58,7 @@ class LeaseModel {
     actualCheckoutAt: 'actual_checkout_at',
     targetDeposit: 'target_deposit',
     signedAt: 'signed_at',
+    isDocumentsVerified: 'is_documents_verified',
   };
 
   async update(id, data, connection = null) {
@@ -278,6 +279,7 @@ class LeaseModel {
       documentUrl: row.document_url,
       targetDeposit: parseFloat(row.target_deposit || 0),
       signedAt: row.signed_at,
+      isDocumentsVerified: !!row.is_documents_verified,
       createdAt: row.created_at,
       // Extra info useful for frontend listing
       unitNumber: row.unit_number,

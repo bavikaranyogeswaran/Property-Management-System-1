@@ -190,7 +190,7 @@ class UserService {
       // LOCKING: Ensure unit is not being processed by another conversion.
       const targetUnitIdForLock = tenantData.unitId || lead.interestedUnit;
       if (targetUnitIdForLock) {
-        const lockAcquired = unitLockService.acquireLock(targetUnitIdForLock, leadId);
+        const lockAcquired = await unitLockService.acquireLock(targetUnitIdForLock, leadId);
         if (!lockAcquired) {
           throw new Error('This unit is currently being processed by another staff member. Please wait 10 minutes or choose another unit.');
         }

@@ -237,6 +237,18 @@ CREATE TABLE lead_access_tokens (
 );
 
 -- =========================
+-- UNIT LOCKS (Concurrent Process Protection)
+-- =========================
+CREATE TABLE unit_locks (
+    unit_id INT PRIMARY KEY,
+    lead_id INT NOT NULL,
+    expires_at DATETIME NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (unit_id) REFERENCES units(unit_id) ON DELETE CASCADE,
+    FOREIGN KEY (lead_id) REFERENCES leads(lead_id) ON DELETE CASCADE
+);
+
+-- =========================
 -- LEASES
 -- =========================
 CREATE TABLE leases (
@@ -254,7 +266,9 @@ CREATE TABLE leases (
     refund_notes TEXT,
     refunded_amount DECIMAL(10, 2) DEFAULT 0.00,
     document_url VARCHAR(500), -- [ADDED] Lease document URL
+    is_documents_verified BOOLEAN DEFAULT FALSE, -- [NEW] Manual verification step
     actual_checkout_at DATETIME, -- [ADDED] Actual checkout time
+    signed_at DATETIME, -- [NEW] Time when lease moved to active
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (tenant_id) REFERENCES users(user_id) ON DELETE RESTRICT,
     FOREIGN KEY (unit_id) REFERENCES units(unit_id) ON DELETE RESTRICT

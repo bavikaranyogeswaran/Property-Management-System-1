@@ -22,7 +22,8 @@ router.patch('/:id/notice-status', authenticateToken, leaseController.updateNoti
 router.get('/:id/adjustments', authenticateToken, leaseController.getRentAdjustments);
 router.post('/:id/adjustments', authenticateToken, leaseController.addRentAdjustment);
 router.post('/:id/finalize-checkout', authenticateToken, leaseController.finalizeCheckout);
-router.get('/:id/deposit-status', authenticateToken, leaseController.getDepositStatus);
+router.post('/:id/deposit-status', authenticateToken, leaseController.getDepositStatus);
+router.post('/:id/verify-documents', authenticateToken, leaseController.verifyLeaseDocuments);
 router.post('/:id/sign', authenticateToken, leaseController.signLease);
 
 export default router;

@@ -174,6 +174,55 @@ class LeaseService {
   }
 
   /**
+   * Manually verifies the tenant's identity/income documents.
+   * If the deposit is already fully paid, this will trigger the formal signing and activation.
+   */
+  async verifyLeaseDocuments(leaseId, user) {
+    if (user.role !== 'owner' && user.role !== 'treasurer') {
+      throw new Error('Access denied: Only owners or treasurers can verify documents.');
+    }
+
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      const lease = await leaseModel.findById(leaseId, connection);
+      if (!lease) throw new Error('Lease not found');
+      if (lease.status !== 'draft') throw new Error('Only draft leases can have documents verified');
+
+      await leaseModel.update(leaseId, { isDocumentsVerified: true }, connection);
+
+      // Audit Log
+      const auditLogger = (await import('../utils/auditLogger.js')).default;
+      await auditLogger.log({
+        userId: user.id,
+        actionType: 'LEASE_DOCUMENTS_VERIFIED',
+        entityId: leaseId,
+        details: { }
+      }, null, connection);
+
+      // Check if deposit is already paid. If so, auto-activate now.
+      const depositStats = await leaseModel.getDepositStatus(leaseId, connection);
+      let activated = false;
+      if (depositStats && depositStats.isFullyPaid) {
+        await this.signLease(leaseId, user, connection);
+        
+        const userService = (await import('./userService.js')).default;
+        await userService.triggerOnboarding(lease.tenantId, connection);
+        activated = true;
+      }
+
+      await connection.commit();
+      return { isDocumentsVerified: true, activated };
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+
+  /**
    * Signs and activates a draft lease.
    */
   async signLease(leaseId, user, connection = null) {
@@ -212,6 +261,11 @@ class LeaseService {
       const depositStats = await leaseModel.getDepositStatus(leaseId, conn);
       if (depositStats && !depositStats.isFullyPaid) {
           throw new Error(`Cannot activate lease: Security Deposit of LKR ${depositStats.targetAmount.toLocaleString()} is not fully paid. Current ledger balance: LKR ${depositStats.paidAmount.toLocaleString()}.`);
+      }
+
+      // [NEW] Verify Documents
+      if (!lease.isDocumentsVerified) {
+        throw new Error('Cannot activate lease: Tenant documents have not been verified by staff.');
       }
 
       await leaseModel.update(leaseId, { status: 'active', signedAt: getLocalTime() }, conn);

@@ -103,6 +103,7 @@ class InvoiceModel {
       tenantName: row.tenant_name,
       propertyName: row.property_name,
       unitNumber: row.unit_number,
+      unitStatus: row.unit_status,
     };
   }
 
@@ -126,7 +127,7 @@ class InvoiceModel {
     const [rows] = await db.query(
       `
             SELECT ri.*, l.tenant_id, l.unit_id,
-                   p.name as property_name, un.unit_number,
+                   p.name as property_name, un.unit_number, un.status as unit_status,
                    COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id = ri.invoice_id AND status = 'verified'), 0) AS amount_paid
             FROM rent_invoices ri 
             JOIN leases l ON ri.lease_id = l.lease_id 

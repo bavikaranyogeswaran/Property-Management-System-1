@@ -18,6 +18,7 @@ export interface Lease {
   refundNotes?: string;
   refundedAmount?: number;
   documentUrl?: string;
+  isDocumentsVerified?: boolean;
   noticeStatus?: 'undecided' | 'vacating' | 'renewing';
   unitNumber?: string;
   propertyId?: string;
@@ -70,6 +71,7 @@ interface LeaseContextType {
   deleteLeaseTerm: (id: number) => Promise<void>;
   finalizeCheckout: (id: string) => Promise<void>;
   activateLease: (id: string) => Promise<void>;
+  verifyLeaseDocuments: (id: string) => Promise<void>;
 
   // Renewal operations
   renewalRequests: RenewalRequest[];
@@ -277,6 +279,18 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const verifyLeaseDocuments = async (id: string) => {
+    try {
+      const response = await apiClient.post(`/leases/${id}/verify-documents`);
+      await fetchLeases();
+      toast.success(response.data.message);
+    } catch (e: any) {
+      const msg = e.response?.data?.error || 'Failed to verify documents';
+      toast.error(msg);
+      throw new Error(msg);
+    }
+  };
+
   const fetchRenewalRequests = async () => {
     try {
       const response = await apiClient.get('/renewal-requests');
@@ -337,6 +351,7 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
       deleteLeaseTerm,
       finalizeCheckout,
       activateLease,
+      verifyLeaseDocuments,
       renewalRequests,
       fetchRenewalRequests,
       proposeRenewalTerms,

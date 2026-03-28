@@ -118,6 +118,12 @@ class PaymentService {
                 throw new Error('This invoice has already been paid.');
             }
 
+            // [NEW] Unit Availability Validation
+            // Block payment if unit is no longer available (e.g. someone else took it first)
+            if (invoice.unitStatus !== 'available') {
+                throw new Error(`Unit ${invoice.unitNumber} is no longer available (Status: ${invoice.unitStatus}). Please contact the owner.`);
+            }
+
             const invoiceId = invoice.id;
             const amount = invoice.amount; // Guests must pay the full amount for the deposit to "hold" the unit
 
@@ -406,12 +412,26 @@ class PaymentService {
                         if (finalInvoice.status === 'paid' && invoice.invoiceType === 'deposit') {
                             const lease = await leaseModel.findById(invoice.leaseId, connection);
                             if (lease && lease.status === 'draft') {
-                                const leaseService = (await import('./leaseService.js')).default;
-                                await leaseService.signLease(lease.id, user, connection);
-                                
-                                // Trigger Onboarding (Set Password email)
-                                const userService = (await import('./userService.js')).default;
-                                await userService.triggerOnboarding(lease.tenantId, connection);
+                                if (lease.isDocumentsVerified) {
+                                    const leaseService = (await import('./leaseService.js')).default;
+                                    await leaseService.signLease(lease.id, user, connection);
+                                    
+                                    // Trigger Onboarding (Set Password email)
+                                    const userService = (await import('./userService.js')).default;
+                                    await userService.triggerOnboarding(lease.tenantId, connection);
+                                } else {
+                                    // Notify Treasurers/Owners that payment is done but documents need review
+                                    const [owners] = await connection.query("SELECT owner_id FROM properties WHERE property_id = ?", [lease.propertyId]);
+                                    const ownerId = owners[0]?.owner_id;
+                                    
+                                    await notificationModel.create({
+                                        userId: ownerId,
+                                        message: `Payment verified for Lease #${lease.id}, but documents are pending verification. Please review and activate.`,
+                                        type: 'lease',
+                                    }, connection);
+                                    
+                                    console.log(`[PaymentService] Deposit paid for Lease ${lease.id}, but skipping auto-activation due to unverified documents.`);
+                                }
                             }
                         }
 
