@@ -130,6 +130,18 @@ class LeaseService {
       // 3. Create Lease
       const leaseId = await leaseModel.create(leaseParams, conn);
 
+      // 4. Generate Security Deposit Invoice immediately for the Draft Lease
+      // This allows the tenant to pay their "Holding Deposit" before the official signing.
+      if (securityDeposit > 0) {
+        await invoiceModel.create({
+          leaseId,
+          amount: securityDeposit,
+          dueDate: formatToLocalDate(addDays(today(), 7)), // Due in 7 days to hold the unit
+          description: 'Security Deposit',
+          type: 'deposit'
+        }, conn);
+      }
+
       // Audit Log
       const auditLogger = (await import('../utils/auditLogger.js')).default;
       await auditLogger.log(
@@ -190,6 +202,14 @@ class LeaseService {
       }
 
       const todayDate = today();
+
+      // [NEW] Verify Deposit Payment in Ledger before activating
+      // This ensures the unit status move to 'occupied' is backed by verified funds.
+      const depositStats = await leaseModel.getDepositStatus(leaseId, conn);
+      if (depositStats && !depositStats.isFullyPaid) {
+          throw new Error(`Cannot activate lease: Security Deposit of LKR ${depositStats.targetAmount.toLocaleString()} is not fully paid. Current ledger balance: LKR ${depositStats.paidAmount.toLocaleString()}.`);
+      }
+
       await leaseModel.update(leaseId, { status: 'active', signedAt: getLocalTime() }, conn);
 
       await visitModel.cancelVisitsForUnit(lease.unitId, todayDate, conn);
@@ -215,18 +235,7 @@ class LeaseService {
         await leadModel.dropLeadsForUnit(lease.unitId, conn);
       }
       
-      if (lease.targetDeposit > 0) {
-        await invoiceModel.create(
-          {
-            leaseId,
-            amount: lease.targetDeposit,
-            dueDate: formatToLocalDate(addDays(todayDate, 5)),
-            description: 'Security Deposit',
-            type: 'deposit',
-          },
-          conn
-        );
-      }
+      // Deposit Invoice is now pre-generated during createLease (Draft Stage)
 
       const start = new Date(lease.startDate);
       const year = start.getFullYear();

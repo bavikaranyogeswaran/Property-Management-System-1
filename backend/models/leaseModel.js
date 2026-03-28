@@ -218,6 +218,34 @@ class LeaseModel {
     return rows[0].count;
   }
 
+  async getDepositBalance(leaseId, connection = null) {
+    const dbConn = connection || db;
+    const [rows] = await dbConn.query(
+      `SELECT (COALESCE(SUM(credit), 0) - COALESCE(SUM(debit), 0)) as balance 
+       FROM accounting_ledger 
+       WHERE lease_id = ? AND category = 'deposit_held'`,
+      [leaseId]
+    );
+    return parseFloat(rows[0].balance || 0);
+  }
+
+  async getDepositStatus(leaseId, connection = null) {
+    const dbConn = connection || db;
+    const lease = await this.findById(leaseId, dbConn);
+    if (!lease) return null;
+
+    const paidAmount = await this.getDepositBalance(leaseId, dbConn);
+    const targetAmount = lease.targetDeposit || 0;
+
+    return {
+      leaseId,
+      targetAmount,
+      paidAmount,
+      isFullyPaid: paidAmount >= targetAmount,
+      shortfall: Math.max(0, targetAmount - paidAmount)
+    };
+  }
+
   mapRows(rows) {
     return rows.map((row) => ({
       id: row.lease_id.toString(),

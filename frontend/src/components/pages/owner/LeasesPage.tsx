@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp, Lease } from '@/app/context/AppContext';
 import { useAuth } from '@/app/context/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -95,6 +95,8 @@ export function LeasesPage() {
   const [isLoadingAdjustments, setIsLoadingAdjustments] = useState(false);
   const [finalizeLeaseId, setFinalizeLeaseId] = useState<string | null>(null);
   const [activateLeaseId, setActivateLeaseId] = useState<string | null>(null);
+  const [depositStatus, setDepositStatus] = useState<any>(null);
+  const [isLoadingDeposit, setIsLoadingDeposit] = useState(false);
   const [markAvailableUnitId, setMarkAvailableUnitId] = useState<string | null>(null);
   const [selectedRenewal, setSelectedRenewal] = useState<any | null>(null);
   const [isRenewalDialogOpen, setIsRenewalDialogOpen] = useState(false);
@@ -281,6 +283,25 @@ export function LeasesPage() {
       }
     }
   };
+
+  useEffect(() => {
+    if (activateLeaseId) {
+      const fetchDepositStatus = async () => {
+        try {
+          setIsLoadingDeposit(true);
+          const res = await apiClient.get(`/leases/${activateLeaseId}/deposit-status`);
+          setDepositStatus(res.data);
+        } catch (error) {
+          console.error('Failed to fetch deposit status:', error);
+        } finally {
+          setIsLoadingDeposit(false);
+        }
+      };
+      fetchDepositStatus();
+    } else {
+      setDepositStatus(null);
+    }
+  }, [activateLeaseId]);
 
   const LeaseRow = ({ lease }: { lease: Lease }) => {
     // ... (keep existing LeaseRow component logic)
@@ -1340,10 +1361,49 @@ export function LeasesPage() {
             <DialogTitle>Sign & Activate Lease</DialogTitle>
             <div className="text-sm text-gray-500 mt-2 space-y-2">
               <p>Are you sure you want to sign and activate this draft lease?</p>
+              
+              <div className="p-3 bg-gray-50 border rounded-lg space-y-3">
+                <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-gray-500">
+                  <span>Security Deposit Verification</span>
+                  {isLoadingDeposit ? (
+                    <span className="animate-pulse">Checking Ledger...</span>
+                  ) : depositStatus?.isFullyPaid ? (
+                    <Badge className="bg-green-100 text-green-700 border-none">Verified</Badge>
+                  ) : (
+                    <Badge className="bg-red-100 text-red-700 border-none">Pending Payment</Badge>
+                  )}
+                </div>
+
+                {isLoadingDeposit ? (
+                  <div className="h-8 bg-gray-100 animate-pulse rounded"></div>
+                ) : depositStatus ? (
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Total Requirement:</span>
+                      <span className="font-medium">LKR {depositStatus.targetAmount?.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Paid Amount (Ledger):</span>
+                      <span className={`font-bold ${depositStatus.isFullyPaid ? 'text-green-600' : 'text-red-600'}`}>
+                        LKR {depositStatus.paidAmount?.toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-xs text-amber-600 italic">No deposit record found in ledger.</p>
+                )}
+              </div>
+
+              {!isLoadingDeposit && depositStatus && !depositStatus.isFullyPaid && (
+                <div className="p-2 bg-red-50 border border-red-100 rounded text-[10px] text-red-700 flex gap-2">
+                  <AlertCircle className="size-3 mt-0.5" />
+                  <p><strong>Warning:</strong> You are attempting to activate a lease without full deposit payment. This unit will be marked as occupied, creating a financial float risk.</p>
+                </div>
+              )}
+
               <ul className="list-disc pl-5 space-y-1">
                 <li>The lease status will change to <strong>Active</strong>.</li>
                 <li>The unit will be reserved or marked as <strong>Occupied</strong> if the lease has started.</li>
-                <li>The <strong>Security Deposit</strong> and <strong>First Month Rent</strong> invoices will be generated immediately.</li>
                 <li>Any pending lead conversions or visits for this unit will be automatically cancelled.</li>
               </ul>
             </div>
@@ -1357,10 +1417,11 @@ export function LeasesPage() {
               Cancel
             </Button>
             <Button
-              type="button"
-              className="bg-green-600 hover:bg-green-700 text-white"
-              onClick={confirmActivateLease}
-            >
+                type="button"
+                className="bg-green-600 hover:bg-green-700 text-white"
+                onClick={confirmActivateLease}
+                disabled={isLoadingDeposit || (depositStatus && !depositStatus.isFullyPaid)}
+              >
               <PlayCircle className="size-4 mr-2" />
               Sign & Activate
             </Button>

@@ -888,6 +888,15 @@ export function LeadsPage() {
                 Optional: Upload the signed rental agreement now.
               </p>
             </div>
+            
+            {/* Conversion Notice */}
+            <div className="p-3 bg-blue-50 border border-blue-100 rounded-md flex gap-2 items-start text-blue-700">
+              <AlertCircle className="size-4 mt-0.5 shrink-0" />
+              <div className="text-xs">
+                <p className="font-bold uppercase tracking-wider mb-1">Deposit & Holding Policy</p>
+                <p>Converting this lead will create a <strong>Draft Lease</strong> and immediately generate a <strong>Security Deposit Invoice</strong>. The tenant will be notified to pay this to hold the unit.</p>
+              </div>
+            </div>
 
             <div className="flex gap-2 justify-end">
               <Button

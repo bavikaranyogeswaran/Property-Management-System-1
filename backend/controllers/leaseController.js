@@ -65,6 +65,21 @@ class LeaseController {
       if (error.message.includes('not found')) return res.status(404).json({ error: error.message });
       if (error.message.includes('draft')) return res.status(400).json({ error: error.message });
       if (error.message.includes('available') || error.message.includes('already leased')) return res.status(409).json({ error: error.message });
+      if (error.message.includes('not fully paid')) return res.status(402).json({ error: error.message });
+      res.status(500).json({ error: error.message });
+    }
+  }
+
+  async getDepositStatus(req, res) {
+    try {
+      const { id } = req.params;
+      const leaseModel = (await import('../models/leaseModel.js')).default;
+      const status = await leaseModel.getDepositStatus(id);
+      
+      if (!status) return res.status(404).json({ error: 'Lease not found' });
+      res.json(status);
+    } catch (error) {
+      console.error('Get Deposit Status Error:', error);
       res.status(500).json({ error: error.message });
     }
   }
