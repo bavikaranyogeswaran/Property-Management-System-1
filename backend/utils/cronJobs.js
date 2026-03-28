@@ -596,6 +596,67 @@ export const expireStaleRenewals = async () => {
 };
 
 /**
+ * Hardening Flow #1: Automatically expire draft leases that have been idle
+ * for > 48 hours without a pending or verified deposit payment.
+ */
+export const expireDraftLeases = async () => {
+  console.log('Running draft lease expiry check...');
+  try {
+    const cutoffDate = addDays(now(), -2); // 48 hours ago
+    
+    // Find draft leases that are too old AND have no pending/verified payments 
+    // for their deposit invoice.
+    const [staleDrafts] = await db.query(
+      `
+      SELECT l.lease_id, l.unit_id 
+      FROM leases l
+      WHERE l.status = 'draft' 
+      AND l.created_at < ?
+      AND NOT EXISTS (
+        SELECT 1 FROM rent_invoices ri
+        JOIN payments p ON ri.invoice_id = p.invoice_id
+        WHERE ri.lease_id = l.lease_id 
+        AND ri.invoice_type = 'deposit'
+        AND p.status IN ('pending', 'verified')
+      )
+      `,
+      [cutoffDate]
+    );
+
+    if (staleDrafts.length > 0) {
+      console.log(`Found ${staleDrafts.length} stale draft leases. Expiring...`);
+      const ids = staleDrafts.map(l => l.lease_id);
+      
+      const connection = await db.getConnection();
+      try {
+        await connection.beginTransaction();
+        
+        // Cancel the leases
+        await connection.query(
+          "UPDATE leases SET status = 'cancelled' WHERE lease_id IN (?)",
+          [ids]
+        );
+        
+        // Void their pending security deposit invoices
+        for (const leaseId of ids) {
+           await invoiceModel.voidPendingByLeaseId(leaseId, connection);
+        }
+        
+        await connection.commit();
+        console.log(`Successfully expired ${staleDrafts.length} draft leases.`);
+      } catch (innerErr) {
+        await connection.rollback();
+        throw innerErr;
+      } finally {
+        connection.release();
+      }
+    }
+  } catch (error) {
+    console.error('Error expiring stale draft leases:', error);
+  }
+};
+
+/**
  * Audit #9: Automatically revoke portal access for former tenants.
  * Deactivates accounts 30 days after their last lease has ended,
  * provided they have no active or future (draft) leases.
@@ -680,6 +741,7 @@ export const runNightlyCron = async (targetDate = null) => {
     await cleanupOldNotifications();
     await expireStaleLeads();
     await expireStaleRenewals();
+    await expireDraftLeases();
     await deactivateFormerTenants(executionDate);
 
     await logCronExecution('nightly_billing', executionDate, 'success');

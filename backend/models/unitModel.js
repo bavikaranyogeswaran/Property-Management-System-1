@@ -236,7 +236,19 @@ class UnitModel {
 
   async countOccupied(propertyId) {
     const [rows] = await db.query(
-      "SELECT COUNT(*) as count FROM units WHERE property_id = ? AND is_archived = FALSE AND status IN ('occupied', 'maintenance')",
+      `SELECT COUNT(u.unit_id) as count 
+       FROM units u
+       WHERE u.property_id = ? AND u.is_archived = FALSE 
+       AND (
+         u.status = 'maintenance' OR
+         EXISTS (
+           SELECT 1 FROM leases l 
+           WHERE l.unit_id = u.unit_id 
+           AND l.status = 'active'
+           AND l.start_date <= CURRENT_DATE() 
+           AND (l.end_date IS NULL OR l.end_date >= CURRENT_DATE())
+         )
+       )`,
       [propertyId]
     );
     return rows[0].count;
@@ -251,8 +263,28 @@ class UnitModel {
       SELECT 
         COALESCE(p.name, CONCAT('Property ', u.property_id)) AS propertyName,
         COUNT(u.unit_id) AS total,
-        SUM(CASE WHEN u.status = 'occupied' THEN 1 ELSE 0 END) AS occupied,
-        GROUP_CONCAT(CASE WHEN u.status != 'occupied' THEN u.unit_number ELSE NULL END) AS vacancies
+        SUM(CASE 
+          WHEN u.status = 'maintenance' THEN 1
+          WHEN EXISTS (
+            SELECT 1 FROM leases l 
+            WHERE l.unit_id = u.unit_id 
+            AND l.status = 'active'
+            AND l.start_date <= CURRENT_DATE() 
+            AND (l.end_date IS NULL OR l.end_date >= CURRENT_DATE())
+          ) THEN 1 
+          ELSE 0 
+        END) AS occupied,
+        GROUP_CONCAT(CASE 
+          WHEN u.status = 'maintenance' THEN NULL
+          WHEN EXISTS (
+            SELECT 1 FROM leases l 
+            WHERE l.unit_id = u.unit_id 
+            AND l.status = 'active'
+            AND l.start_date <= CURRENT_DATE() 
+            AND (l.end_date IS NULL OR l.end_date >= CURRENT_DATE())
+          ) THEN NULL 
+          ELSE u.unit_number 
+        END) AS vacancies
       FROM units u
       LEFT JOIN properties p ON u.property_id = p.property_id
       WHERE u.property_id IN (?) AND u.is_archived = FALSE

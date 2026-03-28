@@ -420,17 +420,29 @@ class PaymentService {
                                     const userService = (await import('./userService.js')).default;
                                     await userService.triggerOnboarding(lease.tenantId, connection);
                                 } else {
-                                    // Notify Treasurers/Owners that payment is done but documents need review
-                                    const [owners] = await connection.query("SELECT owner_id FROM properties WHERE property_id = ?", [lease.propertyId]);
-                                    const ownerId = owners[0]?.owner_id;
+                                    // Notify Treasurers and Owners that payment is done but documents need review
+                                    const [propertyInfo] = await connection.query("SELECT owner_id FROM properties WHERE property_id = ?", [lease.propertyId]);
+                                    const ownerId = propertyInfo[0]?.owner_id;
                                     
-                                    await notificationModel.create({
-                                        userId: ownerId,
-                                        message: `Payment verified for Lease #${lease.id}, but documents are pending verification. Please review and activate.`,
-                                        type: 'lease',
-                                    }, connection);
+                                    const [assignedStaff] = await connection.query(
+                                        "SELECT user_id FROM staff_property_assignments WHERE property_id = ?",
+                                        [lease.propertyId]
+                                    );
+
+                                    const userIdsToNotify = new Set();
+                                    if (ownerId) userIdsToNotify.add(ownerId);
+                                    assignedStaff.forEach(s => userIdsToNotify.add(s.user_id));
+
+                                    for (const userId of userIdsToNotify) {
+                                        await notificationModel.create({
+                                            userId: userId,
+                                            message: `URGENT: Deposit Paid for Lease #${lease.id} (Unit ${lease.unitNumber}). Documents are PENDING verification. Please review and activate.`,
+                                            type: 'lease',
+                                            severity: 'urgent'
+                                        }, connection);
+                                    }
                                     
-                                    console.log(`[PaymentService] Deposit paid for Lease ${lease.id}, but skipping auto-activation due to unverified documents.`);
+                                    console.log(`[PaymentService] Deposit paid for Lease ${lease.id}, notified ${userIdsToNotify.size} staff members. Auto-activation pending document verification.`);
                                 }
                             }
                         }

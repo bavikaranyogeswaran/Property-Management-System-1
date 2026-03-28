@@ -293,33 +293,33 @@ class LeaseService {
         await leadModel.dropLeadsForUnit(lease.unitId, conn);
       }
       
-      // Deposit Invoice is now pre-generated during createLease (Draft Stage)
-
+      // [IMPROVEMENT] Backfill Missing Rent Invoices if activated late
       const start = parseLocalDate(lease.startDate);
-      const year = start.getFullYear();
-      const month = start.getMonth() + 1;
-      const daysInMonth = getDaysInMonth(start);
-      const startDay = start.getDate();
+      const now = getLocalTime();
+      const billingEngine = (await import('../utils/billingEngine.js')).default;
+      
+      let cursorDate = new Date(start.getFullYear(), start.getMonth(), 1);
+      const targetDate = new Date(now.getFullYear(), now.getMonth(), 1);
 
-      let initialRentAmount = lease.monthlyRent;
-      let invoiceDescription = `Rent for ${year}-${month}`;
-
-      if (startDay > 1) {
-        const daysRemaining = daysInMonth - startDay + 1;
-        initialRentAmount =
-          Math.round((lease.monthlyRent / daysInMonth) * daysRemaining * 100) / 100;
-        invoiceDescription += ` (Prorated: ${daysRemaining}/${daysInMonth} days)`;
+      while (cursorDate <= targetDate) {
+          const y = cursorDate.getFullYear();
+          const m = cursorDate.getMonth() + 1;
+          
+          const billingInfo = billingEngine.calculateMonthlyRent(lease, y, m);
+          if (billingInfo) {
+              const exists = await invoiceModel.exists(lease.id, y, m, 'rent', conn);
+              if (!exists) {
+                  await invoiceModel.create({
+                      leaseId: lease.id,
+                      amount: billingInfo.amount,
+                      dueDate: billingInfo.dueDate,
+                      description: billingInfo.description,
+                      type: 'rent'
+                  }, conn);
+              }
+          }
+          cursorDate.setMonth(cursorDate.getMonth() + 1);
       }
-
-      await invoiceModel.create(
-        {
-          leaseId,
-          amount: initialRentAmount,
-          dueDate: formatToLocalDate(addDays(lease.startDate, 5)),
-          description: invoiceDescription,
-        },
-        conn
-      );
 
       const auditLogger = (await import('../utils/auditLogger.js')).default;
       await auditLogger.log(
