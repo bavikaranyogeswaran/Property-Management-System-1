@@ -59,7 +59,7 @@ export function PublicListingPage({
             street: p.street || '',
             city: p.city || '',
             district: p.district || '',
-            image: p.image,
+            imageUrl: p.imageUrl,
             createdAt: p.createdAt,
             description: p.description,
             features: p.features,
@@ -78,7 +78,7 @@ export function PublicListingPage({
             type: u.type,
             monthlyRent: u.monthlyRent,
             status: u.status,
-            image: u.image,
+            imageUrl: u.imageUrl,
             createdAt: u.createdAt,
           }));
           setUnits(mappedUnits);
@@ -238,13 +238,13 @@ export function PublicListingPage({
             key={property.id}
             className="overflow-hidden flex flex-col hover:shadow-lg transition-shadow duration-300"
           >
-            {property.image ? (
+            {property.imageUrl ? (
               <div
                 className="h-64 w-full bg-gray-100 relative group cursor-pointer"
                 onClick={() => navigate(`/property/${property.id}`)}
               >
                 <img
-                  src={property.image}
+                  src={property.imageUrl}
                   alt={property.name}
                   className="w-full h-full object-cover transition-transform group-hover:scale-105 duration-500"
                 />
@@ -268,7 +268,7 @@ export function PublicListingPage({
                   <h3 className="text-xl font-bold text-gray-900 leading-tight mb-1">
                     {property.name}
                   </h3>
-                  {!property.image && (
+                  {!property.imageUrl && (
                     <p className="text-sm text-gray-500">{property.typeName}</p>
                   )}
                 </div>

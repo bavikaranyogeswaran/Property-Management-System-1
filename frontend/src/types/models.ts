@@ -19,7 +19,7 @@ export interface Property {
   propertyTypeId: number;
   typeName?: string;
   totalUnits: number;
-  image?: string;
+  imageUrl?: string;
   createdAt?: string;
 }
 
@@ -32,6 +32,7 @@ export interface Unit {
   bathrooms: number;
   rent: number;
   status: 'available' | 'occupied' | 'maintenance';
+  imageUrl?: string;
   createdAt?: string;
 }
 
