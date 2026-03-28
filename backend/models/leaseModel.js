@@ -77,7 +77,7 @@ class LeaseModel {
     if (fields.length === 0) return false;
 
     const [result] = await dbConn.query(
-      `UPDATE leases SET ${fields.join(', ')} WHERE lease_id = ? AND deleted_at IS NULL`,
+      `UPDATE leases SET ${fields.join(', ')} WHERE lease_id = ?`,
       values
     );
     return result.affectedRows > 0;
@@ -89,12 +89,13 @@ class LeaseModel {
                    u.unit_number,
                    u.property_id,
                    p.name as property_name,
-                   t_usr.name as tenant_name
+                   t_usr.name as tenant_name,
+                   ri.magic_token
             FROM leases l
             JOIN units u ON l.unit_id = u.unit_id
             JOIN properties p ON u.property_id = p.property_id
             JOIN users t_usr ON l.tenant_id = t_usr.user_id
-            WHERE l.deleted_at IS NULL`;
+            LEFT JOIN rent_invoices ri ON l.lease_id = ri.lease_id AND ri.invoice_type = 'deposit'`;
     const params = [];
 
     if (ownerId) {
@@ -124,12 +125,14 @@ class LeaseModel {
                    u.unit_number,
                    u.property_id,
                    p.name as property_name,
-                   t_usr.name as tenant_name
+                   t_usr.name as tenant_name,
+                   ri.magic_token
             FROM leases l
             JOIN units u ON l.unit_id = u.unit_id
             JOIN properties p ON u.property_id = p.property_id
             JOIN users t_usr ON l.tenant_id = t_usr.user_id
-            WHERE l.lease_id = ? AND l.deleted_at IS NULL
+            LEFT JOIN rent_invoices ri ON l.lease_id = ri.lease_id AND ri.invoice_type = 'deposit'
+            WHERE l.lease_id = ?
         `,
       [id]
     );
@@ -144,12 +147,14 @@ class LeaseModel {
                    u.unit_number,
                    u.property_id,
                    p.name as property_name,
-                   t_usr.name as tenant_name
+                   t_usr.name as tenant_name,
+                   ri.magic_token
             FROM leases l
             JOIN units u ON l.unit_id = u.unit_id
             JOIN properties p ON u.property_id = p.property_id
             JOIN users t_usr ON l.tenant_id = t_usr.user_id
-            WHERE l.tenant_id = ? AND l.deleted_at IS NULL
+            LEFT JOIN rent_invoices ri ON l.lease_id = ri.lease_id AND ri.invoice_type = 'deposit'
+            WHERE l.tenant_id = ?
         `,
       [tenantId]
     );
@@ -162,12 +167,14 @@ class LeaseModel {
                    u.unit_number,
                    u.property_id,
                    p.name as property_name,
-                   t_usr.name as tenant_name
+                   t_usr.name as tenant_name,
+                   ri.magic_token
             FROM leases l
             JOIN units u ON l.unit_id = u.unit_id
             JOIN properties p ON u.property_id = p.property_id
             JOIN users t_usr ON l.tenant_id = t_usr.user_id
-            WHERE l.status = 'active' AND l.deleted_at IS NULL
+            LEFT JOIN rent_invoices ri ON l.lease_id = ri.lease_id AND ri.invoice_type = 'deposit'
+            WHERE l.status = 'active'
         `);
     return this.mapRows(rows);
   }
@@ -178,7 +185,7 @@ class LeaseModel {
             SELECT lease_id FROM leases 
             WHERE unit_id = ? 
             AND status IN ('active', 'pending', 'draft')
-            AND deleted_at IS NULL
+           
             AND start_date <= ? 
             AND (end_date IS NULL OR end_date >= ?)`;
     const params = [unitId, endDate || '2099-12-31', startDate];
@@ -195,7 +202,7 @@ class LeaseModel {
   async delete(id, connection = null) {
     const dbConn = connection || db;
     const [result] = await dbConn.query(
-      "UPDATE leases SET deleted_at = NOW(), status = 'cancelled' WHERE lease_id = ?",
+      "UPDATE leases SET status = 'cancelled' WHERE lease_id = ?",
       [id]
     );
     return result.affectedRows > 0;
@@ -207,7 +214,7 @@ class LeaseModel {
       `SELECT COUNT(*) as count FROM leases 
        WHERE unit_id = ? 
        AND status IN ('active', 'pending', 'draft')
-       AND deleted_at IS NULL`,
+      `,
       [unitId]
     );
     return rows[0].count;
@@ -220,7 +227,7 @@ class LeaseModel {
        JOIN units u ON l.unit_id = u.unit_id
        WHERE u.property_id = ? 
        AND l.status IN ('active', 'pending', 'draft')
-       AND l.deleted_at IS NULL`,
+      `,
       [propertyId]
     );
     return rows[0].count;
@@ -277,6 +284,7 @@ class LeaseModel {
       propertyId: row.property_id.toString(),
       propertyName: row.property_name,
       tenantName: row.tenant_name,
+      magicToken: row.magic_token,
     }));
   }
 

@@ -200,7 +200,7 @@ class UserService {
       let userId;
       const existingUser = await userModel.findByEmail(lead.email, connection);
 
-      let invitationData = null;
+      let invitationToken = null;
       if (existingUser) {
         if (existingUser.role === 'tenant') {
           // User is already an active tenant applying for another property.
@@ -227,13 +227,21 @@ class UserService {
           connection
         );
 
-        const token = jwt.sign(
+        invitationToken = jwt.sign(
           { id: userId, type: 'setup_password', role: 'tenant' },
           JWT_SECRET,
           { expiresIn: '48h' }
         );
-        invitationData = { email: lead.email, role: 'tenant', token };
       }
+
+      // Track email context data
+      const mailData = {
+          email: lead.email,
+          name: lead.name,
+          leaseId: null,
+          propertyName: null,
+          unitNumber: null
+      };
 
       // 3. Create Tenant Profile
       const existingTenant = await tenantModel.findByUserId(userId, connection);
@@ -305,7 +313,7 @@ class UserService {
           }
 
           // Use LeaseService with the existing transaction connection
-          await leaseService.createLease(
+          const leaseId = await leaseService.createLease(
             {
               tenantId: userId,
               unitId: targetUnitId,
@@ -319,6 +327,11 @@ class UserService {
             connection,
             user // Pass the acting user here
           );
+
+          // [NEW] Capture context for Magic Link email
+          mailData.leaseId = leaseId;
+          mailData.propertyName = unit.propertyName;
+          mailData.unitNumber = unit.unitNumber;
         }
       }
 
@@ -329,9 +342,32 @@ class UserService {
         unitLockService.releaseLock(targetUnitId);
       }
 
-      // [CRITICAL FIX] Send invitation email ONLY after successful transaction commit
-      if (invitationData) {
-        await emailService.sendInvitationEmail(invitationData.email, invitationData.role, invitationData.token);
+      // [CRITICAL FIX] Send email ONLY after successful transaction commit
+      // [NEW] Check if a deposit magic link was generated for this lease
+      if (mailData.leaseId) {
+          const [depositInvoices] = await connection.query(
+              "SELECT magic_token, amount FROM rent_invoices WHERE lease_id = ? AND invoice_type = 'deposit' AND status = 'pending' LIMIT 1",
+              [mailData.leaseId]
+          );
+
+          if (depositInvoices.length > 0 && depositInvoices[0].magic_token) {
+              // Send Deposit Magic Link instead of Account Invitation
+              // (Account Invitation will be sent automatically AFTER deposit is verified)
+              await emailService.sendDepositMagicLink(
+                  mailData.email,
+                  mailData.name,
+                  mailData.propertyName || 'Property',
+                  mailData.unitNumber || 'N/A',
+                  depositInvoices[0].amount,
+                  depositInvoices[0].magic_token
+              );
+              return { message: 'Lead converted successfully. Deposit payment link sent.', tenantId: userId, magicLinkSent: true };
+          }
+      }
+
+      // Fallback: If no deposit magic link, and it's a new user, send account setup invitation
+      if (invitationToken) {
+          await emailService.sendInvitationEmail(mailData.email, 'tenant', invitationToken);
       }
 
       return { message: 'Lead converted successfully', tenantId: userId };
@@ -340,6 +376,41 @@ class UserService {
       throw error;
     } finally {
       connection.release();
+    }
+  }
+
+  async triggerOnboarding(userId, connection = null) {
+    const db = connection || pool;
+    const user = await userModel.findById(userId, db);
+    if (!user) {
+        console.error(`[UserService] Onboarding failed: User ${userId} not found.`);
+        return;
+    }
+
+    // Generate token for password setup (invitation)
+    const token = sign(
+      { id: userId, type: 'setup_password', role: 'tenant' },
+      JWT_SECRET,
+      { expiresIn: '48h' }
+    );
+
+    try {
+        await emailService.sendInvitationEmail(user.email, 'tenant', token);
+    } catch (err) {
+        console.error(`[UserService] Failed to send onboarding email to ${user.email}:`, err);
+    }
+    
+    // Log audit trail
+    try {
+        const auditLogger = (await import('../utils/auditLogger.js')).default;
+        await auditLogger.log({
+            userId: null, // System action
+            actionType: 'TENANT_ONBOARDING_TRIGGERED',
+            entityId: userId,
+            details: { email: user.email }
+        }, null, db);
+    } catch (err) {
+        console.error('[UserService] Failed to log onboarding audit:', err);
     }
   }
 }

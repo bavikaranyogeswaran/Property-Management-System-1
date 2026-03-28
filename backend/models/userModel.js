@@ -34,7 +34,10 @@ class UserModel {
       "SELECT user_id as id, name, email, phone, role, status, created_at as createdAt FROM users WHERE role = ? AND is_archived = FALSE",
       [role]
     );
-    return rows;
+    return rows.map(row => ({
+      ...row,
+      id: row.id.toString(),
+    }));
   }
 
   async findTenantsByOwner(ownerId) {
@@ -68,7 +71,10 @@ class UserModel {
         `,
       [ownerId]
     );
-    return rows;
+    return rows.map(row => ({
+      ...row,
+      id: row.id.toString(),
+    }));
   }
 
   async findTenantsByTreasurer(treasurerId) {
@@ -106,7 +112,10 @@ class UserModel {
         `,
       [treasurerId]
     );
-    return rows;
+    return rows.map(row => ({
+      ...row,
+      id: row.id.toString(),
+    }));
   }
 
   async findById(id, connection = null) {

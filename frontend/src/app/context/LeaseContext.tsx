@@ -23,6 +23,7 @@ export interface Lease {
   propertyId?: string;
   propertyName?: string;
   tenantName?: string;
+  magicToken?: string;
   createdAt: string;
 }
 

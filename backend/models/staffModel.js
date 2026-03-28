@@ -88,7 +88,18 @@ class StaffModel {
         `,
       [userId]
     );
-    return rows;
+
+    return rows.map((row) => ({
+      id: row.property_id.toString(),
+      ownerId: row.owner_id ? row.owner_id.toString() : null,
+      name: row.name,
+      propertyNo: row.property_no,
+      street: row.street,
+      city: row.city,
+      district: row.district,
+      status: row.status,
+      assignedAt: row.assigned_at,
+    }));
   }
 }
 

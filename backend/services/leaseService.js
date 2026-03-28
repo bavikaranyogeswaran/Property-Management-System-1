@@ -138,7 +138,8 @@ class LeaseService {
           amount: securityDeposit,
           dueDate: formatToLocalDate(addDays(today(), 7)), // Due in 7 days to hold the unit
           description: 'Security Deposit',
-          type: 'deposit'
+          type: 'deposit',
+          magicToken: `DEP-${randomUUID()}`
         }, conn);
       }
 
@@ -175,11 +176,14 @@ class LeaseService {
   /**
    * Signs and activates a draft lease.
    */
-  async signLease(leaseId, user) {
-    const conn = await pool.getConnection();
+  async signLease(leaseId, user, connection = null) {
+    const conn = connection || await pool.getConnection();
+    const isOwnTransaction = !connection;
 
     try {
-      await conn.beginTransaction();
+      if (isOwnTransaction) {
+        await conn.beginTransaction();
+      }
 
       const lease = await leaseModel.findById(leaseId, conn);
       if (!lease) throw new Error('Lease not found');
@@ -275,13 +279,19 @@ class LeaseService {
         conn
       );
 
-      await conn.commit();
+      if (isOwnTransaction) {
+        await conn.commit();
+      }
       return { status: 'active', signedAt: getLocalTime() };
     } catch (error) {
-       await conn.rollback();
-       throw new Error(`Transaction failed: ${error.message}`);
+      if (isOwnTransaction) {
+        await conn.rollback();
+      }
+      throw new Error(`Transaction failed: ${error.message}`);
     } finally {
-       conn.release();
+      if (isOwnTransaction) {
+        conn.release();
+      }
     }
   }
 

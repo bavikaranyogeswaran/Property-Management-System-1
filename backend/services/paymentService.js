@@ -102,6 +102,71 @@ class PaymentService {
         }
     }
 
+    async submitGuestPayment(data, magicToken, file) {
+        const { paymentDate, paymentMethod, referenceNumber } = data;
+        let evidenceUrl = data.evidenceUrl;
+
+        const connection = await pool.getConnection();
+        try {
+            await connection.beginTransaction();
+
+            // 1. Verify Magic Token
+            const invoice = await invoiceModel.findByMagicToken(magicToken, connection);
+            if (!invoice) throw new Error('Invalid or expired payment link.');
+            
+            if (invoice.status === 'paid') {
+                throw new Error('This invoice has already been paid.');
+            }
+
+            const invoiceId = invoice.id;
+            const amount = invoice.amount; // Guests must pay the full amount for the deposit to "hold" the unit
+
+            if (file) {
+                if (!file.path && !file.secure_url) {
+                    throw new Error('Payment evidence file is corrupted or missing path.');
+                }
+                evidenceUrl = file.path || file.secure_url;
+            }
+
+            // 2. Concurrency Control: One pending payment at a time
+            const [pendingPayments] = await connection.query(
+                "SELECT payment_id FROM payments WHERE invoice_id = ? AND status = 'pending'",
+                [invoiceId]
+            );
+            if (pendingPayments.length > 0) {
+                throw new Error('There is already a pending payment for this invoice. Please wait for verification.');
+            }
+
+            const paymentId = await paymentModel.create({
+                invoiceId,
+                amount,
+                paymentDate,
+                paymentMethod,
+                referenceNumber,
+                evidenceUrl,
+            }, connection);
+
+            // 3. Notify Treasurers
+            const [treasurers] = await connection.query("SELECT user_id FROM users WHERE role = 'treasurer' AND status = 'active'");
+            for (const t of treasurers) {
+                await notificationModel.create({
+                    userId: t.user_id,
+                    message: `GUEST PAYMENT: New Deposit submitted via Magic Link for Unit ${invoice.unitNumber} (Amount: ${amount}).`,
+                    type: 'payment',
+                }, connection);
+            }
+
+            await connection.commit();
+            return paymentId;
+
+        } catch (error) {
+            await connection.rollback();
+            throw error;
+        } finally {
+            connection.release();
+        }
+    }
+
     async _postToLedger(paymentId, invoice, amount, description, connection) {
         const { accountType, category } = getLedgerClassification(invoice.invoiceType || invoice.invoice_type);
         return await ledgerModel.create({
@@ -268,9 +333,9 @@ class PaymentService {
                     }
 
                     // Lease Status Warning
-                    const lease = await leaseModel.findById(invoice.lease_id, connection);
+                    const lease = await leaseModel.findById(invoice.leaseId, connection);
                     if (lease && lease.status === 'ended') {
-                        console.warn(`Verified payment ${paymentId} for invoice linked to ENDED lease ${lease.lease_id}`);
+                        console.warn(`Verified payment ${paymentId} for invoice linked to ENDED lease ${lease.id}`);
                     }
 
                     const previousVerified = totalVerified - Number(payment.amount);
@@ -282,9 +347,9 @@ class PaymentService {
                         
                         // Overpayment Logic (Bug B5 Fix)
                         if (incrementalOverpayment > 0) {
-                            await tenantModel.addCredit(invoice.tenant_id, incrementalOverpayment, connection);
+                            await tenantModel.addCredit(invoice.tenantId, incrementalOverpayment, connection);
                             await notificationModel.create({
-                                userId: invoice.tenant_id,
+                                userId: invoice.tenantId,
                                 message: `Overpayment of ${incrementalOverpayment} has been credited to your account balance.`,
                                 type: 'payment',
                             }, connection);
@@ -300,31 +365,55 @@ class PaymentService {
                         await receiptModel.create({
                             paymentId: paymentId,
                             invoiceId: payment.invoiceId,
-                            tenantId: invoice.tenantId || invoice.tenant_id,
+                            tenantId: invoice.tenantId,
                             amount: payment.amount,
                             generatedDate: today(),
                             receiptNumber: `REC-${randomUUID()}`,
                         }, connection);
 
+                        // [CRITICAL FIX] Post Ledger Entry BEFORE activation
+                        // This ensures that lease status checks (deposit balance) can see the verified funds.
+                        await this._postToLedger(
+                            paymentId,
+                            invoice,
+                            payment.amount,
+                            `Payment verified for ${invoice.description || invoice.invoiceType}`,
+                            connection
+                        );
+
                         // Deposit Status Logic
-                        if (invoice.invoice_type === 'deposit') {
-                             const newHeld = Number(lease.security_deposit || 0) + amountAppliedToInvoice;
+                        if (invoice.invoiceType === 'deposit') {
+                             const newHeld = Number(lease.securityDeposit || 0) + amountAppliedToInvoice;
                              
                              const finalInvoice = await invoiceModel.findById(payment.invoiceId, connection);
                              const finalStatus = finalInvoice.status === 'paid' ? 'paid' : 'pending';
                              
-                             await leaseModel.update(invoice.lease_id, {
-                                 deposit_status: finalStatus,
-                                 security_deposit: newHeld,
+                             await leaseModel.update(invoice.leaseId, {
+                                 depositStatus: finalStatus,
+                                 securityDeposit: newHeld,
                              }, connection);
                         }
 
                         // Notify Tenant
                         await notificationModel.create({
-                            userId: invoice.tenantId || invoice.tenant_id,
+                            userId: invoice.tenantId,
                             message: `Payment of ${payment.amount} for Invoice #${payment.invoiceId} has been verified.`,
                             type: 'payment',
                         }, connection);
+
+                        // [AUTO-ACTIVATION] If full deposit is paid on a draft lease, activate it immediately.
+                        const finalInvoice = await invoiceModel.findById(payment.invoiceId, connection);
+                        if (finalInvoice.status === 'paid' && invoice.invoiceType === 'deposit') {
+                            const lease = await leaseModel.findById(invoice.leaseId, connection);
+                            if (lease && lease.status === 'draft') {
+                                const leaseService = (await import('./leaseService.js')).default;
+                                await leaseService.signLease(lease.id, user, connection);
+                                
+                                // Trigger Onboarding (Set Password email)
+                                const userService = (await import('./userService.js')).default;
+                                await userService.triggerOnboarding(lease.tenantId, connection);
+                            }
+                        }
 
                         await auditLogger.log({
                             userId: user.id,
@@ -333,25 +422,16 @@ class PaymentService {
                             details: { invoiceId: payment.invoiceId, amount: payment.amount },
                         }, null, connection);
 
-                        // Post Ledger Entry (Centralized)
-                        await this._postToLedger(
-                            paymentId,
-                            invoice,
-                            payment.amount,
-                            `Payment verified for ${invoice.description || invoice.invoice_type}`,
-                            connection
-                        );
-
                         // Behavior Score
                         try {
                             const paymentDate = parseLocalDate(payment.paymentDate);
-                            const dueDate = parseLocalDate(invoice.due_date);
+                            const dueDate = parseLocalDate(invoice.dueDate);
                             const payStr = formatToLocalDate(paymentDate);
                             const dueStr = formatToLocalDate(dueDate);
 
                             if (payStr <= dueStr) {
-                                 await behaviorLogModel.logPositivePayment(invoice.tenant_id, 5, connection);
-                                 await tenantModel.incrementBehaviorScore(invoice.tenant_id, 5, connection);
+                                 await behaviorLogModel.logPositivePayment(invoice.tenantId, 5, connection);
+                                 await tenantModel.incrementBehaviorScore(invoice.tenantId, 5, connection);
                             }
                         } catch (scoreErr) {
                              console.error('Failed to update positive score:', scoreErr);

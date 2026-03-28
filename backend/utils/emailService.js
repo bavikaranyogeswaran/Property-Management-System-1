@@ -211,6 +211,54 @@ class EmailService {
     }
   }
 
+  async sendDepositMagicLink(email, name, propertyName, unitNumber, amount, magicToken) {
+    const link = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/guest-payment?token=${magicToken}`;
+    const formattedAmount = new Intl.NumberFormat('en-LK', {
+      style: 'currency',
+      currency: 'LKR',
+    }).format(amount);
+
+    if (!this.transporter) {
+      console.log('==================================================');
+      console.log(`[EMAIL MOCK] Magic Link (Deposit Reservation) for ${email}`);
+      console.log(`Property: ${propertyName}, Unit: ${unitNumber}`);
+      console.log(`Amount: ${formattedAmount}`);
+      console.log(`Magic Link: ${link}`);
+      console.log('==================================================');
+      return true;
+    }
+
+    try {
+      await this.transporter.sendMail({
+        from: `"Property Management System" <${process.env.SMTP_USER}>`,
+        to: email,
+        subject: `Security Deposit Payment: ${propertyName}`,
+        html: this._getTemplate(
+          'Reserve Your Unit',
+          `
+                    <p>Hi ${name},</p>
+                    <p>Great news! Your application for <strong>${propertyName}</strong> (Unit ${unitNumber}) has been approved.</p>
+                    <p>To formally reserve this unit and finalize your lease, please pay the security deposit of <strong>${formattedAmount}</strong> using the secure payment link below:</p>
+                    
+                    <div style="text-align: center; margin: 32px 0;">
+                        <a href="${link}" style="background-color: #2563eb; color: white; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px; display: inline-block;">Pay Security Deposit</a>
+                    </div>
+
+                    <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; margin: 24px 0; border: 1px solid #e2e8f0;">
+                         <p style="margin: 0; color: #475569; font-size: 14px;">Once your payment is verified, you will receive an invitation to set up your official tenant account and sign the lease agreement.</p>
+                    </div>
+
+                    <p style="color: #94a3b8; font-size: 14px;">This link is unique to your application and should not be shared.</p>
+                `
+        ),
+      });
+      return true;
+    } catch (error) {
+      console.error('Error sending deposit magic link email:', error);
+      return false;
+    }
+  }
+
   async sendVisitNotification(ownerEmail, visitDetails) {
     const {
       visitorName,

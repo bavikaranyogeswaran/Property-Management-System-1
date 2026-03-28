@@ -73,7 +73,8 @@ class LeadPortalController {
           district: property.district,
         } : null,
         unit: unit ? {
-          typeName: unit.typeName,
+          unitNumber: unit.unitNumber,
+          type: unit.type,
           monthlyRent: unit.monthlyRent,
         } : null,
         leaseTerms: leaseTerms

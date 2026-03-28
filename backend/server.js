@@ -101,6 +101,7 @@ import adminRoutes from './routes/adminRoutes.js';
 import renewalRoutes from './routes/renewalRoutes.js';
 import systemRoutes from './routes/systemRoutes.js';
 import auditRoutes from './routes/auditRoutes.js';
+import guestPaymentRoutes from './routes/guestPaymentRoutes.js';
 
 // ... (rest of imports)
 app.use('/api/lead-portal', leadPortalRoutes);
@@ -108,6 +109,8 @@ app.use('/api/lead-portal', leadPortalRoutes);
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'PMS Backend is running' });
 });
+
+app.use('/api/public/invoice', guestPaymentRoutes);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);

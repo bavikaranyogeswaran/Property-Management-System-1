@@ -16,6 +16,7 @@ const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: {
     folder: 'pms_uploads', 
+    resource_type: 'auto',
     allowed_formats: ['jpg', 'jpeg', 'png', 'webp', 'pdf', 'doc', 'docx'],
     public_id: (req, file) => {
       const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
@@ -31,6 +32,7 @@ const privateStorage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: {
     folder: 'pms_private',
+    resource_type: 'auto',
     access_mode: 'authenticated', // Requires signed URL
     allowed_formats: ['jpg', 'jpeg', 'png', 'webp', 'pdf', 'doc', 'docx'],
     public_id: (req, file) => {

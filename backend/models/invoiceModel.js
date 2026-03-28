@@ -12,7 +12,7 @@ class InvoiceModel {
   //  CREATE: Writing a new bill to the ledger.
   // NOTE: Email notifications are handled by the caller (service/controller/cron layer).
   async create(data, connection = null) {
-    const { leaseId, amount, dueDate, description, type } = data;
+    const { leaseId, amount, dueDate, description, type, magicToken } = data;
     // Need to determine year/month from dueDate
     const date = parseLocalDate(dueDate);
     const year = date.getFullYear();
@@ -22,8 +22,8 @@ class InvoiceModel {
     const db = connection || pool;
     try {
       const [result] = await db.query(
-        'INSERT INTO rent_invoices (lease_id, year, month, amount, due_date, status, invoice_type, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-        [leaseId, year, month, amount, dueDate, 'pending', type, description]
+        'INSERT INTO rent_invoices (lease_id, year, month, amount, due_date, status, invoice_type, description, magic_token) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [leaseId, year, month, amount, dueDate, 'pending', type, description, magicToken || null]
       );
       const invoiceId = result.insertId;
 
@@ -119,6 +119,24 @@ class InvoiceModel {
       [id]
     );
     return this.mapRow(rows[0]);
+  }
+
+  async findByMagicToken(token, connection = null) {
+    const db = connection || pool;
+    const [rows] = await db.query(
+      `
+            SELECT ri.*, l.tenant_id, l.unit_id,
+                   p.name as property_name, un.unit_number,
+                   COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id = ri.invoice_id AND status = 'verified'), 0) AS amount_paid
+            FROM rent_invoices ri 
+            JOIN leases l ON ri.lease_id = l.lease_id 
+            JOIN units un ON l.unit_id = un.unit_id
+            JOIN properties p ON un.property_id = p.property_id
+            WHERE ri.magic_token = ?
+        `,
+      [token]
+    );
+    return rows.length > 0 ? this.mapRow(rows[0]) : null;
   }
 
   async findByTenantId(tenantId) {

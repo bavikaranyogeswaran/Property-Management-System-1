@@ -76,11 +76,11 @@ export function PaymentVerificationPage() {
     const payment = payments.find((p) => p.id === selectedPayment);
     if (!payment) return null;
 
-    const invoice = invoices.find((i) => i.id === payment.invoiceId);
-    const tenant = tenants.find((t) => t.id === payment.tenantId);
-    const unit = invoice ? units.find((u) => u.id === invoice.unitId) : null;
+    const invoice = invoices.find((i) => String(i.id) === String(payment.invoiceId));
+    const tenant = tenants.find((t) => String(t.id) === String(payment.tenantId));
+    const unit = invoice ? units.find((u) => String(u.id) === String(invoice.unitId)) : null;
     const property = unit
-      ? properties.find((p) => p.id === unit.propertyId)
+      ? properties.find((p) => String(p.id) === String(unit.propertyId))
       : null;
 
     return (
@@ -297,15 +297,15 @@ export function PaymentVerificationPage() {
               </TableHeader>
               <TableBody>
                 {pendingPayments.map((payment) => {
-                  const tenant = tenants.find((t) => t.id === payment.tenantId);
+                  const tenant = tenants.find((t) => String(t.id) === String(payment.tenantId));
                   const invoice = invoices.find(
-                    (i) => i.id === payment.invoiceId
+                    (i) => String(i.id) === String(payment.invoiceId)
                   );
                   const unit = invoice
-                    ? units.find((u) => u.id === invoice.unitId)
+                    ? units.find((u) => String(u.id) === String(invoice.unitId))
                     : null;
                   const property = unit
-                    ? properties.find((p) => p.id === unit.propertyId)
+                    ? properties.find((p) => String(p.id) === String(unit.propertyId))
                     : null;
 
                   return (

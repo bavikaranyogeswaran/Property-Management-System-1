@@ -44,6 +44,7 @@ import {
   AlertTriangle,
   PlayCircle,
   Unlock,
+  Share2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -381,7 +382,7 @@ export function LeasesPage() {
               ''
             }
           >
-            {lease.status}
+            {lease.status === 'draft' ? 'Awaiting Deposit' : lease.status}
           </Badge>
         </TableCell>
         <TableCell className="text-right">
@@ -403,6 +404,21 @@ export function LeasesPage() {
                 title="Sign & Activate Lease"
               >
                 <PlayCircle className="size-4" />
+              </Button>
+            )}
+            {lease.status === 'draft' && lease.magicToken && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  const url = `${window.location.origin}/pay/${lease.magicToken}`;
+                  navigator.clipboard.writeText(url);
+                  toast.success('Payment Link copied to clipboard');
+                }}
+                className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                title="Copy Guest Payment Link"
+              >
+                <Share2 className="size-4" />
               </Button>
             )}
             {lease.status === 'expired' && (
@@ -1397,7 +1413,7 @@ export function LeasesPage() {
               {!isLoadingDeposit && depositStatus && !depositStatus.isFullyPaid && (
                 <div className="p-2 bg-red-50 border border-red-100 rounded text-[10px] text-red-700 flex gap-2">
                   <AlertCircle className="size-3 mt-0.5" />
-                  <p><strong>Warning:</strong> You are attempting to activate a lease without full deposit payment. This unit will be marked as occupied, creating a financial float risk.</p>
+                  <p><strong>Warning:</strong> Direct activation is a fallback. The system will <strong>automatically activate</strong> this lease and onboard the tenant as soon as the Treasurer verifies the deposit in the ledger.</p>
                 </div>
               )}
 
