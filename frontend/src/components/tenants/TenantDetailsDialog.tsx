@@ -39,6 +39,8 @@ export const TenantDetailsDialog: React.FC<TenantDetailsDialogProps> = ({
   const [score, setScore] = useState<number>(100);
   const [isAddBehaviorOpen, setIsAddBehaviorOpen] = useState(false);
   const [isNicPreviewOpen, setIsNicPreviewOpen] = useState(false);
+  const [isTinPreviewOpen, setIsTinPreviewOpen] = useState(false);
+  const [isIdCardPreviewOpen, setIsIdCardPreviewOpen] = useState(false);
   const [loading, setLoading] = useState(false);
 
   // In a real app, use environment variable or context for API URL
@@ -175,14 +177,38 @@ export const TenantDetailsDialog: React.FC<TenantDetailsDialogProps> = ({
                         </p>
                       </div>
                       {tenant.nicUrl && (
-                        <div className="sm:col-span-2 mt-2">
+                        <div className="mt-2">
                           <p className="text-sm text-gray-600 mb-1">NIC Document</p>
                           <button 
                             onClick={() => setIsNicPreviewOpen(true)}
                             className="text-blue-600 hover:underline text-sm font-medium flex items-center gap-1"
                           >
                             <Eye className="size-4" />
-                            View Uploaded Document
+                            View NIC
+                          </button>
+                        </div>
+                      )}
+                      {tenant.tinUrl && (
+                        <div className="mt-2">
+                          <p className="text-sm text-gray-600 mb-1">TIN Document</p>
+                          <button 
+                            onClick={() => setIsTinPreviewOpen(true)}
+                            className="text-blue-600 hover:underline text-sm font-medium flex items-center gap-1"
+                          >
+                            <Eye className="size-4" />
+                            View TIN
+                          </button>
+                        </div>
+                      )}
+                      {tenant.idCardUrl && (
+                        <div className="mt-2">
+                          <p className="text-sm text-gray-600 mb-1">ID Card</p>
+                          <button 
+                            onClick={() => setIsIdCardPreviewOpen(true)}
+                            className="text-blue-600 hover:underline text-sm font-medium flex items-center gap-1"
+                          >
+                            <Eye className="size-4" />
+                            View ID Card
                           </button>
                         </div>
                       )}
@@ -289,6 +315,37 @@ export const TenantDetailsDialog: React.FC<TenantDetailsDialogProps> = ({
               <Button onClick={() => setIsNicPreviewOpen(false)}>
                 Close
               </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+      {/* TIN Preview */}
+      <Dialog open={isTinPreviewOpen} onOpenChange={setIsTinPreviewOpen}>
+        <DialogContent className="sm:max-w-[700px]">
+          <DialogHeader><DialogTitle>TIN Document Preview</DialogTitle></DialogHeader>
+          <div className="mt-4 flex flex-col items-center gap-4">
+            <div className="w-full border rounded-lg overflow-hidden bg-gray-50 flex items-center justify-center min-h-[400px]">
+              <iframe src={`${API_URL}/documents/view/${tenant.id}?type=tin`} className="w-full h-[500px]" title="TIN Preview" />
+            </div>
+            <div className="flex justify-end w-full gap-2">
+              <Button variant="outline" onClick={() => window.open(`${API_URL}/documents/view/${tenant.id}?type=tin`, '_blank')}>Open in New Tab</Button>
+              <Button onClick={() => setIsTinPreviewOpen(false)}>Close</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ID Card Preview */}
+      <Dialog open={isIdCardPreviewOpen} onOpenChange={setIsIdCardPreviewOpen}>
+        <DialogContent className="sm:max-w-[700px]">
+          <DialogHeader><DialogTitle>ID Card Preview</DialogTitle></DialogHeader>
+          <div className="mt-4 flex flex-col items-center gap-4">
+            <div className="w-full border rounded-lg overflow-hidden bg-gray-50 flex items-center justify-center min-h-[400px]">
+              <iframe src={`${API_URL}/documents/view/${tenant.id}?type=id_card`} className="w-full h-[500px]" title="ID Card Preview" />
+            </div>
+            <div className="flex justify-end w-full gap-2">
+              <Button variant="outline" onClick={() => window.open(`${API_URL}/documents/view/${tenant.id}?type=id_card`, '_blank')}>Open in New Tab</Button>
+              <Button onClick={() => setIsIdCardPreviewOpen(false)}>Close</Button>
             </div>
           </div>
         </DialogContent>

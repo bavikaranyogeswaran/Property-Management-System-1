@@ -395,7 +395,8 @@ class LeaseService {
     }
 
     const amount = lease.proposedRefundAmount;
-    const status = amount >= lease.securityDeposit ? 'refunded' : 'partially_refunded';
+    // Status moves to 'awaiting_acknowledgment' instead of directly to 'refunded'
+    const status = 'awaiting_acknowledgment';
 
     const connection = await pool.getConnection();
     try {
@@ -600,6 +601,54 @@ class LeaseService {
     });
 
     return { status: 'disputed' };
+  }
+  
+  /**
+   * Tenant acknowledges the refund settlement.
+   * This step is mandatory to prevent legal disputes over deductions.
+   */
+  async acknowledgeRefund(leaseId, tenantId) {
+    const lease = await leaseModel.findById(leaseId);
+    if (!lease) throw new Error('Lease not found');
+    
+    // Authorization: Only the tenant of this lease can acknowledge
+    if (String(lease.tenantId) !== String(tenantId)) {
+        throw new Error('Access denied: You are not the tenant of this lease.');
+    }
+
+    if (lease.depositStatus !== 'awaiting_acknowledgment') {
+      throw new Error('No refund settlement is currently awaiting your acknowledgment.');
+    }
+
+    const finalStatus = lease.proposedRefundAmount >= lease.securityDeposit ? 'refunded' : 'partially_refunded';
+
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      await leaseModel.update(leaseId, {
+        depositStatus: finalStatus,
+        // The security deposit field tracks the "held" balance. 
+        // We set it to 0 as it's been disbursed/applied.
+        securityDeposit: 0, 
+      }, connection);
+
+      const auditLogger = (await import('../utils/auditLogger.js')).default;
+      await auditLogger.log({
+        userId: tenantId,
+        actionType: 'DEPOSIT_REFUND_ACKNOWLEDGED',
+        entityId: leaseId,
+        details: { status: finalStatus, amount: lease.proposedRefundAmount },
+      }, null, connection);
+
+      await connection.commit();
+      return { status: finalStatus };
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
   }
 
   async resolveRefundDispute(leaseId, user) {

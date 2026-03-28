@@ -14,6 +14,8 @@ export interface Tenant {
   behaviorScore?: number;
   nic?: string;
   nicUrl?: string;
+  tinUrl?: string;
+  idCardUrl?: string;
   monthlyIncome?: number | string;
   employmentStatus?: string;
   permanentAddress?: string;

@@ -23,6 +23,7 @@ router.get('/:id/adjustments', authenticateToken, leaseController.getRentAdjustm
 router.post('/:id/adjustments', authenticateToken, leaseController.addRentAdjustment);
 router.post('/:id/finalize-checkout', authenticateToken, leaseController.finalizeCheckout);
 router.post('/:id/deposit-status', authenticateToken, leaseController.getDepositStatus);
+router.put('/:id/acknowledge-refund', authenticateToken, leaseController.acknowledgeRefund);
 router.post('/:id/verify-documents', authenticateToken, leaseController.verifyLeaseDocuments);
 router.post('/:id/sign', authenticateToken, leaseController.signLease);
 

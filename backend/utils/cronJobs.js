@@ -9,7 +9,7 @@ import paymentService from '../services/paymentService.js';
 import { getCurrentDateString, getLocalTime, today, now, parseLocalDate, addDays, formatToLocalDate } from './dateUtils.js';
 
 // --- CONFIGURATION ---
-const LATE_FEE_PERCENTAGE = 0.05;
+const LATE_FEE_PERCENTAGE = 0.03;
 
 /**
  * In-Memory Mutex Lock for Cron Jobs (Coding Level)
@@ -307,9 +307,9 @@ export const applyLateFees = async () => {
 
     let appliedCount = 0;
     for (const inv of overdueInvoices) {
-      // DUPLICATION GUARD: Ensure a late fee hasn't already been created for this invoice/month
+      // DUPLICATION GUARD: Ensure a late fee hasn't already been created for this invoice in the last 30 days
       const [feeExists] = await db.query(
-        "SELECT 1 FROM rent_invoices WHERE lease_id = ? AND description LIKE ? AND invoice_type = 'late_fee' LIMIT 1",
+        "SELECT 1 FROM rent_invoices WHERE lease_id = ? AND description LIKE ? AND invoice_type = 'late_fee' AND created_at > DATE_SUB(NOW(), INTERVAL 30 DAY) LIMIT 1",
         [inv.lease_id, `%Late Fee for Invoice #${inv.invoice_id}%`]
       );
 

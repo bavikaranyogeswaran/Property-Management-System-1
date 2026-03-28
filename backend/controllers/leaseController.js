@@ -280,6 +280,17 @@ class LeaseController {
       res.status(500).json({ error: error.message });
     }
   }
+
+  async acknowledgeRefund(req, res) {
+    try {
+      const { id } = req.params;
+      const result = await leaseService.acknowledgeRefund(id, req.user.id);
+      res.json(result);
+    } catch (error) {
+      console.error(error);
+      res.status(400).json({ error: error.message });
+    }
+  }
 }
 
 export default new LeaseController();

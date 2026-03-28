@@ -35,6 +35,8 @@ CREATE TABLE tenants (
     user_id INT PRIMARY KEY,
     nic VARCHAR(20) UNIQUE,              -- NIC (Optional, number format)
     nic_url VARCHAR(500),                -- [ADDED] URL to uploaded NIC document
+    tin_url VARCHAR(500),                -- [ADDED] URL to uploaded TIN document
+    id_card_url VARCHAR(500),            -- [ADDED] URL to uploaded General ID Card document
     permanent_address VARCHAR(255),      -- Tenant's permanent address
     emergency_contact_name VARCHAR(100),
     emergency_contact_phone VARCHAR(20),
@@ -64,6 +66,7 @@ CREATE TABLE owners (
     user_id INT PRIMARY KEY,
     nic VARCHAR(20),
     tin VARCHAR(50),                     -- Taxpayer Identification Number
+    tin_url VARCHAR(500),                -- [ADDED] URL to uploaded TIN document
     bank_name VARCHAR(100),
     branch_name VARCHAR(100),
     account_holder_name VARCHAR(100),

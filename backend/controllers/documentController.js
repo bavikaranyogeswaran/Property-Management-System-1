@@ -25,15 +25,15 @@ class DocumentController {
                 documentUrl = lease.documentUrl;
                 propertyId = lease.propertyId;
                 tenantUserId = lease.tenantId;
-            } else if (type === 'nic') {
-                const tenant = await tenantModel.findById(id); // assuming id is tenant_id
+            } else if (type === 'nic' || type === 'tin' || type === 'id_card') {
+                const tenant = await tenantModel.findById(id); 
                 if (!tenant) return res.status(404).json({ error: 'Tenant not found' });
                 
-                documentUrl = tenant.nicUrl;
+                if (type === 'nic') documentUrl = tenant.nicUrl;
+                else if (type === 'tin') documentUrl = tenant.tinUrl;
+                else if (type === 'id_card') documentUrl = tenant.idCardUrl;
+                
                 tenantUserId = tenant.user_id;
-                // Need propertyId to check owner access? 
-                // For simplicity, let's assume owners of any property the tenant is in can view?
-                // Or just check if the requester is an owner/treasurer.
             }
 
             if (!documentUrl) {

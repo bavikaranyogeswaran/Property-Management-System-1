@@ -14,6 +14,8 @@ class TenantModel {
       userId,
       nic,
       nic_url,
+      tin_url,
+      id_card_url,
       permanentAddress,
       emergencyContactName,
       emergencyContactPhone,
@@ -23,15 +25,17 @@ class TenantModel {
 
     // Uses the provided connection for transaction support
     const query = `
-            INSERT INTO tenants (user_id, nic, nic_url, permanent_address, emergency_contact_name, emergency_contact_phone, 
+            INSERT INTO tenants (user_id, nic, nic_url, tin_url, id_card_url, permanent_address, emergency_contact_name, emergency_contact_phone, 
              employment_status, monthly_income) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
 
     await connection.query(query, [
       userId,
       nic,
       nic_url,
+      tin_url || null,
+      id_card_url || null,
       permanentAddress,
       emergencyContactName,
       emergencyContactPhone,
@@ -54,6 +58,8 @@ class TenantModel {
       userId: row.user_id,
       nic: row.nic,
       nicUrl: row.nic_url,
+      tinUrl: row.tin_url,
+      idCardUrl: row.id_card_url,
       permanentAddress: row.permanent_address,
       emergencyContactName: row.emergency_contact_name,
       emergencyContactPhone: row.emergency_contact_phone,
@@ -103,6 +109,8 @@ class TenantModel {
   static ALLOWED_UPDATE_FIELDS = {
     nic: 'nic',
     nicUrl: 'nic_url',
+    tinUrl: 'tin_url',
+    idCardUrl: 'id_card_url',
     permanentAddress: 'permanent_address',
     emergencyContactName: 'emergency_contact_name',
     emergencyContactPhone: 'emergency_contact_phone',

@@ -235,6 +235,7 @@ class InvoiceModel {
                 SELECT 1 FROM rent_invoices ri2 
                 WHERE ri2.lease_id = ri.lease_id 
                 AND ri2.description LIKE CONCAT('%Invoice #', ri.invoice_id, '%')
+                AND ri2.created_at > DATE_SUB(NOW(), INTERVAL 30 DAY)
             )
         `,
       [gracePeriodDays]

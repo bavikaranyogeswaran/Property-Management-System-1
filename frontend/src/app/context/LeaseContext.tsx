@@ -13,7 +13,7 @@ export interface Lease {
   monthlyRent: number;
   status: 'draft' | 'active' | 'expired' | 'ended' | 'cancelled';
   securityDeposit?: number;
-  depositStatus?: 'pending' | 'paid' | 'awaiting_approval' | 'disputed' | 'partially_refunded' | 'refunded';
+  depositStatus?: 'pending' | 'paid' | 'awaiting_approval' | 'awaiting_acknowledgment' | 'disputed' | 'partially_refunded' | 'refunded';
   proposedRefundAmount?: number;
   refundNotes?: string;
   refundedAmount?: number;
@@ -62,6 +62,7 @@ interface LeaseContextType {
   renewLease: (id: string, newEndDate: string, newMonthlyRent?: number) => Promise<void>;
   refundDeposit: (id: string, amount: number, notes?: string) => Promise<void>;
   approveRefund: (id: string) => Promise<void>;
+  acknowledgeRefund: (id: string) => Promise<void>;
   disputeRefund: (id: string, notes: string) => Promise<void>;
   updateLeaseDocument: (id: string, documentUrl: string) => Promise<void>;
   updateNoticeStatus: (id: string, status: 'undecided' | 'vacating' | 'renewing') => Promise<void>;
@@ -178,9 +179,21 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
     try {
       await apiClient.post(`/leases/${id}/refund/approve`);
       await fetchLeases();
-      toast.success('Refund approved successfully');
+      toast.success('Refund approved. Awaiting tenant acknowledgment.');
     } catch (e: any) {
       const msg = e.response?.data?.error || 'Failed to approve refund';
+      toast.error(msg);
+      throw new Error(msg);
+    }
+  };
+
+  const acknowledgeRefund = async (id: string) => {
+    try {
+      await apiClient.put(`/leases/${id}/acknowledge-refund`);
+      await fetchLeases();
+      toast.success('Refund settlement acknowledged.');
+    } catch (e: any) {
+      const msg = e.response?.data?.error || 'Failed to acknowledge refund';
       toast.error(msg);
       throw new Error(msg);
     }
@@ -342,6 +355,7 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
       renewLease, 
       refundDeposit,
       approveRefund,
+      acknowledgeRefund,
       disputeRefund,
       updateLeaseDocument, 
       updateNoticeStatus,
