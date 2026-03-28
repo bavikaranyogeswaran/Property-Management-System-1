@@ -123,13 +123,15 @@ export const validateEmail = (email) => {
   };
 };
 
+import { parseLocalDate } from './dateUtils.js';
+
 /**
  * Lease duration validation
  */
 export const validateLeaseDuration = (startDate, endDate, minDays = 90) => {
-  const start = new Date(startDate);
+  const start = parseLocalDate(startDate);
   
-  if (isNaN(start.getTime())) {
+  if (!start) {
     return { isValid: false, error: 'Invalid start date' };
   }
 
@@ -137,9 +139,9 @@ export const validateLeaseDuration = (startDate, endDate, minDays = 90) => {
       return { isValid: false, error: 'End date is required.' };
   }
 
-  const end = new Date(endDate);
+  const end = parseLocalDate(endDate);
   
-  if (isNaN(end.getTime())) {
+  if (!end) {
     return { isValid: false, error: 'Invalid end date' };
   }
 

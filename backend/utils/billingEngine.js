@@ -1,4 +1,4 @@
-import { parseLocalDate, formatToLocalDate } from './dateUtils.js';
+import { parseLocalDate, formatToLocalDate, getDaysInMonth, getEndOfMonth } from './dateUtils.js';
 
 /**
  * BillingEngine Utility
@@ -22,11 +22,11 @@ export const calculateMonthlyRent = (lease, year, month) => {
     const leaseStart = parseLocalDate(lease.startDate);
     const leaseEnd = lease.endDate ? parseLocalDate(lease.endDate) : null;
     
-    // First day of the billing month
-    const billingMonthStart = new Date(year, month - 1, 1);
+    // First day of the billing month (local midnight)
+    const billingMonthStart = parseLocalDate(`${year}-${String(month).padStart(2, '0')}-01`);
     // Last day of the billing month
-    const billingMonthEnd = new Date(year, month, 0);
-    const daysInMonth = billingMonthEnd.getDate();
+    const billingMonthEnd = getEndOfMonth(billingMonthStart);
+    const daysInMonth = getDaysInMonth(billingMonthStart);
 
     // Standard Due Date (1st of the month)
     const dueDate = `${year}-${String(month).padStart(2, '0')}-${String(RENT_DUE_DAY).padStart(2, '0')}`;

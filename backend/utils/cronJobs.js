@@ -577,8 +577,7 @@ export const sendVisitReminders = async () => {
 export const expireStaleRenewals = async () => {
   console.log('Running stale renewal request cleanup...');
   try {
-    const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.getDate() - 14);
+    const cutoffDate = addDays(now(), -14);
 
     const [result] = await db.query(
       `UPDATE renewal_requests 

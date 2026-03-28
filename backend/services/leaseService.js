@@ -7,7 +7,7 @@ import invoiceModel from '../models/invoiceModel.js';
 import visitModel from '../models/visitModel.js';
 import leadModel from '../models/leadModel.js';
 import { validateLeaseDuration } from '../utils/validators.js';
-import { getCurrentDateString, getLocalTime, today, parseLocalDate, addDays, formatToLocalDate } from '../utils/dateUtils.js';
+import { getCurrentDateString, getLocalTime, today, parseLocalDate, addDays, formatToLocalDate, getDaysInMonth } from '../utils/dateUtils.js';
 import renewalService from './renewalService.js';
 
 class LeaseService {
@@ -40,7 +40,7 @@ class LeaseService {
       throw new Error('All fields are required for lease creation.');
     }
 
-    if (new Date(startDate) >= new Date(endDate)) {
+    if (parseLocalDate(startDate) >= parseLocalDate(endDate)) {
       throw new Error('End date must be after start date');
     }
 
@@ -49,7 +49,7 @@ class LeaseService {
         throw new Error(durationCheck.error);
     }
 
-    if (isNaN(new Date(startDate).getTime()) || isNaN(new Date(endDate).getTime())) {
+    if (!parseLocalDate(startDate) || !parseLocalDate(endDate)) {
       throw new Error('Invalid date format');
     }
 
@@ -91,9 +91,9 @@ class LeaseService {
         if (l.status !== 'active' && l.status !== 'draft') return false;
         
         const lStart = parseLocalDate(l.startDate);
-        const lEnd = l.endDate ? parseLocalDate(l.endDate) : new Date('2099-12-31');
+        const lEnd = l.endDate ? parseLocalDate(l.endDate) : parseLocalDate('2099-12-31');
         const reqStart = parseLocalDate(startDate);
-        const reqEnd = endDate ? parseLocalDate(endDate) : new Date('2099-12-31');
+        const reqEnd = endDate ? parseLocalDate(endDate) : parseLocalDate('2099-12-31');
         
         return reqStart <= lEnd && reqEnd >= lStart;
       });
@@ -241,10 +241,10 @@ class LeaseService {
       
       // Deposit Invoice is now pre-generated during createLease (Draft Stage)
 
-      const start = new Date(lease.startDate);
+      const start = parseLocalDate(lease.startDate);
       const year = start.getFullYear();
       const month = start.getMonth() + 1;
-      const daysInMonth = new Date(year, month, 0).getDate();
+      const daysInMonth = getDaysInMonth(start);
       const startDay = start.getDate();
 
       let initialRentAmount = lease.monthlyRent;
@@ -603,7 +603,7 @@ class LeaseService {
       await connection.beginTransaction();
 
       const todayDate = getLocalTime();
-      const start = new Date(lease.startDate);
+      const start = parseLocalDate(lease.startDate);
 
       if (todayDate < start) {
         await leaseModel.update(leaseId, { status: 'cancelled', endDate: terminationDate }, connection);

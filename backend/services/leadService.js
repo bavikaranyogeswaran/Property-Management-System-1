@@ -8,7 +8,7 @@ import leadStageHistoryModel from '../models/leadStageHistoryModel.js';
 import leadTokenModel from '../models/leadTokenModel.js';
 import emailService from '../utils/emailService.js';
 import { validateEmail, validatePhoneNumber } from '../utils/validators.js';
-import { getCurrentDateString, getLocalTime, formatToLocalDate } from '../utils/dateUtils.js';
+import { getCurrentDateString, getLocalTime, formatToLocalDate, parseLocalDate, addMonths } from '../utils/dateUtils.js';
 
 class LeadService {
 
@@ -55,9 +55,8 @@ class LeadService {
         
         // --- OVERLAP & PREFERENCE Logic ---
         if (finalUnitId && moveInDate && preferredTermMonths) {
-            const startDate = new Date(moveInDate);
-            const endDate = new Date(startDate);
-            endDate.setMonth(endDate.getMonth() + parseInt(preferredTermMonths, 10));
+            const startDate = parseLocalDate(moveInDate);
+            const endDate = addMonths(startDate, parseInt(preferredTermMonths, 10));
             
             const hasOverlap = await (await import('../models/leaseModel.js')).default.checkOverlap(
                 finalUnitId, 

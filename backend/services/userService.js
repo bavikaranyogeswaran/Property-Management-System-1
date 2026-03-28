@@ -13,7 +13,7 @@ import leaseModel from '../models/leaseModel.js';
 import leaseService from '../services/leaseService.js';
 import emailService from '../utils/emailService.js';
 import leaseTermModel from '../models/leaseTermModel.js';
-import { getLocalTime } from '../utils/dateUtils.js';
+import { getLocalTime, parseLocalDate, addMonths, today } from '../utils/dateUtils.js';
 import pool from '../config/db.js';
 import unitLockService from '../services/unitLockService.js';
 import leadTokenModel from '../models/leadTokenModel.js';
@@ -291,8 +291,8 @@ class UserService {
         const unit = await unitModel.findById(targetUnitId, connection);
 
         if (unit) {
-          const today = getLocalTime();
-          const leaseStart = startDate ? new Date(startDate) : today;
+          const currentDay = getLocalTime();
+          const leaseStart = startDate ? parseLocalDate(startDate) : currentDay;
           let leaseEnd;
           
           // Fetch lease term if ID provided
@@ -303,13 +303,12 @@ class UserService {
           }
 
           if (endDate) {
-            leaseEnd = new Date(endDate);
+            leaseEnd = parseLocalDate(endDate);
           } else if (leaseTerm && leaseTerm.durationMonths) {
-            leaseEnd = new Date(leaseStart);
-            leaseEnd.setMonth(leaseStart.getMonth() + leaseTerm.durationMonths);
+            leaseEnd = addMonths(leaseStart, leaseTerm.durationMonths);
           } else {
-            leaseEnd = new Date(leaseStart);
-            leaseEnd.setFullYear(leaseStart.getFullYear() + 1);
+            // Default to 1 year
+            leaseEnd = addMonths(leaseStart, 12);
           }
 
           // Use LeaseService with the existing transaction connection

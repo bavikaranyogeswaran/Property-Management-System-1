@@ -94,7 +94,7 @@ class RenewalService {
             const nextStartDateStr = formatToLocalDate(nextStartDate);
 
             // [VALIDATION] Ensure the new lease period is logical
-            if (new Date(request.proposed_end_date) <= nextStartDate) {
+            if (parseLocalDate(request.proposed_end_date) <= nextStartDate) {
                 throw new Error(`The proposed renewal end date (${request.proposed_end_date}) must be AFTER the calculated start date (${nextStartDateStr})`);
             }
 

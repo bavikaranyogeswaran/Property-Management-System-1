@@ -118,6 +118,33 @@ export const addMonths = (date, months) => {
   return result;
 };
 
+/**
+ * Returns the last day of the month for a given date.
+ * @param {Date|string} date 
+ * @param {string} timezone 
+ * @returns {Date}
+ */
+export const getEndOfMonth = (date, timezone = DEFAULT_TIMEZONE) => {
+  const d = date instanceof Date ? new Date(date) : parseLocalDate(date, timezone);
+  // Set to first day of next month, then subtract one hour to get last day of current month in local context
+  const nextMonth = new Date(d.getFullYear(), d.getMonth() + 1, 1);
+  return new Date(nextMonth.getTime() - 1);
+};
+
+/**
+ * Returns the number of days in the month for a given date.
+ * @param {Date|string} date 
+ * @param {string} timezone 
+ * @returns {number}
+ */
+export const getDaysInMonth = (date, timezone = DEFAULT_TIMEZONE) => {
+  const d = date instanceof Date ? new Date(date) : parseLocalDate(date, timezone);
+  // Using the year and month from the local context
+  const year = d.getFullYear();
+  const month = d.getMonth() + 1;
+  return new Date(year, month, 0).getDate();
+};
+
 export default {
   getCurrentDateString,
   formatToLocalDate,
@@ -126,6 +153,8 @@ export default {
   today,
   parseLocalDate,
   addDays,
-  addMonths
+  addMonths,
+  getEndOfMonth,
+  getDaysInMonth
 };
 
