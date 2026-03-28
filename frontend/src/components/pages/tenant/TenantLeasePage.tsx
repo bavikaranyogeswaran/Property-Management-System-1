@@ -371,13 +371,21 @@ export function TenantLeasePage() {
                         </div>
                         {currentLease.refundedAmount !== undefined &&
                           currentLease.refundedAmount > 0 && (
-                            <div>
-                              <p className="text-sm text-gray-500">
-                                Refunded Amount
-                              </p>
-                              <p className="font-medium mt-1 text-blue-600">
-                                LKR {currentLease.refundedAmount.toLocaleString()}
-                              </p>
+                            <div className="space-y-3">
+                              <div>
+                                <p className="text-sm text-gray-500">
+                                  Refunded Amount
+                                </p>
+                                <p className="font-medium mt-1 text-blue-600">
+                                  LKR {currentLease.refundedAmount.toLocaleString()}
+                                </p>
+                              </div>
+                              {currentLease.refundNotes && (
+                                <div className="p-2 bg-blue-50 border border-blue-100 rounded text-xs text-blue-800 italic">
+                                  <p className="font-semibold not-italic mb-1">Deduction Details:</p>
+                                  "{currentLease.refundNotes}"
+                                </div>
+                              )}
                             </div>
                           )}
                       </div>

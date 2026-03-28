@@ -210,10 +210,10 @@ export function RefundRequestsPage() {
               </div>
             ) : (
               <div className="space-y-2">
-                <Label>Reason for Dispute</Label>
+                <Label>Reasons for Deduction / Dispute (Shared with Tenant)</Label>
                 <Input
                   required
-                  placeholder="Explain why the refund is being disputed..."
+                  placeholder="Explain why the full amount is not being refunded..."
                   value={disputeNotes}
                   onChange={(e) => setDisputeNotes(e.target.value)}
                 />

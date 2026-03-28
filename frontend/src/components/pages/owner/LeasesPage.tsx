@@ -1141,12 +1141,12 @@ export function LeasesPage() {
                   </p>
                 </div>
                 <div className="space-y-2">
-                  <Label>Notes / Reason for Deduction</Label>
+                  <Label>Notes / Reason for Deduction (Shared with Tenant)</Label>
                   <Input
                     type="text"
                     value={refundNotes}
                     onChange={(e) => setRefundNotes(e.target.value)}
-                    placeholder="E.g., Cleaning fee deducted"
+                    placeholder="E.g., LKR 5,000 withheld for professional cleaning"
                   />
                 </div>
               </>

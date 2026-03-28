@@ -472,8 +472,7 @@ class LeaseService {
         refundedAmount: Number(lease.refundedAmount || 0) + Number(amount),
         securityDeposit: 0, // Decrement to zero as it's fully disbursed/withheld
         depositStatus: status,
-        proposedRefundAmount: 0,
-        refundNotes: null
+        proposedRefundAmount: 0
       }, connection);
 
       const auditLogger = (await import('../utils/auditLogger.js')).default;
