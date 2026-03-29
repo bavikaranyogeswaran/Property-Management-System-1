@@ -25,6 +25,7 @@ router.post('/:id/finalize-checkout', authenticateToken, leaseController.finaliz
 router.post('/:id/deposit-status', authenticateToken, leaseController.getDepositStatus);
 router.put('/:id/acknowledge-refund', authenticateToken, leaseController.acknowledgeRefund);
 router.post('/:id/verify-documents', authenticateToken, leaseController.verifyLeaseDocuments);
+router.delete('/:id', authenticateToken, leaseController.cancelLease);
 router.post('/:id/sign', authenticateToken, leaseController.signLease);
 
 export default router;

@@ -73,6 +73,7 @@ export function LeasesPage() {
     finalizeCheckout,
     activateLease,
     verifyLeaseDocuments,
+    cancelLease,
     markUnitAvailable,
     renewalRequests,
     proposeRenewalTerms,
@@ -106,6 +107,7 @@ export function LeasesPage() {
   const [newRenewalRent, setNewRenewalRent] = useState('');
   const [newRenewalEndDate, setNewRenewalEndDate] = useState('');
   const [renewalNotes, setRenewalNotes] = useState('');
+  const [cancelReservationId, setCancelReservationId] = useState<string | null>(null);
 
   // --- Helper Functions ---
   const handleDocumentUpdate = async (leaseId: string, e: React.ChangeEvent<HTMLInputElement>) => {
@@ -286,6 +288,15 @@ export function LeasesPage() {
       }
     }
   };
+  
+  const confirmCancelReservation = async () => {
+    if (cancelReservationId) {
+      try {
+        await cancelLease(cancelReservationId);
+        setCancelReservationId(null);
+      } catch (e) {}
+    }
+  };
 
   useEffect(() => {
     if (activateLeaseId) {
@@ -429,6 +440,15 @@ export function LeasesPage() {
                   title="Sign & Activate Lease"
                 >
                   <PlayCircle className="size-4" />
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setCancelReservationId(lease.id)}
+                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                  title="Cancel Reservation"
+                >
+                  <XCircle className="size-4" />
                 </Button>
               </>
             )}
@@ -1609,6 +1629,50 @@ export function LeasesPage() {
                 Mark as Available
               </Button>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Cancel Reservation Confirmation Dialog */}
+      <Dialog
+        open={!!cancelReservationId}
+        onOpenChange={(open) => !open && setCancelReservationId(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertTriangle className="size-5" />
+              Cancel Lease Reservation
+            </DialogTitle>
+            <div className="text-sm text-gray-500 mt-3 space-y-3">
+              <p>
+                Are you sure you want to <strong className="text-red-600">CANCEL</strong> this lease reservation?
+              </p>
+              <div className="bg-red-50 border border-red-100 p-3 rounded-md text-red-800 text-xs">
+                <p className="font-semibold mb-1">Impact:</p>
+                <ul className="list-disc pl-4 space-y-1">
+                  <li>The guest payment link will be immediately deactivated.</li>
+                  <li>Any pending payments for this reservation will be voided.</li>
+                  <li>The unit will be returned to <strong>Available</strong> status for other leads.</li>
+                </ul>
+              </div>
+              <p className="text-xs italic">This action is permanent and cannot be undone.</p>
+            </div>
+          </DialogHeader>
+          <div className="flex justify-end gap-2 mt-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setCancelReservationId(null)}
+            >
+              Keep Reservation
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmCancelReservation}
+            >
+              Cancel Reservation
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

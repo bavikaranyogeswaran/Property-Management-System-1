@@ -73,6 +73,7 @@ interface LeaseContextType {
   finalizeCheckout: (id: string) => Promise<void>;
   activateLease: (id: string) => Promise<void>;
   verifyLeaseDocuments: (id: string) => Promise<void>;
+  cancelLease: (id: string) => Promise<void>;
 
   // Renewal operations
   renewalRequests: RenewalRequest[];
@@ -304,6 +305,18 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const cancelLease = async (id: string) => {
+    try {
+      await apiClient.delete(`/leases/${id}`);
+      await fetchLeases();
+      toast.success('Lease reservation cancelled.');
+    } catch (e: any) {
+      const msg = e.response?.data?.error || 'Failed to cancel lease';
+      toast.error(msg);
+      throw new Error(msg);
+    }
+  };
+
   const fetchRenewalRequests = async () => {
     try {
       const response = await apiClient.get('/renewal-requests');
@@ -370,7 +383,8 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
       fetchRenewalRequests,
       proposeRenewalTerms,
       approveRenewal,
-      rejectRenewal
+      rejectRenewal,
+      cancelLease
     }}>
       {children}
     </LeaseContext.Provider>

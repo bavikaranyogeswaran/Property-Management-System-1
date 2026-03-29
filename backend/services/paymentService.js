@@ -118,10 +118,35 @@ class PaymentService {
                 throw new Error('This invoice has already been paid.');
             }
 
-            // [NEW] Unit Availability Validation
-            // Block payment if unit is no longer available (e.g. someone else took it first)
-            if (invoice.unitStatus !== 'available') {
-                throw new Error(`Unit ${invoice.unitNumber} is no longer available (Status: ${invoice.unitStatus}). Please contact the owner.`);
+            // [HARDENED] Unit Availability & Lease Integrity Validation
+            // We use FOR UPDATE to lock the lease row and ensure no status changes (like cancellation) happen mid-payment.
+            const [leaseStatus] = await connection.query(
+                "SELECT status, unit_id, start_date, end_date FROM leases WHERE lease_id = ? FOR UPDATE",
+                [invoice.lease_id]
+            );
+            
+            if (!leaseStatus[0] || leaseStatus[0].status === 'cancelled') {
+                throw new Error('This lease offer has expired or been cancelled. Please contact the property manager.');
+            }
+
+            // Atomic Overlap Check: Ensure no one ELSE has already submitted a payment for this unit during these dates.
+            // This is the "Hard Reservation Lock" mentioned in the audit.
+            const [overlappingPayments] = await connection.query(
+                `SELECT p.payment_id 
+                 FROM payments p
+                 JOIN rent_invoices ri ON p.invoice_id = ri.invoice_id
+                 JOIN leases l ON ri.lease_id = l.lease_id
+                 WHERE l.unit_id = ? 
+                 AND l.lease_id != ?
+                 AND p.status IN ('pending', 'verified')
+                 AND l.status IN ('active', 'draft')
+                 AND l.start_date <= ? 
+                 AND (l.end_date IS NULL OR l.end_date >= ?)`,
+                [leaseStatus[0].unit_id, invoice.lease_id, leaseStatus[0].end_date, leaseStatus[0].start_date]
+            );
+
+            if (overlappingPayments.length > 0) {
+                 throw new Error(`Concurrency Alert: Unit ${invoice.unitNumber} already has a pending or confirmed payment from another applicant for these overlapping dates. Proceeding with this payment would cause a double-lease risk.`);
             }
 
             const invoiceId = invoice.id;
@@ -134,13 +159,13 @@ class PaymentService {
                 evidenceUrl = file.path || file.secure_url;
             }
 
-            // 2. Concurrency Control: One pending payment at a time
+            // 2. Concurrency Control: One pending payment at a time (for this specific invoice)
             const [pendingPayments] = await connection.query(
                 "SELECT payment_id FROM payments WHERE invoice_id = ? AND status = 'pending'",
                 [invoiceId]
             );
             if (pendingPayments.length > 0) {
-                throw new Error('There is already a pending payment for this invoice. Please wait for verification.');
+                throw new Error('You already have a pending payment for this invoice. Please wait for verification.');
             }
 
             const paymentId = await paymentModel.create({

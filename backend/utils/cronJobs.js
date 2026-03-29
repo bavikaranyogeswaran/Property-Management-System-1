@@ -637,6 +637,23 @@ export const expireDraftLeases = async () => {
           [ids]
         );
         
+        // [NEW] Return unit status to 'available' only if it was 'reserved' and no other active/draft leases exist.
+        const uniqueUnitIds = [...new Set(staleDrafts.map(l => l.unit_id))];
+        for (const unitId of uniqueUnitIds) {
+            const [otherClaims] = await connection.query(
+                "SELECT lease_id FROM leases WHERE unit_id = ? AND status IN ('active', 'draft', 'pending')",
+                [unitId]
+            );
+            if (otherClaims.length === 0) {
+                // Important: Only revert if the unit is currently 'reserved'. 
+                // If it's already 'maintenance' or 'occupied' by another workflow, don't overwrite it.
+                await connection.query(
+                    "UPDATE units SET status = 'available' WHERE unit_id = ? AND status = 'reserved'", 
+                    [unitId]
+                );
+            }
+        }
+        
         // Void their pending security deposit invoices
         for (const leaseId of ids) {
            await invoiceModel.voidPendingByLeaseId(leaseId, connection);

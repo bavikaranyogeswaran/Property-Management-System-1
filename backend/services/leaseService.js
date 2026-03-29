@@ -130,6 +130,9 @@ class LeaseService {
       // 3. Create Lease
       const leaseId = await leaseModel.create(leaseParams, conn);
 
+      // [NEW] Update Unit Status to 'reserved' to hold it
+      await unitModel.update(unitId, { status: 'reserved' }, conn);
+
       // 4. Generate Security Deposit Invoice immediately for the Draft Lease
       // This allows the tenant to pay their "Holding Deposit" before the official signing.
       if (securityDeposit > 0) {
@@ -909,6 +912,49 @@ class LeaseService {
     const lease = await this.getLeaseById(leaseId, user);
     if (!lease) throw new Error('Lease not found');
     return await leaseModel.findAdjustmentsByLeaseId(leaseId);
+  }
+
+  async cancelLease(leaseId, user) {
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+
+      const lease = await leaseModel.findById(leaseId, conn);
+      if (!lease) throw new Error('Lease not found');
+      if (['active', 'expired', 'ended'].includes(lease.status)) {
+          throw new Error('Only draft or pending leases can be cancelled manually. Use termination flow for active leases.');
+      }
+
+      await leaseModel.update(leaseId, { status: 'cancelled' }, conn);
+
+      // [HARD RESERVATION FIX] Check if unit should go back to available
+      const [otherClaims] = await conn.query(
+        "SELECT lease_id FROM leases WHERE unit_id = ? AND status IN ('active', 'draft', 'pending') AND lease_id != ?",
+        [lease.unitId, leaseId]
+      );
+      if (otherClaims.length === 0) {
+        await conn.query(
+          "UPDATE units SET status = 'available' WHERE unit_id = ? AND status = 'reserved'", 
+          [lease.unitId]
+        );
+      }
+
+      const auditLogger = (await import('../utils/auditLogger.js')).default;
+      await auditLogger.log({
+        userId: user.id,
+        actionType: 'LEASE_CANCELLED_BY_STAFF',
+        entityId: leaseId,
+        details: { unitId: lease.unitId }
+      }, null, conn);
+
+      await conn.commit();
+      return true;
+    } catch (error) {
+      await conn.rollback();
+      throw error;
+    } finally {
+      conn.release();
+    }
   }
 }
 

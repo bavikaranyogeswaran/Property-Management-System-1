@@ -291,6 +291,22 @@ class LeaseController {
       res.status(400).json({ error: error.message });
     }
   }
+
+  async cancelLease(req, res) {
+    try {
+      if (req.user.role !== 'owner' && req.user.role !== 'treasurer') {
+         return res.status(403).json({ error: 'Access denied.' });
+      }
+      const { id } = req.params;
+      await leaseService.cancelLease(id, req.user);
+      res.json({ message: 'Lease cancelled successfully and unit status updated.' });
+    } catch (error) {
+      console.error('Cancel Lease Error:', error);
+      if (error.message.includes('not found')) return res.status(404).json({ error: error.message });
+      if (error.message.includes('manually')) return res.status(400).json({ error: error.message });
+      res.status(500).json({ error: error.message });
+    }
+  }
 }
 
 export default new LeaseController();
