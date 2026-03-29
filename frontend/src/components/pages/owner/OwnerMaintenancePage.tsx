@@ -50,6 +50,7 @@ import {
   Edit,
   Eye,
   Trash2,
+  FileText,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -328,9 +329,28 @@ export function OwnerMaintenancePage() {
                       onClick={() => {
                         setSelectedRequest(request);
                         setIsCostDialogOpen(true);
+                        setIsBillDialogOpen(false);
                       }}
+                      title="Record Cost"
                     >
                       <DollarSign className="size-4" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        setSelectedRequest(request);
+                        setBillFormData({
+                          amount: getTotalCost(request.id).toString(),
+                          description: `Maintenance Bill: ${request.title}`,
+                          dueDate: new Date(new Date().setDate(new Date().getDate() + 7)).toISOString().split('T')[0],
+                        });
+                        setIsBillDialogOpen(true);
+                        setIsCostDialogOpen(false);
+                      }}
+                      title="Bill Tenant"
+                    >
+                      <FileText className="size-4" />
                     </Button>
                   </div>
                 </TableCell>
@@ -811,15 +831,27 @@ export function OwnerMaintenancePage() {
                 >
                   Close
                 </Button>
+                {selectedRequest.status === 'completed' && (
+                  <Button
+                    variant="default"
+                    className="bg-purple-600 hover:bg-purple-700"
+                    onClick={() => {
+                      setBillFormData({
+                        amount: getTotalCost(selectedRequest.id).toString(),
+                        description: `Maintenance Bill: ${selectedRequest.title}`,
+                        dueDate: new Date(new Date().setDate(new Date().getDate() + 7)).toISOString().split('T')[0],
+                      });
+                      setIsBillDialogOpen(true);
+                    }}
+                  >
+                    <FileText className="size-4 mr-2" />
+                    Bill Tenant
+                  </Button>
+                )}
                 {selectedRequest.status !== 'completed' &&
                   selectedRequest.status !== 'cancelled' && (
                     <Button
                       onClick={() => {
-                        // Convert view mode to edit mode by ensuring other flags are clear or setting a specific edit flag?
-                        // Currently setSelectedRequest(null) closes everything.
-                        // To switch to update status dialog, we keep selectedRequest but set isStatusDialogOpen to true.
-                        // But the main dialog 'open' condition is `!!selectedRequest && !isStatusDialogOpen && !isCostDialogOpen`.
-                        // So setting isStatusDialogOpen to true will hide this one and show the status one.
                         setIsStatusDialogOpen(true);
                       }}
                     >
@@ -828,6 +860,88 @@ export function OwnerMaintenancePage() {
                   )}
               </div>
             </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Bill Tenant Dialog */}
+      <Dialog open={isBillDialogOpen} onOpenChange={setIsBillDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Bill Tenant for Maintenance</DialogTitle>
+          </DialogHeader>
+          {selectedRequest && (
+            <form onSubmit={handleBillTenant} className="space-y-4 mt-4">
+              <div className="p-4 bg-gray-50 rounded-lg space-y-2">
+                <p className="font-medium">{selectedRequest.title}</p>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Total Recorded Cost:</span>
+                  <span className="font-semibold">LKR {getTotalCost(selectedRequest.id)}</span>
+                </div>
+              </div>
+
+              {/* Grace Period Warning */}
+              {(() => {
+                const tenant = tenants.find(t => t.id === selectedRequest.tenantId);
+                // In a real app, we'd check the lease status here too. 
+                // For simplicity, we just provide a generic notice that it works for departed tenants now.
+                return (
+                  <div className="p-3 bg-blue-50 border border-blue-100 rounded-md flex gap-2 items-start">
+                    <AlertCircle className="size-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                    <p className="text-xs text-blue-800">
+                      Invoices can now be sent to former tenants within 30 days of lease end.
+                    </p>
+                  </div>
+                );
+              })()}
+
+              <div className="space-y-2">
+                <Label htmlFor="bill-amount">Invoiced Amount (LKR)</Label>
+                <Input
+                  id="bill-amount"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={billFormData.amount}
+                  onChange={(e) => setBillFormData({ ...billFormData, amount: e.target.value })}
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="bill-description">Description</Label>
+                <Input
+                  id="bill-description"
+                  value={billFormData.description}
+                  onChange={(e) => setBillFormData({ ...billFormData, description: e.target.value })}
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="bill-due-date">Due Date</Label>
+                <Input
+                  id="bill-due-date"
+                  type="date"
+                  value={billFormData.dueDate}
+                  onChange={(e) => setBillFormData({ ...billFormData, dueDate: e.target.value })}
+                  required
+                />
+              </div>
+
+              <div className="flex gap-2 justify-end pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsBillDialogOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" className="bg-purple-600 hover:bg-purple-700">
+                  Create Invoice
+                </Button>
+              </div>
+            </form>
           )}
         </DialogContent>
       </Dialog>

@@ -143,26 +143,49 @@ class MaintenanceService {
         if (!request) throw new Error('Maintenance Request not found');
 
         const leases = await leaseModel.findByTenantId(request.tenantId);
-        const activeLease = leases.find(
+        
+        // Find most relevant lease (Active first, then recently ended/expired)
+        let targetLease = leases.find(
             (l) => l.unitId === request.unitId.toString() && l.status === 'active'
         );
 
-        if (!activeLease) {
-             throw new Error('No active lease found for this tenant/unit. Cannot invoice.');
+        if (!targetLease) {
+            // Check for recently ended/expired leases (30-day grace period)
+            const gracePeriodDays = 30;
+            const graceDate = new Date();
+            graceDate.setDate(graceDate.getDate() - gracePeriodDays);
+            
+            const recentLeases = leases
+                .filter(l => l.unitId === request.unitId.toString() && (l.status === 'expired' || l.status === 'ended'))
+                .filter(l => l.endDate && new Date(l.endDate) >= graceDate)
+                .sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime());
+            
+            if (recentLeases.length > 0) {
+                targetLease = recentLeases[0];
+            }
         }
 
-        const proposedDescription = description || `Maintenance Bill: ${request.title}`;
+        if (!targetLease) {
+             throw new Error('No active or recently ended lease (within 30 days) found for this tenant/unit. Cannot invoice.');
+        }
+
+        let proposedDescription = description || `Maintenance Bill: ${request.title}`;
         const existingInvoices = await invoiceModel.findByLeaseAndDescription(
-            activeLease.id,
+            targetLease.id,
             proposedDescription
         );
 
+        // [BILLING FIX] If an invoice with this description already exists, append unique cost info
         if (existingInvoices.length > 0) {
-            throw new Error('An invoice for this maintenance request already exists.');
+            if (data.costId) {
+                proposedDescription = `${proposedDescription} (Ref: Cost #${data.costId})`;
+            } else {
+                proposedDescription = `${proposedDescription} (${new Date().getTime()})`;
+            }
         }
 
         const invoiceId = await invoiceModel.create({
-            leaseId: activeLease.id,
+            leaseId: targetLease.id,
             amount,
             dueDate: dueDate || today(),
             description: proposedDescription,
@@ -225,23 +248,32 @@ class MaintenanceService {
             }, connection);
 
             // 2. Identify lease to link ledger entry
-            // Note: If no active lease, we might link to property or use special ID, 
-            // but for accounting integrity, we prefer linking to a lease if possible.
+            // [BILLING FIX] Same grace logic for recording costs
             const leases = await leaseModel.findByTenantId(request.tenantId);
-            const activeLease = leases.find(
+            let targetLease = leases.find(
                 (l) => l.unitId === request.unitId && l.status === 'active'
             );
 
-            if (activeLease) {
+            if (!targetLease) {
+                const graceDate = new Date();
+                graceDate.setDate(graceDate.getDate() - 30);
+                const recentLeases = leases
+                    .filter(l => l.unitId === request.unitId && (l.status === 'expired' || l.status === 'ended'))
+                    .filter(l => l.endDate && new Date(l.endDate) >= graceDate)
+                    .sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime());
+                
+                if (recentLeases.length > 0) {
+                    targetLease = recentLeases[0];
+                }
+            }
+
+            if (targetLease) {
                 // 3. Post to Ledger as an Expense
                 await ledgerModel.create({
-                    leaseId: activeLease.id,
+                    leaseId: targetLease.id,
                     accountType: 'expense',
                     category: 'maintenance_repair',
-                    credit: Number(amount), // In our system, expenses increase with CREDIT (payments made by owner) 
-                    // Wait, let's check ledgerModel.js logic again. 
-                    // summary[name].expense += Number(row.total_credit) - Number(row.total_debit);
-                    // Yes, expenses are treated as positive credits in the summary.
+                    credit: Number(amount), 
                     description: `Maintenance Cost: ${description || request.title} (Req #${requestId})`,
                     entryDate: recordedDate || getCurrentDateString(),
                 }, connection);
