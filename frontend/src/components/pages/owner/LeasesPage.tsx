@@ -73,6 +73,7 @@ export function LeasesPage() {
     finalizeCheckout,
     activateLease,
     verifyLeaseDocuments,
+    rejectLeaseDocuments,
     cancelLease,
     markUnitAvailable,
     renewalRequests,
@@ -108,6 +109,8 @@ export function LeasesPage() {
   const [newRenewalEndDate, setNewRenewalEndDate] = useState('');
   const [renewalNotes, setRenewalNotes] = useState('');
   const [cancelReservationId, setCancelReservationId] = useState<string | null>(null);
+  const [rejectionLeaseId, setRejectionLeaseId] = useState<string | null>(null);
+  const [rejectionReason, setRejectionReason] = useState('');
 
   // --- Helper Functions ---
   const handleDocumentUpdate = async (leaseId: string, e: React.ChangeEvent<HTMLInputElement>) => {
@@ -298,6 +301,16 @@ export function LeasesPage() {
     }
   };
 
+  const confirmRejectDocuments = async () => {
+    if (rejectionLeaseId && rejectionReason) {
+      try {
+        await rejectLeaseDocuments(rejectionLeaseId, rejectionReason);
+        setRejectionLeaseId(null);
+        setRejectionReason('');
+      } catch (e) {}
+    }
+  };
+
   useEffect(() => {
     if (activateLeaseId) {
       const fetchDepositStatus = async () => {
@@ -399,9 +412,9 @@ export function LeasesPage() {
               lease.depositStatus === 'paid' ? 'Awaiting Verification' : 'Awaiting Deposit'
             ) : lease.status}
           </Badge>
-          {lease.status === 'draft' && lease.isDocumentsVerified && (
+          {lease.status === 'draft' && lease.verificationStatus === 'verified' && (
             <Badge variant="outline" className="ml-1 bg-blue-50 text-blue-700 border-blue-200">
-              Docs OK
+               Docs OK
             </Badge>
           )}
         </TableCell>
@@ -417,7 +430,7 @@ export function LeasesPage() {
             </Button>
             {lease.status === 'draft' && (
               <>
-                {!lease.isDocumentsVerified && (
+                {lease.verificationStatus !== 'verified' && (
                   <Button
                     size="sm"
                     variant="ghost"
@@ -432,6 +445,15 @@ export function LeasesPage() {
                     <ShieldCheck className="size-4" />
                   </Button>
                 )}
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setRejectionLeaseId(lease.id)}
+                  className="text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                  title="Reject Documents"
+                >
+                  <AlertTriangle className="size-4" />
+                </Button>
                 <Button
                   size="sm"
                   variant="ghost"
@@ -1427,7 +1449,7 @@ export function LeasesPage() {
               <div className="p-3 bg-gray-50 border rounded-lg space-y-3">
                 <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-gray-500">
                   <span>Document Verification</span>
-                  {leases.find(l => String(l.id) === String(activateLeaseId))?.isDocumentsVerified ? (
+                  {leases.find(l => String(l.id) === String(activateLeaseId))?.verificationStatus === 'verified' ? (
                     <Badge className="bg-blue-100 text-blue-700 border-none">Verified OK</Badge>
                   ) : (
                     <Badge className="bg-amber-100 text-amber-700 border-none">Pending Review</Badge>
@@ -1472,7 +1494,7 @@ export function LeasesPage() {
                 </div>
               )}
 
-              {activateLeaseId && !leases.find(l => String(l.id) === String(activateLeaseId))?.isDocumentsVerified && (
+              {activateLeaseId && leases.find(l => String(l.id) === String(activateLeaseId))?.verificationStatus !== 'verified' && (
                 <div className="p-2 bg-amber-50 border border-amber-100 rounded text-[10px] text-amber-700 flex gap-2">
                   <AlertTriangle className="size-3 mt-0.5" />
                   <p><strong>Required:</strong> You must manually verify the tenant's documents (ID, Proof of Income, etc.) before this lease can be activated. Use the <ShieldCheck className="inline size-3" /> icon in the Drafts tab.</p>
@@ -1501,7 +1523,7 @@ export function LeasesPage() {
                 disabled={
                   isLoadingDeposit || 
                   (depositStatus && !depositStatus.isFullyPaid) || 
-                  !leases.find(l => String(l.id) === String(activateLeaseId))?.isDocumentsVerified
+                  leases.find(l => String(l.id) === String(activateLeaseId))?.verificationStatus !== 'verified'
                 }
               >
               <PlayCircle className="size-4 mr-2" />
@@ -1673,6 +1695,39 @@ export function LeasesPage() {
             >
               Cancel Reservation
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      {/* Rejection Dialog */}
+      <Dialog open={!!rejectionLeaseId} onOpenChange={(open) => !open && setRejectionLeaseId(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reject Tenant Documents</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Reason for Rejection</Label>
+              <Input
+                placeholder="e.g. NIC photo is blurry, please re-upload"
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+              />
+              <p className="text-xs text-gray-500">
+                This reason will be shown to the tenant on their portal.
+              </p>
+            </div>
+            <div className="flex justify-end gap-3 mt-6">
+              <Button variant="outline" onClick={() => setRejectionLeaseId(null)}>
+                Cancel
+              </Button>
+              <Button
+                className="bg-orange-600 hover:bg-orange-700"
+                onClick={confirmRejectDocuments}
+                disabled={!rejectionReason.trim()}
+              >
+                Confirm Rejection
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

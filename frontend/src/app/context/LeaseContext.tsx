@@ -18,7 +18,8 @@ export interface Lease {
   refundNotes?: string;
   refundedAmount?: number;
   documentUrl?: string;
-  isDocumentsVerified?: boolean;
+  verificationStatus?: 'pending' | 'verified' | 'rejected';
+  verificationRejectionReason?: string;
   noticeStatus?: 'undecided' | 'vacating' | 'renewing';
   unitNumber?: string;
   propertyId?: string;
@@ -74,6 +75,8 @@ interface LeaseContextType {
   finalizeCheckout: (id: string) => Promise<void>;
   activateLease: (id: string) => Promise<void>;
   verifyLeaseDocuments: (id: string) => Promise<void>;
+  rejectLeaseDocuments: (id: string, reason: string) => Promise<void>;
+  withdrawApplication: (id: string) => Promise<void>;
   cancelLease: (id: string) => Promise<void>;
 
   // Renewal operations
@@ -324,6 +327,30 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const rejectLeaseDocuments = async (id: string, reason: string) => {
+    try {
+      await apiClient.post(`/leases/${id}/reject-documents`, { reason });
+      await fetchLeases();
+      toast.success('Documents rejected. Feedback sent to tenant.');
+    } catch (e: any) {
+      const msg = e.response?.data?.error || 'Failed to reject documents';
+      toast.error(msg);
+      throw new Error(msg);
+    }
+  };
+
+  const withdrawApplication = async (id: string) => {
+    try {
+      await apiClient.post(`/leases/${id}/withdraw`);
+      await fetchLeases();
+      toast.success('Your application has been withdrawn.');
+    } catch (e: any) {
+      const msg = e.response?.data?.error || 'Failed to withdraw application';
+      toast.error(msg);
+      throw new Error(msg);
+    }
+  };
+
   const cancelLease = async (id: string) => {
     try {
       await apiClient.delete(`/leases/${id}`);
@@ -405,6 +432,8 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
       finalizeCheckout,
       activateLease,
       verifyLeaseDocuments,
+      rejectLeaseDocuments,
+      withdrawApplication,
       renewalRequests,
       fetchRenewalRequests,
       proposeRenewalTerms,

@@ -270,6 +270,8 @@ CREATE TABLE leases (
     refunded_amount DECIMAL(10, 2) DEFAULT 0.00,
     document_url VARCHAR(500), -- [ADDED] Lease document URL
     is_documents_verified BOOLEAN DEFAULT FALSE, -- [NEW] Manual verification step
+    verification_status ENUM('pending', 'verified', 'rejected') DEFAULT 'pending', -- [NEW] Explicit verification state
+    verification_rejection_reason TEXT, -- [NEW] Reason if documents are rejected
     actual_checkout_at DATETIME, -- [ADDED] Actual checkout time
     signed_at DATETIME, -- [NEW] Time when lease moved to active
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,

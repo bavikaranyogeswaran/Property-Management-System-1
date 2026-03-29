@@ -59,6 +59,8 @@ class LeaseModel {
     targetDeposit: 'target_deposit',
     signedAt: 'signed_at',
     isDocumentsVerified: 'is_documents_verified',
+    verificationStatus: 'verification_status',
+    verificationRejectionReason: 'verification_rejection_reason',
   };
 
   async update(id, data, connection = null) {
@@ -280,6 +282,8 @@ class LeaseModel {
       targetDeposit: Number(row.target_deposit || 0),
       signedAt: row.signed_at,
       isDocumentsVerified: !!row.is_documents_verified,
+      verificationStatus: row.verification_status,
+      verificationRejectionReason: row.verification_rejection_reason,
       createdAt: row.created_at,
       // Extra info useful for frontend listing
       unitNumber: row.unit_number,

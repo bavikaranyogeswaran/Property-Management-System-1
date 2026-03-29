@@ -23,8 +23,10 @@ router.get('/:id/adjustments', authenticateToken, leaseController.getRentAdjustm
 router.post('/:id/adjustments', authenticateToken, leaseController.addRentAdjustment);
 router.post('/:id/finalize-checkout', authenticateToken, leaseController.finalizeCheckout);
 router.post('/:id/deposit-status', authenticateToken, leaseController.getDepositStatus);
-router.put('/:id/acknowledge-refund', authenticateToken, leaseController.acknowledgeRefund);
+router.post('/:id/acknowledge-refund', authenticateToken, leaseController.acknowledgeRefund);
 router.post('/:id/verify-documents', authenticateToken, leaseController.verifyLeaseDocuments);
+router.post('/:id/reject-documents', authenticateToken, leaseController.rejectLeaseDocuments);
+router.post('/:id/withdraw', authenticateToken, leaseController.withdrawApplication);
 router.delete('/:id', authenticateToken, leaseController.cancelLease);
 router.post('/:id/sign', authenticateToken, leaseController.signLease);
 router.post('/:id/regenerate-token', authenticateToken, leaseController.regenerateMagicToken);

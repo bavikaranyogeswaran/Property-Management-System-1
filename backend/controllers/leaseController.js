@@ -55,6 +55,29 @@ class LeaseController {
     }
   }
 
+  async rejectLeaseDocuments(req, res) {
+    try {
+      const { id } = req.params;
+      const { reason } = req.body;
+      if (!reason) return res.status(400).json({ error: 'Rejection reason is required' });
+
+      const result = await leaseService.rejectLeaseDocuments(id, reason, req.user);
+      res.status(200).json(result);
+    } catch (error) {
+      res.status(400).json({ error: error.message });
+    }
+  }
+
+  async withdrawApplication(req, res) {
+    try {
+      const { id } = req.params;
+      await leaseService.withdrawApplication(id, req.user);
+      res.status(200).json({ message: 'Application withdrawn successfully' });
+    } catch (error) {
+      res.status(400).json({ error: error.message });
+    }
+  }
+
   async signLease(req, res) {
     try {
       const { id } = req.params;

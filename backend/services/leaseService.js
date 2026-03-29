@@ -202,7 +202,11 @@ class LeaseService {
       if (!lease) throw new Error('Lease not found');
       if (lease.status !== 'draft') throw new Error('Only draft leases can have documents verified');
 
-      await leaseModel.update(leaseId, { isDocumentsVerified: true }, connection);
+      await leaseModel.update(leaseId, { 
+        isDocumentsVerified: true,
+        verificationStatus: 'verified',
+        verificationRejectionReason: null 
+      }, connection);
 
       // Audit Log
       const auditLogger = (await import('../utils/auditLogger.js')).default;
@@ -226,6 +230,51 @@ class LeaseService {
 
       await connection.commit();
       return { isDocumentsVerified: true, activated };
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+
+  /**
+   * Rejects the tenant's documents with a specific reason.
+   */
+  async rejectLeaseDocuments(leaseId, reason, user) {
+    if (user.role !== 'owner' && user.role !== 'treasurer') {
+      throw new Error('Access denied: Only owners or treasurers can reject documents.');
+    }
+
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      const lease = await leaseModel.findById(leaseId, connection);
+      if (!lease) throw new Error('Lease not found');
+      if (lease.status !== 'draft') throw new Error('Only draft leases can have documents rejected');
+
+      await leaseModel.update(leaseId, { 
+        isDocumentsVerified: false,
+        verificationStatus: 'rejected',
+        verificationRejectionReason: reason
+      }, connection);
+
+      // Audit Log
+      const auditLogger = (await import('../utils/auditLogger.js')).default;
+      await auditLogger.log({
+        userId: user.id,
+        actionType: 'LEASE_DOCUMENTS_REJECTED',
+        entityId: leaseId,
+        details: { reason }
+      }, null, connection);
+
+      // [HARD RESERVATION FIX] If documents are rejected, we DO NOT automatically cancel the lease
+      // to allow the tenant to fix the issue. However, we could release the unit if desired.
+      // Keeping it reserved for now as rejection is often just "re-upload clearer images".
+
+      await connection.commit();
+      return { verificationStatus: 'rejected' };
     } catch (error) {
       await connection.rollback();
       throw error;
@@ -954,10 +1003,61 @@ class LeaseService {
         );
       }
 
-      const auditLogger = (await import('../utils/auditLogger.js')).default;
       await auditLogger.log({
         userId: user.id,
         actionType: 'LEASE_CANCELLED_BY_STAFF',
+        entityId: leaseId,
+        details: { unitId: lease.unitId }
+      }, null, conn);
+
+      await conn.commit();
+      return true;
+    } catch (error) {
+      await conn.rollback();
+      throw error;
+    } finally {
+      conn.release();
+    }
+  }
+
+  /**
+   * Allows a tenant to withdraw their OWN lease application while it's in draft status.
+   */
+  async withdrawApplication(leaseId, user) {
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+
+      const lease = await leaseModel.findById(leaseId, conn);
+      if (!lease) throw new Error('Lease not found');
+      
+      // Ownership check: must be the tenant
+      if (String(lease.tenantId) !== String(user.id)) {
+        throw new Error('Access denied: You can only withdraw your own application.');
+      }
+
+      if (lease.status !== 'draft') {
+        throw new Error('Applications can only be withdrawn while in draft status. Use termination flow for active leases.');
+      }
+
+      await leaseModel.update(leaseId, { status: 'cancelled' }, conn);
+
+      // [HARD RESERVATION FIX] Check if unit should go back to available
+      const [otherClaims] = await conn.query(
+        "SELECT lease_id FROM leases WHERE unit_id = ? AND status IN ('active', 'draft', 'pending') AND lease_id != ?",
+        [lease.unitId, leaseId]
+      );
+      if (otherClaims.length === 0) {
+        await conn.query(
+          "UPDATE units SET status = 'available' WHERE unit_id = ? AND status = 'reserved'", 
+          [lease.unitId]
+        );
+      }
+
+      const auditLogger = (await import('../utils/auditLogger.js')).default;
+      await auditLogger.log({
+        userId: user.id,
+        actionType: 'LEASE_WITHDRAWN_BY_TENANT',
         entityId: leaseId,
         details: { unitId: lease.unitId }
       }, null, conn);
