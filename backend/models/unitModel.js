@@ -241,6 +241,7 @@ class UnitModel {
        WHERE u.property_id = ? AND u.is_archived = FALSE 
        AND (
          u.status = 'maintenance' OR
+         u.status = 'reserved' OR
          EXISTS (
            SELECT 1 FROM leases l 
            WHERE l.unit_id = u.unit_id 
@@ -265,6 +266,7 @@ class UnitModel {
         COUNT(u.unit_id) AS total,
         SUM(CASE 
           WHEN u.status = 'maintenance' THEN 1
+          WHEN u.status = 'reserved' THEN 1
           WHEN EXISTS (
             SELECT 1 FROM leases l 
             WHERE l.unit_id = u.unit_id 

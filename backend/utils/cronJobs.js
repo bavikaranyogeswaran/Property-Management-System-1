@@ -390,93 +390,91 @@ export const applyLateFees = async () => {
 };
 
 // Unit Status Sync (Daily at 3:00 AM)
-// Fixes the "Gap Period" bug: Ensure units with Active leases are marked Occupied.
+// Fixes the "Gap Period" & "Reserved Black Hole" bugs:
+// Reconciles units with their logical lease-based states (Occupied/Reserved/Available).
 export const syncUnitStatuses = async () => {
   console.log('Running unit status synchronization...');
   try {
     const currentToday = today();
 
-    // 1. Find Units marked 'available' that actually have an Active Lease covering Today
-    // This handles the case where Lease A ended (Unit->Available) > Gap > Lease B starts (Unit stays Available?? No, we fix it here).
-    const [incorrectAvailable] = await db.query(
+    // STAGE 1: FORCE 'occupied' for units with active leases today
+    // Handles Available/Reserved/Maintenance -> Occupied transitions.
+    const [shouldBeOccupied] = await db.query(
       `
-            SELECT u.unit_id 
-            FROM units u
-            JOIN leases l ON u.unit_id = l.unit_id
-            WHERE u.status = 'available'
-            AND l.status = 'active'
-            AND l.start_date <= ?
-            AND l.end_date >= ?
-        `,
-      [currentToday, currentToday]
-    );
-
-    if (incorrectAvailable.length > 0) {
-      console.log(
-        `Found ${incorrectAvailable.length} units falsely marked 'available'. Correcting to 'occupied'...`
-      );
-      const ids = incorrectAvailable.map((u) => u.unit_id);
-      await db.query(
-        `UPDATE units SET status = 'occupied' WHERE unit_id IN (?)`,
-        [ids]
-      );
-    }
-
-    // 2. Find Units marked 'occupied' that satisfy NO active lease condition?
-    // "Ghost Tenant" Cleanup: find units that are 'occupied' but have no lease that is active today
-    const [ghostOccupied] = await db.query(
-      `
-            SELECT u.unit_id 
-            FROM units u
-            WHERE u.status = 'occupied'
-            AND NOT EXISTS (
-                SELECT 1 FROM leases l
-                WHERE l.unit_id = u.unit_id
-                AND l.status = 'active'
-                AND l.start_date <= ?
-                AND l.end_date >= ?
-            )
-        `,
-      [currentToday, currentToday]
-    );
-
-    if (ghostOccupied.length > 0) {
-      console.log(
-        `Found ${ghostOccupied.length} "Ghost" units falsely marked 'occupied' (no active lease). Correcting to 'available'...`
-      );
-      const ids = ghostOccupied.map((u) => u.unit_id);
-      await db.query(
-        `UPDATE units SET status = 'available' WHERE unit_id IN (?)`,
-        [ids]
-      );
-    }
-
-    // 3. Renewal Handover Fix: Find units in 'maintenance' that have an active
-    //    lease covering today. This handles the case where a draft was activated
-    //    before the new lease start date, the old lease expired setting the unit
-    //    to 'maintenance', and the new lease has now begun.
-    const [maintenanceWithActiveLease] = await db.query(
-      `
-          SELECT u.unit_id
-          FROM units u
-          JOIN leases l ON u.unit_id = l.unit_id
-          WHERE u.status = 'maintenance'
-          AND l.status = 'active'
-          AND l.start_date <= ?
-          AND l.end_date >= ?
+      SELECT DISTINCT u.unit_id 
+      FROM units u
+      JOIN leases l ON u.unit_id = l.unit_id
+      WHERE u.status IN ('available', 'reserved', 'maintenance', 'inactive')
+      AND l.status = 'active'
+      AND l.start_date <= ?
+      AND (l.end_date IS NULL OR l.end_date >= ?)
+      AND u.is_archived = FALSE
       `,
       [currentToday, currentToday]
     );
 
-    if (maintenanceWithActiveLease.length > 0) {
-      console.log(
-        `Found ${maintenanceWithActiveLease.length} units stuck in 'maintenance' with a live active lease. Correcting to 'occupied'...`
-      );
-      const ids = maintenanceWithActiveLease.map((u) => u.unit_id);
-      await db.query(
-        `UPDATE units SET status = 'occupied' WHERE unit_id IN (?)`,
-        [ids]
-      );
+    if (shouldBeOccupied.length > 0) {
+      console.log(`[Sync] Found ${shouldBeOccupied.length} units that should be 'occupied'. Syncing...`);
+      const ids = shouldBeOccupied.map(u => u.unit_id);
+      await db.query(`UPDATE units SET status = 'occupied' WHERE unit_id IN (?)`, [ids]);
+    }
+
+    // STAGE 2: FORCE 'reserved' for units with future claims (no active lease today)
+    // Handles Available/Occupied -> Reserved transitions (e.g., ghost occupied cleanup or future booking).
+    const [shouldBeReserved] = await db.query(
+      `
+      SELECT DISTINCT u.unit_id 
+      FROM units u
+      WHERE u.status IN ('available', 'occupied')
+      AND u.is_archived = FALSE
+      AND EXISTS (
+          SELECT 1 FROM leases l 
+          WHERE l.unit_id = u.unit_id 
+          AND l.status IN ('active', 'draft', 'pending')
+          AND l.start_date > ?
+      )
+      AND NOT EXISTS (
+          SELECT 1 FROM leases l2 
+          WHERE l2.unit_id = u.unit_id 
+          AND l2.status = 'active'
+          AND l2.start_date <= ?
+          AND (l2.end_date IS NULL OR l2.end_date >= ?)
+      )
+      `,
+      [currentToday, currentToday, currentToday]
+    );
+
+    if (shouldBeReserved.length > 0) {
+      console.log(`[Sync] Found ${shouldBeReserved.length} units with future claims that should be 'reserved'. Syncing...`);
+      const ids = shouldBeReserved.map(u => u.unit_id);
+      await db.query(`UPDATE units SET status = 'reserved' WHERE unit_id IN (?)`, [ids]);
+    }
+
+    // STAGE 3: FORCE 'available' for units with NO valid claims (current or future)
+    // Handles Reserved/Occupied -> Available transitions (Ghost Cleanup).
+    // Note: 'maintenance' is deliberately skipped here as it's a manually set status.
+    const [shouldBeAvailable] = await db.query(
+      `
+      SELECT DISTINCT u.unit_id 
+      FROM units u
+      WHERE u.status IN ('occupied', 'reserved')
+      AND u.is_archived = FALSE
+      AND NOT EXISTS (
+          SELECT 1 FROM leases l 
+          WHERE l.unit_id = u.unit_id 
+          AND l.status IN ('active', 'draft', 'pending')
+          AND (l.start_date <= ? OR l.start_date > ?)
+          AND (l.end_date IS NULL OR l.end_date >= ?)
+          AND l.status != 'cancelled' AND l.status != 'expired' AND l.status != 'terminated'
+      )
+      `,
+      [currentToday, currentToday, currentToday]
+    );
+
+    if (shouldBeAvailable.length > 0) {
+        console.log(`[Sync] Found ${shouldBeAvailable.length} units with NO valid claims that should be 'available'. Syncing...`);
+        const ids = shouldBeAvailable.map(u => u.unit_id);
+        await db.query(`UPDATE units SET status = 'available' WHERE unit_id IN (?)`, [ids]);
     }
   } catch (error) {
     console.error('Error syncing unit statuses:', error);
