@@ -12,7 +12,7 @@ class InvoiceModel {
   //  CREATE: Writing a new bill to the ledger.
   // NOTE: Email notifications are handled by the caller (service/controller/cron layer).
   async create(data, connection = null) {
-    const { leaseId, amount, dueDate, description, type, magicToken } = data;
+    const { leaseId, amount, dueDate, description, type, magicTokenHash, magicTokenExpiresAt } = data;
     // Need to determine year/month from dueDate
     const date = parseLocalDate(dueDate);
     const year = date.getFullYear();
@@ -22,8 +22,8 @@ class InvoiceModel {
     const db = connection || pool;
     try {
       const [result] = await db.query(
-        'INSERT INTO rent_invoices (lease_id, year, month, amount, due_date, status, invoice_type, description, magic_token) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [leaseId, year, month, amount, dueDate, 'pending', type, description, magicToken || null]
+        'INSERT INTO rent_invoices (lease_id, year, month, amount, due_date, status, invoice_type, description, magic_token_hash, magic_token_expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [leaseId, year, month, amount, dueDate, 'pending', type, description, magicTokenHash || null, magicTokenExpiresAt || null]
       );
       const invoiceId = result.insertId;
 
@@ -104,7 +104,7 @@ class InvoiceModel {
       propertyName: row.property_name,
       unitNumber: row.unit_number,
       unitStatus: row.unit_status,
-      magicToken: row.magic_token,
+      // magicToken REMOVED for security
     };
   }
 
@@ -123,23 +123,33 @@ class InvoiceModel {
     return this.mapRow(rows[0]);
   }
 
-  async findByMagicToken(token, connection = null) {
-    const db = connection || pool;
-    const [rows] = await db.query(
-      `
-            SELECT ri.*, l.tenant_id, l.unit_id,
-                   p.name as property_name, un.unit_number, un.status as unit_status,
-                   COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id = ri.invoice_id AND status = 'verified'), 0) AS amount_paid
-            FROM rent_invoices ri 
-            JOIN leases l ON ri.lease_id = l.lease_id 
-            JOIN units un ON l.unit_id = un.unit_id
-            JOIN properties p ON un.property_id = p.property_id
-            WHERE ri.magic_token = ?
-        `,
-      [token]
-    );
-    return rows.length > 0 ? this.mapRow(rows[0]) : null;
-  }
+  async findByMagicToken(rawToken, connection = null) {
+     const crypto = await import('crypto');
+     const hash = crypto.createHash('sha256').update(rawToken).digest('hex');
+     const db = connection || pool;
+     const [rows] = await db.query(
+       `
+             SELECT ri.*, l.tenant_id, l.unit_id,
+                    p.name as property_name, un.unit_number, un.status as unit_status,
+                    COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id = ri.invoice_id AND status = 'verified'), 0) AS amount_paid
+             FROM rent_invoices ri 
+             JOIN leases l ON ri.lease_id = l.lease_id 
+             JOIN units un ON l.unit_id = un.unit_id
+             JOIN properties p ON un.property_id = p.property_id
+             WHERE ri.magic_token_hash = ? AND (ri.magic_token_expires_at IS NULL OR ri.magic_token_expires_at > NOW())
+         `,
+       [hash]
+     );
+     return rows.length > 0 ? this.mapRow(rows[0]) : null;
+   }
+
+   async clearMagicToken(invoiceId, connection = null) {
+     const db = connection || pool;
+     await db.query(
+       'UPDATE rent_invoices SET magic_token_hash = NULL, magic_token_expires_at = NULL WHERE invoice_id = ?',
+       [invoiceId]
+     );
+   }
 
   async findByTenantId(tenantId) {
     const [rows] = await pool.query(

@@ -301,10 +301,21 @@ class LeaseController {
       await leaseService.cancelLease(id, req.user);
       res.json({ message: 'Lease cancelled successfully and unit status updated.' });
     } catch (error) {
-      console.error('Cancel Lease Error:', error);
-      if (error.message.includes('not found')) return res.status(404).json({ error: error.message });
-      if (error.message.includes('manually')) return res.status(400).json({ error: error.message });
       res.status(500).json({ error: error.message });
+    }
+  }
+
+  async regenerateMagicToken(req, res) {
+    try {
+      if (req.user.role !== 'owner' && req.user.role !== 'treasurer') {
+         return res.status(403).json({ error: 'Access denied.' });
+      }
+      const { id } = req.params;
+      await leaseService.regenerateMagicLink(id, req.user);
+      res.json({ message: 'New magic link generated and sent to tenant successfully.' });
+    } catch (error) {
+      console.error('Regenerate Token Error:', error);
+      res.status(400).json({ error: error.message });
     }
   }
 }

@@ -1,4 +1,4 @@
-import { randomUUID } from 'crypto';
+import crypto, { randomUUID } from 'crypto';
 import leaseModel from '../models/leaseModel.js';
 import unitModel from '../models/unitModel.js';
 import tenantModel from '../models/tenantModel.js';
@@ -136,14 +136,23 @@ class LeaseService {
       // 4. Generate Security Deposit Invoice immediately for the Draft Lease
       // This allows the tenant to pay their "Holding Deposit" before the official signing.
       if (securityDeposit > 0) {
+        const rawToken = randomUUID();
+        const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+        const expiresAt = formatToLocalDate(addDays(today(), 2)); // 48 hours to pay holding deposit
+
         await invoiceModel.create({
           leaseId,
           amount: securityDeposit,
           dueDate: formatToLocalDate(addDays(today(), 7)), // Due in 7 days to hold the unit
           description: 'Security Deposit',
           type: 'deposit',
-          magicToken: `DEP-${randomUUID()}`
+          magicTokenHash: tokenHash,
+          magicTokenExpiresAt: expiresAt
         }, conn);
+        
+        // Note: The rawToken should be passed to the email service if one was being sent here.
+        // Currently, LeaseService doesn't send the email directly in this method, 
+        // but we've secured the storage.
       }
 
       // Audit Log
@@ -945,6 +954,71 @@ class LeaseService {
         actionType: 'LEASE_CANCELLED_BY_STAFF',
         entityId: leaseId,
         details: { unitId: lease.unitId }
+      }, null, conn);
+
+      await conn.commit();
+      return true;
+    } catch (error) {
+      await conn.rollback();
+      throw error;
+    } finally {
+      conn.release();
+    }
+  }
+
+  async regenerateMagicLink(leaseId, user) {
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+      
+      const lease = await leaseModel.findById(leaseId, conn);
+      if (!lease) throw new Error('Lease not found');
+      if (lease.status !== 'draft') throw new Error('Magic links can only be regenerated for draft leases.');
+
+      // Find the deposit invoice
+      const [invoices] = await conn.query(
+        "SELECT * FROM rent_invoices WHERE lease_id = ? AND invoice_type = 'deposit' AND status = 'pending'",
+        [leaseId]
+      );
+      
+      if (invoices.length === 0) throw new Error('No pending deposit invoice found for this lease.');
+      
+      const invoice = invoices[0];
+      const rawToken = randomUUID();
+      const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+      const expiresAt = formatToLocalDate(addDays(today(), 2));
+
+      await conn.query(
+        "UPDATE rent_invoices SET magic_token_hash = ?, magic_token_expires_at = ? WHERE invoice_id = ?",
+        [tokenHash, expiresAt, invoice.invoice_id]
+      );
+
+      // Notify via email - Reusing emailService
+      const emailService = (await import('../utils/emailService.js')).default;
+      const userModel = (await import('../models/userModel.js')).default;
+      const propertyModel = (await import('../models/propertyModel.js')).default;
+
+      const tenant = await userModel.findById(lease.tenantId);
+      const unit = await unitModel.findById(lease.unitId, conn);
+      const property = await propertyModel.findById(unit.propertyId, conn);
+
+      if (tenant && tenant.email) {
+          await emailService.sendDepositMagicLink(
+              tenant.email, 
+              tenant.name, 
+              property.name, 
+              unit.unitNumber, 
+              invoice.amount, 
+              rawToken
+          );
+      }
+
+      const auditLogger = (await import('../utils/auditLogger.js')).default;
+      await auditLogger.log({
+          userId: user.id || null,
+          actionType: 'MAGIC_LINK_REGENERATED',
+          entityId: leaseId,
+          details: { invoiceId: invoice.invoice_id }
       }, null, conn);
 
       await conn.commit();

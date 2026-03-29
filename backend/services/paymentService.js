@@ -177,6 +177,9 @@ class PaymentService {
                 evidenceUrl,
             }, connection);
 
+            // [HARDENED] Invalidate Magic Token after submission to prevent data leakage/link reuse
+            await invoiceModel.clearMagicToken(invoiceId, connection);
+
             // 3. Notify Treasurers
             const [treasurers] = await connection.query("SELECT user_id FROM users WHERE role = 'treasurer' AND status = 'active'");
             for (const t of treasurers) {

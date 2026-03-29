@@ -27,5 +27,6 @@ router.put('/:id/acknowledge-refund', authenticateToken, leaseController.acknowl
 router.post('/:id/verify-documents', authenticateToken, leaseController.verifyLeaseDocuments);
 router.delete('/:id', authenticateToken, leaseController.cancelLease);
 router.post('/:id/sign', authenticateToken, leaseController.signLease);
+router.post('/:id/regenerate-token', authenticateToken, leaseController.regenerateMagicToken);
 
 export default router;
