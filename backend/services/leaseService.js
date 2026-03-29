@@ -377,8 +377,9 @@ class LeaseService {
       throw new Error('Cannot refund deposit that has not been fully paid.');
     }
 
-    if (amount > lease.securityDeposit) {
-      throw new Error('Refund amount cannot exceed security deposit');
+    const ledgerBalance = await leaseModel.getDepositBalance(leaseId);
+    if (amount > ledgerBalance) {
+      throw new Error(`Refund amount (LKR ${amount.toLocaleString()}) cannot exceed verified ledger balance (LKR ${ledgerBalance.toLocaleString()}).`);
     }
 
     await leaseModel.update(leaseId, {
@@ -414,7 +415,12 @@ class LeaseService {
     try {
       await connection.beginTransaction();
 
-      let withheldAmount = lease.securityDeposit - amount;
+      const ledgerBalance = await leaseModel.getDepositBalance(leaseId, connection);
+      if (amount > ledgerBalance) {
+        throw new Error(`Refund amount (LKR ${amount.toLocaleString()}) cannot exceed verified ledger balance (LKR ${ledgerBalance.toLocaleString()}).`);
+      }
+
+      let withheldAmount = ledgerBalance - amount;
 
       if (withheldAmount > 0) {
         const paymentModel = (await import('../models/paymentModel.js')).default;
