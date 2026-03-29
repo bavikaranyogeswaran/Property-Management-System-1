@@ -64,10 +64,10 @@ export const generateRentInvoices = async () => {
 
     let createdCount = 0;
     for (const lease of activeLeases) {
-      const billingInfo = billingEngine.calculateMonthlyRent(lease, currentYear, currentMonth);
+      const leaseRentInfo = billingEngine.calculateMonthlyRent(lease, currentYear, currentMonth);
 
-      if (!billingInfo) continue;
-      const dueDateStr = billingInfo.dueDate;
+      if (!leaseRentInfo) continue;
+      const dueDateStr = leaseRentInfo.dueDate;
 
       const exists = await invoiceModel.exists(
         lease.id,
@@ -81,9 +81,9 @@ export const generateRentInvoices = async () => {
         );
         const invoiceId = await invoiceModel.create({
           leaseId: lease.id,
-          amount: billingInfo.amount,
-          dueDate: billingInfo.dueDate,
-          description: billingInfo.description,
+          amount: leaseRentInfo.amount,
+          dueDate: leaseRentInfo.dueDate,
+          description: leaseRentInfo.description,
           type: 'rent',
         });
 
@@ -114,7 +114,7 @@ export const generateRentInvoices = async () => {
           );
           if (userRows.length > 0) {
             await emailService.sendInvoiceNotification(userRows[0].email, {
-              amount: fromCents(billingInfo.amount),
+              amount: fromCents(leaseRentInfo.amount),
               dueDate: dueDateStr,
               month: currentMonth,
               year: currentYear,
@@ -673,25 +673,23 @@ export const deactivateFormerTenants = async (targetDate = null) => {
   
   try {
     const [formerTenants] = await db.query(
-      `
-      SELECT u.user_id, u.email
-      FROM users u
-      WHERE u.role = 'tenant' AND u.status = 'active'
-      AND NOT EXISTS (
-        SELECT 1 FROM leases l 
-        WHERE l.tenant_id = u.user_id 
-        AND (l.status = 'active' OR l.status = 'draft')
-      )
-      AND EXISTS (
-        SELECT 1 
-        FROM leases l2 
-        JOIN units un2 ON l2.unit_id = un2.unit_id
-        JOIN properties p2 ON un2.property_id = p2.property_id
-        WHERE l2.tenant_id = u.user_id
-        GROUP BY l2.tenant_id
-        HAVING MAX(l2.end_date) < DATE_SUB(?, INTERVAL p2.tenant_deactivation_days DAY)
-      )
-      `,
+      `SELECT u.user_id, u.email
+       FROM users u
+       WHERE u.role = 'tenant' AND u.status = 'active'
+       AND NOT EXISTS (
+         SELECT 1 FROM leases l 
+         WHERE l.tenant_id = u.user_id 
+         AND (l.status = 'active' OR l.status = 'draft')
+       )
+       AND EXISTS (
+         SELECT 1 
+         FROM leases l2 
+         JOIN units un2 ON l2.unit_id = un2.unit_id
+         JOIN properties p2 ON un2.property_id = p2.property_id
+         WHERE l2.tenant_id = u.user_id
+         GROUP BY l2.tenant_id
+         HAVING MAX(l2.end_date) < DATE_SUB(?, INTERVAL p2.tenant_deactivation_days DAY)
+       )`,
       [referenceDate]
     );
 

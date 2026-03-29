@@ -4,6 +4,7 @@ import messageModel from '../models/messageModel.js';
 import propertyModel from '../models/propertyModel.js';
 import unitModel from '../models/unitModel.js';
 import leaseTermModel from '../models/leaseTermModel.js';
+import db from '../config/db.js';
 
 class LeadPortalController {
   /**
@@ -51,7 +52,7 @@ class LeadPortalController {
       let activeLease = null;
       if (lead.email) {
           const leaseModel = (await import('../models/leaseModel.js')).default;
-          const [leases] = await pool.query(
+          const [leases] = await db.query(
               "SELECT * FROM leases WHERE tenant_id = (SELECT user_id FROM users WHERE email = ? LIMIT 1) AND status = 'draft' ORDER BY created_at DESC LIMIT 1",
               [lead.email]
           );
