@@ -80,7 +80,7 @@ class PayoutModel {
     );
 
     const incomeIds = incomeRows.map(r => r.paymentId);
-    const totalIncome = incomeRows.reduce((sum, r) => sum + parseFloat(r.amount), 0);
+    const totalIncome = incomeRows.reduce((sum, r) => sum + Number(r.amount), 0);
 
     // 2. Snapshot Expense IDs and Total
     const [expenseRows] = await db.query(
@@ -99,7 +99,7 @@ class PayoutModel {
     );
 
     const expenseIds = expenseRows.map(r => r.costId);
-    const totalExpenses = expenseRows.reduce((sum, r) => sum + parseFloat(r.amount), 0);
+    const totalExpenses = expenseRows.reduce((sum, r) => sum + Number(r.amount), 0);
 
     return {
       totalIncome,

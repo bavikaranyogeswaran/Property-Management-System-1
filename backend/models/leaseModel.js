@@ -242,7 +242,7 @@ class LeaseModel {
        WHERE lease_id = ? AND category = 'deposit_held'`,
       [leaseId]
     );
-    return parseFloat(rows[0].balance || 0);
+    return Number(rows[0].balance || 0);
   }
 
   async getDepositStatus(leaseId, connection = null) {
@@ -269,15 +269,15 @@ class LeaseModel {
       unitId: row.unit_id.toString(),
       startDate: this.formatDate(row.start_date),
       endDate: this.formatDate(row.end_date),
-      monthlyRent: parseFloat(row.monthly_rent),
+      monthlyRent: Number(row.monthly_rent),
       status: row.status,
-      securityDeposit: parseFloat(row.security_deposit || 0),
+      securityDeposit: Number(row.security_deposit || 0),
       depositStatus: row.deposit_status,
-      proposedRefundAmount: parseFloat(row.proposed_refund_amount || 0),
+      proposedRefundAmount: Number(row.proposed_refund_amount || 0),
       refundNotes: row.refund_notes,
-      refundedAmount: parseFloat(row.refunded_amount || 0),
+      refundedAmount: Number(row.refunded_amount || 0),
       documentUrl: row.document_url,
-      targetDeposit: parseFloat(row.target_deposit || 0),
+      targetDeposit: Number(row.target_deposit || 0),
       signedAt: row.signed_at,
       isDocumentsVerified: !!row.is_documents_verified,
       createdAt: row.created_at,
@@ -308,14 +308,14 @@ class LeaseModel {
     );
     
     if (adjustments.length > 0) {
-      return parseFloat(adjustments[0].new_monthly_rent);
+      return Number(adjustments[0].new_monthly_rent);
     }
     
     const [leases] = await dbConn.query(
       `SELECT monthly_rent FROM leases WHERE lease_id = ?`,
       [leaseId]
     );
-    return leases.length > 0 ? parseFloat(leases[0].monthly_rent) : 0;
+    return leases.length > 0 ? Number(leases[0].monthly_rent) : 0;
   }
 
   async createAdjustment(data, connection = null) {
@@ -338,7 +338,7 @@ class LeaseModel {
       id: r.adjustment_id.toString(),
       leaseId: r.lease_id.toString(),
       effectiveDate: formatToLocalDate(r.effective_date),
-      newMonthlyRent: parseFloat(r.new_monthly_rent),
+      newMonthlyRent: Number(r.new_monthly_rent),
       notes: r.notes,
       createdAt: r.created_at
     }));

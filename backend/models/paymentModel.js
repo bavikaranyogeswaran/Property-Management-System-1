@@ -46,7 +46,7 @@ class PaymentModel {
       id: row.payment_id.toString(),
       invoiceId: row.invoice_id.toString(),
       tenantId: row.tenant_id?.toString(),
-      amount: parseFloat(row.amount),
+      amount: Number(row.amount),
       paymentDate: row.payment_date,
       paymentMethod: row.payment_method,
       status: row.status,

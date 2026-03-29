@@ -12,6 +12,7 @@ import auditLogger from '../utils/auditLogger.js';
 import ledgerModel from '../models/ledgerModel.js';
 import emailService from '../utils/emailService.js';
 import { getCurrentDateString, getLocalTime, today, now, parseLocalDate, addDays, formatToLocalDate } from '../utils/dateUtils.js';
+import { fromCents } from '../utils/moneyUtils.js';
 
 /**
  * Maps an invoice_type to the correct accounting ledger classification.
@@ -86,7 +87,7 @@ class PaymentService {
             for (const t of treasurers) {
                 await notificationModel.create({
                     userId: t.user_id,
-                    message: `New Payment submitted for Invoice #${invoiceId} (Amount: ${amount}).`,
+                    message: `New Payment submitted for Invoice #${invoiceId} (Amount: ${fromCents(amount).toFixed(2)}).`,
                     type: 'payment',
                 }, connection);
             }
@@ -185,7 +186,7 @@ class PaymentService {
             for (const t of treasurers) {
                 await notificationModel.create({
                     userId: t.user_id,
-                    message: `GUEST PAYMENT: New Deposit submitted via Magic Link for Unit ${invoice.unitNumber} (Amount: ${amount}).`,
+                    message: `GUEST PAYMENT: New Deposit submitted via Magic Link for Unit ${invoice.unitNumber} (Amount: ${fromCents(amount).toFixed(2)}).`,
                     type: 'payment',
                 }, connection);
             }
@@ -264,7 +265,7 @@ class PaymentService {
                         await tenantModel.addCredit(invoice.tenantId || invoice.tenant_id, incrementalOverpayment, connection);
                         await notificationModel.create({
                             userId: invoice.tenantId || invoice.tenant_id,
-                            message: `Overpayment of ${incrementalOverpayment} has been credited to your account balance.`,
+                            message: `Overpayment of ${fromCents(incrementalOverpayment).toFixed(2)} has been credited to your account balance.`,
                             type: 'payment',
                         }, connection);
                     }
@@ -384,7 +385,7 @@ class PaymentService {
                             await tenantModel.addCredit(invoice.tenantId, incrementalOverpayment, connection);
                             await notificationModel.create({
                                 userId: invoice.tenantId,
-                                message: `Overpayment of ${incrementalOverpayment} has been credited to your account balance.`,
+                                message: `Overpayment of ${fromCents(incrementalOverpayment).toFixed(2)} has been credited to your account balance.`,
                                 type: 'payment',
                             }, connection);
                         }
@@ -431,7 +432,7 @@ class PaymentService {
                         // Notify Tenant
                         await notificationModel.create({
                             userId: invoice.tenantId,
-                            message: `Payment of ${payment.amount} for Invoice #${payment.invoiceId} has been verified.`,
+                            message: `Payment of ${fromCents(payment.amount).toFixed(2)} for Invoice #${payment.invoiceId} has been verified.`,
                             type: 'payment',
                         }, connection);
 
@@ -526,8 +527,8 @@ class PaymentService {
                          }
                          
                          const rejectMessage = reason 
-                            ? `Payment of ${payment.amount} for Invoice #${payment.invoiceId} was rejected. Reason: ${reason}`
-                            : `Payment of ${payment.amount} for Invoice #${payment.invoiceId} was rejected. Please contact support.`;
+                            ? `Payment of ${fromCents(payment.amount).toFixed(2)} for Invoice #${payment.invoiceId} was rejected. Reason: ${reason}`
+                            : `Payment of ${fromCents(payment.amount).toFixed(2)} for Invoice #${payment.invoiceId} was rejected. Please contact support.`;
 
                           await notificationModel.create({
                              userId: invoice.tenantId || invoice.tenant_id,
@@ -692,7 +693,7 @@ class PaymentService {
             // 9. Notify Tenant
             await notificationModel.create({
                 userId: invoice.tenantId,
-                message: `LKR ${amountToApply} from your account balance was automatically applied to Invoice #${invoiceId}.`,
+                message: `LKR ${fromCents(amountToApply).toFixed(2)} from your account balance was automatically applied to Invoice #${invoiceId}.`,
                 type: 'payment',
             }, conn);
 

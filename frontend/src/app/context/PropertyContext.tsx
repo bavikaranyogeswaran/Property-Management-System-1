@@ -116,7 +116,10 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
     try {
       const response = await apiClient.get('/units');
       if (response.status === 200) {
-        setUnits(response.data);
+        setUnits(response.data.map((u: any) => ({
+          ...u,
+          monthlyRent: u.monthlyRent / 100
+        })));
       }
     } catch (e) {
       console.error('Failed to fetch units', e);
@@ -216,7 +219,10 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
 
   const addUnit = async (unit: Omit<Unit, 'id' | 'createdAt'>): Promise<Unit | undefined> => {
     try {
-      const response = await apiClient.post('/units', unit);
+      const response = await apiClient.post('/units', {
+        ...unit,
+        monthlyRent: Math.round(unit.monthlyRent * 100)
+      });
       if (response.status === 201) {
         const newUnit: Unit = { ...response.data, id: response.data.id };
         setUnits(prev => [...prev, newUnit]);
@@ -230,7 +236,10 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
 
   const updateUnit = async (id: string, updates: Partial<Unit>) => {
     try {
-      const response = await apiClient.put(`/units/${id}`, updates);
+      const response = await apiClient.put(`/units/${id}`, {
+        ...updates,
+        monthlyRent: updates.monthlyRent ? Math.round(updates.monthlyRent * 100) : undefined
+      });
       if (response.status === 200) {
         setUnits(prev => prev.map(u => (u.id === id ? { ...u, ...response.data, id: response.data.id || u.id } : u)));
       }

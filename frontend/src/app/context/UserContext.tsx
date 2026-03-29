@@ -67,7 +67,10 @@ export function UserProvider({ children }: { children: ReactNode }) {
       try {
         const tRes = await apiClient.get('/users/tenants');
         if (tRes.data) {
-          setTenants(tRes.data);
+          setTenants(tRes.data.map((t: any) => ({
+            ...t,
+            monthlyIncome: t.monthlyIncome ? Number(t.monthlyIncome) / 100 : undefined
+          })));
         }
       } catch (e) {
         console.error('Failed to fetch tenants', e);

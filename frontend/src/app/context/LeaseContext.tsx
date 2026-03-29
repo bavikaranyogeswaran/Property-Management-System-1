@@ -25,6 +25,7 @@ export interface Lease {
   propertyName?: string;
   tenantName?: string;
   magicToken?: string;
+  targetDeposit?: number;
   createdAt: string;
 }
 
@@ -105,7 +106,14 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
     try {
       const lRes = await apiClient.get('/leases');
       if (lRes.data) {
-        setLeases(lRes.data);
+        setLeases(lRes.data.map((l: any) => ({
+          ...l,
+          monthlyRent: l.monthlyRent / 100,
+          securityDeposit: (l.securityDeposit || 0) / 100,
+          proposedRefundAmount: (l.proposedRefundAmount || 0) / 100,
+          refundedAmount: (l.refundedAmount || 0) / 100,
+          targetDeposit: (l.targetDeposit || 0) / 100,
+        })));
       }
     } catch (e) {
       console.error('Failed to fetch leases', e);
@@ -124,7 +132,12 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
 
   const addLease = async (lease: Omit<Lease, 'id' | 'createdAt'>) => {
     try {
-      const response = await apiClient.post('/leases', lease);
+      const response = await apiClient.post('/leases', {
+        ...lease,
+        monthlyRent: Math.round(lease.monthlyRent * 100),
+        securityDeposit: Math.round((lease.securityDeposit || 0) * 100),
+        targetDeposit: Math.round((lease.targetDeposit || 0) * 100),
+      });
       const constructedLease: Lease = {
         ...lease,
         id: response.data.id,
@@ -154,7 +167,10 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
 
   const renewLease = async (id: string, newEndDate: string, newMonthlyRent?: number) => {
     try {
-      await apiClient.post(`/leases/${id}/instant-renew`, { newEndDate, newMonthlyRent });
+      await apiClient.post(`/leases/${id}/instant-renew`, { 
+        newEndDate, 
+        newMonthlyRent: newMonthlyRent ? Math.round(newMonthlyRent * 100) : undefined 
+      });
       await fetchLeases();
       toast.success('Renewal approved. A new draft lease is ready.');
     } catch (e: any) {
@@ -166,7 +182,10 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
 
   const refundDeposit = async (id: string, amount: number, notes?: string) => {
     try {
-      await apiClient.post(`/leases/${id}/refund`, { amount, notes });
+      await apiClient.post(`/leases/${id}/refund`, { 
+        amount: Math.round(amount * 100), 
+        notes 
+      });
       await fetchLeases(); // Easier to refetch instead of manual mapping
       toast.success('Refund requested successfully');
     } catch (e: any) {
@@ -320,7 +339,11 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
   const fetchRenewalRequests = async () => {
     try {
       const response = await apiClient.get('/renewal-requests');
-      setRenewalRequests(response.data);
+      setRenewalRequests(response.data.map((r: any) => ({
+        ...r,
+        currentMonthlyRent: r.currentMonthlyRent / 100,
+        proposedMonthlyRent: r.proposedMonthlyRent ? r.proposedMonthlyRent / 100 : null,
+      })));
     } catch (e) {
       console.error('Failed to fetch renewal requests', e);
     }
@@ -328,7 +351,10 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
 
   const proposeRenewalTerms = async (id: string, data: { proposedMonthlyRent: number; proposedEndDate: string; notes?: string }) => {
     try {
-      await apiClient.post(`/renewal-requests/${id}/propose`, data);
+      await apiClient.post(`/renewal-requests/${id}/propose`, {
+        ...data,
+        proposedMonthlyRent: Math.round(data.proposedMonthlyRent * 100)
+      });
       toast.success('Renewal terms proposed successfully');
       fetchRenewalRequests();
     } catch (e: any) {

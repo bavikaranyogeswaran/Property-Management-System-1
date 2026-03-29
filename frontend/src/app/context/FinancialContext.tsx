@@ -85,6 +85,8 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
       if (invRes.data) {
         setInvoices(invRes.data.map((i: any) => ({
           ...i,
+          amount: i.amount / 100,
+          amountPaid: (i.amountPaid || 0) / 100,
           dueDate: i.dueDate ? new Date(i.dueDate).toLocaleDateString('en-CA') : '',
           generatedDate: i.createdAt ? new Date(i.createdAt).toLocaleDateString('en-CA') : '',
         })));
@@ -95,6 +97,7 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
       if (payRes.data) {
         setPayments(payRes.data.map((p: any) => ({
           ...p,
+          amount: p.amount / 100,
           paymentDate: (p.paymentDate || '').split('T')[0],
           submittedAt: p.createdAt || '',
           proofUrl: p.receiptUrl,
@@ -106,6 +109,7 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
       if (receiptRes.data) {
         setReceipts(receiptRes.data.map((r: any) => ({
           ...r,
+          amount: r.amount / 100,
           generatedDate: r.receiptDate || r.createdAt,
           paymentDate: (r.paymentDate || '').split('T')[0] || r.receiptDate,
         })));
@@ -121,7 +125,15 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
 
   const fetchLedgerSummary = async (year: number): Promise<LedgerSummary> => {
     const { data } = await apiClient.get(`/reports/ledger-summary?year=${year}`);
-    return data;
+    // Normalize subunit cents to display decimals
+    return {
+      totalRevenue: data.totalRevenue / 100,
+      totalLiabilityHeld: data.totalLiabilityHeld / 100,
+      totalLiabilityRefunded: data.totalLiabilityRefunded / 100,
+      netLiability: data.netLiability / 100,
+      totalExpense: data.totalExpense / 100,
+      netOperatingIncome: data.netOperatingIncome / 100,
+    };
   };
 
   const generateMonthlyInvoices = async () => {
@@ -135,7 +147,10 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
 
   const submitPayment = async (payment: Omit<Payment, 'id' | 'submittedAt'>) => {
     try {
-      const res = await paymentApi.submitPayment(payment);
+      const res = await paymentApi.submitPayment({
+        ...payment,
+        amount: Math.round(payment.amount * 100)
+      });
       if (res.status === 201) {
         toast.success('Payment submitted successfully');
         await fetchFinancialData();
@@ -158,7 +173,7 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
 
   const recordCashPayment = async (invoiceId: string, amount: number, paymentDate: string, referenceNumber?: string) => {
     try {
-      await paymentApi.recordCashPayment(invoiceId, amount, paymentDate, referenceNumber);
+      await paymentApi.recordCashPayment(invoiceId, Math.round(amount * 100), paymentDate, referenceNumber);
       toast.success('Cash payment recorded');
       await fetchFinancialData();
     } catch (e: any) {

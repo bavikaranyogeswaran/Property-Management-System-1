@@ -1,4 +1,5 @@
 import { parseLocalDate, formatToLocalDate, getDaysInMonth, getEndOfMonth } from './dateUtils.js';
+import { moneyMath } from './moneyUtils.js';
 
 /**
  * BillingEngine Utility
@@ -44,7 +45,7 @@ export const calculateMonthlyRent = (lease, year, month) => {
     if (leaseStart.getFullYear() === year && (leaseStart.getMonth() + 1) === month) {
         if (leaseStart.getDate() > 1) {
             const billableDays = daysInMonth - leaseStart.getDate() + 1;
-            effectiveAmount = (monthlyRent / daysInMonth) * billableDays;
+            effectiveAmount = moneyMath(monthlyRent).div(daysInMonth).mul(billableDays).toCents();
             prorationDetails.push(`${billableDays}/${daysInMonth} days (Starts ${formatToLocalDate(leaseStart)})`);
         }
     }
@@ -57,13 +58,12 @@ export const calculateMonthlyRent = (lease, year, month) => {
             const startDay = (leaseStart > billingMonthStart) ? leaseStart.getDate() : 1;
             const actualBillable = leaseEnd.getDate() - startDay + 1;
             
-            effectiveAmount = (monthlyRent / daysInMonth) * actualBillable;
+            effectiveAmount = moneyMath(monthlyRent).div(daysInMonth).mul(actualBillable).toCents();
             prorationDetails.push(`${actualBillable}/${daysInMonth} days (Ends ${formatToLocalDate(leaseEnd)})`);
         }
     }
 
-    // Clean up rounding to 2 decimal places
-    effectiveAmount = Math.round(effectiveAmount * 100) / 100;
+    // effectiveAmount is now an integer (cents). No more rounding hack needed.
 
     if (prorationDetails.length > 0) {
         description += ` (Prorated: ${prorationDetails.join(', ')})`;

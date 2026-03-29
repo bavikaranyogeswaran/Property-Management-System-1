@@ -65,9 +65,9 @@ class TenantModel {
       emergencyContactPhone: row.emergency_contact_phone,
       // employerName removed
       employmentStatus: row.employment_status,
-      monthlyIncome: parseFloat(row.monthly_income),
+      monthlyIncome: Number(row.monthly_income),
       // dateOfBirth removed
-      creditBalance: parseFloat(row.credit_balance || 0),
+      creditBalance: Number(row.credit_balance || 0),
       behaviorScore: row.behavior_score,
     };
   }

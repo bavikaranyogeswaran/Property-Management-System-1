@@ -59,6 +59,7 @@ export function MaintenanceProvider({ children }: { children: ReactNode }) {
         if (mcRes.data) {
           setMaintenanceCosts(mcRes.data.map((c: any) => ({
             ...c,
+            amount: c.amount / 100,
             recordedDate: (c.recordedDate || '').split('T')[0],
           })));
         }
@@ -96,7 +97,10 @@ export function MaintenanceProvider({ children }: { children: ReactNode }) {
 
   const addMaintenanceCost = async (cost: Omit<MaintenanceCost, 'id' | 'recordedDate'>) => {
     try {
-      await maintenanceApi.addCost(cost);
+      await maintenanceApi.addCost({
+        ...cost,
+        amount: Math.round(cost.amount * 100)
+      });
       toast.success(cost.billToTenant ? 'Cost recorded & Invoice generated' : 'Cost recorded');
       await fetchMaintenanceData();
     } catch (e) {
@@ -116,7 +120,12 @@ export function MaintenanceProvider({ children }: { children: ReactNode }) {
 
   const createMaintenanceInvoice = async (requestId: string, amount: number, description: string, dueDate?: string) => {
     try {
-      await maintenanceApi.createInvoice({ requestId, amount, description, dueDate });
+      await maintenanceApi.createInvoice({ 
+        requestId, 
+        amount: Math.round(amount * 100), 
+        description, 
+        dueDate 
+      });
       toast.success('Maintenance invoice created successfully');
     } catch (e: any) {
       toast.error(`Failed to create invoice: ${e.response?.data?.error || e.message}`);

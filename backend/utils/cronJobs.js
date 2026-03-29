@@ -7,6 +7,7 @@ import emailService from './emailService.js';
 import billingEngine from './billingEngine.js';
 import paymentService from '../services/paymentService.js';
 import { getCurrentDateString, getLocalTime, today, now, parseLocalDate, addDays, formatToLocalDate } from './dateUtils.js';
+import { moneyMath, fromCents } from './moneyUtils.js';
 
 // --- CONFIGURATION ---
 const LATE_FEE_PERCENTAGE = 0.03;
@@ -123,7 +124,7 @@ export const generateRentInvoices = async () => {
           );
           if (userRows.length > 0) {
             await emailService.sendInvoiceNotification(userRows[0].email, {
-              amount: billingInfo.amount,
+              amount: fromCents(billingInfo.amount),
               dueDate: dueDateStr,
               month: currentMonth,
               year: currentYear,
@@ -318,7 +319,7 @@ export const applyLateFees = async () => {
         continue;
       }
 
-      const lateFeeAmount = inv.amount * LATE_FEE_PERCENTAGE;
+      const lateFeeAmount = moneyMath(inv.amount).mul(LATE_FEE_PERCENTAGE).toCents();
 
       // Create Late Fee Invoice
       const lateFeeInvoiceId = await invoiceModel.createLateFeeInvoice({
@@ -339,7 +340,7 @@ export const applyLateFees = async () => {
       // Notify Tenant
       await notificationModel.create({
         userId: inv.tenant_id,
-        message: `A late fee of LKR ${lateFeeAmount} has been applied to your account for overdue invoice #${inv.invoice_id}.`,
+        message: `A late fee of LKR ${fromCents(lateFeeAmount).toFixed(2)} has been applied to your account for overdue invoice #${inv.invoice_id}.`,
         type: 'invoice',
         isRead: false,
       });
@@ -374,7 +375,7 @@ export const applyLateFees = async () => {
           // We reuse sendInvoiceNotification or create a generic one?
           // sendInvoiceNotification expects { amount, dueDate, month, year, invoiceId }
           await emailService.sendInvoiceNotification(userRows[0].email, {
-            amount: lateFeeAmount,
+            amount: fromCents(lateFeeAmount),
             dueDate: today(),
             month: inv.month,
             year: inv.year,
@@ -507,7 +508,7 @@ export const sendRentReminders = async () => {
         const [userRows] = await db.query('SELECT email FROM users WHERE user_id = ?', [lease.tenantId]);
         if (userRows.length > 0 && userRows[0].email) {
             await emailService.sendRentReminder(userRows[0].email, {
-                amount: lease.monthlyRent,
+                amount: fromCents(lease.monthlyRent),
                 dueDate: dueDate,
                 daysLeft: 3
             });
