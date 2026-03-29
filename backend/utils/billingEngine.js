@@ -7,7 +7,7 @@ import { moneyMath } from './moneyUtils.js';
  */
 
 const RENT_DUE_DAY = 1; // Standardized: 1st of the month
-const GRACE_PERIOD_DAYS = 5;
+const DEFAULT_GRACE_PERIOD_DAYS = 5; // Legacy fallback
 
 /**
  * Calculates the rent amount and due date for a specific billing month.
@@ -80,6 +80,6 @@ export const calculateMonthlyRent = (lease, year, month) => {
 
 export default {
     RENT_DUE_DAY,
-    GRACE_PERIOD_DAYS,
+    DEFAULT_GRACE_PERIOD_DAYS,
     calculateMonthlyRent
 };

@@ -2,6 +2,7 @@ import propertyModel from '../models/propertyModel.js';
 import unitModel from '../models/unitModel.js';
 import leaseModel from '../models/leaseModel.js';
 import pool from '../config/db.js';
+import { validatePropertyConfig } from '../utils/validators.js';
 
 class PropertyService {
   async createProperty(data) {
@@ -14,6 +15,11 @@ class PropertyService {
       !data.propertyTypeId
     ) {
       throw new Error('Missing required fields');
+    }
+
+    const configValidation = validatePropertyConfig(data);
+    if (!configValidation.isValid) {
+      throw new Error(configValidation.errors.join(', '));
     }
 
     const id = await propertyModel.create(data);
@@ -29,6 +35,11 @@ class PropertyService {
   }
 
   async updateProperty(id, data) {
+    const configValidation = validatePropertyConfig(data);
+    if (!configValidation.isValid) {
+      throw new Error(configValidation.errors.join(', '));
+    }
+
     const updated = await propertyModel.update(id, data);
     if (!updated) {
       throw new Error('Property not found or update failed');

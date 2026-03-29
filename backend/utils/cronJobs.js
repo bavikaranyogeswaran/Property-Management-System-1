@@ -64,15 +64,8 @@ export const generateRentInvoices = async () => {
 
     let createdCount = 0;
     for (const lease of activeLeases) {
-      // EDGE CASE: If lease ends exactly on the billing date (the 1st),
-      // we generate a 1-day prorated invoice or skip it to avoid full month charge.
-      if (lease.end_date === formatToLocalDate(currentToday)) {
-        console.log(`Lease ${lease.id} ends today (${lease.end_date}). Skipping full rent generation.`);
-        // Note: Move-out proration logic could create a 1-day invoice here if desired.
-        continue;
-      }
-
       const billingInfo = billingEngine.calculateMonthlyRent(lease, currentYear, currentMonth);
+
       if (!billingInfo) continue;
       const dueDateStr = billingInfo.dueDate;
 
@@ -114,9 +107,6 @@ export const generateRentInvoices = async () => {
 
 
         // Send Email
-        // We need tenant email. Fetch from lease->tenant->user?
-        // activeLeases query currently returns: `l.lease_id as id, l.unit_id, l.monthly_rent as monthlyRent, l.tenant_id as tenantId, u.unit_number as unitNumber`
-        // It does NOT return email. We need to fetch email.
         try {
           const [userRows] = await db.query(
             'SELECT email FROM users WHERE user_id = ?',
@@ -301,7 +291,7 @@ export const sendLeaseExpiryWarnings = async () => {
 export const applyLateFees = async () => {
   console.log('Running late fee automation...');
   try {
-    const overdueInvoices = await invoiceModel.findOverdue(billingEngine.GRACE_PERIOD_DAYS);
+    const overdueInvoices = await invoiceModel.findOverdue();
     console.log(
       `Found ${overdueInvoices.length} overdue invoices eligible for late fees.`
     );
@@ -319,7 +309,9 @@ export const applyLateFees = async () => {
         continue;
       }
 
-      const lateFeeAmount = moneyMath(inv.amount).mul(LATE_FEE_PERCENTAGE).toCents();
+      // Use property-specific fee if available, otherwise fallback to system default
+      const feePercentage = inv.lateFeePercentage !== null ? (inv.lateFeePercentage / 100) : LATE_FEE_PERCENTAGE;
+      const lateFeeAmount = moneyMath(inv.amount).mul(feePercentage).toCents();
 
       // Create Late Fee Invoice
       const lateFeeInvoiceId = await invoiceModel.createLateFeeInvoice({
@@ -673,17 +665,13 @@ export const expireDraftLeases = async () => {
     console.error('Error expiring stale draft leases:', error);
   }
 };
-
 /**
  * Audit #9: Automatically revoke portal access for former tenants.
- * Deactivates accounts 30 days after their last lease has ended,
+ * Deactivates accounts based on property-specific deactivation periods,
  * provided they have no active or future (draft) leases.
  */
 export const deactivateFormerTenants = async (targetDate = null) => {
   const referenceDate = targetDate ? parseLocalDate(targetDate) : getLocalTime();
-  const gracePeriodCutoff = formatToLocalDate(addDays(referenceDate, -30));
-  
-  console.log(`Running former tenant deactivation check (Cutoff: ${gracePeriodCutoff})...`);
   
   try {
     const [formerTenants] = await db.query(
@@ -696,13 +684,17 @@ export const deactivateFormerTenants = async (targetDate = null) => {
         WHERE l.tenant_id = u.user_id 
         AND (l.status = 'active' OR l.status = 'draft')
       )
-      AND (
-        SELECT MAX(l2.end_date) 
+      AND EXISTS (
+        SELECT 1 
         FROM leases l2 
+        JOIN units un2 ON l2.unit_id = un2.unit_id
+        JOIN properties p2 ON un2.property_id = p2.property_id
         WHERE l2.tenant_id = u.user_id
-      ) < ?
+        GROUP BY l2.tenant_id
+        HAVING MAX(l2.end_date) < DATE_SUB(?, INTERVAL p2.tenant_deactivation_days DAY)
+      )
       `,
-      [gracePeriodCutoff]
+      [referenceDate]
     );
 
     if (formerTenants.length > 0) {
@@ -724,7 +716,7 @@ export const deactivateFormerTenants = async (targetDate = null) => {
             userId: null, // System action
             actionType: 'TENANT_ACCESS_REVOKED',
             entityId: tenant.user_id,
-            details: { reason: 'Lease ended > 30 days ago', cutoffDate: gracePeriodCutoff }
+            details: { reason: 'Lease ended past property-specific deactivation period', referenceDate }
           });
         } catch (auditErr) {
           console.error(`Failed to log audit for revocation of ${tenant.user_id}:`, auditErr);

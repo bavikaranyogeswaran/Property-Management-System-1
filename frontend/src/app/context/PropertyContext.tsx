@@ -16,6 +16,9 @@ export interface Property {
   imageUrl?: string;
   description?: string;
   features?: string[];
+  lateFeePercentage: number;
+  lateFeeGracePeriod: number;
+  tenantDeactivationDays: number;
 }
 
 export interface PropertyType {

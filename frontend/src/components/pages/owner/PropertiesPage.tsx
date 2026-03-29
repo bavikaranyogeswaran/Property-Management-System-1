@@ -81,6 +81,7 @@ export function PropertiesPage() {
 
   // Property Form
   const propertyForm = useForm<PropertyFormValues>({
+    mode: 'onChange',
     resolver: zodResolver(propertySchema),
     defaultValues: {
       name: '',
@@ -91,11 +92,15 @@ export function PropertiesPage() {
       propertyTypeId: 0,
       description: '',
       features: [],
+      lateFeePercentage: 3,
+      lateFeeGracePeriod: 5,
+      tenantDeactivationDays: 30,
     },
   });
 
   // Interest Form
   const interestForm = useForm<LeadFormValues>({
+    mode: 'onChange',
     resolver: zodResolver(leadSchema),
     defaultValues: {
       name: '',
@@ -318,6 +323,9 @@ export function PropertiesPage() {
       propertyTypeId: property.propertyTypeId,
       description: property.description || '',
       features: property.features || [],
+      lateFeePercentage: property.lateFeePercentage ?? 3,
+      lateFeeGracePeriod: property.lateFeeGracePeriod ?? 5,
+      tenantDeactivationDays: property.tenantDeactivationDays ?? 30,
     });
 
     // Initial state with just the primary image (better than nothing while loading)
@@ -357,6 +365,9 @@ export function PropertiesPage() {
       propertyTypeId: 0,
       description: '',
       features: [],
+      lateFeePercentage: 3,
+      lateFeeGracePeriod: 5,
+      tenantDeactivationDays: 30,
     });
     setExistingImages([]);
     setUploadFiles([]);
@@ -689,6 +700,84 @@ export function PropertiesPage() {
                             )}
                           />
                         </div>
+                      </div>
+                    </div>
+
+                    {/* Business Rules */}
+                    <div className="border-t pt-6 space-y-4">
+                      <h3 className="text-lg font-medium">Business Rules</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <FormField
+                          control={propertyForm.control}
+                          name="lateFeePercentage"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Late Fee (%)</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  type="number" 
+                                  step="0.01" 
+                                  min="0"
+                                  {...field} 
+                                  onChange={e => {
+                                    const val = e.target.value === '' ? '' : parseFloat(e.target.value);
+                                    field.onChange(val);
+                                  }}
+                                />
+                              </FormControl>
+                              <p className="text-[0.8rem] text-muted-foreground">Applied monthly on overdue balance</p>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={propertyForm.control}
+                          name="lateFeeGracePeriod"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Grace Period (Days)</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  type="number" 
+                                  step="1"
+                                  min="0"
+                                  {...field} 
+                                  onChange={e => {
+                                    const val = e.target.value === '' ? '' : parseInt(e.target.value);
+                                    field.onChange(val);
+                                  }}
+                                />
+                              </FormControl>
+                              <p className="text-[0.8rem] text-muted-foreground">Days after due date before late fees apply</p>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={propertyForm.control}
+                          name="tenantDeactivationDays"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Tenant Deactivation (Days)</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  type="number" 
+                                  step="1"
+                                  min="0"
+                                  {...field} 
+                                  onChange={e => {
+                                    const val = e.target.value === '' ? '' : parseInt(e.target.value);
+                                    field.onChange(val);
+                                  }}
+                                />
+                              </FormControl>
+                              <p className="text-[0.8rem] text-muted-foreground">Days after lease end before portal access revocation</p>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
                       </div>
                     </div>
 

@@ -28,8 +28,8 @@ class PropertyModel {
 
     const [result] = await db.query(
       `INSERT INTO properties 
-            (owner_id, name, property_type_id, property_no, street, city, district, image_url, description, features) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            (owner_id, name, property_type_id, property_no, street, city, district, image_url, description, features, late_fee_percentage, late_fee_grace_period, tenant_deactivation_days) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         ownerId,
         name,
@@ -41,6 +41,9 @@ class PropertyModel {
         imageUrl,
         description,
         featuresJson,
+        propertyData.lateFeePercentage || 3.00,
+        propertyData.lateFeeGracePeriod || 5,
+        propertyData.tenantDeactivationDays || 30,
       ]
     );
     return result.insertId;
@@ -62,6 +65,9 @@ class PropertyModel {
                 p.status, 
                 p.created_at,
                 p.property_type_id,
+                p.late_fee_percentage,
+                p.late_fee_grace_period,
+                p.tenant_deactivation_days,
                 pt.name as type_name,
                 pt.type_id as type_id
             FROM properties p
@@ -92,6 +98,9 @@ class PropertyModel {
       features: row.features || [],
       status: row.status,
       createdAt: row.created_at,
+      lateFeePercentage: parseFloat(row.late_fee_percentage),
+      lateFeeGracePeriod: parseInt(row.late_fee_grace_period),
+      tenantDeactivationDays: parseInt(row.tenant_deactivation_days),
     }));
   }
 
@@ -112,6 +121,9 @@ class PropertyModel {
                 p.status, 
                 p.created_at,
                 p.property_type_id,
+                p.late_fee_percentage,
+                p.late_fee_grace_period,
+                p.tenant_deactivation_days,
                 pt.name as type_name,
                 pt.type_id as type_id
             FROM properties p
@@ -138,6 +150,9 @@ class PropertyModel {
       features: rows[0].features || [],
       status: rows[0].status,
       createdAt: rows[0].created_at,
+      lateFeePercentage: parseFloat(rows[0].late_fee_percentage),
+      lateFeeGracePeriod: parseInt(rows[0].late_fee_grace_period),
+      tenantDeactivationDays: parseInt(rows[0].tenant_deactivation_days),
     };
   }
 
@@ -151,7 +166,10 @@ class PropertyModel {
     imageUrl: 'image_url',
     status: 'status',
     description: 'description',
-    features: 'features'
+    features: 'features',
+    lateFeePercentage: 'late_fee_percentage',
+    lateFeeGracePeriod: 'late_fee_grace_period',
+    tenantDeactivationDays: 'tenant_deactivation_days'
   };
 
   async update(id, updates) {
