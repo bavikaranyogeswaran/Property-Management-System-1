@@ -59,7 +59,7 @@ export function PublicListingPage({
             street: p.street || '',
             city: p.city || '',
             district: p.district || '',
-            image: p.image,
+            imageUrl: p.imageUrl,
             createdAt: p.createdAt,
             description: p.description,
             features: p.features,
@@ -78,7 +78,7 @@ export function PublicListingPage({
             type: u.type,
             monthlyRent: u.monthlyRent,
             status: u.status,
-            image: u.image,
+            imageUrl: u.imageUrl,
             createdAt: u.createdAt,
           }));
           setUnits(mappedUnits);
@@ -136,8 +136,8 @@ export function PublicListingPage({
     e.preventDefault();
 
     // Term validation
-    if (!interestFormData.leaseTermId && parseInt(interestFormData.preferredTermMonths) < 3) {
-      toast.error('Minimum lease duration is 3 months');
+    if (!interestFormData.leaseTermId) {
+      toast.error('Please select a lease term');
       return;
     }
 
@@ -238,13 +238,13 @@ export function PublicListingPage({
             key={property.id}
             className="overflow-hidden flex flex-col hover:shadow-lg transition-shadow duration-300"
           >
-            {property.image ? (
+            {property.imageUrl ? (
               <div
                 className="h-64 w-full bg-gray-100 relative group cursor-pointer"
                 onClick={() => navigate(`/property/${property.id}`)}
               >
                 <img
-                  src={property.image}
+                  src={property.imageUrl}
                   alt={property.name}
                   className="w-full h-full object-cover transition-transform group-hover:scale-105 duration-500"
                 />
@@ -268,7 +268,7 @@ export function PublicListingPage({
                   <h3 className="text-xl font-bold text-gray-900 leading-tight mb-1">
                     {property.name}
                   </h3>
-                  {!property.image && (
+                  {!property.imageUrl && (
                     <p className="text-sm text-gray-500">{property.typeName}</p>
                   )}
                 </div>
@@ -447,32 +447,14 @@ export function PublicListingPage({
                 }}
                 required
               >
-                <option value="">Custom / Undecided</option>
+                <option value="" disabled>Select a Lease Term</option>
                 {leaseTerms.map(t => (
                   <option key={t.leaseTermId} value={t.leaseTermId.toString()}>
-                    {t.name} ({t.type === 'periodic' ? 'Periodic' : `${t.durationMonths} months`})
+                    {t.name} ({t.durationMonths} months)
                   </option>
                 ))}
               </select>
             </div>
-
-            {!interestFormData.leaseTermId && (
-              <div className="space-y-2">
-                <Label htmlFor="lead-term-custom">Custom Duration (Months)</Label>
-                <Input
-                  id="lead-term-custom"
-                  type="number"
-                  min="3"
-                  value={interestFormData.preferredTermMonths}
-                  onChange={(e) =>
-                    setInterestFormData({
-                      ...interestFormData,
-                      preferredTermMonths: e.target.value,
-                    })
-                  }
-                />
-              </div>
-            )}
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">

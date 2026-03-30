@@ -1,6 +1,6 @@
 import express from 'express';
 import leadController from '../controllers/leadController.js';
-import authenticateToken from '../middleware/authMiddleware.js';
+import { authenticateToken } from '../middleware/authMiddleware.js';
 
 import messageController from '../controllers/messageController.js';
 

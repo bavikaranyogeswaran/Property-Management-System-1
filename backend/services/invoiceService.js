@@ -3,10 +3,13 @@ import invoiceModel from '../models/invoiceModel.js';
 import leaseModel from '../models/leaseModel.js';
 import staffModel from '../models/staffModel.js';
 import paymentModel from '../models/paymentModel.js';
+import paymentService from './paymentService.js';
 import behaviorLogModel from '../models/behaviorLogModel.js';
 import tenantModel from '../models/tenantModel.js';
 import userModel from '../models/userModel.js';
 import emailService from '../utils/emailService.js';
+import billingEngine from '../utils/billingEngine.js';
+import { getCurrentDateString, getLocalTime, parseLocalDate, now } from '../utils/dateUtils.js';
 
 class InvoiceService {
     
@@ -26,7 +29,25 @@ class InvoiceService {
         if (user.role !== 'treasurer') {
             throw new Error('Denied. Only Treasurers can create invoices.');
         }
+
+        // RBAC Check: Ensure treasurer is assigned to this property
+        const lease = await leaseModel.findById(data.leaseId);
+        if (!lease) throw new Error('Lease not found');
+        
+        const assigned = await staffModel.getAssignedProperties(user.id);
+        const assignedPropertyIds = assigned.map((p) => p.id.toString());
+        if (!assignedPropertyIds.includes(lease.propertyId.toString())) {
+            throw new Error('Access denied. You are not assigned to this property.');
+        }
+
         const invoiceId = await invoiceModel.create(data);
+        
+        // Auto-apply credit if exists
+        try {
+            await paymentService.applyTenantCredit(invoiceId);
+        } catch (err) {
+            console.error(`[InvoiceService] Failed to auto-apply credit to new invoice ${invoiceId}:`, err);
+        }
         
         // Notify Tenant via Email
         try {
@@ -34,7 +55,7 @@ class InvoiceService {
             if (lease) {
                 const tenant = await userModel.findById(lease.tenantId);
                 if (tenant && tenant.email) {
-                    const dueDate = new Date(data.dueDate);
+                    const dueDate = parseLocalDate(data.dueDate);
                     await emailService.sendInvoiceNotification(tenant.email, {
                         amount: data.amount,
                         dueDate: data.dueDate,
@@ -57,7 +78,7 @@ class InvoiceService {
             throw new Error('Access denied. Only Treasurers can generate invoices.');
         }
 
-        const now = new Date();
+        const now = getLocalTime();
         const y = year || now.getFullYear();
         const m = month || now.getMonth() + 1;
 
@@ -74,10 +95,10 @@ class InvoiceService {
         let skippedCount = 0;
 
         for (const lease of targetLeases) {
-            const leaseStart = new Date(lease.startDate);
+            const leaseStart = parseLocalDate(lease.startDate);
             leaseStart.setHours(0, 0, 0, 0);
 
-            const targetMonthStart = new Date(y, m - 1, 1);
+            const targetMonthStart = parseLocalDate(`${y}-${String(m).padStart(2, '0')}-01`);
             targetMonthStart.setHours(0, 0, 0, 0);
 
             if (leaseStart > targetMonthStart) {
@@ -91,23 +112,33 @@ class InvoiceService {
                 continue;
             }
 
-            const dueDate = new Date(y, m - 1, 5);
-            const dueDateStr = dueDate.toISOString().split('T')[0];
+            const billingInfo = billingEngine.calculateMonthlyRent(lease, y, m);
+            if (!billingInfo) {
+                skippedCount++;
+                continue;
+            }
 
             const invoiceId = await invoiceModel.create({
                 leaseId: lease.id,
-                amount: lease.monthlyRent,
-                dueDate: dueDateStr,
-                description: `Rent for ${y}-${m}`,
+                amount: billingInfo.amount,
+                dueDate: billingInfo.dueDate,
+                description: billingInfo.description,
             });
+
+            // Auto-apply credit if exists
+            try {
+                await paymentService.applyTenantCredit(invoiceId);
+            } catch (err) {
+                console.error(`[InvoiceService] Failed to auto-apply credit to generated invoice ${invoiceId}:`, err);
+            }
 
             // Notify Tenant via Email
             try {
                 const tenant = await userModel.findById(lease.tenantId);
                 if (tenant && tenant.email) {
                     await emailService.sendInvoiceNotification(tenant.email, {
-                        amount: lease.monthlyRent,
-                        dueDate: dueDateStr,
+                        amount: billingInfo.amount,
+                        dueDate: billingInfo.dueDate,
                         month: m,
                         year: y,
                         invoiceId: invoiceId,
@@ -130,15 +161,26 @@ class InvoiceService {
 
         const invoice = await invoiceModel.findById(id);
         if (!invoice) throw new Error('Invoice not found');
+        
+        // RBAC Check: Ensure treasurer is assigned to this property
+        const lease = await leaseModel.findById(invoice.leaseId);
+        if (!lease) throw new Error('Lease not found');
+
+        const assigned = await staffModel.getAssignedProperties(user.id);
+        const assignedPropertyIds = assigned.map((p) => p.id.toString());
+        if (!assignedPropertyIds.includes(lease.propertyId.toString())) {
+            throw new Error('Access denied. You are not assigned to this property.');
+        }
+
         const oldStatus = invoice.status;
 
         if (status === 'overdue') {
-            const dueDate = new Date(invoice.due_date);
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
+            const dueDate = parseLocalDate(invoice.due_date);
+            const currentToday = now();
+            currentToday.setHours(0, 0, 0, 0);
             dueDate.setHours(0, 0, 0, 0);
 
-            if (today <= dueDate) {
+            if (currentToday <= dueDate) {
                 throw new Error('Cannot mark invoice as overdue before the due date.');
             }
 
@@ -150,6 +192,19 @@ class InvoiceService {
         }
 
         const updatedInvoice = await invoiceModel.updateStatus(id, status);
+        
+        // Logic Fix: If it's a deposit invoice being paid, update the Lease's security_deposit column.
+        if (status === 'paid' && invoice.invoice_type === 'deposit') {
+             // We need to mirror the logic in paymentService.js
+             const lease = await leaseModel.findById(invoice.lease_id);
+             if (lease) {
+                 const newHeld = Number(lease.securityDeposit || 0) + Number(invoice.amount);
+                 await leaseModel.update(invoice.lease_id, {
+                     deposit_status: 'paid',
+                     security_deposit: newHeld
+                 });
+             }
+        }
 
         // Scoring Logic
         if (status === 'overdue' && oldStatus !== 'overdue') {

@@ -1,9 +1,10 @@
 import pool from '../config/db.js';
 
 class NotificationModel {
-  async create(data) {
+  async create(data, connection = null) {
     const { userId, message, type, isRead } = data;
-    const [result] = await pool.query(
+    const db = connection || pool;
+    const [result] = await db.query(
       'INSERT INTO notifications (user_id, message, type, is_read) VALUES (?, ?, ?, ?)',
       [userId, message, type, isRead || false]
     );

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import visitController from '../controllers/visitController.js';
-import authenticateToken from '../middleware/authMiddleware.js';
+import { authenticateToken } from '../middleware/authMiddleware.js';
 
 const router = Router();
 
@@ -13,5 +13,8 @@ router.get('/', authenticateToken, visitController.getVisits);
 
 // Update visit status
 router.patch('/:id/status', authenticateToken, visitController.updateStatus);
+
+// Visitor cancellation (Public)
+router.post('/:id/cancel', visitController.cancelVisit);
 
 export default router;

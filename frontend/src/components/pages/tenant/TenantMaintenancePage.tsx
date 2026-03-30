@@ -37,6 +37,7 @@ export function TenantMaintenancePage() {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
+    category: 'general',
     priority: 'medium' as MaintenanceRequest['priority'],
   });
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
@@ -79,6 +80,7 @@ export function TenantMaintenancePage() {
     submissionData.append('unitId', tenantUnit.id);
     submissionData.append('title', formData.title);
     submissionData.append('description', formData.description);
+    submissionData.append('category', formData.category);
     submissionData.append('priority', formData.priority);
 
     selectedImages.forEach((file) => {
@@ -92,6 +94,7 @@ export function TenantMaintenancePage() {
       setFormData({
         title: '',
         description: '',
+        category: 'general',
         priority: 'medium',
       });
       setSelectedImages([]);
@@ -194,24 +197,47 @@ export function TenantMaintenancePage() {
                   required
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="priority">Priority</Label>
-                <Select
-                  value={formData.priority}
-                  onValueChange={(value: MaintenanceRequest['priority']) =>
-                    setFormData({ ...formData, priority: value })
-                  }
-                >
-                  <SelectTrigger id="priority">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="low">Low</SelectItem>
-                    <SelectItem value="medium">Medium</SelectItem>
-                    <SelectItem value="high">High</SelectItem>
-                    <SelectItem value="urgent">Urgent</SelectItem>
-                  </SelectContent>
-                </Select>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="category">Category</Label>
+                  <Select
+                    value={formData.category}
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, category: value })
+                    }
+                  >
+                    <SelectTrigger id="category">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="general">General</SelectItem>
+                      <SelectItem value="plumbing">Plumbing</SelectItem>
+                      <SelectItem value="electrical">Electrical</SelectItem>
+                      <SelectItem value="appliance">Appliance</SelectItem>
+                      <SelectItem value="hvac">HVAC</SelectItem>
+                      <SelectItem value="structural">Structural</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="priority">Priority</Label>
+                  <Select
+                    value={formData.priority}
+                    onValueChange={(value: MaintenanceRequest['priority']) =>
+                      setFormData({ ...formData, priority: value })
+                    }
+                  >
+                    <SelectTrigger id="priority">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">Low</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="high">High</SelectItem>
+                      <SelectItem value="urgent">Urgent</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               {/* Image Upload */}
@@ -275,6 +301,7 @@ export function TenantMaintenancePage() {
                     setFormData({
                       title: '',
                       description: '',
+                      category: 'general',
                       priority: 'medium',
                     });
                     setSelectedImages([]);
@@ -356,9 +383,8 @@ export function TenantMaintenancePage() {
                         <span>Unit: {unit?.unitNumber}</span>
                         <span>•</span>
                         <span className="font-medium text-gray-700">
-                          {request.priority.charAt(0).toUpperCase() +
-                            request.priority.slice(1)}{' '}
-                          Priority
+                          {request.category.charAt(0).toUpperCase() +
+                            request.category.slice(1)} ({request.priority})
                         </span>
                         <span>•</span>
                         <span>Submitted: {request.submittedDate}</span>

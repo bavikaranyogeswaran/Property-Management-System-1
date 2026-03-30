@@ -127,9 +127,9 @@ export function LeadsPage() {
       
       if (!autoUnitId) {
         // 1. Check if lead had a specific unit visit
-        const leadVisit = visits.find(v => String(v.lead_id) === String(selectedLead.id) && v.unit_id);
-        if (leadVisit && leadVisit.unit_id) {
-            autoUnitId = leadVisit.unit_id;
+        const leadVisit = visits.find(v => String(v.leadId) === String(selectedLead.id) && v.unitId);
+        if (leadVisit && leadVisit.unitId) {
+            autoUnitId = leadVisit.unitId;
         } else {
             // 2. Check if property has only one available unit
             const availableUnits = units.filter(u => String(u.propertyId) === String(selectedLead.propertyId) && u.status === 'available');
@@ -162,7 +162,7 @@ export function LeadsPage() {
 
   useEffect(() => {
     if (conversionData.leaseTermId) {
-        const term = leaseTerms.find(t => String(t.leaseTermId) === String(conversionData.leaseTermId));
+        const term = leaseTerms.find(t => String(t.id) === String(conversionData.leaseTermId));
         if (term) {
             if (term.type === 'periodic') {
                 setConversionData(prev => ({ ...prev, endDate: '' }));
@@ -231,7 +231,8 @@ export function LeadsPage() {
         documentUrl: '',
       });
     } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Failed to convert lead');
+      const errorMsg = error.response?.data?.error || error.message || 'Failed to convert lead';
+      toast.error(errorMsg);
     }
   };
 
@@ -338,24 +339,24 @@ export function LeadsPage() {
         </TableHeader>
         <TableBody>
           {data.map((visit) => {
-            const visitDate = new Date(visit.scheduled_date).toLocaleString();
+            const visitDate = new Date(visit.scheduledDate).toLocaleString();
             return (
-              <TableRow key={visit.visit_id}>
+              <TableRow key={visit.id}>
                 <TableCell>
-                  <div className="font-medium">{visit.visitor_name}</div>
+                  <div className="font-medium">{visit.visitorName}</div>
                   <div className="text-xs text-gray-500">
-                    {visit.visitor_email}
+                    {visit.visitorEmail}
                   </div>
                   <div className="text-xs text-gray-500">
-                    {visit.visitor_phone}
+                    {visit.visitorPhone}
                   </div>
                 </TableCell>
                 <TableCell>{visitDate}</TableCell>
                 <TableCell>
-                  <div>{visit.property_name}</div>
-                  {visit.unit_number && (
+                  <div>{visit.propertyName}</div>
+                  {visit.unitNumber && (
                     <div className="text-xs text-gray-500">
-                      Unit: {visit.unit_number}
+                      Unit: {visit.unitNumber}
                     </div>
                   )}
                 </TableCell>
@@ -372,7 +373,7 @@ export function LeadsPage() {
                           variant="ghost"
                           className="text-green-600 hover:bg-green-50"
                           onClick={() =>
-                            handleVisitStatusChange(visit.visit_id, 'confirmed')
+                            handleVisitStatusChange(visit.id, 'confirmed')
                           }
                           title="Confirm Visit"
                         >
@@ -383,7 +384,7 @@ export function LeadsPage() {
                           variant="ghost"
                           className="text-red-600 hover:bg-red-50"
                           onClick={() =>
-                            handleVisitStatusChange(visit.visit_id, 'cancelled')
+                            handleVisitStatusChange(visit.id, 'cancelled')
                           }
                           title="Cancel Visit"
                         >
@@ -397,7 +398,7 @@ export function LeadsPage() {
                         variant="ghost"
                         className="text-blue-600 hover:bg-blue-50"
                         onClick={() =>
-                          handleVisitStatusChange(visit.visit_id, 'completed')
+                          handleVisitStatusChange(visit.id, 'completed')
                         }
                         title="Mark as Completed"
                       >
@@ -483,7 +484,7 @@ export function LeadsPage() {
                     <div>
                       <span className="font-medium">Term:</span>{' '}
                       {lead.leaseTermId 
-                        ? leaseTerms.find(t => String(t.leaseTermId) === String(lead.leaseTermId))?.name 
+                        ? leaseTerms.find(t => String(t.id) === String(lead.leaseTermId))?.name 
                         : (lead.preferredTermMonths ? `${lead.preferredTermMonths} months` : '-')}
                     </div>
                     <div>
@@ -693,10 +694,12 @@ export function LeadsPage() {
       </Dialog>
 
       <Dialog open={isConvertDialogOpen} onOpenChange={setIsConvertDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Convert Lead to Tenant</DialogTitle>
-          </DialogHeader>
+        <DialogContent className="max-w-md p-0 overflow-hidden">
+          <div className="flex flex-col max-h-[90vh]">
+            <DialogHeader className="p-6 pb-2">
+              <DialogTitle>Convert Lead to Tenant</DialogTitle>
+            </DialogHeader>
+            <div className="flex-1 overflow-y-auto p-6 pt-2">
           <div className="space-y-4 mt-4">
             <p className="text-sm text-gray-600">
               Are you sure you want to convert{' '}
@@ -711,10 +714,10 @@ export function LeadsPage() {
                 value={conversionData.leaseTermId}
                 onChange={(e) => setConversionData({ ...conversionData, leaseTermId: e.target.value })}
               >
-                <option value="">Custom / Manual</option>
+                <option value="" disabled>Select a Lease Term</option>
                 {leaseTerms.map(term => (
-                  <option key={term.leaseTermId} value={term.leaseTermId}>
-                    {term.name} ({term.type})
+                  <option key={term.id} value={term.id}>
+                    {term.name} ({term.durationMonths} months)
                   </option>
                 ))}
               </select>
@@ -737,24 +740,24 @@ export function LeadsPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="conv-end-date">Lease End Date</Label>
-                <Input
-                  id="conv-end-date"
-                  type="date"
-                  value={conversionData.endDate}
-                  disabled={!!(conversionData.leaseTermId && leaseTerms.find(t => String(t.leaseTermId) === String(conversionData.leaseTermId))?.type === 'periodic')}
-                  onChange={(e) =>
-                    setConversionData({
-                      ...conversionData,
-                      endDate: e.target.value,
-                    })
-                  }
-                />
+                <div className="flex flex-col gap-2">
+                  <Input
+                    id="conv-end-date"
+                    type="date"
+                    value={conversionData.endDate}
+                    required
+                    onChange={(e) =>
+                      setConversionData({
+                        ...conversionData,
+                        endDate: e.target.value,
+                      })
+                    }
+                  />
+                </div>
                 <p className="text-[10px] text-gray-500">
-                  {conversionData.leaseTermId && leaseTerms.find(t => String(t.leaseTermId) === String(conversionData.leaseTermId))?.type === 'periodic'
-                    ? 'Periodic lease has no fixed end date'
-                    : selectedLead?.preferredTermMonths 
-                      ? `Pre-filled with lead's ${selectedLead.preferredTermMonths}mo preference`
-                      : 'Required (Min 90 days recommended)'}
+                  {selectedLead?.preferredTermMonths 
+                    ? `Pre-filled with lead's ${selectedLead.preferredTermMonths}mo preference`
+                    : 'Required (Min 90 days recommended)'}
                 </p>
               </div>
             </div>
@@ -762,15 +765,60 @@ export function LeadsPage() {
             <div className="space-y-2 pt-2 border-t">
               <Label>Unit Assignment</Label>
               {selectedLead?.interestedUnit ? (
-                <div className="p-3 bg-gray-50 rounded-md border text-sm text-gray-700 flex justify-between items-center">
-                  <span>
-                    Interested Unit:{' '}
-                    <strong>
-                      {units.find((u) => u.id === selectedLead.interestedUnit)
-                        ?.unitNumber || 'Unknown'}
-                    </strong>
-                  </span>
+                <div className="space-y-3">
+                  <div className="p-3 bg-gray-50 rounded-md border text-sm text-gray-700 flex justify-between items-center">
+                    <span>
+                      Interested Unit:{' '}
+                      <strong className="text-gray-900">
+                        {units.find((u) => u.id === selectedLead.interestedUnit)
+                          ?.unitNumber || 'Unknown'}
+                      </strong>
+                    </span>
+                    {(() => {
+                        const unit = units.find((u) => u.id === selectedLead.interestedUnit);
+                        if (!unit) return null;
+                        
+                        const statusColors: Record<string, string> = {
+                            available: 'bg-green-100 text-green-700',
+                            occupied: 'bg-blue-100 text-blue-700',
+                            maintenance: 'bg-red-100 text-red-700',
+                            reserved: 'bg-yellow-100 text-yellow-700'
+                        };
 
+                        return (
+                            <Badge className={`${statusColors[unit.status] || 'bg-gray-100'} border-none`}>
+                                {unit.status.toUpperCase()}
+                            </Badge>
+                        );
+                    })()}
+                  </div>
+
+                  {(() => {
+                    const unit = units.find((u) => u.id === selectedLead.interestedUnit);
+                    if (unit?.status === 'maintenance') {
+                      return (
+                        <div className="p-3 bg-red-50 border border-red-200 rounded-md flex gap-2 items-start text-red-700">
+                          <AlertCircle className="size-4 mt-0.5 shrink-0" />
+                          <div className="text-xs">
+                            <p className="font-bold">Unit Under Maintenance</p>
+                            <p>This unit is currently offline for repairs. You cannot create a lease until maintenance is completed.</p>
+                          </div>
+                        </div>
+                      );
+                    }
+                    if (unit?.status === 'occupied') {
+                      return (
+                        <div className="p-3 bg-blue-50 border border-blue-100 rounded-md flex gap-2 items-start text-blue-700">
+                            <AlertCircle className="size-4 mt-0.5 shrink-0" />
+                            <div className="text-xs">
+                                <p className="font-bold">Unit Currently Occupied</p>
+                                <p>This unit is currently leased. Ensure the move-in date ({conversionData.startDate}) is after the current tenant vacates.</p>
+                            </div>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -840,6 +888,15 @@ export function LeadsPage() {
                 Optional: Upload the signed rental agreement now.
               </p>
             </div>
+            
+            {/* Conversion Notice */}
+            <div className="p-3 bg-blue-50 border border-blue-100 rounded-md flex gap-2 items-start text-blue-700">
+              <AlertCircle className="size-4 mt-0.5 shrink-0" />
+              <div className="text-xs">
+                <p className="font-bold uppercase tracking-wider mb-1">Deposit & Holding Policy</p>
+                <p>Converting this lead will create a <strong>Draft Lease</strong> and immediately generate a <strong>Security Deposit Invoice</strong>. The tenant will be notified to pay this to hold the unit.</p>
+              </div>
+            </div>
 
             <div className="flex gap-2 justify-end">
               <Button
@@ -852,7 +909,18 @@ export function LeadsPage() {
               >
                 Cancel
               </Button>
-              <Button onClick={handleConvert}>Convert to Tenant</Button>
+              <Button 
+                onClick={handleConvert}
+                disabled={(() => {
+                    const unitId = selectedLead?.interestedUnit || conversionData.unitId;
+                    const unit = units.find(u => String(u.id) === String(unitId));
+                    return unit?.status === 'maintenance';
+                })()}
+              >
+                Convert to Tenant
+              </Button>
+            </div>
+            </div>
             </div>
           </div>
         </DialogContent>

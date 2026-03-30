@@ -4,69 +4,70 @@ import leaseModel from '../models/leaseModel.js';
 import invoiceModel from '../models/invoiceModel.js';
 import notificationModel from '../models/notificationModel.js';
 import emailService from './emailService.js';
+import billingEngine from './billingEngine.js';
+import paymentService from '../services/paymentService.js';
+import { getCurrentDateString, getLocalTime, today, now, parseLocalDate, addDays, formatToLocalDate } from './dateUtils.js';
+import { moneyMath, fromCents } from './moneyUtils.js';
 
-// Configuration Constants
-const RENT_DUE_DAY = parseInt(process.env.RENT_DUE_DAY) || 5; // Day of the month rent is due
-const GRACE_PERIOD_DAYS = parseInt(process.env.GRACE_PERIOD_DAYS) || 5; // Days after due date before late fees apply
-const LATE_FEE_PERCENTAGE = parseFloat(process.env.LATE_FEE_PERCENTAGE) || 0.05; // 5% of invoice amount
+// --- CONFIGURATION ---
+const LATE_FEE_PERCENTAGE = 0.03;
+
+/**
+ * In-Memory Mutex Lock for Cron Jobs (Coding Level)
+ */
+const activeLocks = new Set();
+
+const runWithLock = async (jobName, taskFn) => {
+  if (activeLocks.has(jobName)) {
+    console.warn(`[Cron] Job "${jobName}" is already locked (in-memory). Aborting.`);
+    return;
+  }
+
+  activeLocks.add(jobName);
+  console.log(`[Cron] Locked job: ${jobName} (in-memory)`);
+  
+  try {
+    await taskFn();
+  } catch (err) {
+    console.error(`[Cron] Error in locked job "${jobName}":`, err);
+  } finally {
+    activeLocks.delete(jobName);
+    console.log(`[Cron] Unlocked job: ${jobName} (in-memory)`);
+  }
+};
+
+/**
+ * Log Cron Execution outcome
+ */
+const logCronExecution = async (jobName, executionDate, status, message = null) => {
+  try {
+    await db.query(
+      `INSERT INTO cron_logs (job_name, execution_date, status, message, ended_at) 
+       VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+      [jobName, executionDate, status, message]
+    );
+  } catch (err) {
+    console.error('[Cron] Failed to log execution:', err);
+  }
+};
 
 export const generateRentInvoices = async () => {
   console.log('Running automated rent invoicing...');
-  const today = new Date();
+  const currentToday = now();
 
-  // Check if it's the 1st of the month (or for testing purposes, we assume checks are safe to run anytime due to existence check)
-  // Production: if (today.getDate() !== 1) return;
-
-  // We'll leave the date check commented out for easier testing/demos, OR enforce it but export a force mode.
-  // For this implementation, I will enforcing the check but skip it if running via manual function call in tests?
-  // Actually, usually cron runs blindly. The logic inside should guard.
-  // Let's implement: Run ANY day, but only create if missing for THIS month.
-  // This makes it robust (if server is down on 1st, it catches up on 2nd).
-
-  const currentYear = today.getFullYear();
-  const currentMonth = today.getMonth() + 1; // 1-12
-  const dueDate = new Date(today.getFullYear(), today.getMonth(), RENT_DUE_DAY);
+  const currentYear = currentToday.getFullYear();
+  const currentMonth = currentToday.getMonth() + 1; // 1-12
 
   try {
-    const activeLeases = await leaseModel.findActive(); // Should return all active (and pending? no only active)
+    const activeLeases = await leaseModel.findActive();
     console.log(`Found ${activeLeases.length} active leases.`);
 
     let createdCount = 0;
     for (const lease of activeLeases) {
-      // Logic Check: Prevent Premature Billing
-      // If the lease starts in the future, do not invoice yet.
-      // This handles cases where a lease is signed and 'active' but the move-in date hasn't arrived.
-      const leaseStart = new Date(lease.startDate);
-      if (leaseStart > today) {
-        // console.log(`Skipping Lease ${lease.id} (Future Start: ${lease.startDate})`);
-        continue;
-      }
+      const leaseRentInfo = billingEngine.calculateMonthlyRent(lease, currentYear, currentMonth);
 
-      // Proration Logic For Last Month
-      let rentAmount = lease.monthlyRent;
-      let description = `Rent for ${currentYear}-${currentMonth}`;
-
-      // Check if lease ends this month
-      if (lease.endDate) {
-        const endDate = new Date(lease.endDate);
-        if (
-          endDate.getFullYear() === currentYear &&
-          endDate.getMonth() + 1 === currentMonth
-        ) {
-          const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
-          const endDay = endDate.getDate();
-
-          if (endDay < daysInMonth) {
-            rentAmount =
-              Math.round((lease.monthlyRent / daysInMonth) * endDay * 100) /
-              100;
-            description += ` (Prorated: ${endDay}/${daysInMonth} days)`;
-            console.log(
-              `Prorating Final Month for Lease ${lease.id}: ${rentAmount}`
-            );
-          }
-        }
-      }
+      if (!leaseRentInfo) continue;
+      const dueDateStr = leaseRentInfo.dueDate;
 
       const exists = await invoiceModel.exists(
         lease.id,
@@ -80,108 +81,32 @@ export const generateRentInvoices = async () => {
         );
         const invoiceId = await invoiceModel.create({
           leaseId: lease.id,
-          amount: rentAmount,
-          dueDate: dueDate.toISOString().split('T')[0],
-          description: description,
+          amount: leaseRentInfo.amount,
+          dueDate: leaseRentInfo.dueDate,
+          description: leaseRentInfo.description,
           type: 'rent',
         });
 
         if (!invoiceId) {
-          continue; // Skip if invoice already exists
+          continue;
         }
 
-        // Logic Fix: Auto-Apply Credits
-        const tenantModel = (await import('../models/tenantModel.js')).default;
-        // Fetch fresh tenant data (specifically credit balance)
-        const tenant = await tenantModel.findByUserId(lease.tenantId);
-
-        if (tenant && tenant.creditBalance > 0) {
-          const amountToApply = Math.min(tenant.creditBalance, rentAmount);
-
-          if (amountToApply > 0) {
-            const paymentModel = (await import('../models/paymentModel.js'))
-              .default;
-
-            // 1. Create Verified Payment
-            const payId = await paymentModel.create({
-              invoiceId,
-              amount: amountToApply,
-              paymentDate: new Date(),
-              paymentMethod: 'credit_applied',
-              referenceNumber: `CREDIT-${Date.now()}`,
-              evidenceUrl: null,
-            });
-            await paymentModel.updateStatus(payId, 'verified');
-
-            // 2. Deduct Credit
-            await tenantModel.deductCredit(lease.tenantId, amountToApply);
-
-            // 3. Update Invoice Status
-            // Logic simplified: If applied starts == rentAmount, it's paid.
-            // But we should use the standard 'verifyPayment' check logic or just update manually.
-            // verifyPayment controller logic is safer but we are in cron.
-            // Simple Update:
-            if (amountToApply >= rentAmount) {
-              await invoiceModel.updateStatus(invoiceId, 'paid');
-            } else {
-              await invoiceModel.updateStatus(invoiceId, 'partially_paid');
-            }
-
-            // 4. Generate Receipt for the credit-applied payment
-            const receiptModel = (await import('../models/receiptModel.js')).default;
-            const { randomUUID } = await import('crypto');
-            await receiptModel.create({
-              paymentId: payId,
-              invoiceId,
-              tenantId: lease.tenantId,
-              amount: amountToApply,
-              generatedDate: new Date().toISOString(),
-              receiptNumber: `REC-CREDIT-${randomUUID()}`,
-            });
-
-            console.log(
-              `Auto-applied credit ${amountToApply} to Invoice ${invoiceId}. Remaining Credit: ${tenant.creditBalance - amountToApply}`
-            );
-
-            // 5. Post to Ledger (Credit Revenue for auto-applied credit)
-            try {
-              const ledgerModel = (await import('../models/ledgerModel.js')).default;
-              await ledgerModel.create({
-                paymentId: payId,
-                invoiceId,
-                leaseId: lease.id,
-                accountType: 'revenue',
-                category: 'rent',
-                credit: Number(amountToApply),
-                description: `Auto-applied credit from tenant balance to invoice #${invoiceId}`,
-                entryDate: new Date().toISOString().split('T')[0],
-              });
-            } catch (ledgerErr) {
-              console.error('Failed to post ledger entry for auto-applied credit:', ledgerErr);
-            }
-
-            // Notify Tenant of Credit Usage
-            await notificationModel.create({
-              userId: lease.tenantId,
-              message: `A credit of LKR ${amountToApply} was automatically applied to your new rent invoice.`,
-              type: 'payment',
-              isRead: false,
-            });
-          }
+        // Auto-apply credit if exists
+        try {
+          await paymentService.applyTenantCredit(invoiceId);
+        } catch (err) {
+          console.error(`[Cron] Failed to auto-apply credit to generated rent invoice ${invoiceId}:`, err);
         }
 
-        // Send Notification (Invoice Created)
         await notificationModel.create({
           userId: lease.tenantId,
-          message: `A new rent invoice for ${currentYear}-${currentMonth} has been generated. Due date: ${dueDate.toISOString().split('T')[0]}`,
+          message: `A new rent invoice for ${currentYear}-${currentMonth} has been generated. Due date: ${dueDateStr}`,
           type: 'invoice',
           isRead: false,
         });
 
+
         // Send Email
-        // We need tenant email. Fetch from lease->tenant->user?
-        // activeLeases query currently returns: `l.lease_id as id, l.unit_id, l.monthly_rent as monthlyRent, l.tenant_id as tenantId, u.unit_number as unitNumber`
-        // It does NOT return email. We need to fetch email.
         try {
           const [userRows] = await db.query(
             'SELECT email FROM users WHERE user_id = ?',
@@ -189,8 +114,8 @@ export const generateRentInvoices = async () => {
           );
           if (userRows.length > 0) {
             await emailService.sendInvoiceNotification(userRows[0].email, {
-              amount: rentAmount,
-              dueDate: dueDate.toISOString().split('T')[0],
+              amount: fromCents(leaseRentInfo.amount),
+              dueDate: dueDateStr,
               month: currentMonth,
               year: currentYear,
               invoiceId: invoiceId,
@@ -215,7 +140,7 @@ export const checkLeaseExpiration = async () => {
   try {
     await connection.beginTransaction();
 
-    const today = new Date().toISOString().split('T')[0];
+    const currentToday = today();
 
     // 1. Find active leases past end date
     const [expiredLeases] = await connection.query(
@@ -226,16 +151,16 @@ export const checkLeaseExpiration = async () => {
             JOIN properties p ON u.property_id = p.property_id
             WHERE l.status = 'active' AND l.end_date < ?
         `,
-      [today]
+      [currentToday]
     );
 
     if (expiredLeases.length > 0) {
       console.log(`Found ${expiredLeases.length} expired leases.`);
 
       for (const lease of expiredLeases) {
-        // Update Lease to 'ended'
+        // Update Lease to 'expired' (System Auto-Expiry)
         await connection.query(
-          "UPDATE leases SET status = 'ended' WHERE lease_id = ?",
+          "UPDATE leases SET status = 'expired' WHERE lease_id = ?",
           [lease.lease_id]
         );
 
@@ -247,14 +172,14 @@ export const checkLeaseExpiration = async () => {
         );
 
         console.log(
-          `Lease ${lease.lease_id} ended. Unit ${lease.unit_id} set to Maintenance (Turnover).`
+          `Lease ${lease.lease_id} is now EXPIRED. Unit ${lease.unit_id} set to Maintenance (Turnover).`
         );
 
         // Notify Owner
         if (lease.owner_id) {
           await notificationModel.create({
             userId: lease.owner_id,
-            message: `Lease for Unit ${lease.unit_id} has ended. Unit is now in Maintenance for turnover.`,
+            message: `Lease for Unit ${lease.unit_id} has EXPIRED. Unit is now in Maintenance for turnover. Please process checkout.`,
             type: 'lease',
             severity: 'info',
           });
@@ -267,50 +192,11 @@ export const checkLeaseExpiration = async () => {
         for (const t of treasurers) {
           await notificationModel.create({
             userId: t.user_id,
-            message: `Lease #${lease.lease_id} has ended. Please process the Security Deposit Refund.`,
+            message: `Lease #${lease.lease_id} has EXPIRED. Please prepare for Security Deposit Refund.`,
             type: 'lease',
             severity: 'warning',
           });
         }
-      }
-    }
-
-    // 2. Process Turnover Buffer (Maintenance -> Available)
-    // Find units in maintenance that had a lease end >= 3 days ago
-    // AND do not have any active/pending maintenance requests (Safety check)
-    const bufferDate = new Date();
-    bufferDate.setDate(bufferDate.getDate() - 3);
-    const bufferDateStr = bufferDate.toISOString().split('T')[0];
-
-    // Query: Units in 'maintenance' where LATEST lease end_date <= bufferDate
-    // And NO active maintenance requests.
-    const [turnoverUnits] = await connection.query(
-      `
-            SELECT u.unit_id 
-            FROM units u
-            JOIN leases l ON u.unit_id = l.unit_id
-            WHERE u.status = 'maintenance'
-            AND l.status = 'ended'
-            AND l.end_date <= ?
-            AND l.end_date = (SELECT MAX(end_date) FROM leases WHERE unit_id = u.unit_id)
-            AND NOT EXISTS (
-                SELECT 1 FROM maintenance_requests mr 
-                WHERE mr.unit_id = u.unit_id 
-                AND mr.status IN ('submitted', 'in_progress')
-            )
-        `,
-      [bufferDateStr]
-    );
-
-    if (turnoverUnits.length > 0) {
-      console.log(
-        `Found ${turnoverUnits.length} units ready for Turnover (Maintenance -> Available).`
-      );
-      for (const u of turnoverUnits) {
-        await connection.query(
-          "UPDATE units SET status = 'available' WHERE unit_id = ?",
-          [u.unit_id]
-        );
       }
     }
 
@@ -327,21 +213,16 @@ export const checkLeaseExpiration = async () => {
 export const sendLeaseExpiryWarnings = async () => {
   console.log('Running lease expiry warning check...');
   // Warn at 30 and 60 days
-  const today = new Date();
+  const currentToday = now();
   
-  const warningDate30 = new Date();
-  warningDate30.setDate(today.getDate() + 30);
-  const dateStr30 = warningDate30.toISOString().split('T')[0];
-
-  const warningDate60 = new Date();
-  warningDate60.setDate(today.getDate() + 60);
-  const dateStr60 = warningDate60.toISOString().split('T')[0];
+  const dateStr30 = formatToLocalDate(addDays(currentToday, 30));
+  const dateStr60 = formatToLocalDate(addDays(currentToday, 60));
 
   try {
     // Find leases expiring exactly in 30 or 60 days
     const [expiringLeases] = await db.query(
       `
-            SELECT l.*, t.email as tenant_email, u_owner.email as owner_email, p.propertyName, un.unit_number
+            SELECT l.*, t.email as tenant_email, u_owner.email as owner_email, p.name as property_name, un.unit_number
             FROM leases l
             JOIN users t ON l.tenant_id = t.user_id
             JOIN units un ON l.unit_id = un.unit_id
@@ -373,7 +254,7 @@ export const sendLeaseExpiryWarnings = async () => {
             await emailService.sendLeaseExpiryReminder(lease.tenant_email, {
                 daysCount,
                 endDate: lease.end_date,
-                propertyName: lease.propertyName,
+                propertyName: lease.property_name,
                 unitNumber: lease.unit_number,
                 role: 'tenant'
             });
@@ -393,7 +274,7 @@ export const sendLeaseExpiryWarnings = async () => {
               await emailService.sendLeaseExpiryReminder(lease.owner_email, {
                   daysCount,
                   endDate: lease.end_date,
-                  propertyName: lease.propertyName,
+                  propertyName: lease.property_name,
                   unitNumber: lease.unit_number,
                   role: 'owner'
               });
@@ -410,77 +291,48 @@ export const sendLeaseExpiryWarnings = async () => {
 export const applyLateFees = async () => {
   console.log('Running late fee automation...');
   try {
-    const overdueInvoices = await invoiceModel.findOverdue(GRACE_PERIOD_DAYS);
+    const overdueInvoices = await invoiceModel.findOverdue();
     console.log(
       `Found ${overdueInvoices.length} overdue invoices eligible for late fees.`
     );
 
     let appliedCount = 0;
     for (const inv of overdueInvoices) {
-      // Fix 2: Calculate based on the Historical Invoice Amount, not current lease rent.
-      const lateFeeAmount = inv.amount * LATE_FEE_PERCENTAGE;
+      // DUPLICATION GUARD: Ensure a late fee hasn't already been created for this invoice in the last 30 days
+      const [feeExists] = await db.query(
+        "SELECT 1 FROM rent_invoices WHERE lease_id = ? AND description LIKE ? AND invoice_type = 'late_fee' AND created_at > DATE_SUB(NOW(), INTERVAL 30 DAY) LIMIT 1",
+        [inv.lease_id, `%Late Fee for Invoice #${inv.invoice_id}%`]
+      );
+
+      if (feeExists.length > 0) {
+        console.log(`Late fee already exists for Invoice #${inv.invoice_id}. Skipping.`);
+        continue;
+      }
+
+      // Use property-specific fee if available, otherwise fallback to system default
+      const feePercentage = inv.lateFeePercentage !== null ? (inv.lateFeePercentage / 100) : LATE_FEE_PERCENTAGE;
+      const lateFeeAmount = moneyMath(inv.amount).mul(feePercentage).toCents();
 
       // Create Late Fee Invoice
       const lateFeeInvoiceId = await invoiceModel.createLateFeeInvoice({
         leaseId: inv.lease_id,
         amount: lateFeeAmount,
-        dueDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000), // 5-day grace period
+        dueDate: formatToLocalDate(addDays(now(), 5)), // 5-day grace period
         description: `Late Fee for Invoice #${inv.invoice_id} (${inv.year}-${inv.month})`,
       });
 
       // Auto-Apply Credits to Late Fee (consistent with rent invoice logic)
-      const tenantModel = (await import('../models/tenantModel.js')).default;
-      const tenant = await tenantModel.findByUserId(inv.tenant_id);
-
-      if (tenant && tenant.creditBalance > 0) {
-        const amountToApply = Math.min(tenant.creditBalance, lateFeeAmount);
-
-        if (amountToApply > 0) {
-          const paymentModel = (await import('../models/paymentModel.js')).default;
-
-          // 1. Create Verified Payment
-          const payId = await paymentModel.create({
-            invoiceId: lateFeeInvoiceId,
-            amount: amountToApply,
-            paymentDate: new Date(),
-            paymentMethod: 'credit_applied',
-            referenceNumber: `CREDIT-LATEFEE-${Date.now()}`,
-            evidenceUrl: null,
-          });
-          await paymentModel.updateStatus(payId, 'verified');
-
-          // 2. Deduct Credit
-          await tenantModel.deductCredit(inv.tenant_id, amountToApply);
-
-          // 3. Update Invoice Status
-          if (amountToApply >= lateFeeAmount) {
-            await invoiceModel.updateStatus(lateFeeInvoiceId, 'paid');
-          } else {
-            await invoiceModel.updateStatus(lateFeeInvoiceId, 'partially_paid');
-          }
-
-          // 4. Generate Receipt
-          const receiptModel = (await import('../models/receiptModel.js')).default;
-          const { randomUUID } = await import('crypto');
-          await receiptModel.create({
-            paymentId: payId,
-            invoiceId: lateFeeInvoiceId,
-            tenantId: inv.tenant_id,
-            amount: amountToApply,
-            generatedDate: new Date().toISOString(),
-            receiptNumber: `REC-CREDIT-LATEFEE-${randomUUID()}`,
-          });
-
-          console.log(
-            `Auto-applied credit ${amountToApply} to Late Fee Invoice ${lateFeeInvoiceId}. Remaining Credit: ${tenant.creditBalance - amountToApply}`
-          );
-        }
+      // Auto-Apply Credits to Late Fee (consistent with rent invoice logic)
+      try {
+        await paymentService.applyTenantCredit(lateFeeInvoiceId);
+      } catch (err) {
+        console.error(`[Cron] Failed to auto-apply credit to late fee invoice ${lateFeeInvoiceId}:`, err);
       }
 
       // Notify Tenant
       await notificationModel.create({
         userId: inv.tenant_id,
-        message: `A late fee of LKR ${lateFeeAmount} has been applied to your account for overdue invoice #${inv.invoice_id}.`,
+        message: `A late fee of LKR ${fromCents(lateFeeAmount).toFixed(2)} has been applied to your account for overdue invoice #${inv.invoice_id}.`,
         type: 'invoice',
         isRead: false,
       });
@@ -515,8 +367,8 @@ export const applyLateFees = async () => {
           // We reuse sendInvoiceNotification or create a generic one?
           // sendInvoiceNotification expects { amount, dueDate, month, year, invoiceId }
           await emailService.sendInvoiceNotification(userRows[0].email, {
-            amount: lateFeeAmount,
-            dueDate: new Date().toISOString().split('T')[0],
+            amount: fromCents(lateFeeAmount),
+            dueDate: today(),
             month: inv.month,
             year: inv.year,
             invoiceId: 'LATE-FEE',
@@ -526,45 +378,8 @@ export const applyLateFees = async () => {
         console.error('Failed to send late fee email:', emailErr);
       }
 
-      // Logic Fix: Sync Behavior Score (Deduct 10 points)
-      try {
-        const scoreChange = -10;
-        // Import locally if not at top, or assume available.
-        // We need to dynamic import if not readily available or add to top.
-        // Let's add dynamic imports for safety inside the loop/function or better yet, just use pool/db if models aren't easy.
-        // But we used invoiceModel so models should be fine.
-        // We'll use the raw queries or models. Let's use models pattern if possible.
-        // But cronJobs.js has imports at top. Let's check imports.
-        // I will add the logic using DB queries directly for speed/safety like in the controller example.
-
-        // 1. Create Log
-        // We need behaviorLogModel. Let's use direct DB insert to avoid circular dep issues or import mess.
-        await db.query(
-          `
-                    INSERT INTO tenant_behavior_logs (tenant_id, type, category, score_change, description, recorded_by, created_at)
-                    VALUES (?, 'negative', 'Payment', ?, ?, NULL, NOW())
-                `,
-          [
-            inv.tenant_id,
-            scoreChange,
-            `Late Fee applied for Invoice #${inv.invoice_id}`,
-          ]
-        );
-
-        // 2. Update Tenant Score
-        await db.query(
-          'UPDATE tenants SET behavior_score = LEAST(100, GREATEST(0, behavior_score + ?)) WHERE user_id = ?',
-          [scoreChange, inv.tenant_id]
-        );
-        console.log(
-          `Auto-deducted 10 points for Tenant ${inv.tenant_id} due to late fee.`
-        );
-      } catch (scoreErr) {
-        console.error(
-          'Failed to update behavior score on auto-late fee:',
-          scoreErr
-        );
-      }
+      // [B4 FIX] Removed duplicate behavior score deduction block.
+      // The deduction at lines 393-406 (behaviorLogModel + tenantModel.incrementBehaviorScore) is the single source of truth.
 
       appliedCount++;
     }
@@ -575,65 +390,91 @@ export const applyLateFees = async () => {
 };
 
 // Unit Status Sync (Daily at 3:00 AM)
-// Fixes the "Gap Period" bug: Ensure units with Active leases are marked Occupied.
+// Fixes the "Gap Period" & "Reserved Black Hole" bugs:
+// Reconciles units with their logical lease-based states (Occupied/Reserved/Available).
 export const syncUnitStatuses = async () => {
   console.log('Running unit status synchronization...');
   try {
-    const today = new Date().toISOString().split('T')[0];
+    const currentToday = today();
 
-    // 1. Find Units marked 'available' that actually have an Active Lease covering Today
-    // This handles the case where Lease A ended (Unit->Available) > Gap > Lease B starts (Unit stays Available?? No, we fix it here).
-    const [incorrectAvailable] = await db.query(
+    // STAGE 1: FORCE 'occupied' for units with active leases today
+    // Handles Available/Reserved/Maintenance -> Occupied transitions.
+    const [shouldBeOccupied] = await db.query(
       `
-            SELECT u.unit_id 
-            FROM units u
-            JOIN leases l ON u.unit_id = l.unit_id
-            WHERE u.status = 'available'
-            AND l.status = 'active'
-            AND l.start_date <= ?
-            AND l.end_date >= ?
-        `,
-      [today, today]
+      SELECT DISTINCT u.unit_id 
+      FROM units u
+      JOIN leases l ON u.unit_id = l.unit_id
+      WHERE u.status IN ('available', 'reserved', 'maintenance', 'inactive')
+      AND l.status = 'active'
+      AND l.start_date <= ?
+      AND (l.end_date IS NULL OR l.end_date >= ?)
+      AND u.is_archived = FALSE
+      `,
+      [currentToday, currentToday]
     );
 
-    if (incorrectAvailable.length > 0) {
-      console.log(
-        `Found ${incorrectAvailable.length} units falsely marked 'available'. Correcting to 'occupied'...`
-      );
-      const ids = incorrectAvailable.map((u) => u.unit_id);
-      await db.query(
-        `UPDATE units SET status = 'occupied' WHERE unit_id IN (?)`,
-        [ids]
-      );
+    if (shouldBeOccupied.length > 0) {
+      console.log(`[Sync] Found ${shouldBeOccupied.length} units that should be 'occupied'. Syncing...`);
+      const ids = shouldBeOccupied.map(u => u.unit_id);
+      await db.query(`UPDATE units SET status = 'occupied' WHERE unit_id IN (?)`, [ids]);
     }
 
-    // 2. Find Units marked 'occupied' that satisfy NO active lease condition?
-    // "Ghost Tenant" Cleanup: find units that are 'occupied' but have no lease that is active today
-    const [ghostOccupied] = await db.query(
+    // STAGE 2: FORCE 'reserved' for units with future claims (no active lease today)
+    // Handles Available/Occupied -> Reserved transitions (e.g., ghost occupied cleanup or future booking).
+    const [shouldBeReserved] = await db.query(
       `
-            SELECT u.unit_id 
-            FROM units u
-            WHERE u.status = 'occupied'
-            AND NOT EXISTS (
-                SELECT 1 FROM leases l
-                WHERE l.unit_id = u.unit_id
-                AND l.status = 'active'
-                AND l.start_date <= ?
-                AND l.end_date >= ?
-            )
-        `,
-      [today, today]
+      SELECT DISTINCT u.unit_id 
+      FROM units u
+      WHERE u.status IN ('available', 'occupied')
+      AND u.is_archived = FALSE
+      AND EXISTS (
+          SELECT 1 FROM leases l 
+          WHERE l.unit_id = u.unit_id 
+          AND l.status IN ('active', 'draft', 'pending')
+          AND l.start_date > ?
+      )
+      AND NOT EXISTS (
+          SELECT 1 FROM leases l2 
+          WHERE l2.unit_id = u.unit_id 
+          AND l2.status = 'active'
+          AND l2.start_date <= ?
+          AND (l2.end_date IS NULL OR l2.end_date >= ?)
+      )
+      `,
+      [currentToday, currentToday, currentToday]
     );
 
-    if (ghostOccupied.length > 0) {
-      console.log(
-        `Found ${ghostOccupied.length} "Ghost" units falsely marked 'occupied' (no active lease). Correcting to 'available'...`
-      );
-      const ids = ghostOccupied.map((u) => u.unit_id);
-      await db.query(
-        `UPDATE units SET status = 'available' WHERE unit_id IN (?)`,
-        [ids]
-      );
+    if (shouldBeReserved.length > 0) {
+      console.log(`[Sync] Found ${shouldBeReserved.length} units with future claims that should be 'reserved'. Syncing...`);
+      const ids = shouldBeReserved.map(u => u.unit_id);
+      await db.query(`UPDATE units SET status = 'reserved' WHERE unit_id IN (?)`, [ids]);
+    }
+
+    // STAGE 3: FORCE 'available' for units with NO valid claims (current or future)
+    // Handles Reserved/Occupied -> Available transitions (Ghost Cleanup).
+    // Note: 'maintenance' is deliberately skipped here as it's a manually set status.
+    const [shouldBeAvailable] = await db.query(
+      `
+      SELECT DISTINCT u.unit_id 
+      FROM units u
+      WHERE u.status IN ('occupied', 'reserved')
+      AND u.is_archived = FALSE
+      AND NOT EXISTS (
+          SELECT 1 FROM leases l 
+          WHERE l.unit_id = u.unit_id 
+          AND l.status IN ('active', 'draft', 'pending')
+          AND (l.start_date <= ? OR l.start_date > ?)
+          AND (l.end_date IS NULL OR l.end_date >= ?)
+          AND l.status != 'cancelled' AND l.status != 'expired' AND l.status != 'terminated'
+      )
+      `,
+      [currentToday, currentToday, currentToday]
+    );
+
+    if (shouldBeAvailable.length > 0) {
+        console.log(`[Sync] Found ${shouldBeAvailable.length} units with NO valid claims that should be 'available'. Syncing...`);
+        const ids = shouldBeAvailable.map(u => u.unit_id);
+        await db.query(`UPDATE units SET status = 'available' WHERE unit_id IN (?)`, [ids]);
     }
   } catch (error) {
     console.error('Error syncing unit statuses:', error);
@@ -642,23 +483,22 @@ export const syncUnitStatuses = async () => {
 
 // Rent Reminder (Daily at 8:00 AM)
 export const sendRentReminders = async () => {
-  const today = new Date();
-  const targetDay = RENT_DUE_DAY - 3;
+  const currentToday = now();
+  const targetDay = billingEngine.RENT_DUE_DAY - 3;
   
-  // Handling the case where targetDay is 2 (3 days before the 5th)
-  if (today.getDate() !== targetDay) return;
+  if (currentToday.getDate() !== targetDay) return;
 
   console.log('Running automated rent reminders...');
   try {
     const activeLeases = await leaseModel.findActive();
-    const dueDate = new Date(today.getFullYear(), today.getMonth(), RENT_DUE_DAY).toISOString().split('T')[0];
+    const dueDate = `${currentToday.getFullYear()}-${String(currentToday.getMonth() + 1).padStart(2, '0')}-${String(billingEngine.RENT_DUE_DAY).padStart(2, '0')}`;
 
     for (const lease of activeLeases) {
         // Fetch tenant email
         const [userRows] = await db.query('SELECT email FROM users WHERE user_id = ?', [lease.tenantId]);
         if (userRows.length > 0 && userRows[0].email) {
             await emailService.sendRentReminder(userRows[0].email, {
-                amount: lease.monthlyRent,
+                amount: fromCents(lease.monthlyRent),
                 dueDate: dueDate,
                 daysLeft: 3
             });
@@ -684,26 +524,274 @@ export const cleanupOldNotifications = async () => {
   }
 };
 
+// Stale Lead Auto-Expiry (Daily at 4:30 AM)
+// Drops leads that have been 'interested' for 90+ days with no activity
+export const expireStaleLeads = async () => {
+  console.log('Running stale lead expiry...');
+  try {
+    const leadModel = (await import('../models/leadModel.js')).default;
+    const count = await leadModel.expireStaleLeads(90);
+    console.log(`Expired ${count} stale leads.`);
+  } catch (error) {
+    console.error('Error expiring stale leads:', error);
+  }
+};
+
+// Visit Reminders (Daily at 7:00 AM)
+// Sends 24h reminder emails to visitors with upcoming visits
+export const sendVisitReminders = async () => {
+  console.log('Running visit reminders...');
+  try {
+    const visitModel = (await import('../models/visitModel.js')).default;
+    const upcoming = await visitModel.findUpcoming(24);
+
+    for (const visit of upcoming) {
+      try {
+        if (visit.visitor_email) {
+          await emailService.sendVisitReminder(visit.visitor_email, {
+            visitorName: visit.visitor_name,
+            propertyName: visit.property_name,
+            unitNumber: visit.unit_number,
+            scheduledDate: visit.scheduled_date,
+          });
+        }
+      } catch (emailErr) {
+        console.error(`Failed to send visit reminder for visit ${visit.visit_id}:`, emailErr);
+      }
+    }
+    console.log(`Sent ${upcoming.length} visit reminders.`);
+  } catch (error) {
+    console.error('Error in visit reminders:', error);
+  }
+};
+
+export const expireStaleRenewals = async () => {
+  console.log('Running stale renewal request cleanup...');
+  try {
+    const cutoffDate = addDays(now(), -14);
+
+    const [result] = await db.query(
+      `UPDATE renewal_requests 
+       SET status = 'expired' 
+       WHERE status IN ('pending', 'negotiating') 
+       AND created_at < ?`,
+      [cutoffDate]
+    );
+
+    if (result.affectedRows > 0) {
+      console.log(`Expired ${result.affectedRows} stale renewal requests.`);
+    }
+  } catch (error) {
+    console.error('Error expiring stale renewal requests:', error);
+  }
+};
+
+/**
+ * Hardening Flow #1: Automatically expire draft leases that have been idle
+ * for > 48 hours without a pending or verified deposit payment.
+ */
+export const expireDraftLeases = async () => {
+  console.log('Running draft lease expiry check...');
+  try {
+    const cutoffDate = addDays(now(), -2); // 48 hours ago
+    
+    // Find draft leases that are too old AND have no pending/verified payments 
+    // for their deposit invoice.
+    const [staleDrafts] = await db.query(
+      `
+      SELECT l.lease_id, l.unit_id 
+      FROM leases l
+      WHERE l.status = 'draft' 
+      AND l.created_at < ?
+      AND NOT EXISTS (
+        SELECT 1 FROM rent_invoices ri
+        JOIN payments p ON ri.invoice_id = p.invoice_id
+        WHERE ri.lease_id = l.lease_id 
+        AND ri.invoice_type = 'deposit'
+        AND p.status IN ('pending', 'verified')
+      )
+      `,
+      [cutoffDate]
+    );
+
+    if (staleDrafts.length > 0) {
+      console.log(`Found ${staleDrafts.length} stale draft leases. Expiring...`);
+      const ids = staleDrafts.map(l => l.lease_id);
+      
+      const connection = await db.getConnection();
+      try {
+        await connection.beginTransaction();
+        
+        // Cancel the leases
+        await connection.query(
+          "UPDATE leases SET status = 'cancelled' WHERE lease_id IN (?)",
+          [ids]
+        );
+        
+        // [NEW] Return unit status to 'available' only if it was 'reserved' and no other active/draft leases exist.
+        const uniqueUnitIds = [...new Set(staleDrafts.map(l => l.unit_id))];
+        for (const unitId of uniqueUnitIds) {
+            const [otherClaims] = await connection.query(
+                "SELECT lease_id FROM leases WHERE unit_id = ? AND status IN ('active', 'draft', 'pending')",
+                [unitId]
+            );
+            if (otherClaims.length === 0) {
+                // Important: Only revert if the unit is currently 'reserved'. 
+                // If it's already 'maintenance' or 'occupied' by another workflow, don't overwrite it.
+                await connection.query(
+                    "UPDATE units SET status = 'available' WHERE unit_id = ? AND status = 'reserved'", 
+                    [unitId]
+                );
+            }
+        }
+        
+        // Void their pending security deposit invoices
+        for (const leaseId of ids) {
+           await invoiceModel.voidPendingByLeaseId(leaseId, connection);
+        }
+        
+        await connection.commit();
+        console.log(`Successfully expired ${staleDrafts.length} draft leases.`);
+      } catch (innerErr) {
+        await connection.rollback();
+        throw innerErr;
+      } finally {
+        connection.release();
+      }
+    }
+  } catch (error) {
+    console.error('Error expiring stale draft leases:', error);
+  }
+};
+/**
+ * Audit #9: Automatically revoke portal access for former tenants.
+ * Deactivates accounts based on property-specific deactivation periods,
+ * provided they have no active or future (draft) leases.
+ */
+export const deactivateFormerTenants = async (targetDate = null) => {
+  const referenceDate = targetDate ? parseLocalDate(targetDate) : getLocalTime();
+  
+  try {
+    const [formerTenants] = await db.query(
+      `SELECT u.user_id, u.email
+       FROM users u
+       WHERE u.role = 'tenant' AND u.status = 'active'
+       AND NOT EXISTS (
+         SELECT 1 FROM leases l 
+         WHERE l.tenant_id = u.user_id 
+         AND (l.status = 'active' OR l.status = 'draft')
+       )
+       AND EXISTS (
+         SELECT 1 
+         FROM leases l2 
+         JOIN units un2 ON l2.unit_id = un2.unit_id
+         JOIN properties p2 ON un2.property_id = p2.property_id
+         WHERE l2.tenant_id = u.user_id
+         GROUP BY l2.tenant_id
+         HAVING MAX(l2.end_date) < DATE_SUB(?, INTERVAL p2.tenant_deactivation_days DAY)
+       )`,
+      [referenceDate]
+    );
+
+    if (formerTenants.length > 0) {
+      console.log(`Found ${formerTenants.length} former tenants eligible for deactivation.`);
+      const ids = formerTenants.map(t => t.user_id);
+      
+      await db.query(
+        "UPDATE users SET status = 'inactive' WHERE user_id IN (?)",
+        [ids]
+      );
+
+      for (const tenant of formerTenants) {
+        console.log(`[Revocation] Deactivated account for former tenant: ${tenant.email} (User ID: ${tenant.user_id})`);
+        
+        // Log to Audit trail
+        try {
+          const auditLogger = (await import('./auditLogger.js')).default;
+          await auditLogger.log({
+            userId: null, // System action
+            actionType: 'TENANT_ACCESS_REVOKED',
+            entityId: tenant.user_id,
+            details: { reason: 'Lease ended past property-specific deactivation period', referenceDate }
+          });
+        } catch (auditErr) {
+          console.error(`Failed to log audit for revocation of ${tenant.user_id}:`, auditErr);
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Error in former tenant deactivation:', error);
+  }
+};
+
+/**
+ * Unified Nightly Cron Job (Locking + Backfill)
+ */
+export const runNightlyCron = async (targetDate = null) => {
+  const executionDate = targetDate || today();
+  console.log(`--- Starting Nightly Cron Activities for ${executionDate} ---`);
+
+  try {
+    // 1. Warnings & Expiries
+    await sendLeaseExpiryWarnings();
+    await checkLeaseExpiration();
+
+    // 2. Billing (Rent)
+    await generateRentInvoices();
+
+    // 3. Billing (Late Fees)
+    await applyLateFees();
+
+    // 4. Maintenance / Lead Expiries
+    await syncUnitStatuses();
+    await cleanupOldNotifications();
+    await expireStaleLeads();
+    await expireStaleRenewals();
+    await expireDraftLeases();
+    await deactivateFormerTenants(executionDate);
+
+    await logCronExecution('nightly_billing', executionDate, 'success');
+  } catch (err) {
+    await logCronExecution('nightly_billing', executionDate, 'failed', err.message);
+    throw err;
+  }
+};
+
+/**
+ * Main Entry Point with Backfill Logic
+ */
+export const executeNightlyPayload = async () => {
+  await runWithLock('nightly_billing', async () => {
+    // BACKFILL LOGIC: Check last successful run
+    const [lastRun] = await db.query(
+      "SELECT execution_date FROM cron_logs WHERE job_name = 'nightly_billing' AND status = 'success' ORDER BY execution_date DESC LIMIT 1"
+    );
+
+    const todayDate = parseLocalDate(today());
+    let startDate;
+
+    if (lastRun.length > 0) {
+      startDate = addDays(lastRun[0].execution_date, 1);
+    } else {
+      startDate = todayDate;
+    }
+
+    // Process all missed days up to today
+    let current = startDate;
+    while (current <= todayDate) {
+      const dateStr = formatToLocalDate(current);
+      await runNightlyCron(dateStr);
+      current = addDays(current, 1);
+    }
+  });
+};
+
 const initCronJobs = () => {
-  // Run every day at 0:30 AM (Expiry Warnings)
-  cron.schedule('30 0 * * *', sendLeaseExpiryWarnings);
+  // Main Nightly Cron (Run at 1:00 AM)
+  cron.schedule('0 1 * * *', executeNightlyPayload);
 
-  // Run every day at midnight (Lease Expiry)
-  cron.schedule('0 0 * * *', checkLeaseExpiration);
-
-  // Run every day at 1:00 AM (Invoicing)
-  cron.schedule('0 1 * * *', generateRentInvoices);
-
-  // Run every day at 2:00 AM (Late Fees)
-  cron.schedule('0 2 * * *', applyLateFees);
-
-  // Run every day at 3:00 AM (Unit Status Sync)
-  cron.schedule('0 3 * * *', syncUnitStatuses);
-
-  // Run every day at 4:00 AM (Notification Cleanup)
-  cron.schedule('0 4 * * *', cleanupOldNotifications);
-
-  // Run every day at 8:00 AM (Rent Reminders)
+  // Reminders (Non-critical, don't need full locking/backfill for now)
+  cron.schedule('0 7 * * *', sendVisitReminders);
   cron.schedule('0 8 * * *', sendRentReminders);
 };
 

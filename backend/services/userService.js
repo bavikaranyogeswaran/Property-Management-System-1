@@ -12,14 +12,16 @@ import unitModel from '../models/unitModel.js';
 import leaseModel from '../models/leaseModel.js';
 import leaseService from '../services/leaseService.js';
 import emailService from '../utils/emailService.js';
-import leadTokenModel from '../models/leadTokenModel.js';
 import leaseTermModel from '../models/leaseTermModel.js';
+import { getLocalTime, parseLocalDate, addMonths, today } from '../utils/dateUtils.js';
 import pool from '../config/db.js';
+import unitLockService from '../services/unitLockService.js';
+import leadTokenModel from '../models/leadTokenModel.js';
 
 const SALT_ROUNDS = 10;
 
 class UserService {
-  async createTreasurer(name, email, phone, password, staffData = {}) {
+  async createTreasurer(name, email, phone, password, staffData = {}, user = null) {
     const connection = await pool.getConnection();
     try {
       await connection.beginTransaction();
@@ -29,7 +31,7 @@ class UserService {
       // Better to use connection if possible, but finding by email is just a read.
       // However, concurrent inserts might race.
       // For now, simple read is fine.
-      const existingUser = await userModel.findByEmail(email);
+      const existingUser = await userModel.findByEmail(email, connection);
       if (existingUser) {
         throw new Error('Email already in use');
       }
@@ -58,6 +60,14 @@ class UserService {
         connection
       );
 
+      const auditLogger = (await import('../utils/auditLogger.js')).default;
+      await auditLogger.log({
+        userId: user?.id || null,
+        actionType: 'STAFF_ACCOUNT_CREATED',
+        entityId: userId,
+        details: { name, email, role: 'treasurer' }
+      }, null, connection);
+
       await connection.commit();
 
       // Setup Token & Email (Outside transaction as side effect)
@@ -83,7 +93,7 @@ class UserService {
 
     // Check if email is being changed and if it's taken
     const existingUser = await userModel.findByEmail(email);
-    if (existingUser && existingUser.user_id !== parseInt(id)) {
+    if (existingUser && existingUser.id !== parseInt(id)) {
       throw new Error('Email already in use');
     }
 
@@ -155,31 +165,47 @@ class UserService {
   }
 
   // Convert lead to tenant
-  async convertLeadToTenant(leadId, startDate, endDate, tenantData = {}) {
+  async convertLeadToTenant(leadId, startDate, endDate, tenantData = {}, user = null) {
     const connection = await pool.getConnection();
     try {
       await connection.beginTransaction();
 
       // 1. Get lead details
-      const lead = await leadModel.findById(leadId);
+      const lead = await leadModel.findById(leadId, connection);
       if (!lead) {
         throw new Error('Lead not found');
       }
 
+      // IDEMPOTENCY: If lead already converted, return Success.
       if (lead.status === 'converted') {
-        throw new Error('Lead is already converted');
+        // Return existing user ID by finding user with lead's email
+        const existingUser = await userModel.findByEmail(lead.email, connection);
+        return { 
+            message: 'Lead already converted', 
+            tenantId: existingUser ? existingUser.id : null,
+            alreadyConverted: true 
+        };
+      }
+
+      // LOCKING: Ensure unit is not being processed by another conversion.
+      const targetUnitIdForLock = tenantData.unitId || lead.interestedUnit;
+      if (targetUnitIdForLock) {
+        const lockAcquired = await unitLockService.acquireLock(targetUnitIdForLock, leadId);
+        if (!lockAcquired) {
+          throw new Error('This unit is currently being processed by another staff member. Please wait 10 minutes or choose another unit.');
+        }
       }
 
       // 2. Check if a user with this email already exists
       let userId;
-      const existingUser = await userModel.findByEmail(lead.email);
+      const existingUser = await userModel.findByEmail(lead.email, connection);
 
-      let invitationData = null;
+      let invitationToken = null;
       if (existingUser) {
         if (existingUser.role === 'tenant') {
           // User is already an active tenant applying for another property.
           // They already have an account and password, so we just proceed with lease creation.
-          userId = existingUser.user_id;
+          userId = existingUser.id;
           console.log(`Lead ${leadId} is already a tenant (User ID: ${userId}). Proceeding with new lease creation.`);
         } else {
           throw new Error(`Email ${lead.email} is already associated with a ${existingUser.role} account. Cannot convert to tenant.`);
@@ -201,13 +227,21 @@ class UserService {
           connection
         );
 
-        const token = jwt.sign(
+        invitationToken = jwt.sign(
           { id: userId, type: 'setup_password', role: 'tenant' },
           JWT_SECRET,
           { expiresIn: '48h' }
         );
-        invitationData = { email: lead.email, role: 'tenant', token };
       }
+
+      // Track email context data
+      const mailData = {
+          email: lead.email,
+          name: lead.name,
+          leaseId: null,
+          propertyName: null,
+          unitNumber: null
+      };
 
       // 3. Create Tenant Profile
       const existingTenant = await tenantModel.findByUserId(userId, connection);
@@ -233,7 +267,7 @@ class UserService {
       );
 
       // 4a. Invalidate portal access tokens
-      await leadTokenModel.invalidateForLead(leadId);
+      await leadTokenModel.invalidateForLead(leadId, connection);
 
       // 4b. Record stage history (positional args: leadId, fromStatus, toStatus, notes, connection)
       const leadStageHistoryModel = (await import('../models/leadStageHistoryModel.js')).default;
@@ -254,34 +288,31 @@ class UserService {
         // However, we need to fetch the unit to get the rent first?
         // LeaseService expects us to pass monthlyRent.
 
-        const unit = await unitModel.findById(targetUnitId);
+        const unit = await unitModel.findById(targetUnitId, connection);
 
         if (unit) {
-          const today = new Date();
-          const leaseStart = startDate ? new Date(startDate) : today;
+          const currentDay = getLocalTime();
+          const leaseStart = startDate ? parseLocalDate(startDate) : currentDay;
           let leaseEnd;
           
           // Fetch lease term if ID provided
           const leaseTermId = tenantData.leaseTermId || lead.leaseTermId;
           let leaseTerm = null;
           if (leaseTermId) {
-            leaseTerm = await leaseTermModel.findById(leaseTermId);
+            leaseTerm = await leaseTermModel.findById(leaseTermId, connection);
           }
 
-          if (leaseTerm && leaseTerm.type === 'periodic') {
-            leaseEnd = null; // Periodic leases have no fixed end date
-          } else if (endDate) {
-            leaseEnd = new Date(endDate);
-          } else if (leaseTerm && leaseTerm.type === 'fixed' && leaseTerm.durationMonths) {
-            leaseEnd = new Date(leaseStart);
-            leaseEnd.setMonth(leaseStart.getMonth() + leaseTerm.durationMonths);
+          if (endDate) {
+            leaseEnd = parseLocalDate(endDate);
+          } else if (leaseTerm && leaseTerm.durationMonths) {
+            leaseEnd = addMonths(leaseStart, leaseTerm.durationMonths);
           } else {
-            leaseEnd = new Date(leaseStart);
-            leaseEnd.setFullYear(leaseStart.getFullYear() + 1);
+            // Default to 1 year
+            leaseEnd = addMonths(leaseStart, 12);
           }
 
           // Use LeaseService with the existing transaction connection
-          await leaseService.createLease(
+          const leaseId = await leaseService.createLease(
             {
               tenantId: userId,
               unitId: targetUnitId,
@@ -292,16 +323,50 @@ class UserService {
               securityDeposit: unit.monthlyRent, // Default 1 month deposit
               documentUrl: tenantData.documentUrl || null,
             },
-            connection
+            connection,
+            user // Pass the acting user here
           );
+
+          // [NEW] Capture context for Magic Link email
+          mailData.leaseId = leaseId;
+          mailData.propertyName = unit.propertyName;
+          mailData.unitNumber = unit.unitNumber;
         }
       }
 
       await connection.commit();
 
-      // [CRITICAL FIX] Send invitation email ONLY after successful transaction commit
-      if (invitationData) {
-        await emailService.sendInvitationEmail(invitationData.email, invitationData.role, invitationData.token);
+      // RELEASE LOCK: Clear reservation on success
+      if (targetUnitId) {
+        unitLockService.releaseLock(targetUnitId);
+      }
+
+      // [CRITICAL FIX] Send email ONLY after successful transaction commit
+      // [NEW] Check if a deposit magic link was generated for this lease
+      if (mailData.leaseId) {
+          const [depositInvoices] = await connection.query(
+              "SELECT magic_token, amount FROM rent_invoices WHERE lease_id = ? AND invoice_type = 'deposit' AND status = 'pending' LIMIT 1",
+              [mailData.leaseId]
+          );
+
+          if (depositInvoices.length > 0 && depositInvoices[0].magic_token) {
+              // Send Deposit Magic Link instead of Account Invitation
+              // (Account Invitation will be sent automatically AFTER deposit is verified)
+              await emailService.sendDepositMagicLink(
+                  mailData.email,
+                  mailData.name,
+                  mailData.propertyName || 'Property',
+                  mailData.unitNumber || 'N/A',
+                  depositInvoices[0].amount,
+                  depositInvoices[0].magic_token
+              );
+              return { message: 'Lead converted successfully. Deposit payment link sent.', tenantId: userId, magicLinkSent: true };
+          }
+      }
+
+      // Fallback: If no deposit magic link, and it's a new user, send account setup invitation
+      if (invitationToken) {
+          await emailService.sendInvitationEmail(mailData.email, 'tenant', invitationToken);
       }
 
       return { message: 'Lead converted successfully', tenantId: userId };
@@ -310,6 +375,41 @@ class UserService {
       throw error;
     } finally {
       connection.release();
+    }
+  }
+
+  async triggerOnboarding(userId, connection = null) {
+    const db = connection || pool;
+    const user = await userModel.findById(userId, db);
+    if (!user) {
+        console.error(`[UserService] Onboarding failed: User ${userId} not found.`);
+        return;
+    }
+
+    // Generate token for password setup (invitation)
+    const token = sign(
+      { id: userId, type: 'setup_password', role: 'tenant' },
+      JWT_SECRET,
+      { expiresIn: '48h' }
+    );
+
+    try {
+        await emailService.sendInvitationEmail(user.email, 'tenant', token);
+    } catch (err) {
+        console.error(`[UserService] Failed to send onboarding email to ${user.email}:`, err);
+    }
+    
+    // Log audit trail
+    try {
+        const auditLogger = (await import('../utils/auditLogger.js')).default;
+        await auditLogger.log({
+            userId: null, // System action
+            actionType: 'TENANT_ONBOARDING_TRIGGERED',
+            entityId: userId,
+            details: { email: user.email }
+        }, null, db);
+    } catch (err) {
+        console.error('[UserService] Failed to log onboarding audit:', err);
     }
   }
 }

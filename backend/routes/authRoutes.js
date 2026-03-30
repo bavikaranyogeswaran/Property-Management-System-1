@@ -1,8 +1,10 @@
 import { Router } from 'express';
+import rateLimit from 'express-rate-limit';
+const router = Router();
 import authController from '../controllers/authController.js';
 
 import passwordController from '../controllers/passwordController.js';
-import authenticateToken from '../middleware/authMiddleware.js';
+import { authenticateToken } from '../middleware/authMiddleware.js';
 import validateRequest from '../middleware/validateRequest.js';
 import forgotPasswordLimiter from '../middleware/forgotPasswordLimiter.js';
 import {
@@ -14,11 +16,17 @@ import {
   changePasswordSchema,
 } from '../schemas/authSchemas.js';
 
-const router = Router();
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 mins
+  max: 10, // 10 attempts
+  message: { error: 'Too many login attempts. Please try again after 15 minutes.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 import upload from '../middleware/upload.js';
 
-router.post('/login', validateRequest(loginSchema), authController.login);
+router.post('/login', loginLimiter, validateRequest(loginSchema), authController.login);
 router.post(
   '/verify-email',
   validateRequest(verifyEmailSchema),

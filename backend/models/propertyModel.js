@@ -28,8 +28,8 @@ class PropertyModel {
 
     const [result] = await db.query(
       `INSERT INTO properties 
-            (owner_id, name, property_type_id, property_no, street, city, district, image_url, description, features) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            (owner_id, name, property_type_id, property_no, street, city, district, image_url, description, features, late_fee_percentage, late_fee_grace_period, tenant_deactivation_days) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         ownerId,
         name,
@@ -41,6 +41,9 @@ class PropertyModel {
         imageUrl,
         description,
         featuresJson,
+        propertyData.lateFeePercentage || 3.00,
+        propertyData.lateFeeGracePeriod || 5,
+        propertyData.tenantDeactivationDays || 30,
       ]
     );
     return result.insertId;
@@ -62,6 +65,9 @@ class PropertyModel {
                 p.status, 
                 p.created_at,
                 p.property_type_id,
+                p.late_fee_percentage,
+                p.late_fee_grace_period,
+                p.tenant_deactivation_days,
                 pt.name as type_name,
                 pt.type_id as type_id
             FROM properties p
@@ -86,13 +92,15 @@ class PropertyModel {
       city: row.city,
       district: row.district,
       propertyTypeId: row.property_type_id,
-      typeName: row.type_name, // Alias from SQL
-      image: row.image_url,
+      typeName: row.type_name,
+      imageUrl: row.image_url,
       description: row.description,
       features: row.features || [],
-      uniqueId: row.unique_id, // If it exists
       status: row.status,
       createdAt: row.created_at,
+      lateFeePercentage: parseFloat(row.late_fee_percentage),
+      lateFeeGracePeriod: parseInt(row.late_fee_grace_period),
+      tenantDeactivationDays: parseInt(row.tenant_deactivation_days),
     }));
   }
 
@@ -113,6 +121,9 @@ class PropertyModel {
                 p.status, 
                 p.created_at,
                 p.property_type_id,
+                p.late_fee_percentage,
+                p.late_fee_grace_period,
+                p.tenant_deactivation_days,
                 pt.name as type_name,
                 pt.type_id as type_id
             FROM properties p
@@ -134,63 +145,45 @@ class PropertyModel {
       district: rows[0].district,
       propertyTypeId: rows[0].property_type_id,
       typeName: rows[0].type_name,
-      image: rows[0].image_url,
+      imageUrl: rows[0].image_url,
       description: rows[0].description,
       features: rows[0].features || [],
-      uniqueId: rows[0].unique_id,
       status: rows[0].status,
       createdAt: rows[0].created_at,
+      lateFeePercentage: parseFloat(rows[0].late_fee_percentage),
+      lateFeeGracePeriod: parseInt(rows[0].late_fee_grace_period),
+      tenantDeactivationDays: parseInt(rows[0].tenant_deactivation_days),
     };
   }
+
+  static UPDATE_KEY_MAP = {
+    name: 'name',
+    propertyTypeId: 'property_type_id',
+    propertyNo: 'property_no',
+    street: 'street',
+    city: 'city',
+    district: 'district',
+    imageUrl: 'image_url',
+    status: 'status',
+    description: 'description',
+    features: 'features',
+    lateFeePercentage: 'late_fee_percentage',
+    lateFeeGracePeriod: 'late_fee_grace_period',
+    tenantDeactivationDays: 'tenant_deactivation_days'
+  };
 
   async update(id, updates) {
     const fields = [];
     const values = [];
 
-    if (updates.name) {
-      fields.push('name = ?');
-      values.push(updates.name);
-    }
-    if (updates.propertyTypeId) {
-      fields.push('property_type_id = ?');
-      values.push(updates.propertyTypeId);
-    }
-
-    // Address updates
-    if (updates.propertyNo) {
-      fields.push('property_no = ?');
-      values.push(updates.propertyNo);
-    }
-    if (updates.street) {
-      fields.push('street = ?');
-      values.push(updates.street);
-    }
-    if (updates.city) {
-      fields.push('city = ?');
-      values.push(updates.city);
-    }
-    if (updates.district) {
-      fields.push('district = ?');
-      values.push(updates.district);
-    }
-
-    if (updates.imageUrl) {
-      fields.push('image_url = ?');
-      values.push(updates.imageUrl);
-    }
-    if (updates.status) {
-      fields.push('status = ?');
-      values.push(updates.status);
-    }
-
-    if (updates.description !== undefined) {
-      fields.push('description = ?');
-      values.push(updates.description);
-    }
-    if (updates.features !== undefined) {
-      fields.push('features = ?');
-      values.push(JSON.stringify(updates.features));
-    }
+    Object.keys(updates).forEach((key) => {
+      const column = PropertyModel.UPDATE_KEY_MAP[key];
+      if (column && updates[key] !== undefined) {
+        fields.push(`${column} = ?`);
+        const val = key === 'features' ? JSON.stringify(updates[key]) : updates[key];
+        values.push(val);
+      }
+    });
 
     if (fields.length === 0) return false;
 
@@ -202,8 +195,9 @@ class PropertyModel {
     return result.affectedRows > 0;
   }
 
-  async delete(id) {
-    const [result] = await db.query(
+  async delete(id, connection = null) {
+    const dbConn = connection || db;
+    const [result] = await dbConn.query(
       "UPDATE properties SET archived_at = NOW(), is_archived = TRUE, status = 'inactive' WHERE property_id = ?",
       [id]
     );
@@ -212,7 +206,11 @@ class PropertyModel {
 
   async getTypes() {
     const [rows] = await db.query('SELECT * FROM property_types');
-    return rows;
+    return rows.map(row => ({
+      id: row.type_id.toString(),
+      name: row.name,
+      description: row.description
+    }));
   }
 
   async addImages(propertyId, imagesData) {
@@ -232,12 +230,18 @@ class PropertyModel {
     );
 
     // Fetch and return created images
-    // For simplicity, just selecting by property_id
     const [rows] = await db.query(
       'SELECT * FROM property_images WHERE property_id = ? ORDER BY display_order ASC',
       [propertyId]
     );
-    return rows;
+    return rows.map(row => ({
+      id: row.image_id.toString(),
+      propertyId: row.property_id.toString(),
+      imageUrl: row.image_url,
+      isPrimary: !!row.is_primary,
+      displayOrder: row.display_order,
+      uploadedAt: row.created_at
+    }));
   }
   async findOwnerDetails(propertyId) {
     const [rows] = await db.query(
@@ -247,7 +251,12 @@ class PropertyModel {
              WHERE p.property_id = ?`,
       [propertyId]
     );
-    return rows[0];
+    if (!rows[0]) return null;
+    return {
+        propertyName: rows[0].property_name,
+        ownerEmail: rows[0].owner_email,
+        ownerId: rows[0].owner_id.toString()
+    };
   }
 
   async clearPrimaryImages(propertyId) {

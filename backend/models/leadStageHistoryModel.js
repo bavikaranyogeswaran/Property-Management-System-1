@@ -1,4 +1,5 @@
 import db from '../config/db.js';
+import { getLocalTime } from '../utils/dateUtils.js';
 
 class LeadStageHistoryModel {
   /**
@@ -26,7 +27,7 @@ class LeadStageHistoryModel {
 
         if (previousHistory.length > 0) {
           const previousDate = new Date(previousHistory[0].changed_at);
-          const now = new Date();
+          const now = getLocalTime();
           const diffTime = Math.abs(now - previousDate);
           durationInPreviousStage = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); // Convert to days
         }

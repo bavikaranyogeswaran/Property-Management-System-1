@@ -145,8 +145,8 @@ export function PublicPropertyDetailsPage() {
     }
 
     // Term validation
-    if (!interestFormData.leaseTermId && parseInt(interestFormData.preferredTermMonths) < 3) {
-      errors.preferredTermMonths = 'Minimum lease duration is 3 months';
+    if (!interestFormData.leaseTermId) {
+      errors.leaseTermId = 'Please select a lease term';
     }
 
     setFormErrors(errors);
@@ -262,9 +262,9 @@ export function PublicPropertyDetailsPage() {
 
         {/* Hero Section */}
         <div className="relative w-full h-[50vh] min-h-[400px] md:h-[60vh] bg-gray-900 overflow-hidden">
-          {property.image ? (
+          {property.imageUrl ? (
             <img
-              src={property.image}
+              src={property.imageUrl}
               alt={property.name}
               className="w-full h-full object-cover opacity-90 transition-transform duration-1000 hover:scale-105"
             />
@@ -396,12 +396,12 @@ export function PublicPropertyDetailsPage() {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   {galleryImages.map((img, index) => (
                     <div
-                      key={img.image_id || index}
+                      key={img.id || index}
                       className="relative aspect-square rounded-xl overflow-hidden cursor-pointer group"
                       onClick={() => setLightboxIndex(index)}
                     >
                       <img
-                        src={img.image_url}
+                        src={img.imageUrl}
                         alt={`Gallery ${index + 1}`}
                         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                       />
@@ -496,9 +496,9 @@ export function PublicPropertyDetailsPage() {
                     >
                       {/* Unit Image */}
                       <div className="w-full md:w-56 h-48 md:h-auto bg-gray-100 rounded-xl overflow-hidden relative shrink-0">
-                        {unit.image ? (
+                        {unit.imageUrl ? (
                           <img
-                            src={unit.image}
+                            src={unit.imageUrl}
                             alt={`Unit ${unit.unitNumber}`}
                             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                           />
@@ -616,7 +616,7 @@ export function PublicPropertyDetailsPage() {
 
           <div className="max-w-[90vw] max-h-[90vh]">
             <img
-              src={galleryImages[lightboxIndex].image_url}
+              src={galleryImages[lightboxIndex].imageUrl}
               alt="Full screen"
               className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl"
             />
@@ -672,9 +672,9 @@ export function PublicPropertyDetailsPage() {
               {/* Unit Gallery */}
               <div className="space-y-4">
                 <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden relative">
-                  {selectedUnit.image ? (
+                  {selectedUnit.imageUrl ? (
                     <img
-                      src={selectedUnit.image}
+                      src={selectedUnit.imageUrl}
                       alt={selectedUnit.unitNumber}
                       className="w-full h-full object-cover"
                     />
@@ -697,7 +697,7 @@ export function PublicPropertyDetailsPage() {
                           onClick={() => setUnitLightboxIndex(idx)}
                         >
                           <img
-                            src={img.image_url}
+                            src={img.imageUrl}
                             alt=""
                             className="w-full h-full object-cover"
                           />
@@ -897,32 +897,14 @@ export function PublicPropertyDetailsPage() {
                   });
                 }}
               >
-                <option value="">Custom / Undecided</option>
+                <option value="" disabled>Select a Lease Term</option>
                 {leaseTerms.map(t => (
                   <option key={t.leaseTermId} value={t.leaseTermId.toString()}>
-                    {t.name} ({t.type === 'periodic' ? 'Periodic' : `${t.durationMonths} months`})
+                    {t.name} ({t.durationMonths} months)
                   </option>
                 ))}
               </select>
             </div>
-
-            {!interestFormData.leaseTermId && (
-              <div className="space-y-2">
-                <Label htmlFor="lead-term-custom">Custom Duration (Months)</Label>
-                <Input
-                  id="lead-term-custom"
-                  type="number"
-                  min="3"
-                  value={interestFormData.preferredTermMonths}
-                  onChange={(e) =>
-                    setInterestFormData({
-                      ...interestFormData,
-                      preferredTermMonths: e.target.value,
-                    })
-                  }
-                />
-              </div>
-            )}
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">

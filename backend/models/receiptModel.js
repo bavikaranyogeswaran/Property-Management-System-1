@@ -1,7 +1,8 @@
 import pool from '../config/db.js';
+import { getLocalTime, parseLocalDate } from '../utils/dateUtils.js';
 
 class ReceiptModel {
-  async create(data) {
+  async create(data, connection = null) {
     const {
       paymentId,
       invoiceId,
@@ -11,9 +12,10 @@ class ReceiptModel {
       receiptNumber,
     } = data;
     // generatedDate becomes receipt_date. Ensure valid date linked to payment.
-    const dateValue = generatedDate ? new Date(generatedDate) : new Date();
+    const dateValue = generatedDate ? parseLocalDate(generatedDate) : getLocalTime();
 
-    const [result] = await pool.query(
+    const db = connection || pool;
+    const [result] = await db.query(
       'INSERT INTO receipts (payment_id, amount, receipt_date, receipt_number) VALUES (?, ?, ?, ?)',
       [paymentId, amount, dateValue, receiptNumber]
     );
@@ -125,8 +127,9 @@ class ReceiptModel {
       description: row.description || `Invoice #${row.invoice_id}`,
     };
   }
-  async findByPaymentId(paymentId) {
-    const [rows] = await pool.query(
+  async findByPaymentId(paymentId, connection = null) {
+    const db = connection || pool;
+    const [rows] = await db.query(
       'SELECT * FROM receipts WHERE payment_id = ?',
       [paymentId]
     );

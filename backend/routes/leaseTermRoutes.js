@@ -1,6 +1,6 @@
 import express from 'express';
 import leaseTermController from '../controllers/leaseTermController.js';
-import authenticateToken, { authorizeRoles } from '../middleware/authMiddleware.js';
+import { authenticateToken, authorizeRoles } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 

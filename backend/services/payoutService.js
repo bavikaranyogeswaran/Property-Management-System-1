@@ -2,30 +2,37 @@ import payoutModel from '../models/payoutModel.js';
 
 class PayoutService {
   async previewPayout(ownerId, startDate, endDate) {
-    if (!startDate || !endDate) {
-      throw new Error('Start date and end date are required');
+    if (!endDate) {
+      throw new Error('End date is required');
     }
     return await payoutModel.calculateNetPayout(ownerId, startDate, endDate);
   }
 
   async createPayout(ownerId, startDate, endDate) {
-    if (!startDate || !endDate) {
-      throw new Error('Start date and end date are required');
+    if (!endDate) {
+      throw new Error('End date is required');
     }
 
-    // Logic Fix: Prevent Overlapping Payouts (Period-based guard)
+    // Overlap Fix: New payout must not end before a previous one ends, 
+    // but we can have multiple payouts for different records in the same month.
     const hasOverlap = await payoutModel.checkOverlap(ownerId, startDate, endDate);
     if (hasOverlap) {
-      throw new Error('A payout record already exists for this period.');
+      throw new Error('A payout record already exists that covers part of this period.');
     }
 
-    const { netPayout } = await payoutModel.calculateNetPayout(ownerId, startDate, endDate);
-
-    // Use a transaction to ensure payout creation and record linking are atomic
+    // Use a transaction to ensure payout calculation and record linking are atomic
     const connection = await (await import('../config/db.js')).default.getConnection();
     try {
       await connection.beginTransaction();
 
+      // 1. Calculate within transaction to lock/snapshot records
+      const { netPayout, incomeIds, expenseIds } = await payoutModel.calculateNetPayout(ownerId, startDate, endDate, connection);
+
+      if (incomeIds.length === 0 && expenseIds.length === 0) {
+          throw new Error('No eligible records found for this payout period.');
+      }
+
+      // 2. Create Payout record
       const payoutId = await payoutModel.create({
         ownerId,
         amount: netPayout,
@@ -33,8 +40,8 @@ class PayoutService {
         periodEnd: endDate,
       }, connection);
 
-      // Link financial records to this payout so they aren't double-counted
-      await payoutModel.linkRecordsToPayout(payoutId, ownerId, startDate, endDate, connection);
+      // 3. Link only the specific IDs that were included in the calculation
+      await payoutModel.linkRecordsToPayout(payoutId, incomeIds, expenseIds, connection);
 
       await connection.commit();
       return { payoutId, netPayout };

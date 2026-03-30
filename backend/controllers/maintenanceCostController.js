@@ -1,4 +1,5 @@
 import maintenanceCostModel from '../models/maintenanceCostModel.js';
+import { today } from '../utils/dateUtils.js';
 
 class MaintenanceCostController {
   async addCost(req, res) {
@@ -11,12 +12,13 @@ class MaintenanceCostController {
         return res.status(403).json({ error: 'Access denied' });
       }
 
-      const costId = await maintenanceCostModel.create({
+      const maintenanceService = (await import('../services/maintenanceService.js')).default;
+      const costId = await maintenanceService.recordCost({
         requestId,
         amount,
         description,
-        recordedDate,
-      });
+        recordedDate
+      }, req.user);
 
       // Logic Check: Billable Maintenance
       // If flagged, generate an Invoice for the tenant.
@@ -47,12 +49,11 @@ class MaintenanceCostController {
             );
 
             if (activeLease) {
-              const invoiceModel = (await import('../models/invoiceModel.js'))
-                .default;
+              const invoiceModel = (await import('../models/invoiceModel.js')).default;
               await invoiceModel.create({
                 leaseId: activeLease.id, // Mapped model uses 'id'
                 amount: amount,
-                dueDate: new Date(), // Immediate
+                dueDate: today(), // Immediate
                 description: `Maintenance Charge: ${description || 'Repair Costs'}`,
                 type: 'maintenance',
               });

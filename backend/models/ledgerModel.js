@@ -48,6 +48,22 @@ class LedgerModel {
     }
   }
 
+  mapRow(row) {
+    if (!row) return null;
+    return {
+      id: row.entry_id.toString(),
+      paymentId: row.payment_id ? row.payment_id.toString() : null,
+      invoiceId: row.invoice_id ? row.invoice_id.toString() : null,
+      leaseId: row.lease_id.toString(),
+      accountType: row.account_type,
+      category: row.category,
+      debit: Number(row.debit),
+      credit: Number(row.credit),
+      description: row.description,
+      entryDate: row.entry_date
+    };
+  }
+
   /**
    * Get all ledger entries for a specific lease.
    */
@@ -56,7 +72,7 @@ class LedgerModel {
       `SELECT * FROM accounting_ledger WHERE lease_id = ? ORDER BY entry_date DESC, entry_id DESC`,
       [leaseId]
     );
-    return rows;
+    return rows.map(row => this.mapRow(row));
   }
 
   /**
@@ -211,6 +227,19 @@ class LedgerModel {
     });
 
     return Object.values(monthlyData);
+  }
+
+  /**
+   * Internal Audit Tool: Finds verified payments that don't have a corresponding ledger entry.
+   */
+  async findMismatches() {
+    const [rows] = await db.query(`
+        SELECT p.payment_id, p.amount, p.invoice_id, p.status
+        FROM payments p
+        LEFT JOIN ledger l ON p.payment_id = l.payment_id
+        WHERE p.status = 'verified' AND l.ledger_id IS NULL
+    `);
+    return rows;
   }
 }
 

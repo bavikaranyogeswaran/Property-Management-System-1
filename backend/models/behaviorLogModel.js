@@ -28,7 +28,8 @@ class BehaviorLogModel {
 
   async findByTenantId(tenantId) {
     const query = `
-            SELECT * FROM tenant_behavior_logs 
+            SELECT log_id as id, tenant_id as tenantId, type, category, score_change as scoreChange, description, recorded_by as recordedBy, created_at as createdAt 
+            FROM tenant_behavior_logs 
             WHERE tenant_id = ? 
             ORDER BY created_at DESC
         `;

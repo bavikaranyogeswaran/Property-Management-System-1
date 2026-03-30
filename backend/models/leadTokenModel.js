@@ -4,9 +4,9 @@ import crypto from 'crypto';
 class LeadTokenModel {
   /**
    * Create a new access token for a lead.
-   * Token expires in 90 days by default.
+   * Token expires in 30 days by default.
    */
-  async create(leadId, expiryDays = 90) {
+  async create(leadId, expiryDays = 30) {
     const token = crypto.randomUUID();
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + expiryDays);
@@ -36,8 +36,9 @@ class LeadTokenModel {
   /**
    * Delete all tokens for a given lead (e.g. on conversion or drop).
    */
-  async invalidateForLead(leadId) {
-    await db.query(
+  async invalidateForLead(leadId, connection = null) {
+    const dbConn = connection || db;
+    await dbConn.query(
       'DELETE FROM lead_access_tokens WHERE lead_id = ?',
       [leadId]
     );

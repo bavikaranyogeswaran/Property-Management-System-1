@@ -143,6 +143,19 @@ export const validateName = (name: string): ValidationResult => {
 };
 
 /**
+ * Safely parses a YYYY-MM-DD string into a Date object at midnight local time.
+ * This matches backend logic to avoid "one day off" errors.
+ */
+const parseDate = (dateStr: string): Date | null => {
+  if (!dateStr) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    return new Date(`${dateStr}T00:00:00`);
+  }
+  const d = new Date(dateStr);
+  return isNaN(d.getTime()) ? null : d;
+};
+
+/**
  * Lease duration validation
  */
 export const validateLeaseDuration = (
@@ -150,10 +163,10 @@ export const validateLeaseDuration = (
   endDate: string,
   minDays: number = 90
 ): ValidationResult => {
-  const start = new Date(startDate);
-  const end = new Date(endDate);
+  const start = parseDate(startDate);
+  const end = parseDate(endDate);
   
-  if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+  if (!start || !end) {
     return { isValid: false, error: 'Invalid start or end date' };
   }
 

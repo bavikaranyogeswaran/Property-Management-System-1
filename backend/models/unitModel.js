@@ -43,7 +43,11 @@ class UnitModel {
                     WHERE l.unit_id = u.unit_id 
                     AND l.status = 'active' 
                     AND l.start_date <= CURRENT_DATE() 
-                    AND l.end_date >= CURRENT_DATE()) as active_lease_count
+                    AND (l.end_date IS NULL OR l.end_date >= CURRENT_DATE())) as active_lease_count,
+                   (SELECT COUNT(*) FROM leases l 
+                    WHERE l.unit_id = u.unit_id 
+                    AND l.status IN ('active', 'pending')
+                    AND l.start_date > CURRENT_DATE()) as future_lease_count
             FROM units u
             JOIN properties p ON u.property_id = p.property_id
             JOIN unit_types ut ON u.unit_type_id = ut.type_id
@@ -53,8 +57,9 @@ class UnitModel {
     return this.mapRows(rows);
   }
 
-  async findById(id) {
-    const [rows] = await db.query(
+  async findById(id, connection = null) {
+    const dbConn = connection || db;
+    const [rows] = await dbConn.query(
       `
             SELECT u.*, 
                    p.name as property_name, 
@@ -63,7 +68,11 @@ class UnitModel {
                     WHERE l.unit_id = u.unit_id 
                     AND l.status = 'active' 
                     AND l.start_date <= CURRENT_DATE() 
-                    AND l.end_date >= CURRENT_DATE()) as active_lease_count
+                    AND (l.end_date IS NULL OR l.end_date >= CURRENT_DATE())) as active_lease_count,
+                   (SELECT COUNT(*) FROM leases l 
+                    WHERE l.unit_id = u.unit_id 
+                    AND l.status IN ('active', 'pending')
+                    AND l.start_date > CURRENT_DATE()) as future_lease_count
             FROM units u
             JOIN properties p ON u.property_id = p.property_id
             JOIN unit_types ut ON u.unit_type_id = ut.type_id
@@ -86,7 +95,11 @@ class UnitModel {
                     WHERE l.unit_id = u.unit_id 
                     AND l.status = 'active' 
                     AND l.start_date <= CURRENT_DATE() 
-                    AND l.end_date >= CURRENT_DATE()) as active_lease_count
+                    AND (l.end_date IS NULL OR l.end_date >= CURRENT_DATE())) as active_lease_count,
+                   (SELECT COUNT(*) FROM leases l 
+                    WHERE l.unit_id = u.unit_id 
+                    AND l.status IN ('active', 'pending')
+                    AND l.start_date > CURRENT_DATE()) as future_lease_count
             FROM units u
             JOIN properties p ON u.property_id = p.property_id
             JOIN unit_types ut ON u.unit_type_id = ut.type_id
@@ -109,7 +122,11 @@ class UnitModel {
                     WHERE l.unit_id = u.unit_id 
                     AND l.status = 'active' 
                     AND l.start_date <= CURRENT_DATE() 
-                    AND l.end_date >= CURRENT_DATE()) as active_lease_count
+                    AND (l.end_date IS NULL OR l.end_date >= CURRENT_DATE())) as active_lease_count,
+                   (SELECT COUNT(*) FROM leases l 
+                    WHERE l.unit_id = u.unit_id 
+                    AND l.status IN ('active', 'pending')
+                    AND l.start_date > CURRENT_DATE()) as future_lease_count
             FROM units u
             JOIN properties p ON u.property_id = p.property_id
             JOIN unit_types ut ON u.unit_type_id = ut.type_id
@@ -158,12 +175,22 @@ class UnitModel {
     return result.affectedRows > 0;
   }
 
-  async delete(id) {
-    const [result] = await db.query(
+  async delete(id, connection = null) {
+    const dbConn = connection || db;
+    const [result] = await dbConn.query(
       "UPDATE units SET archived_at = NOW(), is_archived = TRUE, status = 'inactive' WHERE unit_id = ?",
       [id]
     );
     return result.affectedRows > 0;
+  }
+
+  async archiveByPropertyId(propertyId, connection = null) {
+    const dbConn = connection || db;
+    const [result] = await dbConn.query(
+      "UPDATE units SET archived_at = NOW(), is_archived = TRUE, status = 'inactive' WHERE property_id = ? AND is_archived = FALSE",
+      [propertyId]
+    );
+    return result.affectedRows >= 0;
   }
 
   mapRows(rows) {
@@ -178,6 +205,8 @@ class UnitModel {
       let status = row.status;
       if (row.active_lease_count > 0) {
         status = 'occupied';
+      } else if (row.future_lease_count > 0) {
+        status = 'reserved';
       }
 
       return {
@@ -188,7 +217,7 @@ class UnitModel {
         type: row.type_name,
         monthlyRent: parseFloat(row.monthly_rent),
         status: status,
-        image: row.image_url,
+        imageUrl: row.image_url,
         createdAt: row.created_at,
         propertyName: row.property_name,
       };
@@ -207,7 +236,20 @@ class UnitModel {
 
   async countOccupied(propertyId) {
     const [rows] = await db.query(
-      "SELECT COUNT(*) as count FROM units WHERE property_id = ? AND is_archived = FALSE AND status IN ('occupied', 'maintenance')",
+      `SELECT COUNT(u.unit_id) as count 
+       FROM units u
+       WHERE u.property_id = ? AND u.is_archived = FALSE 
+       AND (
+         u.status = 'maintenance' OR
+         u.status = 'reserved' OR
+         EXISTS (
+           SELECT 1 FROM leases l 
+           WHERE l.unit_id = u.unit_id 
+           AND l.status = 'active'
+           AND l.start_date <= CURRENT_DATE() 
+           AND (l.end_date IS NULL OR l.end_date >= CURRENT_DATE())
+         )
+       )`,
       [propertyId]
     );
     return rows[0].count;
@@ -220,10 +262,31 @@ class UnitModel {
     const [rows] = await db.query(
       `
       SELECT 
-        COALESCE(p.name, CONCAT('Property ', u.property_id)) AS property_name,
+        COALESCE(p.name, CONCAT('Property ', u.property_id)) AS propertyName,
         COUNT(u.unit_id) AS total,
-        SUM(CASE WHEN u.status = 'occupied' THEN 1 ELSE 0 END) AS occupied,
-        GROUP_CONCAT(CASE WHEN u.status != 'occupied' THEN u.unit_number ELSE NULL END) AS vacancies
+        SUM(CASE 
+          WHEN u.status = 'maintenance' THEN 1
+          WHEN u.status = 'reserved' THEN 1
+          WHEN EXISTS (
+            SELECT 1 FROM leases l 
+            WHERE l.unit_id = u.unit_id 
+            AND l.status = 'active'
+            AND l.start_date <= CURRENT_DATE() 
+            AND (l.end_date IS NULL OR l.end_date >= CURRENT_DATE())
+          ) THEN 1 
+          ELSE 0 
+        END) AS occupied,
+        GROUP_CONCAT(CASE 
+          WHEN u.status = 'maintenance' THEN NULL
+          WHEN EXISTS (
+            SELECT 1 FROM leases l 
+            WHERE l.unit_id = u.unit_id 
+            AND l.status = 'active'
+            AND l.start_date <= CURRENT_DATE() 
+            AND (l.end_date IS NULL OR l.end_date >= CURRENT_DATE())
+          ) THEN NULL 
+          ELSE u.unit_number 
+        END) AS vacancies
       FROM units u
       LEFT JOIN properties p ON u.property_id = p.property_id
       WHERE u.property_id IN (?) AND u.is_archived = FALSE
@@ -235,7 +298,7 @@ class UnitModel {
     // Transform string vacancies back into array mapping Report Service expectations
     const propertyStats = {};
     rows.forEach(row => {
-      propertyStats[row.property_name] = {
+      propertyStats[row.propertyName] = {
         total: row.total,
         occupied: row.occupied,
         vacancies: row.vacancies ? row.vacancies.split(',') : []

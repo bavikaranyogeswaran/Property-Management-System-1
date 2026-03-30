@@ -1,8 +1,6 @@
 import { Router } from 'express';
 import imageController from '../controllers/imageController.js';
-import authenticateToken, {
-  authorizeRoles,
-} from '../middleware/authMiddleware.js';
+import { authenticateToken, authorizeRoles } from '../middleware/authMiddleware.js';
 import upload from '../middleware/upload.js';
 
 const router = Router();
@@ -14,6 +12,9 @@ router.get('/units/:unitId/images', imageController.getUnitImages);
 // General purpose file upload route (Protected)
 router.use(authenticateToken);
 router.post('/upload', upload.single('file'), imageController.uploadGeneralFile);
+
+import { privateUpload } from '../middleware/upload.js';
+router.post('/upload/private', privateUpload.single('file'), imageController.uploadGeneralFile);
 
 // Protected Routes (Owner Only)
 router.use(authorizeRoles('owner'));

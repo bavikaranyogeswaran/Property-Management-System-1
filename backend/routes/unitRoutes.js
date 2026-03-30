@@ -1,8 +1,6 @@
 import { Router } from 'express';
 import unitController from '../controllers/unitController.js';
-import authenticateToken, {
-  authorizeRoles,
-} from '../middleware/authMiddleware.js';
+import { authenticateToken, authorizeRoles } from '../middleware/authMiddleware.js';
 
 const router = Router();
 
@@ -28,6 +26,14 @@ router.delete(
   authenticateToken,
   authorizeRoles('owner'),
   unitController.deleteUnit
+);
+
+// Mark a maintenance unit as available (owner or treasurer)
+router.patch(
+  '/:id/mark-available',
+  authenticateToken,
+  authorizeRoles('owner'),
+  unitController.markAvailable
 );
 
 export default router;

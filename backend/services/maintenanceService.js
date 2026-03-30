@@ -7,6 +7,10 @@ import leaseModel from '../models/leaseModel.js';
 import invoiceModel from '../models/invoiceModel.js';
 import userModel from '../models/userModel.js';
 import emailService from '../utils/emailService.js';
+import maintenanceCostModel from '../models/maintenanceCostModel.js';
+import ledgerModel from '../models/ledgerModel.js';
+import pool from '../config/db.js';
+import { getCurrentDateString, getLocalTime, today, now } from '../utils/dateUtils.js';
 
 class MaintenanceService {
 
@@ -23,12 +27,19 @@ class MaintenanceService {
             throw new Error('Access denied. You do not have an active lease for this unit.');
         }
 
+        // Flood Protection: Max 5 open requests per unit
+        const openCount = await maintenanceRequestModel.countOpenByUnitId(unitId);
+        if (openCount >= 5) {
+            throw new Error('Maximum number of open maintenance requests (5) reached for this unit.');
+        }
+
         const requestId = await maintenanceRequestModel.create({
             unitId,
             tenantId,
             title,
             description,
             priority,
+            category: data.category || 'general',
             images,
         });
 
@@ -37,9 +48,9 @@ class MaintenanceService {
             const unit = await unitModel.findById(unitId);
             if (unit && unit.propertyId) {
                 const property = await propertyModel.findById(unit.propertyId);
-                if (property && property.owner_id) {
+                if (property && property.ownerId) {
                     await notificationModel.create({
-                        userId: property.owner_id,
+                        userId: property.ownerId,
                         message: `New Maintenance Request for Unit ${unit.unitNumber}: ${title}`,
                         type: 'maintenance',
                         severity: 'warning',
@@ -54,8 +65,23 @@ class MaintenanceService {
     }
 
     async updateStatus(id, status, user) {
-        if (user.role !== 'owner') {
-             throw new Error('Only owners can update status');
+        if (user.role !== 'owner' && user.role !== 'treasurer') {
+             throw new Error('Only owners and treasurers can update status');
+        }
+
+        // Treasurer RBAC: Check assigned property
+        if (user.role === 'treasurer') {
+            const request = await maintenanceRequestModel.findById(id);
+            if (!request) throw new Error('Request not found');
+            
+            const unit = await unitModel.findById(request.unitId);
+            const staffModel = (await import('../models/staffModel.js')).default;
+            const assigned = await staffModel.getAssignedProperties(user.id);
+            const assignedPropertyIds = assigned.map((p) => p.property_id.toString());
+            
+            if (!assignedPropertyIds.includes(unit.propertyId.toString())) {
+                throw new Error('Access denied. You are not assigned to this property.');
+            }
         }
 
         const updated = await maintenanceRequestModel.updateStatus(id, status);
@@ -116,49 +142,77 @@ class MaintenanceService {
         const request = await maintenanceRequestModel.findById(requestId);
         if (!request) throw new Error('Maintenance Request not found');
 
-        const leases = await leaseModel.findByTenantId(request.tenant_id);
-        const activeLease = leases.find(
-            (l) => l.unitId === request.unit_id.toString() && l.status === 'active'
+        const leases = await leaseModel.findByTenantId(request.tenantId);
+        
+        // Find most relevant lease (Active first, then recently ended/expired)
+        let targetLease = leases.find(
+            (l) => l.unitId === request.unitId.toString() && l.status === 'active'
         );
 
-        if (!activeLease) {
-             throw new Error('No active lease found for this tenant/unit. Cannot invoice.');
+        if (!targetLease) {
+            // Check for recently ended/expired leases (30-day grace period)
+            const gracePeriodDays = 30;
+            const graceDate = new Date();
+            graceDate.setDate(graceDate.getDate() - gracePeriodDays);
+            
+            const recentLeases = leases
+                .filter(l => l.unitId === request.unitId.toString() && (l.status === 'expired' || l.status === 'ended'))
+                .filter(l => l.endDate && new Date(l.endDate) >= graceDate)
+                .sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime());
+            
+            if (recentLeases.length > 0) {
+                targetLease = recentLeases[0];
+            }
         }
 
-        const proposedDescription = description || `Maintenance Bill: ${request.title}`;
+        if (!targetLease) {
+             throw new Error('No active or recently ended lease (within 30 days) found for this tenant/unit. Cannot invoice.');
+        }
+
+        let proposedDescription = description || `Maintenance Bill: ${request.title}`;
         const existingInvoices = await invoiceModel.findByLeaseAndDescription(
-            activeLease.id,
+            targetLease.id,
             proposedDescription
         );
 
+        // [BILLING FIX] If an invoice with this description already exists, append unique cost info
         if (existingInvoices.length > 0) {
-            throw new Error('An invoice for this maintenance request already exists.');
+            if (data.costId) {
+                proposedDescription = `${proposedDescription} (Ref: Cost #${data.costId})`;
+            } else {
+                proposedDescription = `${proposedDescription} (${new Date().getTime()})`;
+            }
         }
 
         const invoiceId = await invoiceModel.create({
-            leaseId: activeLease.id,
+            leaseId: targetLease.id,
             amount,
-            dueDate: dueDate || new Date(),
+            dueDate: dueDate || today(),
             description: proposedDescription,
             type: 'maintenance',
         });
 
+        // Link cost if provided and mark as reimbursable if not already
+        if (data.costId) {
+            await pool.query('UPDATE maintenance_costs SET invoice_id = ?, is_reimbursable = TRUE WHERE cost_id = ?', [invoiceId, data.costId]);
+        }
+
         await notificationModel.create({
-            userId: request.tenant_id,
+            userId: request.tenantId,
             message: `You have been billed ${amount} for maintenance: ${request.title}`,
             type: 'invoice',
         });
 
         // Notify Tenant via Email
         try {
-            const tenant = await userModel.findById(request.tenant_id);
+            const tenant = await userModel.findById(request.tenantId);
             if (tenant && tenant.email) {
-                const dueDateObj = dueDate ? new Date(dueDate) : new Date();
+                const currentNow = now();
                 await emailService.sendInvoiceNotification(tenant.email, {
                     amount,
-                    dueDate: dueDate || dueDateObj.toISOString().split('T')[0],
-                    month: dueDateObj.getMonth() + 1,
-                    year: dueDateObj.getFullYear(),
+                    dueDate: dueDate || today(),
+                    month: currentNow.getMonth() + 1,
+                    year: currentNow.getFullYear(),
                     invoiceId: invoiceId,
                     description: proposedDescription
                 });
@@ -170,37 +224,86 @@ class MaintenanceService {
         return invoiceId;
     }
     
+    async recordCost(data, user) {
+        if (user.role !== 'owner' && user.role !== 'treasurer') {
+            throw new Error('Access denied');
+        }
+
+        const { requestId, amount, description, recordedDate } = data;
+        const request = await maintenanceRequestModel.findById(requestId);
+        if (!request) throw new Error('Maintenance Request not found');
+
+        const connection = await pool.getConnection();
+        try {
+            await connection.beginTransaction();
+
+            // 1. Record the cost
+            const costId = await maintenanceCostModel.create({
+                requestId,
+                amount,
+                description,
+                recordedDate: recordedDate || getLocalTime(),
+                invoiceId: data.invoiceId || null,
+                isReimbursable: data.isReimbursable || false
+            }, connection);
+
+            // 2. Identify lease to link ledger entry
+            // [BILLING FIX] Same grace logic for recording costs
+            const leases = await leaseModel.findByTenantId(request.tenantId);
+            let targetLease = leases.find(
+                (l) => l.unitId === request.unitId && l.status === 'active'
+            );
+
+            if (!targetLease) {
+                const graceDate = new Date();
+                graceDate.setDate(graceDate.getDate() - 30);
+                const recentLeases = leases
+                    .filter(l => l.unitId === request.unitId && (l.status === 'expired' || l.status === 'ended'))
+                    .filter(l => l.endDate && new Date(l.endDate) >= graceDate)
+                    .sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime());
+                
+                if (recentLeases.length > 0) {
+                    targetLease = recentLeases[0];
+                }
+            }
+
+            if (targetLease) {
+                // 3. Post to Ledger as an Expense
+                await ledgerModel.create({
+                    leaseId: targetLease.id,
+                    accountType: 'expense',
+                    category: 'maintenance_repair',
+                    credit: Number(amount), 
+                    description: `Maintenance Cost: ${description || request.title} (Req #${requestId})`,
+                    entryDate: recordedDate || getCurrentDateString(),
+                }, connection);
+            }
+
+            const auditLogger = (await import('../utils/auditLogger.js')).default;
+            await auditLogger.log({
+                userId: user.id,
+                actionType: 'MAINTENANCE_COST_RECORDED',
+                entityId: requestId,
+                details: { amount, description, costId }
+            }, null, connection);
+
+            await connection.commit();
+            return costId;
+        } catch (error) {
+            await connection.rollback();
+            throw error;
+        } finally {
+            connection.release();
+        }
+    }
+
     async getRequests(user) {
          if (user.role === 'tenant') {
              return await maintenanceRequestModel.findByTenantId(user.id);
          } else if (user.role === 'owner') {
              return await maintenanceRequestModel.findByOwnerId(user.id);
          } else if (user.role === 'treasurer') {
-             const results = await maintenanceRequestModel.findAll();
-             // Filter by assigned properties
-             const staffModel = (await import('../models/staffModel.js')).default;
-             const assigned = await staffModel.getAssignedProperties(user.id);
-             const assignedPropertyIds = assigned.map((p) => p.property_id.toString());
-             
-             // Extract unique unit IDs from the requests
-             const unitIds = [...new Set(results.map(r => r.unitId))];
-             
-             // Find properties for these units
-             if (unitIds.length === 0) return [];
-             const units = await Promise.all(unitIds.map(id => unitModel.findById(id)));
-             const unitIdToPropertyId = {};
-             units.forEach(u => {
-                 if (u) unitIdToPropertyId[u.id] = u.propertyId.toString();
-             });
-             
-             console.log('Treasurer assignedPropertyIds:', assignedPropertyIds);
-             console.log('Treasurer unitIdToPropertyId:', unitIdToPropertyId);
-
-             return results.filter((r) => {
-                 const propId = unitIdToPropertyId[r.unitId];
-                 console.log(`Checking request ${r.id} for unit ${r.unitId} -> propId: ${propId}`);
-                 return assignedPropertyIds.includes(propId);
-             });
+             return await maintenanceRequestModel.findByTreasurerId(user.id);
          } else {
              throw new Error('Access denied');
          }

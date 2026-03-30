@@ -1,6 +1,7 @@
 
 import PDFDocument from 'pdfkit';
 import reportService from '../services/reportService.js';
+import { getLocalTime, parseLocalDate } from '../utils/dateUtils.js';
 
 // ============================================================================
 //  PDF HELPER UTILITIES
@@ -447,10 +448,11 @@ class ReportController {
       doc.moveDown(0.5);
 
       // --- Compute Aggregates with Urgency Tiers ---
-      const now = new Date();
+      const nowTime = getLocalTime();
       const leasesWithDays = expiringLeases.map(lease => {
-        const endDate = new Date(lease.endDate);
-        const diffDays = Math.ceil((endDate - now) / (1000 * 60 * 60 * 24));
+        const endDate = parseLocalDate(lease.endDate);
+        const diffTime = endDate.getTime() - nowTime.getTime();
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
         let urgency = 'upcoming', urgencyColor = '#334155';
         if (diffDays <= 14) { urgency = 'critical'; urgencyColor = '#ef4444'; }
         else if (diffDays <= 30) { urgency = 'urgent'; urgencyColor = '#f59e0b'; }

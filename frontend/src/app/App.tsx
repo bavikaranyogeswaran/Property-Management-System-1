@@ -90,6 +90,7 @@ import { OwnerReportsPage } from '@/components/pages/owner/OwnerReportsPage';
 import { VisitsPage } from '@/components/pages/owner/VisitsPage';
 import OwnerPayoutsPage from '@/components/pages/OwnerPayoutsPage';
 import { OwnerPaymentsPage } from '@/components/pages/owner/OwnerPaymentsPage';
+import { RefundRequestsPage } from '@/components/pages/owner/RefundRequestsPage';
 
 // Tenant Pages
 import { TenantDashboard } from '@/components/pages/tenant/TenantDashboard';
@@ -111,7 +112,9 @@ import { ReceiptsPage } from '@/components/pages/common/ReceiptsPage';
 import { NotificationsPage } from '@/components/pages/common/NotificationsPage';
 import { PublicListingPage } from '@/components/pages/public/PublicListingPage';
 import { PublicPropertyDetailsPage } from '@/components/pages/public/PublicPropertyDetailsPage';
+import CancelVisitPage from '@/components/pages/public/CancelVisitPage';
 import AuditLogsPage from '@/components/pages/AuditLogsPage';
+import { GuestPaymentPage } from '@/components/pages/public/GuestPaymentPage';
 
 // Lead Pages
 import { LeadPortalPage } from '@/components/pages/lead/LeadPortalPage';
@@ -167,6 +170,8 @@ function AppContent() {
       <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/verify-email" element={<VerifyEmailPage />} />
       <Route path="/setup-password" element={<SetupPasswordPage />} />
+      <Route path="/cancel-visit" element={<CancelVisitPage />} />
+      <Route path="/pay/:token" element={<PublicPropertiesWrapper><GuestPaymentPage /></PublicPropertiesWrapper>} />
 
       {/* Public/Shared Properties Route */}
       <Route
@@ -292,6 +297,14 @@ function AppContent() {
             element={
               <ProtectedRoute>
                 <LeasesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/refund-requests"
+            element={
+              <ProtectedRoute>
+                <RefundRequestsPage />
               </ProtectedRoute>
             }
           />
@@ -432,6 +445,14 @@ function AppContent() {
             element={
               <ProtectedRoute>
                 <PaymentVerificationPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/leases"
+            element={
+              <ProtectedRoute>
+                <LeasesPage />
               </ProtectedRoute>
             }
           />

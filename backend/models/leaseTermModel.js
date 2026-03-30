@@ -19,8 +19,9 @@ class LeaseTermModel {
     return rows;
   }
 
-  async findById(id) {
-    const [rows] = await db.query(`
+  async findById(id, connection = null) {
+    const dbConn = connection || db;
+    const [rows] = await dbConn.query(`
             SELECT 
                 lease_term_id as leaseTermId,
                 owner_id as ownerId,

@@ -11,14 +11,51 @@ class VisitService {
 
     async scheduleVisit(data) {
         const { propertyId, unitId, name, email, phone, date, time, notes } = data;
+        let unit = null;
 
         if (!propertyId || !name || !email || !date || !time) {
              throw new Error('Missing required fields');
         }
 
-        const scheduledDate = new Date(`${date}T${time}`);
-        let leadId = await leadModel.findIdByEmailAndProperty(email, propertyId);
+        // 1. Time Slot Rounding (Nearest 30 mins)
+        let scheduledDate = new Date(`${date}T${time}`);
+        const minutes = scheduledDate.getMinutes();
+        if (minutes < 15) scheduledDate.setMinutes(0, 0, 0);
+        else if (minutes < 45) scheduledDate.setMinutes(30, 0, 0);
+        else {
+            scheduledDate.setHours(scheduledDate.getHours() + 1);
+            scheduledDate.setMinutes(0, 0, 0);
+        }
 
+        // 2a. Business Hours Validation (9 AM - 6 PM)
+        const hour = scheduledDate.getHours();
+        if (hour < 9 || hour >= 18) {
+            throw new Error('Visits can only be scheduled between 9:00 AM and 6:00 PM.');
+        }
+
+        // 2b. Lead Time Validation (Min 2 hours)
+        const now = new Date();
+        const twoHoursFromNow = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+        if (scheduledDate < twoHoursFromNow) {
+            throw new Error('Visits must be scheduled at least 2 hours in advance');
+        }
+
+        // 3. Unit Status Validation
+        if (unitId) {
+            unit = await unitModel.findById(unitId);
+            if (!unit) throw new Error('Unit not found');
+            if (unit.status !== 'available') {
+                throw new Error(`Unit ${unit.unitNumber} is currently ${unit.status} and not available for visits.`);
+            }
+
+            // 4. Conflict Detection
+            const hasConflict = await visitModel.existsInSlot(unitId, scheduledDate);
+            if (hasConflict) {
+                throw new Error('This time slot is already booked for this unit. Please select another time.');
+            }
+        }
+
+        let leadId = await leadModel.findIdByEmailAndProperty(email, propertyId);
         if (!leadId) {
             leadId = await leadModel.create({
                 propertyId,
@@ -52,10 +89,11 @@ class VisitService {
                  const { property_name, owner_email, owner_id } = propertyDetails;
                  let unit_number = null;
                  if (unitId) {
-                     const unit = await unitModel.findById(unitId);
+                     // unit is already fetched above if unitId exists
                      unit_number = unit ? unit.unitNumber : null;
                  }
 
+                 // Notify Owner
                  await emailService.sendVisitNotification(owner_email, {
                      visitorName: name,
                      visitorPhone: phone,
@@ -63,6 +101,15 @@ class VisitService {
                      unitNumber: unit_number,
                      scheduledDate,
                      notes,
+                 });
+
+                 // Notify Visitor
+                 await emailService.sendVisitScheduledToVisitor(email, {
+                     visitorName: name,
+                     propertyName: property_name,
+                     unitNumber: unit_number,
+                     scheduledDate,
+                     visitId,
                  });
 
                  if (owner_id) {
@@ -78,7 +125,27 @@ class VisitService {
             console.error('Notification failed', e);
         }
 
-        return { visitId, leadId };
+        return { visitId, leadId, roundedTime: scheduledDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
+    }
+
+    async cancelVisit(visitId, user) {
+        // If user is provided, check ownership if needed. 
+        // For public cancellation, we might use a token, but for now we follow the simple pattern.
+        const visit = await visitModel.findById(visitId);
+        if (!visit) throw new Error('Visit not found');
+        
+        const success = await visitModel.updateStatus(visitId, 'cancelled');
+        
+        if (success) {
+            await auditLogger.log({
+                userId: user ? user.id : null,
+                actionType: 'VISIT_CANCELLED',
+                entityId: visitId,
+                details: { cancelledBy: user ? 'user' : 'visitor' },
+            }, { user });
+        }
+        
+        return success;
     }
 
     async getVisits(user) {
@@ -88,6 +155,10 @@ class VisitService {
     }
 
     async updateStatus(id, status, user) {
+        if (!user || (user.role !== 'owner' && user.role !== 'treasurer')) {
+            throw new Error('Access denied. Only owners and treasurers can update visit status.');
+        }
+
         if (!['pending', 'confirmed', 'cancelled', 'completed'].includes(status)) {
             throw new Error('Invalid status');
         }

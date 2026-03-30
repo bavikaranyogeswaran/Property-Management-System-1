@@ -58,6 +58,7 @@ const authLimiter = rateLimit({
 app.use('/api/auth', authLimiter);
 
 // General Rate Limiter: Prevent abuse of all other endpoints
+// Increased to 1000 to accommodate multiple dashboard requests
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 1000, 
@@ -96,12 +97,27 @@ import reportRoutes from './routes/reportRoutes.js';
 import payoutRoutes from './routes/payoutRoutes.js';
 import messageRoutes from './routes/messageRoutes.js';
 import leaseTermRoutes from './routes/leaseTermRoutes.js';
+import documentRoutes from './routes/documentRoutes.js';
+import adminRoutes from './routes/adminRoutes.js';
+import renewalRoutes from './routes/renewalRoutes.js';
+import systemRoutes from './routes/systemRoutes.js';
+import auditRoutes from './routes/auditRoutes.js';
+import guestPaymentRoutes from './routes/guestPaymentRoutes.js';
 
-// Lead Portal (public, no auth) — MUST be mounted before imageRoutes
+// ... (rest of imports)
 app.use('/api/lead-portal', leadPortalRoutes);
 
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', message: 'PMS Backend is running' });
+});
+
+app.use('/api/public/invoice', guestPaymentRoutes);
+
 app.use('/api/auth', authRoutes);
+app.use('/api/admin', adminRoutes);
 app.use('/api/users', userRoutes);
+app.use(express.urlencoded({ extended: true }));
+
 app.use('/api/leads', leadRoutes);
 app.use('/api/properties', propertyRoutes);
 app.use('/api/property-types', propertyTypeRoutes);
@@ -120,11 +136,11 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/payouts', payoutRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/lease-terms', leaseTermRoutes);
+app.use('/api/documents', documentRoutes);
+app.use('/api/renewal-requests', renewalRoutes);
+app.use('/api/system', systemRoutes);
+app.use('/api/audit-logs', auditRoutes);
 app.use('/api', imageRoutes);
-
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', message: 'PMS Backend is running' });
-});
 
 // ============================================================================
 //  ERROR HANDLING (The Complaint Department)

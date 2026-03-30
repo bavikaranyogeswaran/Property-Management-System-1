@@ -10,6 +10,13 @@ export const propertySchema = z.object({
   propertyTypeId: z.number().min(1, 'Property type is required'),
   description: z.string().optional(),
   features: z.array(z.string()).optional(),
+  lateFeePercentage: z.number()
+    .min(0, 'Late fee cannot be negative')
+    .max(100, 'Late fee cannot exceed 100%'),
+  lateFeeGracePeriod: z.number().int()
+    .min(0, 'Grace period cannot be negative'),
+  tenantDeactivationDays: z.number().int()
+    .min(0, 'Deactivation days cannot be negative'),
 });
 
 export const unitSchema = z.object({

@@ -11,6 +11,7 @@ export interface MaintenanceRequest {
   title: string;
   description: string;
   priority: 'low' | 'medium' | 'high' | 'urgent';
+  category: string;
   status: 'submitted' | 'in_progress' | 'completed' | 'cancelled';
   submittedDate: string;
   completedDate?: string;
@@ -29,7 +30,7 @@ export interface MaintenanceCost {
 interface MaintenanceContextType {
   maintenanceRequests: MaintenanceRequest[];
   maintenanceCosts: MaintenanceCost[];
-  addMaintenanceRequest: (request: Omit<MaintenanceRequest, 'id' | 'submittedDate'>) => Promise<void>;
+  addMaintenanceRequest: (request: Omit<MaintenanceRequest, 'id' | 'submittedDate'> | FormData) => Promise<void>;
   updateMaintenanceRequest: (id: string, request: Partial<MaintenanceRequest>) => Promise<void>;
   addMaintenanceCost: (cost: Omit<MaintenanceCost, 'id' | 'recordedDate'>) => Promise<void>;
   deleteMaintenanceCost: (id: string) => Promise<void>;
@@ -48,15 +49,8 @@ export function MaintenanceProvider({ children }: { children: ReactNode }) {
       const mRes = await maintenanceApi.getRequests();
       if (mRes.data) {
         setMaintenanceRequests(mRes.data.map((r: any) => ({
-          id: (r.request_id || r.id).toString(),
-          tenantId: (r.tenant_id || r.tenantId).toString(),
-          unitId: (r.unit_id || r.unitId).toString(),
-          title: r.title,
-          description: r.description,
-          priority: r.priority,
-          status: r.status,
-          submittedDate: (r.created_at || r.createdAt || '').split('T')[0],
-          images: r.images,
+          ...r,
+          submittedDate: (r.createdAt || '').split('T')[0],
         })));
       }
 
@@ -64,11 +58,9 @@ export function MaintenanceProvider({ children }: { children: ReactNode }) {
         const mcRes = await maintenanceApi.getCosts('');
         if (mcRes.data) {
           setMaintenanceCosts(mcRes.data.map((c: any) => ({
-            id: c.cost_id.toString(),
-            requestId: c.request_id.toString(),
-            amount: parseFloat(c.amount),
-            description: c.description,
-            recordedDate: (c.recorded_date || '').split('T')[0],
+            ...c,
+            amount: c.amount / 100,
+            recordedDate: (c.recordedDate || '').split('T')[0],
           })));
         }
       }
@@ -81,13 +73,13 @@ export function MaintenanceProvider({ children }: { children: ReactNode }) {
     if (user) fetchMaintenanceData();
   }, [user]);
 
-  const addMaintenanceRequest = async (request: Omit<MaintenanceRequest, 'id' | 'submittedDate'>) => {
+  const addMaintenanceRequest = async (request: Omit<MaintenanceRequest, 'id' | 'submittedDate'> | FormData) => {
     try {
       await maintenanceApi.createRequest(request);
       toast.success('Maintenance request submitted');
       await fetchMaintenanceData();
-    } catch (e) {
-      toast.error('Failed to submit request');
+    } catch (e: any) {
+      toast.error(e.response?.data?.error || 'Failed to submit request');
     }
   };
 
@@ -105,7 +97,10 @@ export function MaintenanceProvider({ children }: { children: ReactNode }) {
 
   const addMaintenanceCost = async (cost: Omit<MaintenanceCost, 'id' | 'recordedDate'>) => {
     try {
-      await maintenanceApi.addCost(cost);
+      await maintenanceApi.addCost({
+        ...cost,
+        amount: Math.round(cost.amount * 100)
+      });
       toast.success(cost.billToTenant ? 'Cost recorded & Invoice generated' : 'Cost recorded');
       await fetchMaintenanceData();
     } catch (e) {
@@ -125,7 +120,12 @@ export function MaintenanceProvider({ children }: { children: ReactNode }) {
 
   const createMaintenanceInvoice = async (requestId: string, amount: number, description: string, dueDate?: string) => {
     try {
-      await maintenanceApi.createInvoice({ requestId, amount, description, dueDate });
+      await maintenanceApi.createInvoice({ 
+        requestId, 
+        amount: Math.round(amount * 100), 
+        description, 
+        dueDate 
+      });
       toast.success('Maintenance invoice created successfully');
     } catch (e: any) {
       toast.error(`Failed to create invoice: ${e.response?.data?.error || e.message}`);

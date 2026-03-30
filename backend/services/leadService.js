@@ -1,12 +1,14 @@
 
 import leadModel from '../models/leadModel.js';
 import unitModel from '../models/unitModel.js';
+import visitModel from '../models/visitModel.js';
 import propertyModel from '../models/propertyModel.js';
 import userModel from '../models/userModel.js';
 import leadStageHistoryModel from '../models/leadStageHistoryModel.js';
 import leadTokenModel from '../models/leadTokenModel.js';
 import emailService from '../utils/emailService.js';
 import { validateEmail, validatePhoneNumber } from '../utils/validators.js';
+import { getCurrentDateString, getLocalTime, formatToLocalDate, parseLocalDate, addMonths } from '../utils/dateUtils.js';
 
 class LeadService {
 
@@ -53,22 +55,21 @@ class LeadService {
         
         // --- OVERLAP & PREFERENCE Logic ---
         if (finalUnitId && moveInDate && preferredTermMonths) {
-            const startDate = new Date(moveInDate);
-            const endDate = new Date(startDate);
-            endDate.setMonth(endDate.getMonth() + parseInt(preferredTermMonths, 10));
+            const startDate = parseLocalDate(moveInDate);
+            const endDate = addMonths(startDate, parseInt(preferredTermMonths, 10));
             
             const hasOverlap = await (await import('../models/leaseModel.js')).default.checkOverlap(
                 finalUnitId, 
-                startDate.toISOString().split('T')[0], 
-                endDate.toISOString().split('T')[0]
+                formatToLocalDate(startDate), 
+                formatToLocalDate(endDate)
             );
             
             if (hasOverlap) {
                 // If there's an overlap, check if the current tenant is vacating
                 const activeLease = await (await import('../models/leaseModel.js')).default.checkOverlap(
                     finalUnitId,
-                    startDate.toISOString().split('T')[0],
-                    endDate.toISOString().split('T')[0]
+                    formatToLocalDate(startDate),
+                    formatToLocalDate(endDate)
                 );
                 // Note: checkOverlap only returns true/false. 
                 // We might want to be more specific later, but for now, we follow the plan.
@@ -85,7 +86,7 @@ class LeadService {
         if (existingLeadId) {
             leadId = existingLeadId;
             await leadModel.update(leadId, {
-                lastContactedAt: new Date(),
+                lastContactedAt: getLocalTime(),
                 notes: notes ? `${notes} (Re-inquiry)` : undefined,
                 interestedUnit: finalUnitId,
                 unitId: finalUnitId,
@@ -117,11 +118,9 @@ class LeadService {
             isNew = true;
         }
 
-        // Generate portal access token (create new or reuse existing)
-        let portalToken = await leadTokenModel.findByLeadId(leadId);
-        if (!portalToken) {
-            portalToken = await leadTokenModel.create(leadId);
-        }
+        // Generate portal access token (ALWAYS rotate on re-inquiry)
+        await leadTokenModel.invalidateForLead(leadId);
+        const portalToken = await leadTokenModel.create(leadId);
 
         // Email Notification with portal link
         try {
@@ -136,10 +135,12 @@ class LeadService {
     }
 
     async getLeads(user) {
-        if (user.role !== 'owner') {
-             throw new Error('Access denied.');
+        if (user.role === 'owner') {
+            return await leadModel.findAll(user.id);
+        } else if (user.role === 'treasurer') {
+            return await leadModel.findByTreasurerId(user.id);
         }
-        return await leadModel.findAll(user.id);
+        throw new Error('Access denied.');
     }
 
     async getMyLead(email) {
@@ -180,6 +181,13 @@ class LeadService {
 
         const success = await leadModel.update(id, data);
         if (!success) throw new Error('Lead update failed');
+
+        // Cancel pending visits and revoke tokens when lead is dropped
+        if (data.status === 'dropped') {
+            await visitModel.cancelVisitsForLead(id);
+            await leadTokenModel.invalidateForLead(id);
+        }
+
         return success;
     }
 

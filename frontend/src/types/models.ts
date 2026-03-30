@@ -19,7 +19,7 @@ export interface Property {
   propertyTypeId: number;
   typeName?: string;
   totalUnits: number;
-  image?: string;
+  imageUrl?: string;
   createdAt?: string;
 }
 
@@ -32,6 +32,7 @@ export interface Unit {
   bathrooms: number;
   rent: number;
   status: 'available' | 'occupied' | 'maintenance';
+  imageUrl?: string;
   createdAt?: string;
 }
 
@@ -121,34 +122,34 @@ export interface Treasurer {
 }
 
 export interface BehaviorLog {
-  log_id: number;
-  tenant_id: number;
+  id: string;
+  tenantId: string;
   type: 'positive' | 'negative' | 'neutral';
   category: string;
-  score_change: number;
+  scoreChange: number;
   description: string;
-  recorded_by: number;
-  created_at: string;
+  recordedBy: string;
+  createdAt: string;
 }
 
 export interface OwnerPayout {
-  payout_id: number;
-  owner_id: number;
+  id: string;
+  ownerId: string;
   amount: number;
-  period_start: string;
-  period_end: string;
+  periodStart: string;
+  periodEnd: string;
   status: 'pending' | 'processed';
-  generated_at: string;
-  processed_at?: string;
+  generatedAt: string;
+  processedAt?: string;
 }
 
 export interface AuditLog {
-  log_id: number;
-  user_id: number | null;
-  action_type: string;
-  entity_id: number | null;
+  id: string;
+  userId: string | null;
+  actionType: string;
+  entityId: string | null;
   details: string; // JSON string
-  ip_address: string;
-  created_at: string;
-  user_name?: string;
+  ipAddress: string;
+  createdAt: string;
+  userName?: string;
 }

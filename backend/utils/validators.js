@@ -123,15 +123,26 @@ export const validateEmail = (email) => {
   };
 };
 
+import { parseLocalDate } from './dateUtils.js';
+
 /**
  * Lease duration validation
  */
 export const validateLeaseDuration = (startDate, endDate, minDays = 90) => {
-  const start = new Date(startDate);
-  const end = new Date(endDate);
+  const start = parseLocalDate(startDate);
   
-  if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-    return { isValid: false, error: 'Invalid start or end date' };
+  if (!start) {
+    return { isValid: false, error: 'Invalid start date' };
+  }
+
+  if (!endDate) {
+      return { isValid: false, error: 'End date is required.' };
+  }
+
+  const end = parseLocalDate(endDate);
+  
+  if (!end) {
+    return { isValid: false, error: 'Invalid end date' };
   }
 
   const diffTime = end.getTime() - start.getTime();
@@ -145,4 +156,37 @@ export const validateLeaseDuration = (startDate, endDate, minDays = 90) => {
   }
 
   return { isValid: true, error: null };
+};
+
+/**
+ * Property configuration validation
+ */
+export const validatePropertyConfig = (data) => {
+  const errors = [];
+
+  if (data.lateFeePercentage !== undefined) {
+    const val = parseFloat(data.lateFeePercentage);
+    if (isNaN(val) || val < 0 || val > 100) {
+      errors.push('Late fee percentage must be between 0 and 100');
+    }
+  }
+
+  if (data.lateFeeGracePeriod !== undefined) {
+    const val = parseInt(data.lateFeeGracePeriod);
+    if (isNaN(val) || val < 0) {
+      errors.push('Grace period must be a non-negative number');
+    }
+  }
+
+  if (data.tenantDeactivationDays !== undefined) {
+    const val = parseInt(data.tenantDeactivationDays);
+    if (isNaN(val) || val < 0) {
+      errors.push('Tenant deactivation days must be a non-negative number');
+    }
+  }
+
+  return {
+    isValid: errors.length === 0,
+    errors: errors,
+  };
 };

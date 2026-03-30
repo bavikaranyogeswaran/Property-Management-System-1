@@ -8,10 +8,12 @@
 import pool from '../config/db.js';
 
 class UserModel {
-  async findByEmail(email) {
-    const [rows] = await pool.query('SELECT * FROM users WHERE email = ? AND is_archived = FALSE', [
-      email,
-    ]);
+  async findByEmail(email, connection = null) {
+    const db = connection || pool;
+    const [rows] = await db.query(
+      'SELECT user_id as id, name, email, phone, role, password_hash as passwordHash, is_email_verified as isEmailVerified, status, created_at as createdAt FROM users WHERE email = ? AND is_archived = FALSE',
+      [email]
+    );
     return rows[0];
   }
 
@@ -32,7 +34,10 @@ class UserModel {
       "SELECT user_id as id, name, email, phone, role, status, created_at as createdAt FROM users WHERE role = ? AND is_archived = FALSE",
       [role]
     );
-    return rows;
+    return rows.map(row => ({
+      ...row,
+      id: row.id.toString(),
+    }));
   }
 
   async findTenantsByOwner(ownerId) {
@@ -66,7 +71,10 @@ class UserModel {
         `,
       [ownerId]
     );
-    return rows;
+    return rows.map(row => ({
+      ...row,
+      id: row.id.toString(),
+    }));
   }
 
   async findTenantsByTreasurer(treasurerId) {
@@ -98,30 +106,35 @@ class UserModel {
             
             WHERE u.role = 'tenant' 
                 AND ut.property_id = spa.property_id
-                AND l.status = 'active'
+                AND l.status != 'cancelled'
                 AND u.is_archived = FALSE
             ORDER BY u.created_at DESC
         `,
       [treasurerId]
     );
-    return rows;
+    return rows.map(row => ({
+      ...row,
+      id: row.id.toString(),
+    }));
   }
 
-  async findById(id) {
-    // We first fetch the user to know the role, or we just LEFT JOIN everything.
-    // Joining everything is safer to fetch all data in one go.
+  async findById(id, connection = null) {
+    const db = connection || pool;
     const query = `
-            SELECT u.*, 
-                   t.nic as tenant_nic, t.monthly_income, t.nic_url as nicUrl,
-                   o.nic as owner_nic, o.tin, o.bank_name, o.account_number,
-                   s.employee_id, s.job_title
+            SELECT u.user_id as id, u.name, u.email, u.phone, u.role, u.status, u.created_at as createdAt,
+                   t.nic, t.nic_url as nicUrl, t.permanent_address as permanentAddress, 
+                   t.employment_status as employmentStatus, t.monthly_income as monthlyIncome, 
+                   t.behavior_score as behaviorScore, t.credit_balance as creditBalance,
+                   o.nic as ownerNic, o.tin, o.bank_name as bankName, o.branch_name as branchName, 
+                   o.account_holder_name as accountHolderName, o.account_number as accountNumber,
+                   s.employee_id as employeeId, s.job_title as jobTitle, s.shift_start as shiftStart, s.shift_end as shiftEnd
             FROM users u
             LEFT JOIN tenants t ON u.user_id = t.user_id
             LEFT JOIN owners o ON u.user_id = o.user_id
             LEFT JOIN staff s ON u.user_id = s.user_id
             WHERE u.user_id = ? AND u.is_archived = FALSE
         `;
-    const [rows] = await pool.query(query, [id]);
+    const [rows] = await db.query(query, [id]);
     return rows[0];
   }
 
@@ -140,11 +153,18 @@ class UserModel {
     // Use provided connection or default pool (for non-transactional calls)
     const db = connection || pool;
 
-    const [result] = await db.query(
-      'INSERT INTO users (name, email, phone, password_hash, role, is_email_verified, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [name, email, phone, passwordHash, role, is_email_verified, status]
-    );
-    return result.insertId;
+    try {
+      const [result] = await db.query(
+        'INSERT INTO users (name, email, phone, password_hash, role, is_email_verified, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [name, email, phone, passwordHash, role, is_email_verified, status]
+      );
+      return result.insertId;
+    } catch (error) {
+      if (error.code === 'ER_DUP_ENTRY') {
+        throw new Error('Email address is already in use.');
+      }
+      throw error;
+    }
   }
 
   async countByRole(role) {
@@ -155,20 +175,22 @@ class UserModel {
     return rows[0].count;
   }
 
-  async update(id, updateData) {
+  async update(id, updateData, connection = null) {
+    const db = connection || pool;
     const { name, email, phone, status } = updateData;
     // Build query dynamically based on provided fields?
     // For simplicity now, we assume these specific fields are passed.
     // If password update is needed later, separate method is better.
-    const [result] = await pool.query(
+    const [result] = await db.query(
       'UPDATE users SET name = ?, email = ?, phone = ?, status = ? WHERE user_id = ? AND is_archived = FALSE',
       [name, email, phone, status, id]
     );
     return result.affectedRows > 0;
   }
 
-  async updatePassword(id, passwordHash) {
-    const [result] = await pool.query(
+  async updatePassword(id, passwordHash, connection = null) {
+    const db = connection || pool;
+    const [result] = await db.query(
       'UPDATE users SET password_hash = ? WHERE user_id = ?',
       [passwordHash, id]
     );
@@ -184,7 +206,8 @@ class UserModel {
     return result.affectedRows > 0;
   }
 
-  async delete(id) {
+  async delete(id, connection = null) {
+    const db = connection || pool;
     // Soft delete to preserve financial history and audit trail
     const user = await this.findById(id);
     if (!user) return false;
@@ -192,22 +215,24 @@ class UserModel {
     // Archive email to allow reusing the same email for new registrations
     const archivedEmail = `deleted_${id}_${Date.now()}_${user.email}`.substring(0, 100);
 
-    const [result] = await pool.query(
+    const [result] = await db.query(
       'UPDATE users SET archived_at = NOW(), is_archived = TRUE, email = ?, status = ?, name = CONCAT(name, " (Deleted)") WHERE user_id = ?',
       [archivedEmail, 'inactive', id]
     );
     return result.affectedRows > 0;
   }
-  async verifyEmail(id) {
-    const [result] = await pool.query(
+  async verifyEmail(id, connection = null) {
+    const db = connection || pool;
+    const [result] = await db.query(
       'UPDATE users SET is_email_verified = TRUE, email_verified_at = NOW(), status = "active" WHERE user_id = ?',
       [id]
     );
     return result.affectedRows > 0;
   }
 
-  async setupPassword(id, passwordHash) {
-    const [result] = await pool.query(
+  async setupPassword(id, passwordHash, connection = null) {
+    const db = connection || pool;
+    const [result] = await db.query(
       'UPDATE users SET password_hash = ?, is_email_verified = TRUE, email_verified_at = NOW(), status = "active" WHERE user_id = ?',
       [passwordHash, id]
     );

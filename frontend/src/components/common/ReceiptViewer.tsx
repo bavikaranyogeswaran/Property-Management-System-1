@@ -4,6 +4,7 @@ import { Download, Printer, CheckCircle } from 'lucide-react';
 import { Receipt } from '@/app/context/AppContext';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
+import { toast } from 'sonner';
 
 interface ReceiptViewerProps {
   receipt: Receipt | null;
@@ -64,7 +65,7 @@ export function ReceiptViewer({
       console.log('PDF saved');
     } catch (error) {
       console.error('Error generating PDF:', error);
-      alert(
+      toast.error(
         `Failed to generate PDF: ${error instanceof Error ? error.message : String(error)}`
       );
     }

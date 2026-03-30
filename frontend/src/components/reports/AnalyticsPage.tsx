@@ -144,6 +144,7 @@ export function AnalyticsPage() {
     }, 0);
 
     return {
+      id: property.id,
       name: property.name,
       revenue: revenue,
       units: propertyUnits.length,
@@ -164,6 +165,7 @@ export function AnalyticsPage() {
     }, 0);
 
     return {
+      id: property.id,
       name: property.name,
       cost: totalCost,
     };
@@ -389,7 +391,7 @@ export function AnalyticsPage() {
                   </thead>
                   <tbody>
                     {propertyRevenueData.map((prop) => (
-                      <tr key={prop.name} className="border-b last:border-0">
+                      <tr key={prop.id} className="border-b last:border-0">
                         <td className="py-3 font-medium">{prop.name}</td>
                         <td className="py-3">{prop.units}</td>
                         <td className="py-3">{prop.occupied}</td>
@@ -506,6 +508,54 @@ export function AnalyticsPage() {
               </CardContent>
             </Card>
           </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Unit Occupancy by Property</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {properties.map((property) => {
+                  const propUnits = unitsByProperty.get(property.id) || [];
+                  const propOccupied = propUnits.filter(
+                    (u) => u.status === 'occupied'
+                  ).length;
+                  const propRate =
+                    propUnits.length > 0
+                      ? (propOccupied / propUnits.length) * 100
+                      : 0;
+
+                  return (
+                    <div key={property.id} className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <p className="font-medium">{property.name}</p>
+                          <p className="text-sm text-gray-500">
+                            {propOccupied} of {propUnits.length} units occupied
+                          </p>
+                        </div>
+                        <span className="text-lg font-semibold">
+                          {propRate.toFixed(0)}%
+                        </span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div
+                          className={`h-2 rounded-full transition-all ${
+                            propRate >= 80
+                              ? 'bg-green-600'
+                              : propRate >= 50
+                                ? 'bg-orange-600'
+                                : 'bg-red-600'
+                          }`}
+                          style={{ width: `${propRate}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* Maintenance Tab */}
@@ -594,195 +644,7 @@ export function AnalyticsPage() {
               </CardContent>
             </Card>
           </div>
-        </TabsContent>
 
-        {/* Payments Tab */}
-        <TabsContent value="payments" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Payment Status Overview</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-                      <p className="text-xs text-gray-700">Paid</p>
-                      <p className="text-2xl font-semibold text-green-700 mt-2">
-                        {paidInvoices}
-                      </p>
-                      <p className="text-xs text-gray-600 mt-1">
-                        LKR{' '}
-                        {invoices
-                          .filter((i) => i.status === 'paid')
-                          .reduce((s, i) => s + i.amount, 0)
-                          .toLocaleString()}
-                      </p>
-                    </div>
-                    <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
-                      <p className="text-xs text-gray-700">Pending</p>
-                      <p className="text-2xl font-semibold text-orange-700 mt-2">
-                        {invoices.filter((i) => i.status === 'pending').length}
-                      </p>
-                      <p className="text-xs text-gray-600 mt-1">
-                        LKR {pendingPayments.toLocaleString()}
-                      </p>
-                    </div>
-                    <div className="p-4 bg-red-50 rounded-lg border border-red-200">
-                      <p className="text-xs text-gray-700">Overdue</p>
-                      <p className="text-2xl font-semibold text-red-700 mt-2">
-                        {overdueInvoices}
-                      </p>
-                      <p className="text-xs text-gray-600 mt-1">
-                        LKR{' '}
-                        {invoices
-                          .filter(
-                            (i) =>
-                              i.status === 'pending' &&
-                              new Date(i.dueDate) < new Date()
-                          )
-                          .reduce((s, i) => s + i.amount, 0)
-                          .toLocaleString()}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="pt-4 border-t">
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-sm font-medium">
-                        Collection Rate
-                      </span>
-                      <span className="text-2xl font-semibold text-blue-700">
-                        {collectionRate}%
-                      </span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div
-                        className="bg-blue-600 h-2 rounded-full transition-all"
-                        style={{ width: `${collectionRate}%` }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Payment Verification Status</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {[
-                    {
-                      label: 'Verified Payments',
-                      value: payments.filter((p) => p.status === 'verified')
-                        .length,
-                      amount: payments
-                        .filter((p) => p.status === 'verified')
-                        .reduce((s, p) => s + p.amount, 0),
-                      color: 'bg-green-100 text-green-700',
-                    },
-                    {
-                      label: 'Pending Verification',
-                      value: payments.filter((p) => p.status === 'pending')
-                        .length,
-                      amount: payments
-                        .filter((p) => p.status === 'pending')
-                        .reduce((s, p) => s + p.amount, 0),
-                      color: 'bg-orange-100 text-orange-700',
-                    },
-                    {
-                      label: 'Rejected Payments',
-                      value: payments.filter((p) => p.status === 'rejected')
-                        .length,
-                      amount: payments
-                        .filter((p) => p.status === 'rejected')
-                        .reduce((s, p) => s + p.amount, 0),
-                      color: 'bg-red-100 text-red-700',
-                    },
-                    {
-                      label: 'Receipts Generated',
-                      value: receipts.length,
-                      amount: receipts.reduce((s, r) => s + r.amount, 0),
-                      color: 'bg-blue-100 text-blue-700',
-                    },
-                  ].map((stat) => (
-                    <div
-                      key={stat.label}
-                      className="flex justify-between items-center p-3 bg-gray-50 rounded-lg"
-                    >
-                      <div>
-                        <p className="text-sm font-medium">{stat.label}</p>
-                        <p className="text-xs text-gray-600 mt-1">
-                          LKR {stat.amount.toLocaleString()}
-                        </p>
-                      </div>
-                      <span
-                        className={`px-3 py-1 rounded-full font-semibold ${stat.color}`}
-                      >
-                        {stat.value}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        {/* Occupancy Tab Content */}
-        <TabsContent value="occupancy" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Unit Occupancy by Property</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {properties.map((property) => {
-                  const propUnits = unitsByProperty.get(property.id) || [];
-                  const propOccupied = propUnits.filter(
-                    (u) => u.status === 'occupied'
-                  ).length;
-                  const propRate =
-                    propUnits.length > 0
-                      ? (propOccupied / propUnits.length) * 100
-                      : 0;
-
-                  return (
-                    <div key={property.id} className="space-y-2">
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <p className="font-medium">{property.name}</p>
-                          <p className="text-sm text-gray-500">
-                            {propOccupied} of {propUnits.length} units occupied
-                          </p>
-                        </div>
-                        <span className="text-lg font-semibold">
-                          {propRate.toFixed(0)}%
-                        </span>
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div
-                          className={`h-2 rounded-full transition-all ${
-                            propRate >= 80
-                              ? 'bg-green-600'
-                              : propRate >= 50
-                                ? 'bg-orange-600'
-                                : 'bg-red-600'
-                          }`}
-                          style={{ width: `${propRate}%` }}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Maintenance Tab Content */}
-        <TabsContent value="maintenance" className="space-y-6">
           <Card>
             <CardHeader>
               <CardTitle>Maintenance Cost Breakdown</CardTitle>
@@ -858,7 +720,7 @@ export function AnalyticsPage() {
           </Card>
         </TabsContent>
 
-        {/* Payments Tab Content */}
+        {/* Payments Tab */}
         <TabsContent value="payments" className="space-y-6">
           <Card>
             <CardHeader>
@@ -924,6 +786,68 @@ export function AnalyticsPage() {
                     </div>
                   </div>
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Payment Verification Status</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {[
+                  {
+                    label: 'Verified Payments',
+                    value: payments.filter((p) => p.status === 'verified')
+                      .length,
+                    amount: payments
+                      .filter((p) => p.status === 'verified')
+                      .reduce((s, p) => s + p.amount, 0),
+                    color: 'bg-green-100 text-green-700',
+                  },
+                  {
+                    label: 'Pending Verification',
+                    value: payments.filter((p) => p.status === 'pending')
+                      .length,
+                    amount: payments
+                      .filter((p) => p.status === 'pending')
+                      .reduce((s, p) => s + p.amount, 0),
+                    color: 'bg-orange-100 text-orange-700',
+                  },
+                  {
+                    label: 'Rejected Payments',
+                    value: payments.filter((p) => p.status === 'rejected')
+                      .length,
+                    amount: payments
+                      .filter((p) => p.status === 'rejected')
+                      .reduce((s, p) => s + p.amount, 0),
+                    color: 'bg-red-100 text-red-700',
+                  },
+                  {
+                    label: 'Receipts Generated',
+                    value: receipts.length,
+                    amount: receipts.reduce((s, r) => s + r.amount, 0),
+                    color: 'bg-blue-100 text-blue-700',
+                  },
+                ].map((stat) => (
+                  <div
+                    key={stat.label}
+                    className="flex justify-between items-center p-3 bg-gray-50 rounded-lg"
+                  >
+                    <div>
+                      <p className="text-sm font-medium">{stat.label}</p>
+                      <p className="text-xs text-gray-600 mt-1">
+                        LKR {stat.amount.toLocaleString()}
+                      </p>
+                    </div>
+                    <span
+                      className={`px-3 py-1 rounded-full font-semibold ${stat.color}`}
+                    >
+                      {stat.value}
+                    </span>
+                  </div>
+                ))}
               </div>
             </CardContent>
           </Card>

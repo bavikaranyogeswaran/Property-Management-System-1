@@ -15,7 +15,8 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
-import { User, Lock, Shield, Trash, Eye, EyeOff } from 'lucide-react';
+import { User, Lock, Shield, Trash, Eye, EyeOff, Activity, RefreshCcw, History, CheckCircle2, XCircle } from 'lucide-react';
+import axios from 'axios';
 import { toast } from 'sonner';
 
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -116,6 +117,12 @@ export function SettingsPage() {
             <TabsTrigger value="types">
               <Shield className="size-4 mr-2" />
               Types
+            </TabsTrigger>
+          )}
+          {user?.role === 'owner' && (
+            <TabsTrigger value="system">
+              <Activity className="size-4 mr-2" />
+              System
             </TabsTrigger>
           )}
         </TabsList>
@@ -324,6 +331,12 @@ export function SettingsPage() {
             </Card>
           </TabsContent>
         )}
+
+        {user?.role === 'owner' && (
+          <TabsContent value="system">
+            <SystemTools />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );
@@ -375,7 +388,7 @@ function TypeManager() {
         <div className="border rounded-md divide-y">
           {propertyTypes.map((type) => (
             <div
-              key={type.type_id}
+              key={type.id}
               className="p-2.5 flex justify-between items-center text-sm"
             >
               <span>{type.name}</span>
@@ -383,7 +396,7 @@ function TypeManager() {
                 variant="ghost"
                 size="sm"
                 className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
-                onClick={() => deletePropertyType(type.type_id)}
+                onClick={() => deletePropertyType(type.id)}
               >
                 <Trash className="size-3" />
                 <span className="sr-only">Delete</span>
@@ -414,7 +427,7 @@ function TypeManager() {
         <div className="border rounded-md divide-y">
           {unitTypes.map((type) => (
             <div
-              key={type.type_id}
+              key={type.id}
               className="p-2.5 flex justify-between items-center text-sm"
             >
               <span>{type.name}</span>
@@ -422,7 +435,7 @@ function TypeManager() {
                 variant="ghost"
                 size="sm"
                 className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
-                onClick={() => deleteUnitType(type.type_id)}
+                onClick={() => deleteUnitType(type.id)}
               >
                 <Trash className="size-3" />
               </Button>
@@ -438,6 +451,149 @@ function TypeManager() {
     </div>
   );
 }
+function SystemTools() {
+  const [logs, setLogs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [triggering, setTriggering] = useState(false);
+
+  const fetchLogs = async () => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get('http://localhost:3000/api/system/cron-logs', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setLogs(response.data);
+    } catch (error) {
+      console.error('Failed to fetch cron logs:', error);
+      toast.error('Failed to load system logs');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleTriggerCron = async () => {
+    if (!window.confirm('This will trigger the billing and synchronization process for any missed days since the last successful run. Continue?')) return;
+    
+    setTriggering(true);
+    try {
+      const token = localStorage.getItem('token');
+      await axios.post('http://localhost:3000/api/system/cron-run', {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      toast.success('Nightly billing process triggered successfully.');
+      // Refresh logs after a short delay
+      setTimeout(fetchLogs, 2000);
+    } catch (error) {
+      console.error('Failed to trigger cron:', error);
+      toast.error('Failed to trigger system process');
+    } finally {
+      setTriggering(false);
+    }
+  };
+
+  React.useEffect(() => {
+    fetchLogs();
+  }, []);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Administrative Tools</CardTitle>
+        <CardDescription>
+          Monitor and manage automated system processes (Cron Jobs)
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg border border-blue-100">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-blue-500 rounded-full text-white">
+              <Activity className="size-5" />
+            </div>
+            <div>
+              <p className="font-semibold text-blue-900">Billing Engine & Sync</p>
+              <p className="text-xs text-blue-700">Manages rent generation, late fees, and unit synchronization.</p>
+            </div>
+          </div>
+          <Button 
+            onClick={handleTriggerCron} 
+            disabled={triggering}
+            variant="default" 
+            className="shadow-sm"
+          >
+            {triggering ? (
+              <RefreshCcw className="size-4 mr-2 animate-spin" />
+            ) : (
+              <RefreshCcw className="size-4 mr-2" />
+            )}
+            Run Nightly Process
+          </Button>
+        </div>
+
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-medium flex items-center gap-2">
+              <History className="size-4 text-gray-500" />
+              Recent Automated Activity
+            </h3>
+            <Button variant="ghost" size="sm" onClick={fetchLogs} disabled={loading} className="h-8 text-xs">
+              Refresh Logs
+            </Button>
+          </div>
+
+          <div className="border rounded-md overflow-hidden bg-white">
+            <div className="max-h-[300px] overflow-y-auto">
+              {loading && logs.length === 0 ? (
+                <div className="p-8 text-center text-gray-400 text-sm">Loading activity...</div>
+              ) : logs.length === 0 ? (
+                <div className="p-8 text-center text-gray-400 text-sm">No recent activity found.</div>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 border-b sticky top-0">
+                    <tr>
+                      <th className="px-4 py-2 text-left font-medium text-gray-500">Execution Date</th>
+                      <th className="px-4 py-2 text-left font-medium text-gray-500">Status</th>
+                      <th className="px-4 py-2 text-left font-medium text-gray-500">Finished At</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {logs.map((log) => (
+                      <tr key={log.id} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-4 py-2 font-medium">{log.executionDate.split('T')[0]}</td>
+                        <td className="px-4 py-2">
+                          {log.status === 'success' ? (
+                            <Badge className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100 flex items-center gap-1 w-fit">
+                              <CheckCircle2 className="size-3" />
+                              Success
+                            </Badge>
+                          ) : log.status === 'failed' ? (
+                            <Badge variant="destructive" className="flex items-center gap-1 w-fit">
+                              <XCircle className="size-3" />
+                              Failed
+                            </Badge>
+                          ) : (
+                            <Badge variant="secondary" className="animate-pulse">Running</Badge>
+                          )}
+                        </td>
+                        <td className="px-4 py-2 text-gray-500 text-xs">
+                          {log.endedAt ? new Date(log.endedAt).toLocaleString() : '-'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+          <p className="text-[10px] text-gray-400 text-center">
+            * Backend server uses Asia/Colombo (UTC+5:30) for log timestamps.
+          </p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function LeaseTermManager() {
   const { leaseTerms, addLeaseTerm, deleteLeaseTerm } = useLease();
   const [newTerm, setNewTerm] = useState({
@@ -474,10 +630,10 @@ function LeaseTermManager() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="font-medium text-sm text-gray-900">Lease Terms</h3>
-        <Badge variant="outline">Fixed & Periodic</Badge>
+        <Badge variant="outline">Fixed Terms Only</Badge>
       </div>
 
-      <form onSubmit={handleAddTerm} className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+      <form onSubmit={handleAddTerm} className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className="sm:col-span-1">
           <Input
             placeholder="Name (e.g. 1 Year Fixed)"
@@ -486,26 +642,14 @@ function LeaseTermManager() {
           />
         </div>
         <div className="sm:col-span-1">
-          <select
-            className="w-full h-10 px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            value={newTerm.type}
-            onChange={(e) => setNewTerm({ ...newTerm, type: e.target.value as 'fixed' | 'periodic' })}
-          >
-            <option value="fixed">Fixed</option>
-            <option value="periodic">Periodic</option>
-          </select>
+          <Input
+            type="number"
+            placeholder="Months"
+            min="3"
+            value={newTerm.durationMonths}
+            onChange={(e) => setNewTerm({ ...newTerm, durationMonths: parseInt(e.target.value) })}
+          />
         </div>
-        {newTerm.type === 'fixed' && (
-          <div className="sm:col-span-1">
-            <Input
-              type="number"
-              placeholder="Months"
-              min="3"
-              value={newTerm.durationMonths}
-              onChange={(e) => setNewTerm({ ...newTerm, durationMonths: parseInt(e.target.value) })}
-            />
-          </div>
-        )}
         <div className="sm:col-span-1 flex gap-2">
           <Button type="submit" className="flex-1">
             Add Term
@@ -516,23 +660,18 @@ function LeaseTermManager() {
       <div className="border rounded-md divide-y overflow-hidden">
         {leaseTerms.map((term) => (
           <div
-            key={term.leaseTermId}
+            key={term.id}
             className="p-3 flex justify-between items-center text-sm bg-white hover:bg-gray-50 transition-colors"
           >
             <div className="flex items-center gap-3">
               <span className="font-medium">{term.name}</span>
-              <Badge variant={term.type === 'fixed' ? 'default' : 'secondary'} className="text-[10px] h-5">
-                {term.type}
-              </Badge>
-              {term.type === 'fixed' && (
-                <span className="text-gray-500 text-xs">({term.durationMonths} months)</span>
-              )}
+              <span className="text-gray-500 text-xs">({term.durationMonths} months)</span>
             </div>
             <Button
               variant="ghost"
               size="sm"
               className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
-              onClick={() => deleteLeaseTerm(term.leaseTermId)}
+              onClick={() => deleteLeaseTerm(term.id)}
             >
               <Trash className="size-3.5" />
             </Button>

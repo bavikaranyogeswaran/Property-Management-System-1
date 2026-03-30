@@ -8,8 +8,7 @@
 import pool from '../config/db.js';
 
 class PaymentModel {
-  //  RECORD PAYMENT: Saving a transaction slip.
-  async create(data) {
+  async create(data, connection = null) {
     const {
       invoiceId,
       amount,
@@ -18,8 +17,9 @@ class PaymentModel {
       referenceNumber,
       evidenceUrl,
     } = data;
+    const db = connection || pool;
     try {
-      const [result] = await pool.query(
+      const [result] = await db.query(
         'INSERT INTO payments (invoice_id, amount, payment_date, payment_method, reference_number, proof_url, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
         [
           invoiceId,
@@ -40,24 +40,33 @@ class PaymentModel {
     }
   }
 
-  async findById(id) {
-    const [rows] = await pool.query(
-      'SELECT * FROM payments WHERE payment_id = ?',
-      [id]
-    );
-    const row = rows[0];
+  mapRow(row) {
     if (!row) return null;
     return {
       id: row.payment_id.toString(),
       invoiceId: row.invoice_id.toString(),
-      amount: parseFloat(row.amount),
+      tenantId: row.tenant_id?.toString(),
+      amount: Number(row.amount),
       paymentDate: row.payment_date,
       paymentMethod: row.payment_method,
       status: row.status,
-      receiptUrl: row.proof_url,
+      proofUrl: row.proof_url,
       referenceNumber: row.reference_number,
       createdAt: row.created_at,
+      // Joined fields
+      tenantName: row.tenant_name,
+      leaseId: row.lease_id?.toString(),
+      propertyId: row.property_id?.toString(),
     };
+  }
+
+  async findById(id, connection = null) {
+    const db = connection || pool;
+    const [rows] = await db.query(
+      'SELECT * FROM payments WHERE payment_id = ?',
+      [id]
+    );
+    return this.mapRow(rows[0]);
   }
 
   async findAll() {
@@ -72,22 +81,7 @@ class PaymentModel {
             JOIN users u ON l.tenant_id = u.user_id
             ORDER BY p.payment_date DESC
         `);
-    return rows.map((row) => ({
-      id: row.payment_id.toString(),
-      invoiceId: row.invoice_id.toString(),
-      tenantId: row.tenant_id.toString(),
-      amount: parseFloat(row.amount),
-      paymentDate: row.payment_date,
-      paymentMethod: row.payment_method,
-      status: row.status,
-      receiptUrl: row.proof_url,
-      referenceNumber: row.reference_number, // Added for completeness if needed
-      createdAt: row.created_at,
-      // Extra fields for UI convenience
-      tenantName: row.tenant_name,
-      leaseId: row.lease_id.toString(),
-      propertyId: row.property_id.toString(),
-    }));
+    return rows.map((row) => this.mapRow(row));
   }
 
   async findByOwnerId(ownerId) {
@@ -113,7 +107,7 @@ class PaymentModel {
       paymentDate: row.payment_date,
       paymentMethod: row.payment_method,
       status: row.status,
-      receiptUrl: row.proof_url,
+      proofUrl: row.proof_url,
       referenceNumber: row.reference_number,
       createdAt: row.created_at,
       tenantName: row.tenant_name,
@@ -125,7 +119,7 @@ class PaymentModel {
   async findByTreasurerId(treasurerId) {
     const [rows] = await pool.query(
       `
-            SELECT p.*, u.name, un.property_id, ri.lease_id, l.tenant_id
+            SELECT p.*, u.name as tenant_name, un.property_id, ri.lease_id, l.tenant_id
             FROM payments p
             JOIN rent_invoices ri ON p.invoice_id = ri.invoice_id
             JOIN leases l ON ri.lease_id = l.lease_id
@@ -137,24 +131,26 @@ class PaymentModel {
         `,
       [treasurerId]
     );
-    return rows;
+    return rows.map(row => this.mapRow(row));
   }
 
-  async findByInvoiceId(invoiceId) {
-    const [rows] = await pool.query(
+  async findByInvoiceId(invoiceId, connection = null) {
+    const db = connection || pool;
+    const [rows] = await db.query(
       'SELECT * FROM payments WHERE invoice_id = ?',
       [invoiceId]
     );
-    return rows;
+    return rows.map(row => this.mapRow(row));
   }
 
-  async findByInvoiceIds(invoiceIds) {
+  async findByInvoiceIds(invoiceIds, connection = null) {
     if (!invoiceIds || invoiceIds.length === 0) return [];
-    const [rows] = await pool.query(
+    const db = connection || pool;
+    const [rows] = await db.query(
       'SELECT * FROM payments WHERE invoice_id IN (?)',
       [invoiceIds]
     );
-    return rows;
+    return rows.map(row => this.mapRow(row));
   }
 
   async findByTenantId(tenantId) {
@@ -169,12 +165,13 @@ class PaymentModel {
         `,
       [tenantId]
     );
-    return rows;
+    return rows.map(row => this.mapRow(row));
   }
 
-  async updateStatus(id, status, verifiedBy = null) {
+  async updateStatus(id, status, verifiedBy = null, connection = null) {
+    const db = connection || pool;
     // verifiedBy could be stored if we add that column, for now just status
-    const [result] = await pool.query('UPDATE payments SET status = ? WHERE payment_id = ? AND status != ?', [
+    const [result] = await db.query('UPDATE payments SET status = ? WHERE payment_id = ? AND status != ?', [
       status,
       id,
       status, // Prevent redundant updates taking lock success
@@ -183,7 +180,7 @@ class PaymentModel {
     // If approved, we might want to update the invoice status too - handled in controller transaction potentially?
     // Or simple model call.
     return {
-        payment: await this.findById(id),
+        payment: await this.findById(id, connection),
         changed: result.affectedRows > 0
     };
   }

@@ -4,6 +4,7 @@ import messageModel from '../models/messageModel.js';
 import propertyModel from '../models/propertyModel.js';
 import unitModel from '../models/unitModel.js';
 import leaseTermModel from '../models/leaseTermModel.js';
+import db from '../config/db.js';
 
 class LeadPortalController {
   /**
@@ -47,6 +48,23 @@ class LeadPortalController {
         }
       }
       
+      // Fetch associated draft lease if it exists
+      let activeLease = null;
+      if (lead.email) {
+          const leaseModel = (await import('../models/leaseModel.js')).default;
+          const [leases] = await db.query(
+              "SELECT * FROM leases WHERE tenant_id = (SELECT user_id FROM users WHERE email = ? LIMIT 1) AND status = 'draft' ORDER BY created_at DESC LIMIT 1",
+              [lead.email]
+          );
+          if (leases.length > 0) {
+              activeLease = leaseModel.mapRows(leases)[0];
+              
+              // Enrich with deposit status
+              const depositStats = await leaseModel.getDepositStatus(activeLease.id);
+              activeLease.depositStatus = depositStats;
+          }
+      }
+      
       // Fetch available lease terms for the owner
       let leaseTerms = [];
       if (property && property.owner_id) {
@@ -73,9 +91,11 @@ class LeadPortalController {
           district: property.district,
         } : null,
         unit: unit ? {
-          typeName: unit.typeName,
+          unitNumber: unit.unitNumber,
+          type: unit.type,
           monthlyRent: unit.monthlyRent,
         } : null,
+        activeLease,
         leaseTerms: leaseTerms
       });
     } catch (error) {

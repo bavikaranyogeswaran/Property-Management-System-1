@@ -61,21 +61,21 @@ class VisitModel {
 
     const [rows] = await db.query(query, params);
     return rows.map((row) => ({
-      visit_id: row.visit_id.toString(),
-      property_id: row.property_id.toString(),
-      unit_id: row.unit_id ? row.unit_id.toString() : null,
-      lead_id: row.lead_id ? row.lead_id.toString() : null,
-      visitor_name: row.visitor_name,
-      visitor_email: row.visitor_email,
-      visitor_phone: row.visitor_phone,
-      scheduled_date: row.scheduled_date,
+      id: row.visit_id.toString(),
+      propertyId: row.property_id.toString(),
+      unitId: row.unit_id ? row.unit_id.toString() : null,
+      leadId: row.lead_id ? row.lead_id.toString() : null,
+      visitorName: row.visitor_name,
+      visitorEmail: row.visitor_email,
+      visitorPhone: row.visitor_phone,
+      scheduledDate: row.scheduled_date,
       status: row.status,
       notes: row.notes,
-      created_at: row.created_at,
+      createdAt: row.created_at,
       // Joined fields
-      property_name: row.property_name,
-      unit_number: row.unit_number,
-      lead_status: row.lead_status,
+      propertyName: row.property_name,
+      unitNumber: row.unit_number,
+      leadStatus: row.lead_status,
     }));
   }
 
@@ -95,17 +95,17 @@ class VisitModel {
     if (rows.length === 0) return null;
     const row = rows[0];
     return {
-      visit_id: row.visit_id.toString(),
-      property_id: row.property_id.toString(),
-      unit_id: row.unit_id ? row.unit_id.toString() : null,
-      lead_id: row.lead_id ? row.lead_id.toString() : null,
-      visitor_name: row.visitor_name,
-      visitor_email: row.visitor_email,
-      visitor_phone: row.visitor_phone,
-      scheduled_date: row.scheduled_date,
+      id: row.visit_id.toString(),
+      propertyId: row.property_id.toString(),
+      unitId: row.unit_id ? row.unit_id.toString() : null,
+      leadId: row.lead_id ? row.lead_id.toString() : null,
+      visitorName: row.visitor_name,
+      visitorEmail: row.visitor_email,
+      visitorPhone: row.visitor_phone,
+      scheduledDate: row.scheduled_date,
       status: row.status,
       notes: row.notes,
-      created_at: row.created_at,
+      createdAt: row.created_at,
     };
   }
   async cancelVisitsForUnit(unitId, date, connection = null) {
@@ -116,6 +116,39 @@ class VisitModel {
              WHERE unit_id = ? AND status IN ('pending', 'confirmed') AND scheduled_date >= ?`,
       [unitId, date]
     );
+  }
+
+  async cancelVisitsForLead(leadId, connection = null) {
+    const dbConn = connection || db;
+    await dbConn.query(
+      `UPDATE property_visits
+       SET status = 'cancelled', notes = CONCAT(COALESCE(notes, ''), ' [System: Lead dropped]')
+       WHERE lead_id = ? AND status IN ('pending', 'confirmed')`,
+      [leadId]
+    );
+  }
+
+  async existsInSlot(unitId, scheduledDate) {
+    if (!unitId) return false;
+    const [rows] = await db.query(
+      `SELECT visit_id FROM property_visits 
+             WHERE unit_id = ? AND scheduled_date = ? AND status IN ('pending', 'confirmed')`,
+      [unitId, scheduledDate]
+    );
+    return rows.length > 0;
+  }
+
+  async findUpcoming(hoursAhead = 24) {
+    const [rows] = await db.query(
+      `SELECT v.*, p.name as property_name, u.unit_number
+       FROM property_visits v
+       JOIN properties p ON v.property_id = p.property_id
+       LEFT JOIN units u ON v.unit_id = u.unit_id
+       WHERE v.status IN ('pending', 'confirmed')
+       AND v.scheduled_date BETWEEN NOW() AND DATE_ADD(NOW(), INTERVAL ? HOUR)`,
+      [hoursAhead]
+    );
+    return rows;
   }
 }
 

@@ -19,7 +19,7 @@ import { Button } from '@/components/ui/button';
 
 export function TenantLeasePage() {
   const { user } = useAuth();
-  const { leases, units, properties, updateNoticeStatus } = useApp();
+  const { leases, units, properties, updateNoticeStatus, renewalRequests, acknowledgeRefund } = useApp();
 
   // Separate active and past leases
   const activeLeases = leases.filter((l) => l.status === 'active');
@@ -75,6 +75,9 @@ export function TenantLeasePage() {
   const depositStatusColors: Record<string, string> = {
     pending: 'bg-yellow-100 text-yellow-800',
     paid: 'bg-green-100 text-green-800',
+    awaiting_approval: 'bg-yellow-100 text-yellow-800',
+    awaiting_acknowledgment: 'bg-blue-100 text-blue-800',
+    disputed: 'bg-red-100 text-red-800',
     partially_refunded: 'bg-blue-100 text-blue-800',
     refunded: 'bg-gray-100 text-gray-800',
   };
@@ -222,9 +225,40 @@ export function TenantLeasePage() {
                       )}
                     </div>
                     {currentLease.noticeStatus === 'renewing' && (
-                      <p className="text-xs text-green-700 font-medium">
-                        ✓ We've noted your interest in renewing. We'll be in touch with the updated contract.
-                      </p>
+                      <div className="space-y-3">
+                        <p className="text-xs text-green-700 font-medium">
+                          ✓ We've noted your interest in renewing.
+                        </p>
+                        {(() => {
+                           const request = renewalRequests.find(r => r.leaseId === currentLease.id);
+                           if (request) {
+                             return (
+                               <div className="p-3 bg-white border border-blue-100 rounded-md shadow-sm space-y-2">
+                                 <div className="flex justify-between items-start">
+                                   <p className="text-sm font-semibold text-blue-900">Renewal Request Status</p>
+                                   <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                                     {request.status.toUpperCase()}
+                                   </Badge>
+                                 </div>
+                                 {request.proposedMonthlyRent ? (
+                                   <div className="text-sm text-gray-700">
+                                     <p>Proposed Rent: <span className="font-bold text-emerald-600">LKR {request.proposedMonthlyRent}</span></p>
+                                     <p>Proposed End Date: <span className="font-medium">{formatDate(request.proposedEndDate)}</span></p>
+                                   </div>
+                                 ) : (
+                                   <p className="text-xs text-gray-500 italic">Owner is reviewing your renewal request. You'll see the proposed terms here shortly.</p>
+                                 )}
+                                 {request.negotiationNotes && (
+                                   <div className="mt-2 pt-2 border-t text-xs text-gray-600 italic">
+                                     " {request.negotiationNotes} "
+                                   </div>
+                                 )}
+                               </div>
+                             );
+                           }
+                           return null;
+                        })()}
+                      </div>
                     )}
                     {currentLease.noticeStatus === 'vacating' && (
                       <p className="text-xs text-red-700 font-medium">
@@ -338,15 +372,45 @@ export function TenantLeasePage() {
                               : '0'}
                           </p>
                         </div>
+                        {currentLease.depositStatus === 'awaiting_acknowledgment' && (
+                          <div className="col-span-2 mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                            <div className="flex items-start gap-3">
+                              <Shield className="size-5 text-blue-600 mt-0.5" />
+                              <div className="space-y-3">
+                                <h4 className="font-semibold text-blue-900">Refund Settlement Ready</h4>
+                                <p className="text-sm text-blue-800">
+                                  Owner has approved a refund of <strong>LKR {currentLease.proposedRefundAmount?.toLocaleString()}</strong>.
+                                  Please acknowledge this settlement to finalize the process.
+                                </p>
+                                <Button 
+                                  size="sm" 
+                                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                                  onClick={() => acknowledgeRefund(currentLease.id)}
+                                >
+                                  <CheckCircle className="size-4 mr-2" />
+                                  Confirm & Acknowledge Settlement
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                         {currentLease.refundedAmount !== undefined &&
                           currentLease.refundedAmount > 0 && (
-                            <div>
-                              <p className="text-sm text-gray-500">
-                                Refunded Amount
-                              </p>
-                              <p className="font-medium mt-1 text-blue-600">
-                                LKR {currentLease.refundedAmount.toLocaleString()}
-                              </p>
+                            <div className="space-y-3">
+                              <div>
+                                <p className="text-sm text-gray-500">
+                                  Refunded Amount
+                                </p>
+                                <p className="font-medium mt-1 text-blue-600">
+                                  LKR {currentLease.refundedAmount.toLocaleString()}
+                                </p>
+                              </div>
+                              {currentLease.refundNotes && (
+                                <div className="p-2 bg-blue-50 border border-blue-100 rounded text-xs text-blue-800 italic">
+                                  <p className="font-semibold not-italic mb-1">Deduction Details:</p>
+                                  "{currentLease.refundNotes}"
+                                </div>
+                              )}
                             </div>
                           )}
                       </div>
@@ -399,9 +463,12 @@ export function TenantLeasePage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() =>
-                        window.open(currentLease.documentUrl, '_blank')
-                      }
+                      onClick={() => {
+                        if (currentLease.id) {
+                          const baseUrl = '/api'; // Assuming standard base
+                          window.open(`${baseUrl}/documents/view/${currentLease.id}?type=lease`, '_blank');
+                        }
+                      }}
                     >
                       <ExternalLink className="size-4 mr-2" />
                       View Lease Document

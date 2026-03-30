@@ -11,17 +11,43 @@ export interface Lease {
   startDate: string;
   endDate: string | null;
   monthlyRent: number;
-  status: 'active' | 'ended' | 'cancelled';
+  status: 'draft' | 'active' | 'expired' | 'ended' | 'cancelled';
   securityDeposit?: number;
-  depositStatus?: 'pending' | 'paid' | 'partially_refunded' | 'refunded';
+  depositStatus?: 'pending' | 'paid' | 'awaiting_approval' | 'awaiting_acknowledgment' | 'disputed' | 'partially_refunded' | 'refunded';
+  proposedRefundAmount?: number;
+  refundNotes?: string;
   refundedAmount?: number;
   documentUrl?: string;
+  verificationStatus?: 'pending' | 'verified' | 'rejected';
+  verificationRejectionReason?: string;
   noticeStatus?: 'undecided' | 'vacating' | 'renewing';
+  unitNumber?: string;
+  propertyId?: string;
+  propertyName?: string;
+  tenantName?: string;
+  magicToken?: string;
+  targetDeposit?: number;
   createdAt: string;
 }
 
+export interface RenewalRequest {
+  id: string;
+  leaseId: string;
+  currentMonthlyRent: number;
+  proposedMonthlyRent: number | null;
+  proposedEndDate: string | null;
+  status: 'pending' | 'negotiating' | 'approved' | 'rejected' | 'cancelled';
+  negotiationNotes: string | null;
+  unitId?: string;
+  unitNumber?: string;
+  propertyName?: string;
+  tenantName?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface LeaseTerm {
-  leaseTermId: number;
+  id: number;
   ownerId: number;
   name: string;
   type: 'fixed' | 'periodic';
@@ -36,13 +62,29 @@ interface LeaseContextType {
   addLease: (lease: Omit<Lease, 'id' | 'createdAt'>) => Promise<void>;
   endLease: (id: string) => Promise<void>;
   renewLease: (id: string, newEndDate: string, newMonthlyRent?: number) => Promise<void>;
-  refundDeposit: (id: string, amount: number) => Promise<void>;
+  refundDeposit: (id: string, amount: number, notes?: string) => Promise<void>;
+  approveRefund: (id: string) => Promise<void>;
+  acknowledgeRefund: (id: string) => Promise<void>;
+  disputeRefund: (id: string, notes: string) => Promise<void>;
   updateLeaseDocument: (id: string, documentUrl: string) => Promise<void>;
   updateNoticeStatus: (id: string, status: 'undecided' | 'vacating' | 'renewing') => Promise<void>;
   leaseTerms: LeaseTerm[];
-  addLeaseTerm: (term: Omit<LeaseTerm, 'leaseTermId' | 'ownerId' | 'createdAt'>) => Promise<void>;
+  addLeaseTerm: (term: Omit<LeaseTerm, 'id' | 'ownerId' | 'createdAt'>) => Promise<void>;
   updateLeaseTerm: (id: number, term: Partial<LeaseTerm>) => Promise<void>;
   deleteLeaseTerm: (id: number) => Promise<void>;
+  finalizeCheckout: (id: string) => Promise<void>;
+  activateLease: (id: string) => Promise<void>;
+  verifyLeaseDocuments: (id: string) => Promise<void>;
+  rejectLeaseDocuments: (id: string, reason: string) => Promise<void>;
+  withdrawApplication: (id: string) => Promise<void>;
+  cancelLease: (id: string) => Promise<void>;
+
+  // Renewal operations
+  renewalRequests: RenewalRequest[];
+  fetchRenewalRequests: () => Promise<void>;
+  proposeRenewalTerms: (id: string, data: { proposedMonthlyRent: number; proposedEndDate: string; notes?: string }) => Promise<void>;
+  approveRenewal: (id: string) => Promise<void>;
+  rejectRenewal: (id: string) => Promise<void>;
 }
 
 const LeaseContext = createContext<LeaseContextType | undefined>(undefined);
@@ -52,6 +94,7 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
   const { updateUnit } = useProperty();
   const [leases, setLeases] = useState<Lease[]>([]);
   const [leaseTerms, setLeaseTerms] = useState<LeaseTerm[]>([]);
+  const [renewalRequests, setRenewalRequests] = useState<RenewalRequest[]>([]);
 
   const fetchLeaseTerms = async () => {
     try {
@@ -68,11 +111,11 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
       if (lRes.data) {
         setLeases(lRes.data.map((l: any) => ({
           ...l,
-          id: l.id?.toString() || l.lease_id?.toString(),
-          tenantId: l.tenantId?.toString() || l.tenant_id?.toString(),
-          unitId: l.unitId?.toString() || l.unit_id?.toString(),
-          documentUrl: l.documentUrl || l.document_url,
-          noticeStatus: l.noticeStatus || l.notice_status,
+          monthlyRent: l.monthlyRent / 100,
+          securityDeposit: (l.securityDeposit || 0) / 100,
+          proposedRefundAmount: (l.proposedRefundAmount || 0) / 100,
+          refundedAmount: (l.refundedAmount || 0) / 100,
+          targetDeposit: (l.targetDeposit || 0) / 100,
         })));
       }
     } catch (e) {
@@ -83,13 +126,21 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (user) {
       fetchLeases();
-      if (user.role === 'owner') fetchLeaseTerms();
+      fetchRenewalRequests();
+      if (user.role === 'owner' || user.role === 'treasurer') {
+        fetchLeaseTerms();
+      }
     }
   }, [user]);
 
   const addLease = async (lease: Omit<Lease, 'id' | 'createdAt'>) => {
     try {
-      const response = await apiClient.post('/leases', lease);
+      const response = await apiClient.post('/leases', {
+        ...lease,
+        monthlyRent: Math.round(lease.monthlyRent * 100),
+        securityDeposit: Math.round((lease.securityDeposit || 0) * 100),
+        targetDeposit: Math.round((lease.targetDeposit || 0) * 100),
+      });
       const constructedLease: Lease = {
         ...lease,
         id: response.data.id,
@@ -119,9 +170,12 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
 
   const renewLease = async (id: string, newEndDate: string, newMonthlyRent?: number) => {
     try {
-      await apiClient.put(`/leases/${id}/renew`, { newEndDate, newMonthlyRent });
-      setLeases(prev => prev.map(l => (l.id === id ? { ...l, endDate: newEndDate, monthlyRent: newMonthlyRent || l.monthlyRent } : l)));
-      toast.success('Lease renewed successfully');
+      await apiClient.post(`/leases/${id}/instant-renew`, { 
+        newEndDate, 
+        newMonthlyRent: newMonthlyRent ? Math.round(newMonthlyRent * 100) : undefined 
+      });
+      await fetchLeases();
+      toast.success('Renewal approved. A new draft lease is ready.');
     } catch (e: any) {
       const msg = e.response?.data?.error || 'Failed to renew lease';
       toast.error(msg);
@@ -129,20 +183,52 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const refundDeposit = async (id: string, amount: number) => {
+  const refundDeposit = async (id: string, amount: number, notes?: string) => {
     try {
-      await apiClient.post(`/leases/${id}/refund`, { amount });
-      const lRes = await apiClient.get('/leases');
-      setLeases(lRes.data.map((l: any) => ({
-        ...l,
-        id: l.id?.toString() || l.lease_id?.toString(),
-        tenantId: l.tenantId?.toString() || l.tenant_id?.toString(),
-        unitId: l.unitId?.toString() || l.unit_id?.toString(),
-        documentUrl: l.documentUrl || l.document_url,
-      })));
-      toast.success('Deposit refunded successfully');
+      await apiClient.post(`/leases/${id}/refund`, { 
+        amount: Math.round(amount * 100), 
+        notes 
+      });
+      await fetchLeases(); // Easier to refetch instead of manual mapping
+      toast.success('Refund requested successfully');
     } catch (e: any) {
       const msg = e.response?.data?.error || 'Failed to refund deposit';
+      toast.error(msg);
+      throw new Error(msg);
+    }
+  };
+
+  const approveRefund = async (id: string) => {
+    try {
+      await apiClient.post(`/leases/${id}/refund/approve`);
+      await fetchLeases();
+      toast.success('Refund approved. Awaiting tenant acknowledgment.');
+    } catch (e: any) {
+      const msg = e.response?.data?.error || 'Failed to approve refund';
+      toast.error(msg);
+      throw new Error(msg);
+    }
+  };
+
+  const acknowledgeRefund = async (id: string) => {
+    try {
+      await apiClient.put(`/leases/${id}/acknowledge-refund`);
+      await fetchLeases();
+      toast.success('Refund settlement acknowledged.');
+    } catch (e: any) {
+      const msg = e.response?.data?.error || 'Failed to acknowledge refund';
+      toast.error(msg);
+      throw new Error(msg);
+    }
+  };
+
+  const disputeRefund = async (id: string, notes: string) => {
+    try {
+      await apiClient.post(`/leases/${id}/refund/dispute`, { notes });
+      await fetchLeases();
+      toast.success('Refund disputed successfully');
+    } catch (e: any) {
+      const msg = e.response?.data?.error || 'Failed to dispute refund';
       toast.error(msg);
       throw new Error(msg);
     }
@@ -170,7 +256,7 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const addLeaseTerm = async (term: Omit<LeaseTerm, 'leaseTermId' | 'ownerId' | 'createdAt'>) => {
+  const addLeaseTerm = async (term: Omit<LeaseTerm, 'id' | 'ownerId' | 'createdAt'>) => {
     try {
       await apiClient.post('/lease-terms', term);
       await fetchLeaseTerms();
@@ -203,19 +289,157 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const finalizeCheckout = async (id: string) => {
+    try {
+      await apiClient.post(`/leases/${id}/finalize-checkout`);
+      setLeases(prev => prev.map(l => (l.id === id ? { ...l, status: 'ended' } : l)));
+      const lease = leases.find(l => l.id === id);
+      if (lease) await updateUnit(lease.unitId, { status: 'available' });
+      toast.success('Lease checkout finalized. Unit is now available.');
+    } catch (e: any) {
+      const msg = e.response?.data?.error || 'Failed to finalize checkout';
+      toast.error(msg);
+      throw new Error(msg);
+    }
+  };
+
+  const activateLease = async (id: string) => {
+    try {
+      await apiClient.post(`/leases/${id}/sign`);
+      await fetchLeases();
+      toast.success('Lease signed and activated successfully.');
+    } catch (e: any) {
+      const msg = e.response?.data?.error || 'Failed to sign lease';
+      toast.error(msg);
+      throw new Error(msg);
+    }
+  };
+
+  const verifyLeaseDocuments = async (id: string) => {
+    try {
+      const response = await apiClient.post(`/leases/${id}/verify-documents`);
+      await fetchLeases();
+      toast.success(response.data.message);
+    } catch (e: any) {
+      const msg = e.response?.data?.error || 'Failed to verify documents';
+      toast.error(msg);
+      throw new Error(msg);
+    }
+  };
+
+  const rejectLeaseDocuments = async (id: string, reason: string) => {
+    try {
+      await apiClient.post(`/leases/${id}/reject-documents`, { reason });
+      await fetchLeases();
+      toast.success('Documents rejected. Feedback sent to tenant.');
+    } catch (e: any) {
+      const msg = e.response?.data?.error || 'Failed to reject documents';
+      toast.error(msg);
+      throw new Error(msg);
+    }
+  };
+
+  const withdrawApplication = async (id: string) => {
+    try {
+      await apiClient.post(`/leases/${id}/withdraw`);
+      await fetchLeases();
+      toast.success('Your application has been withdrawn.');
+    } catch (e: any) {
+      const msg = e.response?.data?.error || 'Failed to withdraw application';
+      toast.error(msg);
+      throw new Error(msg);
+    }
+  };
+
+  const cancelLease = async (id: string) => {
+    try {
+      await apiClient.delete(`/leases/${id}`);
+      await fetchLeases();
+      toast.success('Lease reservation cancelled.');
+    } catch (e: any) {
+      const msg = e.response?.data?.error || 'Failed to cancel lease';
+      toast.error(msg);
+      throw new Error(msg);
+    }
+  };
+
+  const fetchRenewalRequests = async () => {
+    try {
+      const response = await apiClient.get('/renewal-requests');
+      setRenewalRequests(response.data.map((r: any) => ({
+        ...r,
+        currentMonthlyRent: r.currentMonthlyRent / 100,
+        proposedMonthlyRent: r.proposedMonthlyRent ? r.proposedMonthlyRent / 100 : null,
+      })));
+    } catch (e) {
+      console.error('Failed to fetch renewal requests', e);
+    }
+  };
+
+  const proposeRenewalTerms = async (id: string, data: { proposedMonthlyRent: number; proposedEndDate: string; notes?: string }) => {
+    try {
+      await apiClient.post(`/renewal-requests/${id}/propose`, {
+        ...data,
+        proposedMonthlyRent: Math.round(data.proposedMonthlyRent * 100)
+      });
+      toast.success('Renewal terms proposed successfully');
+      fetchRenewalRequests();
+    } catch (e: any) {
+      toast.error(e.response?.data?.error || 'Failed to propose renewal terms');
+      throw e;
+    }
+  };
+
+  const approveRenewal = async (id: string) => {
+    try {
+      await apiClient.post(`/renewal-requests/${id}/approve`);
+      toast.success('Renewal approved. New draft lease created.');
+      fetchRenewalRequests();
+      fetchLeases(); // New draft lease should appear
+    } catch (e: any) {
+      toast.error(e.response?.data?.error || 'Failed to approve renewal');
+      throw e;
+    }
+  };
+
+  const rejectRenewal = async (id: string) => {
+    try {
+      await apiClient.post(`/renewal-requests/${id}/reject`);
+      toast.success('Renewal request rejected');
+      fetchRenewalRequests();
+    } catch (e: any) {
+      toast.error(e.response?.data?.error || 'Failed to reject renewal');
+      throw e;
+    }
+  };
+
   return (
     <LeaseContext.Provider value={{ 
       leases, 
       addLease, 
       endLease, 
       renewLease, 
-      refundDeposit, 
+      refundDeposit,
+      approveRefund,
+      acknowledgeRefund,
+      disputeRefund,
       updateLeaseDocument, 
       updateNoticeStatus,
       leaseTerms,
       addLeaseTerm,
       updateLeaseTerm,
-      deleteLeaseTerm
+      deleteLeaseTerm,
+      finalizeCheckout,
+      activateLease,
+      verifyLeaseDocuments,
+      rejectLeaseDocuments,
+      withdrawApplication,
+      renewalRequests,
+      fetchRenewalRequests,
+      proposeRenewalTerms,
+      approveRenewal,
+      rejectRenewal,
+      cancelLease
     }}>
       {children}
     </LeaseContext.Provider>

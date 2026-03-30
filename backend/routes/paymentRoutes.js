@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import paymentController from '../controllers/paymentController.js';
 
-import authenticateToken from '../middleware/authMiddleware.js';
+import { authenticateToken, authorizeRoles } from '../middleware/authMiddleware.js';
 import validateRequest from '../middleware/validateRequest.js';
 import {
   submitPaymentSchema,
@@ -30,6 +30,7 @@ router.get('/', authenticateToken, paymentController.getPayments);
 router.put(
   '/:id/verify',
   authenticateToken,
+  authorizeRoles('treasurer'),
   validateRequest(verifyPaymentSchema),
   paymentController.verifyPayment
 );

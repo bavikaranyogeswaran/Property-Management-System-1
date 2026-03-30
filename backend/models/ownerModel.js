@@ -10,19 +10,21 @@ class OwnerModel {
       branchName,
       accountHolderName,
       accountNumber,
+      tin_url,
     } = ownerData;
 
     // Uses the provided connection for transaction support
     const query = `
             INSERT INTO owners 
-            (user_id, nic, tin, bank_name, branch_name, account_holder_name, account_number) 
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            (user_id, nic, tin, tin_url, bank_name, branch_name, account_holder_name, account_number) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         `;
 
     await connection.query(query, [
       userId,
       nic,
       tin,
+      tin_url || null,
       bankName,
       branchName,
       accountHolderName,
@@ -46,6 +48,7 @@ class OwnerModel {
       branchName: row.branch_name,
       accountHolderName: row.account_holder_name,
       accountNumber: row.account_number,
+      tinUrl: row.tin_url,
       // residenceAddress removed from findByUserId return as strictly strictly schema doesn't seem to have it in CREATE TABLE owners above?
       // Wait, looking at schema.sql line 58...
       // CREATE TABLE owners ( user_id, nic, tin, bank_name... )

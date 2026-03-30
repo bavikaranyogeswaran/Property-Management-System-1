@@ -18,6 +18,7 @@ import {
   MessageSquare,
 } from 'lucide-react';
 import { API_BASE_URL } from '@/services/api';
+import { toast } from 'sonner';
 
 // ============================================================================
 //  LEAD PORTAL PAGE (Guest Access via Token Link)
@@ -65,6 +66,18 @@ interface PortalData {
   lead: LeadData;
   property: PropertyData | null;
   unit: UnitData | null;
+  activeLease?: {
+    id: number;
+    status: string;
+    isDocumentsVerified: boolean;
+    verificationStatus: 'pending' | 'verified' | 'rejected';
+    verificationRejectionReason?: string;
+    depositStatus: {
+      isFullyPaid: boolean;
+      paidAmount: number;
+      targetAmount: number;
+    };
+  } | null;
   leaseTerms: LeaseTerm[];
 }
 
@@ -98,6 +111,12 @@ function portalApi(token: string) {
       axios.put(
         `${API_BASE_URL}/lead-portal/preferences`,
         { moveInDate, preferredTermMonths, leaseTermId },
+        { params: { token } }
+      ),
+    withdrawApplication: (leaseId: number) => 
+      axios.post(
+        `${API_BASE_URL}/leases/${leaseId}/withdraw`, 
+        {}, 
         { params: { token } }
       ),
   };
@@ -201,10 +220,10 @@ export function LeadPortalPage() {
         };
       });
       setIsEditingPrefs(false);
-      alert('Preferences updated successfully!');
+      toast.success('Preferences updated successfully!');
     } catch (err: any) {
       const msg = err.response?.data?.error || 'Failed to update preferences';
-      alert(msg);
+      toast.error(msg);
     } finally {
       setSavingPrefs(false);
     }
@@ -229,7 +248,7 @@ export function LeadPortalPage() {
       setNewMessage('');
     } catch (err: any) {
       const msg = err.response?.data?.error || 'Failed to send message';
-      alert(msg);
+      toast.error(msg);
     } finally {
       setSending(false);
     }
@@ -250,6 +269,23 @@ export function LeadPortalPage() {
         {variant.label}
       </Badge>
     );
+  };
+
+  const handleWithdraw = async () => {
+    if (!portalData?.activeLease?.id || !token) return;
+    
+    if (!confirm('Are you sure you want to withdraw your application? This will release the unit and cancel your request.')) {
+        return;
+    }
+
+    try {
+        const api = portalApi(token);
+        await api.withdrawApplication(portalData.activeLease.id);
+        toast.success('Application withdrawn successfully.');
+        window.location.reload();
+    } catch (err: any) {
+        toast.error(err.response?.data?.error || 'Failed to withdraw application');
+    }
   };
 
   // Error State
@@ -302,6 +338,69 @@ export function LeadPortalPage() {
         </div>
         {getStatusBadge(lead.status)}
       </div>
+
+      {/* Onboarding Progress Card */}
+      {portalData.activeLease && lead.status !== 'dropped' && (
+          <Card className="border-blue-100 bg-blue-50/30">
+              <CardContent className="pt-6">
+                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                      <div className="space-y-1 flex-1">
+                          <h3 className="text-lg font-semibold text-blue-900 flex items-center gap-2">
+                              Application in Progress
+                              <Badge className="bg-blue-200 text-blue-800 hover:bg-blue-200 border-0">Draft Lease</Badge>
+                          </h3>
+                          <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-blue-700 mt-2">
+                              <div className="flex items-center gap-2">
+                                  <div className={`size-2 rounded-full ${portalData.activeLease.depositStatus.isFullyPaid ? 'bg-green-500' : 'bg-yellow-500'}`} />
+                                  Deposit: {portalData.activeLease.depositStatus.isFullyPaid ? 'Paid' : `Pending (LKR ${ (portalData.activeLease.depositStatus.targetAmount - portalData.activeLease.depositStatus.paidAmount).toLocaleString() } left)`}
+                              </div>
+                              <div className="flex items-center gap-2">
+                                  <div className={`size-2 rounded-full ${
+                                      portalData.activeLease.verificationStatus === 'verified' ? 'bg-green-500' : 
+                                      portalData.activeLease.verificationStatus === 'rejected' ? 'bg-red-500' : 'bg-yellow-500'
+                                  }`} />
+                                  Documents: {
+                                      portalData.activeLease.verificationStatus === 'verified' ? 'Verified' : 
+                                      portalData.activeLease.verificationStatus === 'rejected' ? 'Action Required' : 'Awaiting Verification'
+                                  }
+                              </div>
+                          </div>
+                          
+                          {portalData.activeLease.verificationStatus === 'rejected' && (
+                              <div className="mt-4 p-3 bg-red-50 border border-red-100 rounded-md flex gap-3">
+                                  <AlertCircle className="size-5 text-red-500 shrink-0" />
+                                  <div>
+                                      <p className="text-sm font-bold text-red-800">Verification Feedback:</p>
+                                      <p className="text-sm text-red-700">{portalData.activeLease.verificationRejectionReason || 'Please re-upload your identity documents.'}</p>
+                                  </div>
+                              </div>
+                          )}
+
+                          {!portalData.activeLease.depositStatus.isFullyPaid && (
+                              <p className="text-sm text-blue-600 mt-2">
+                                  Please complete your deposit payment using the link sent to your email to proceed with verification.
+                              </p>
+                          )}
+                          {portalData.activeLease.depositStatus.isFullyPaid && portalData.activeLease.verificationStatus === 'pending' && (
+                              <p className="text-sm text-blue-600 mt-2">
+                                  Payment received! Our staff is currently reviewing your documents.
+                              </p>
+                          )}
+                      </div>
+                      
+                      <div className="flex flex-col gap-2 shrink-0">
+                          <Button 
+                              variant="outline" 
+                              className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                              onClick={handleWithdraw}
+                          >
+                              Withdraw Application
+                          </Button>
+                      </div>
+                  </div>
+              </CardContent>
+          </Card>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column: Details */}

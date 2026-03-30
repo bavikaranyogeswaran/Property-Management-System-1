@@ -13,10 +13,10 @@ class PayoutController {
           .json({ error: 'Only owners can generate their payouts' });
       }
 
-      if (!startDate || !endDate) {
+      if (!endDate) {
         return res
           .status(400)
-          .json({ error: 'Start date and end date required' });
+          .json({ error: 'End date is required' });
       }
 
       const calculation = await payoutService.previewPayout(

@@ -13,7 +13,9 @@ class TenantModel {
     const {
       userId,
       nic,
-      nic_url,
+      nicUrl,
+      tinUrl,
+      idCardUrl,
       permanentAddress,
       emergencyContactName,
       emergencyContactPhone,
@@ -23,15 +25,17 @@ class TenantModel {
 
     // Uses the provided connection for transaction support
     const query = `
-            INSERT INTO tenants (user_id, nic, nic_url, permanent_address, emergency_contact_name, emergency_contact_phone, 
+            INSERT INTO tenants (user_id, nic, nic_url, tin_url, id_card_url, permanent_address, emergency_contact_name, emergency_contact_phone, 
              employment_status, monthly_income) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
 
     await connection.query(query, [
       userId,
       nic,
-      nic_url,
+      nicUrl,
+      tinUrl || null,
+      idCardUrl || null,
       permanentAddress,
       emergencyContactName,
       emergencyContactPhone,
@@ -54,14 +58,16 @@ class TenantModel {
       userId: row.user_id,
       nic: row.nic,
       nicUrl: row.nic_url,
+      tinUrl: row.tin_url,
+      idCardUrl: row.id_card_url,
       permanentAddress: row.permanent_address,
       emergencyContactName: row.emergency_contact_name,
       emergencyContactPhone: row.emergency_contact_phone,
       // employerName removed
       employmentStatus: row.employment_status,
-      monthlyIncome: parseFloat(row.monthly_income),
+      monthlyIncome: Number(row.monthly_income),
       // dateOfBirth removed
-      creditBalance: parseFloat(row.credit_balance || 0),
+      creditBalance: Number(row.credit_balance || 0),
       behaviorScore: row.behavior_score,
     };
   }
@@ -103,6 +109,8 @@ class TenantModel {
   static ALLOWED_UPDATE_FIELDS = {
     nic: 'nic',
     nicUrl: 'nic_url',
+    tinUrl: 'tin_url',
+    idCardUrl: 'id_card_url',
     permanentAddress: 'permanent_address',
     emergencyContactName: 'emergency_contact_name',
     emergencyContactPhone: 'emergency_contact_phone',
@@ -110,7 +118,8 @@ class TenantModel {
     monthlyIncome: 'monthly_income',
   };
 
-  async update(userId, data) {
+  async update(userId, data, connection = null) {
+    const db = connection || pool;
     const fields = [];
     const values = [];
 
@@ -125,32 +134,40 @@ class TenantModel {
     if (fields.length === 0) return false;
 
     values.push(userId);
-    const [result] = await pool.query(
+    const [result] = await db.query(
       `UPDATE tenants SET ${fields.join(', ')} WHERE user_id = ?`,
       values
     );
     return result.affectedRows > 0;
   }
 
-  async addCredit(userId, amount) {
-    await pool.query(
+  async addCredit(userId, amount, connection = null) {
+    const db = connection || pool;
+    await db.query(
       'UPDATE tenants SET credit_balance = credit_balance + ? WHERE user_id = ?',
       [amount, userId]
     );
   }
 
-  async deductCredit(userId, amount) {
-    await pool.query(
+  async deductCredit(userId, amount, connection = null) {
+    const db = connection || pool;
+    await db.query(
       'UPDATE tenants SET credit_balance = credit_balance - ? WHERE user_id = ?',
       [amount, userId]
     );
   }
   async incrementBehaviorScore(userId, scoreChange, connection = null) {
     const db = connection || pool;
+    const currentScore = await this.getBehaviorScore(userId, db);
+    if (currentScore === null) return null;
+
+    const newScore = Math.min(100, Math.max(0, currentScore + scoreChange));
+
     await db.query(
-      'UPDATE tenants SET behavior_score = LEAST(100, GREATEST(0, behavior_score + ?)) WHERE user_id = ?',
-      [scoreChange, userId]
+      'UPDATE tenants SET behavior_score = ? WHERE user_id = ?',
+      [newScore, userId]
     );
+    return newScore;
   }
 
   async getBehaviorScore(userId, connection = null) {

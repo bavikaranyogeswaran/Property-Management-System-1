@@ -35,6 +35,8 @@ CREATE TABLE tenants (
     user_id INT PRIMARY KEY,
     nic VARCHAR(20) UNIQUE,              -- NIC (Optional, number format)
     nic_url VARCHAR(500),                -- [ADDED] URL to uploaded NIC document
+    tin_url VARCHAR(500),                -- [ADDED] URL to uploaded TIN document
+    id_card_url VARCHAR(500),            -- [ADDED] URL to uploaded General ID Card document
     permanent_address VARCHAR(255),      -- Tenant's permanent address
     emergency_contact_name VARCHAR(100),
     emergency_contact_phone VARCHAR(20),
@@ -64,6 +66,7 @@ CREATE TABLE owners (
     user_id INT PRIMARY KEY,
     nic VARCHAR(20),
     tin VARCHAR(50),                     -- Taxpayer Identification Number
+    tin_url VARCHAR(500),                -- [ADDED] URL to uploaded TIN document
     bank_name VARCHAR(100),
     branch_name VARCHAR(100),
     account_holder_name VARCHAR(100),
@@ -237,6 +240,18 @@ CREATE TABLE lead_access_tokens (
 );
 
 -- =========================
+-- UNIT LOCKS (Concurrent Process Protection)
+-- =========================
+CREATE TABLE unit_locks (
+    unit_id INT PRIMARY KEY,
+    lead_id INT NOT NULL,
+    expires_at DATETIME NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (unit_id) REFERENCES units(unit_id) ON DELETE CASCADE,
+    FOREIGN KEY (lead_id) REFERENCES leads(lead_id) ON DELETE CASCADE
+);
+
+-- =========================
 -- LEASES
 -- =========================
 CREATE TABLE leases (
@@ -246,15 +261,35 @@ CREATE TABLE leases (
     start_date DATE NOT NULL,
     end_date DATE,
     monthly_rent DECIMAL(10,2) NOT NULL,
-    status ENUM('active','ended','cancelled') DEFAULT 'active',
+    status ENUM('draft', 'active', 'expired', 'ended', 'cancelled') DEFAULT 'active',
     notice_status ENUM('undecided', 'vacating', 'renewing') DEFAULT 'undecided', -- [ADDED] Tenant's intent
     security_deposit DECIMAL(10, 2) DEFAULT 0.00,
-    deposit_status ENUM('pending', 'paid', 'partially_refunded', 'refunded') DEFAULT 'pending',
+    deposit_status ENUM('pending', 'paid', 'awaiting_approval', 'disputed', 'partially_refunded', 'refunded') DEFAULT 'pending',
+    proposed_refund_amount DECIMAL(10, 2) DEFAULT 0.00,
+    refund_notes TEXT,
     refunded_amount DECIMAL(10, 2) DEFAULT 0.00,
     document_url VARCHAR(500), -- [ADDED] Lease document URL
+    is_documents_verified BOOLEAN DEFAULT FALSE, -- [NEW] Manual verification step
+    verification_status ENUM('pending', 'verified', 'rejected') DEFAULT 'pending', -- [NEW] Explicit verification state
+    verification_rejection_reason TEXT, -- [NEW] Reason if documents are rejected
+    actual_checkout_at DATETIME, -- [ADDED] Actual checkout time
+    signed_at DATETIME, -- [NEW] Time when lease moved to active
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (tenant_id) REFERENCES users(user_id) ON DELETE RESTRICT,
     FOREIGN KEY (unit_id) REFERENCES units(unit_id) ON DELETE RESTRICT
+);
+
+-- =========================
+-- LEASE RENT ADJUSTMENTS (Addendums)
+-- =========================
+CREATE TABLE lease_rent_adjustments (
+    adjustment_id INT AUTO_INCREMENT PRIMARY KEY,
+    lease_id INT NOT NULL,
+    effective_date DATE NOT NULL,
+    new_monthly_rent DECIMAL(10,2) NOT NULL,
+    notes TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (lease_id) REFERENCES leases(lease_id) ON DELETE CASCADE
 );
 
 -- =========================
@@ -289,8 +324,10 @@ CREATE TABLE payments (
     status ENUM('pending','verified','rejected') DEFAULT 'pending',
     verified_by INT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    payout_id INT,
     FOREIGN KEY (invoice_id) REFERENCES rent_invoices(invoice_id) ON DELETE RESTRICT,
     FOREIGN KEY (verified_by) REFERENCES users(user_id) ON DELETE SET NULL,
+    FOREIGN KEY (payout_id) REFERENCES owner_payouts(payout_id) ON DELETE SET NULL,
     UNIQUE KEY unique_payment_ref (reference_number)
 );
 
@@ -339,8 +376,10 @@ CREATE TABLE maintenance_costs (
     description VARCHAR(255),
     amount DECIMAL(10,2) NOT NULL,
     recorded_date DATE NOT NULL,
+    payout_id INT,
     status ENUM('active', 'voided') DEFAULT 'active',
     FOREIGN KEY (request_id) REFERENCES maintenance_requests(request_id) ON DELETE CASCADE,
+    FOREIGN KEY (payout_id) REFERENCES owner_payouts(payout_id) ON DELETE SET NULL,
     UNIQUE KEY unique_cost_entry (request_id, description(255), amount, recorded_date)
 );
 
@@ -463,3 +502,18 @@ CREATE INDEX idx_leases_status_end_date ON leases(status, end_date);
 CREATE INDEX idx_invoices_status_due_date ON rent_invoices(status, due_date);
 
 
+-- =========================
+-- RENEWAL REQUESTS (Negotiation flow)
+-- =========================
+CREATE TABLE IF NOT EXISTS renewal_requests (
+    request_id INT AUTO_INCREMENT PRIMARY KEY,
+    lease_id INT NOT NULL,
+    current_monthly_rent DECIMAL(10,2) NOT NULL,
+    proposed_monthly_rent DECIMAL(10,2) NULL,
+    proposed_end_date DATE NULL,
+    status ENUM('pending', 'negotiating', 'approved', 'rejected', 'cancelled') DEFAULT 'pending',
+    negotiation_notes TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (lease_id) REFERENCES leases(lease_id) ON DELETE CASCADE
+);

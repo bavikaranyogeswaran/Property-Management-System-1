@@ -6,6 +6,7 @@ import unitModel from '../models/unitModel.js';
 import leaseModel from '../models/leaseModel.js';
 import leadModel from '../models/leadModel.js';
 import ledgerModel from '../models/ledgerModel.js';
+import { getLocalTime, parseLocalDate, addDays } from '../utils/dateUtils.js';
 
 class ReportService {
 
@@ -188,15 +189,14 @@ class ReportService {
         if (propertyIds.length === 0) return [];
 
         const activeLeases = await leaseModel.findActive();
-        const now = new Date();
-        const ninetyDaysFromNow = new Date();
-        ninetyDaysFromNow.setDate(now.getDate() + 90);
+        const nowTime = getLocalTime();
+        const ninetyDaysFromNow = addDays(nowTime, 90);
 
         return activeLeases.filter((lease) => {
             // Filter by accessible properties
             if (!propertyIds.includes(Number(lease.propertyId))) return false;
-            const endDate = new Date(lease.endDate);
-            return endDate >= now && endDate <= ninetyDaysFromNow;
+            const endDate = parseLocalDate(lease.endDate);
+            return endDate >= nowTime && endDate <= ninetyDaysFromNow;
         });
     }
 

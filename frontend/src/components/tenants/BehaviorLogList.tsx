@@ -51,9 +51,9 @@ export const BehaviorLogList: React.FC<BehaviorLogListProps> = ({ logs }) => {
             </TableRow>
           ) : (
             logs.map((log) => (
-              <TableRow key={log.log_id}>
+              <TableRow key={log.id}>
                 <TableCell>
-                  {format(new Date(log.created_at), 'MMM d, yyyy')}
+                  {format(new Date(log.createdAt), 'MMM d, yyyy')}
                 </TableCell>
                 <TableCell>{log.category}</TableCell>
                 <TableCell>
@@ -63,10 +63,10 @@ export const BehaviorLogList: React.FC<BehaviorLogListProps> = ({ logs }) => {
                 </TableCell>
                 <TableCell>{log.description}</TableCell>
                 <TableCell
-                  className={`text-right font-medium ${log.score_change >= 0 ? 'text-green-600' : 'text-red-600'}`}
+                   className={`text-right font-medium ${log.scoreChange >= 0 ? 'text-green-600' : 'text-red-600'}`}
                 >
-                  {log.score_change > 0 ? '+' : ''}
-                  {log.score_change}
+                  {log.scoreChange > 0 ? '+' : ''}
+                  {log.scoreChange}
                 </TableCell>
               </TableRow>
             ))

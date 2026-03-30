@@ -24,8 +24,8 @@ export function VisitsPage() {
     .filter((v) => (filter === 'all' ? true : v.status === filter))
     .sort(
       (a, b) =>
-        new Date(a.scheduled_date).getTime() -
-        new Date(b.scheduled_date).getTime()
+        new Date(a.scheduledDate).getTime() -
+        new Date(b.scheduledDate).getTime()
     );
 
   const handleStatusUpdate = async (id: string, newStatus: Visit['status']) => {
@@ -82,7 +82,7 @@ export function VisitsPage() {
           </Card>
         ) : (
           filteredVisits.map((visit) => (
-            <Card key={visit.visit_id} className="overflow-hidden">
+            <Card key={visit.id} className="overflow-hidden">
               <div className="p-6 flex flex-col lg:flex-row gap-6 items-start lg:items-center justify-between">
                 {/* Visitor Info */}
                 <div className="flex items-start gap-4 min-w-[250px]">
@@ -91,15 +91,15 @@ export function VisitsPage() {
                   </div>
                   <div>
                     <h3 className="font-semibold text-gray-900">
-                      {visit.visitor_name}
+                      {visit.visitorName}
                     </h3>
                     <div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
                       <Mail className="size-3" />
-                      {visit.visitor_email}
+                      {visit.visitorEmail}
                     </div>
                     <div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
                       <Phone className="size-3" />
-                      {visit.visitor_phone}
+                      {visit.visitorPhone}
                     </div>
                   </div>
                 </div>
@@ -109,12 +109,12 @@ export function VisitsPage() {
                   <div className="flex items-center gap-2 text-gray-700">
                     <MapPin className="size-4 text-blue-500" />
                     <span className="font-medium">
-                      {visit.property_name || 'Unknown Property'}
+                      {visit.propertyName || 'Unknown Property'}
                     </span>
                   </div>
-                  {visit.unit_number && (
+                  {visit.unitNumber && (
                     <div className="text-sm text-gray-500 ml-6">
-                      Unit {visit.unit_number}
+                      Unit {visit.unitNumber}
                     </div>
                   )}
                 </div>
@@ -124,13 +124,13 @@ export function VisitsPage() {
                   <div className="flex items-center gap-2 text-gray-700">
                     <Calendar className="size-4 text-purple-500" />
                     <span>
-                      {format(new Date(visit.scheduled_date), 'MMM dd, yyyy')}
+                      {format(new Date(visit.scheduledDate), 'MMM dd, yyyy')}
                     </span>
                   </div>
                   <div className="flex items-center gap-2 text-gray-700">
                     <Clock className="size-4 text-purple-500" />
                     <span>
-                      {format(new Date(visit.scheduled_date), 'hh:mm a')}
+                      {format(new Date(visit.scheduledDate), 'hh:mm a')}
                     </span>
                   </div>
                 </div>
@@ -149,7 +149,7 @@ export function VisitsPage() {
                         size="sm"
                         className="bg-green-600 hover:bg-green-700 text-white"
                         onClick={() =>
-                          handleStatusUpdate(visit.visit_id, 'confirmed')
+                          handleStatusUpdate(visit.id, 'confirmed')
                         }
                       >
                         <Check className="size-4 mr-1" /> Confirm
@@ -159,7 +159,7 @@ export function VisitsPage() {
                         variant="outline"
                         className="text-red-600 hover:bg-red-50 hover:text-red-700 border-red-200"
                         onClick={() =>
-                          handleStatusUpdate(visit.visit_id, 'cancelled')
+                          handleStatusUpdate(visit.id, 'cancelled')
                         }
                       >
                         <X className="size-4 mr-1" /> Rej
@@ -173,7 +173,7 @@ export function VisitsPage() {
                         size="sm"
                         className="bg-blue-600 hover:bg-blue-700 text-white"
                         onClick={() =>
-                          handleStatusUpdate(visit.visit_id, 'completed')
+                          handleStatusUpdate(visit.id, 'completed')
                         }
                       >
                         <CheckCircle className="size-4 mr-1" /> Complete
@@ -183,7 +183,7 @@ export function VisitsPage() {
                         variant="ghost"
                         className="text-red-600 hover:bg-red-50"
                         onClick={() =>
-                          handleStatusUpdate(visit.visit_id, 'cancelled')
+                          handleStatusUpdate(visit.id, 'cancelled')
                         }
                       >
                         Cancel

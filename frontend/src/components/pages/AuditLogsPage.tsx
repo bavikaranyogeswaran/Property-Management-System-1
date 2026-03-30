@@ -62,15 +62,15 @@ const AuditLogsPage: React.FC = () => {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {logs.map((log) => (
-                  <tr key={log.log_id} className="hover:bg-gray-50">
+                  <tr key={log.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {new Date(log.created_at).toLocaleString()}
+                      {new Date(log.createdAt).toLocaleString()}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600">
-                      {log.action_type}
+                      {log.actionType}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {log.user_name || log.user_id || 'System'}
+                      {log.userName || log.userId || 'System'}
                     </td>
                     <td
                       className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate"
@@ -81,7 +81,7 @@ const AuditLogsPage: React.FC = () => {
                         : JSON.stringify(log.details)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {log.ip_address}
+                      {log.ipAddress}
                     </td>
                   </tr>
                 ))}
