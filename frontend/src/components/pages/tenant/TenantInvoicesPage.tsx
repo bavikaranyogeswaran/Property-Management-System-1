@@ -502,9 +502,6 @@ export function TenantInvoicesPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
-                  <SelectItem value="Check">Check</SelectItem>
-                  <SelectItem value="Cash">Cash</SelectItem>
-                  <SelectItem value="Mobile Payment">Mobile Payment</SelectItem>
                   <SelectItem value="Online Payment">Online Payment (PayHere)</SelectItem>
                 </SelectContent>
               </Select>
@@ -515,7 +512,7 @@ export function TenantInvoicesPage() {
                   <img src="https://www.payhere.lk/downloads/images/payhere_short_banner.png" alt="PayHere" className="h-8" />
                   <div>
                     <h4 className="font-bold text-blue-900">Secure Instant Payment</h4>
-                    <p className="text-xs text-blue-700">Pay using Visa, Mastercard, or Mobile Wallets. Your invoice will be marked as paid <strong>immediately</strong>.</p>
+                    <p className="text-xs text-blue-700">Pay using Visa or Mastercard. Your invoice will be marked as paid <strong>immediately</strong>.</p>
                   </div>
                </div>
             ) : (

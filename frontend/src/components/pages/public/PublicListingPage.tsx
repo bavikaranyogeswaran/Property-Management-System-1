@@ -76,7 +76,7 @@ export function PublicListingPage({
             unitNumber: u.unitNumber,
             unitTypeId: u.unitTypeId,
             type: u.type,
-            monthlyRent: u.monthlyRent,
+            monthlyRent: u.monthlyRent / 100,
             status: u.status,
             imageUrl: u.imageUrl,
             createdAt: u.createdAt,
@@ -438,7 +438,7 @@ export function PublicListingPage({
                 value={interestFormData.leaseTermId}
                 onChange={(e) => {
                   const val = e.target.value;
-                  const term = leaseTerms.find(t => String(t.leaseTermId) === val);
+                  const term = leaseTerms.find(t => String(t.id) === val || String(t.leaseTermId) === val);
                   setInterestFormData({
                     ...interestFormData,
                     leaseTermId: val,
@@ -449,7 +449,7 @@ export function PublicListingPage({
               >
                 <option value="" disabled>Select a Lease Term</option>
                 {leaseTerms.map(t => (
-                  <option key={t.leaseTermId} value={t.leaseTermId.toString()}>
+                  <option key={t.id} value={t.id.toString()}>
                     {t.name} ({t.durationMonths} months)
                   </option>
                 ))}

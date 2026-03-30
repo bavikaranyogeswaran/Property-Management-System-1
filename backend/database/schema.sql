@@ -35,8 +35,6 @@ CREATE TABLE tenants (
     user_id INT PRIMARY KEY,
     nic VARCHAR(20) UNIQUE,              -- NIC (Optional, number format)
     nic_url VARCHAR(500),                -- [ADDED] URL to uploaded NIC document
-    tin_url VARCHAR(500),                -- [ADDED] URL to uploaded TIN document
-    id_card_url VARCHAR(500),            -- [ADDED] URL to uploaded General ID Card document
     permanent_address VARCHAR(255),      -- Tenant's permanent address
     emergency_contact_name VARCHAR(100),
     emergency_contact_phone VARCHAR(20),
@@ -134,7 +132,7 @@ CREATE TABLE units (
     unit_number VARCHAR(50) NOT NULL,
     unit_type_id INT NOT NULL,               -- [MODIFIED] FK to unit_types
     monthly_rent DECIMAL(10,2) NOT NULL,
-    status ENUM('available','occupied','maintenance') DEFAULT 'available',
+    status ENUM('available', 'occupied', 'maintenance', 'reserved', 'inactive') DEFAULT 'available',
     is_archived BOOLEAN DEFAULT FALSE,
     archived_at DATETIME,
     image_url VARCHAR(255),                  -- [DEPRECATED] Use unit_images table instead

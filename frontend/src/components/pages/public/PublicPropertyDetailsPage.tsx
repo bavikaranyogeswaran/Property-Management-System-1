@@ -889,7 +889,7 @@ export function PublicPropertyDetailsPage() {
                 value={interestFormData.leaseTermId}
                 onChange={(e) => {
                   const val = e.target.value;
-                  const term = leaseTerms.find(t => String(t.leaseTermId) === val);
+                  const term = leaseTerms.find(t => String(t.id) === val || String(t.leaseTermId) === val);
                   setInterestFormData({
                     ...interestFormData,
                     leaseTermId: val,
@@ -899,7 +899,7 @@ export function PublicPropertyDetailsPage() {
               >
                 <option value="" disabled>Select a Lease Term</option>
                 {leaseTerms.map(t => (
-                  <option key={t.leaseTermId} value={t.leaseTermId.toString()}>
+                  <option key={t.id} value={t.id.toString()}>
                     {t.name} ({t.durationMonths} months)
                   </option>
                 ))}

@@ -48,6 +48,7 @@ export interface RenewalRequest {
 
 export interface LeaseTerm {
   id: number;
+  leaseTermId: number; // For compatibility
   ownerId: number;
   name: string;
   type: 'fixed' | 'periodic';

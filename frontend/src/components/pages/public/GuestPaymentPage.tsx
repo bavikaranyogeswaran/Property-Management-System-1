@@ -55,7 +55,10 @@ export function GuestPaymentPage() {
       try {
         setLoading(true);
         const response = await apiClient.get(`/public/invoice/${token}`);
-        setInvoice(response.data);
+        setInvoice({
+          ...response.data,
+          amount: response.data.amount / 100
+        });
       } catch (err: any) {
         setError(err.response?.data?.error || 'Invalid or expired payment link.');
       } finally {

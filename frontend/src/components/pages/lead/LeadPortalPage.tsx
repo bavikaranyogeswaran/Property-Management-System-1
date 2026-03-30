@@ -159,7 +159,24 @@ export function LeadPortalPage() {
           api.getPortalData(),
           api.getMessages(),
         ]);
-        setPortalData(portalRes.data);
+        setPortalData({
+          ...portalRes.data,
+          unit: portalRes.data.unit ? {
+            ...portalRes.data.unit,
+            monthlyRent: portalRes.data.unit.monthlyRent / 100
+          } : null,
+          activeLease: portalRes.data.activeLease ? {
+            ...portalRes.data.activeLease,
+            monthlyRent: portalRes.data.activeLease.monthlyRent / 100,
+            securityDeposit: (portalRes.data.activeLease.securityDeposit || 0) / 100,
+            targetDeposit: (portalRes.data.activeLease.targetDeposit || 0) / 100,
+            depositStatus: portalRes.data.activeLease.depositStatus ? {
+              ...portalRes.data.activeLease.depositStatus,
+              paidAmount: portalRes.data.activeLease.depositStatus.paidAmount / 100,
+              targetAmount: portalRes.data.activeLease.depositStatus.targetAmount / 100
+            } : null
+          } : null
+        });
         setMessages(messagesRes.data);
         // Init edit data
         if (portalRes.data.lead) {

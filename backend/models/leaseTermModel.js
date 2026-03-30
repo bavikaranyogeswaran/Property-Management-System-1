@@ -4,6 +4,7 @@ class LeaseTermModel {
   async findAllByOwner(ownerId) {
     const [rows] = await db.query(`
             SELECT 
+                lease_term_id as id,
                 lease_term_id as leaseTermId,
                 owner_id as ownerId,
                 name,
@@ -23,6 +24,7 @@ class LeaseTermModel {
     const dbConn = connection || db;
     const [rows] = await dbConn.query(`
             SELECT 
+                lease_term_id as id,
                 lease_term_id as leaseTermId,
                 owner_id as ownerId,
                 name,

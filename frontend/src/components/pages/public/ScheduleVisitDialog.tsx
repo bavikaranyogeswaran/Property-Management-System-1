@@ -26,6 +26,7 @@ interface Unit {
 }
 
 interface LeaseTerm {
+  id: number;
   leaseTermId: number;
   name: string;
   type: 'fixed' | 'periodic';

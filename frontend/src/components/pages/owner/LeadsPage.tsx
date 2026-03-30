@@ -162,7 +162,10 @@ export function LeadsPage() {
 
   useEffect(() => {
     if (conversionData.leaseTermId) {
-        const term = leaseTerms.find(t => String(t.id) === String(conversionData.leaseTermId));
+        const term = leaseTerms.find(t => 
+            String(t.id) === String(conversionData.leaseTermId) || 
+            String(t.leaseTermId) === String(conversionData.leaseTermId)
+        );
         if (term) {
             if (term.type === 'periodic') {
                 setConversionData(prev => ({ ...prev, endDate: '' }));
@@ -483,9 +486,13 @@ export function LeadsPage() {
                     </div>
                     <div>
                       <span className="font-medium">Term:</span>{' '}
-                      {lead.leaseTermId 
-                        ? leaseTerms.find(t => String(t.id) === String(lead.leaseTermId))?.name 
-                        : (lead.preferredTermMonths ? `${lead.preferredTermMonths} months` : '-')}
+                      {(() => {
+                        if (lead.leaseTermId) {
+                          const term = leaseTerms.find(t => String(t.id) === String(lead.leaseTermId) || String(t.leaseTermId) === String(lead.leaseTermId));
+                          if (term) return term.name;
+                        }
+                        return lead.preferredTermMonths ? `${lead.preferredTermMonths} months` : '-';
+                      })()}
                     </div>
                     <div>
                       <span className="font-medium">Occupants:</span>{' '}
