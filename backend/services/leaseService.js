@@ -135,8 +135,9 @@ class LeaseService {
 
       // 4. Generate Security Deposit Invoice immediately for the Draft Lease
       // This allows the tenant to pay their "Holding Deposit" before the official signing.
+      let rawToken = null;
       if (securityDeposit > 0) {
-        const rawToken = randomUUID();
+        rawToken = randomUUID();
         const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
         const expiresAt = formatToLocalDate(addDays(today(), 2)); // 48 hours to pay holding deposit
 
@@ -172,7 +173,7 @@ class LeaseService {
         await conn.commit();
       }
 
-      return leaseId;
+      return { leaseId, magicToken: rawToken };
     } catch (error) {
       if (isOwnTransaction) {
         await conn.rollback();

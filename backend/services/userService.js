@@ -312,7 +312,7 @@ class UserService {
           }
 
           // Use LeaseService with the existing transaction connection
-          const leaseId = await leaseService.createLease(
+          const { leaseId, magicToken: internalMagicToken } = await leaseService.createLease(
             {
               tenantId: userId,
               unitId: targetUnitId,
@@ -329,8 +329,10 @@ class UserService {
 
           // [NEW] Capture context for Magic Link email
           mailData.leaseId = leaseId;
+          mailData.magicToken = internalMagicToken; // [NEW] Capture raw token from Service
           mailData.propertyName = unit.propertyName;
           mailData.unitNumber = unit.unitNumber;
+          mailData.depositAmount = unit.monthlyRent; // [NEW] Capture amount
         }
       }
 
@@ -342,14 +344,8 @@ class UserService {
       }
 
       // [CRITICAL FIX] Send email ONLY after successful transaction commit
-      // [NEW] Check if a deposit magic link was generated for this lease
-      if (mailData.leaseId) {
-          const [depositInvoices] = await connection.query(
-              "SELECT magic_token, amount FROM rent_invoices WHERE lease_id = ? AND invoice_type = 'deposit' AND status = 'pending' LIMIT 1",
-              [mailData.leaseId]
-          );
-
-          if (depositInvoices.length > 0 && depositInvoices[0].magic_token) {
+      // [NEW] Use the magicToken returned by LeaseService
+      if (mailData.leaseId && mailData.magicToken) {
               // Send Deposit Magic Link instead of Account Invitation
               // (Account Invitation will be sent automatically AFTER deposit is verified)
               await emailService.sendDepositMagicLink(
@@ -357,11 +353,10 @@ class UserService {
                   mailData.name,
                   mailData.propertyName || 'Property',
                   mailData.unitNumber || 'N/A',
-                  depositInvoices[0].amount,
-                  depositInvoices[0].magic_token
+                  mailData.depositAmount,
+                  mailData.magicToken
               );
               return { message: 'Lead converted successfully. Deposit payment link sent.', tenantId: userId, magicLinkSent: true };
-          }
       }
 
       // Fallback: If no deposit magic link, and it's a new user, send account setup invitation

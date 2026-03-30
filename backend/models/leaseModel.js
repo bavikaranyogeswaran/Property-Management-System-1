@@ -92,8 +92,8 @@ class LeaseModel {
                    u.unit_number,
                    u.property_id,
                    p.name as property_name,
-                   t_usr.name as tenant_name,
-                   ri.magic_token
+                   p.name as property_name,
+                   t_usr.name as tenant_name
             FROM leases l
             JOIN units u ON l.unit_id = u.unit_id
             JOIN properties p ON u.property_id = p.property_id
@@ -128,8 +128,8 @@ class LeaseModel {
                    u.unit_number,
                    u.property_id,
                    p.name as property_name,
-                   t_usr.name as tenant_name,
-                   ri.magic_token
+                   p.name as property_name,
+                   t_usr.name as tenant_name
             FROM leases l
             JOIN units u ON l.unit_id = u.unit_id
             JOIN properties p ON u.property_id = p.property_id
@@ -150,8 +150,8 @@ class LeaseModel {
                    u.unit_number,
                    u.property_id,
                    p.name as property_name,
-                   t_usr.name as tenant_name,
-                   ri.magic_token
+                   p.name as property_name,
+                   t_usr.name as tenant_name
             FROM leases l
             JOIN units u ON l.unit_id = u.unit_id
             JOIN properties p ON u.property_id = p.property_id
@@ -170,8 +170,8 @@ class LeaseModel {
                    u.unit_number,
                    u.property_id,
                    p.name as property_name,
-                   t_usr.name as tenant_name,
-                   ri.magic_token
+                   p.name as property_name,
+                   t_usr.name as tenant_name
             FROM leases l
             JOIN units u ON l.unit_id = u.unit_id
             JOIN properties p ON u.property_id = p.property_id
@@ -290,7 +290,6 @@ class LeaseModel {
       propertyId: row.property_id.toString(),
       propertyName: row.property_name,
       tenantName: row.tenant_name,
-      magicToken: row.magic_token,
     }));
   }
 

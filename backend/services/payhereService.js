@@ -7,10 +7,10 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const MERCHANT_ID = process.env.PAYHERE_MERCHANT_ID;
+const MERCHANT_ID = (process.env.PAYHERE_MERCHANT_ID || '').trim();
 const NOTIFY_URL = process.env.PAYHERE_NOTIFY_URL || 'http://localhost:5000/api/payhere/notify';
-const RETURN_URL = process.env.PAYHERE_RETURN_URL || 'http://localhost:3000/payment/success';
-const CANCEL_URL = process.env.PAYHERE_CANCEL_URL || 'http://localhost:3000/payment/cancel';
+const RETURN_URL = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/payment-success`;
+const CANCEL_URL = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/payment-cancel`;
 
 class PayHereService {
     /**
@@ -32,8 +32,8 @@ class PayHereService {
         const tenant = await userModel.findById(invoice.tenantId || invoice.tenant_id);
         if (!tenant) throw new Error('Tenant record not found');
 
-        const orderId = `INV-${invoiceId}-${Date.now()}`;
-        const amount = invoice.amount;
+        const orderId = `INV-${invoice.id || invoice.invoice_id}-${Date.now()}`;
+        const amount = invoice.amount / 100;
         const currency = 'LKR';
 
         const hash = generateCheckoutHash(orderId, amount, currency);
@@ -46,7 +46,7 @@ class PayHereService {
             notify_url: NOTIFY_URL,
             order_id: orderId,
             items: invoice.description || `Payment for Invoice #${invoiceId}`,
-            amount: amount,
+            amount: amount.toFixed(2),
             currency: currency,
             hash: hash,
             first_name: tenant.firstName || tenant.first_name || 'Tenant',

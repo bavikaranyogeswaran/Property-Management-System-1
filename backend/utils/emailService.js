@@ -212,11 +212,11 @@ class EmailService {
   }
 
   async sendDepositMagicLink(email, name, propertyName, unitNumber, amount, magicToken) {
-    const link = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/guest-payment?token=${magicToken}`;
+    const link = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/pay/${magicToken}`;
     const formattedAmount = new Intl.NumberFormat('en-LK', {
       style: 'currency',
       currency: 'LKR',
-    }).format(amount);
+    }).format(amount / 100);
 
     if (!this.transporter) {
       console.log('==================================================');
@@ -324,7 +324,7 @@ class EmailService {
     const formattedAmount = new Intl.NumberFormat('en-LK', {
       style: 'currency',
       currency: 'LKR',
-    }).format(amount);
+    }).format(amount / 100);
     const isLateFee =
       invoiceId === 'LATE-FEE' ||
       (invoiceDetails.description &&
