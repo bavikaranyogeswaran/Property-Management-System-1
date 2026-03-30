@@ -41,29 +41,31 @@ export const calculateMonthlyRent = (lease, year, month) => {
     let description = `Rent for ${year}-${month}`;
     let prorationDetails = [];
 
+    const FIXED_DAYS_IN_MONTH = 30;
+
     // Case 2: Proration for Start Month
     if (leaseStart.getFullYear() === year && (leaseStart.getMonth() + 1) === month) {
         if (leaseStart.getDate() > 1) {
-            const billableDays = daysInMonth - leaseStart.getDate() + 1;
-            effectiveAmount = moneyMath(monthlyRent).div(daysInMonth).mul(billableDays).toDecimal();
-            prorationDetails.push(`${billableDays}/${daysInMonth} days (Starts ${formatToLocalDate(leaseStart)})`);
+            // [LOGIC FIX] Fixed 30-Day billing: treat 31st as 30th to get 1 day of rent.
+            const billableDays = FIXED_DAYS_IN_MONTH - Math.min(leaseStart.getDate(), 30) + 1;
+            effectiveAmount = moneyMath(monthlyRent).div(FIXED_DAYS_IN_MONTH).mul(billableDays).toDecimal();
+            prorationDetails.push(`${billableDays}/30 days (Starts ${formatToLocalDate(leaseStart)})`);
         }
     }
 
     // Case 3: Proration for End Month
     if (leaseEnd && leaseEnd.getFullYear() === year && (leaseEnd.getMonth() + 1) === month) {
-        if (leaseEnd.getDate() < daysInMonth) {
-            const billableDays = leaseEnd.getDate();
-            // If already prorated for start (same month start/end), we adjust the base
-            const startDay = (leaseStart > billingMonthStart) ? leaseStart.getDate() : 1;
-            const actualBillable = leaseEnd.getDate() - startDay + 1;
+        if (leaseEnd.getDate() < getDaysInMonth(billingMonthStart)) {
+            // [LOGIC FIX] Fixed 30-Day billing: treat 31st as 30th (full month equivalent to 30 days).
+            const startDay = (leaseStart > billingMonthStart) ? Math.min(leaseStart.getDate(), 30) : 1;
+            const actualBillable = Math.min(leaseEnd.getDate(), 30) - startDay + 1;
             
-            effectiveAmount = moneyMath(monthlyRent).div(daysInMonth).mul(actualBillable).toDecimal();
-            prorationDetails.push(`${actualBillable}/${daysInMonth} days (Ends ${formatToLocalDate(leaseEnd)})`);
+            effectiveAmount = moneyMath(monthlyRent).div(FIXED_DAYS_IN_MONTH).mul(actualBillable).toDecimal();
+            prorationDetails.push(`${actualBillable}/30 days (Ends ${formatToLocalDate(leaseEnd)})`);
         }
     }
 
-    // effectiveAmount is now a decimal (e.g. 100.50). No more 100x multiplier bug.
+    // effectiveAmount is now a decimal (e.g. 100.50). Fixed 30-day proration applied.
 
     if (prorationDetails.length > 0) {
         description += ` (Prorated: ${prorationDetails.join(', ')})`;
