@@ -29,6 +29,17 @@ class InvoiceService {
         if (user.role !== 'treasurer') {
             throw new Error('Denied. Only Treasurers can create invoices.');
         }
+
+        // RBAC Check: Ensure treasurer is assigned to this property
+        const lease = await leaseModel.findById(data.leaseId);
+        if (!lease) throw new Error('Lease not found');
+        
+        const assigned = await staffModel.getAssignedProperties(user.id);
+        const assignedPropertyIds = assigned.map((p) => p.id.toString());
+        if (!assignedPropertyIds.includes(lease.propertyId.toString())) {
+            throw new Error('Access denied. You are not assigned to this property.');
+        }
+
         const invoiceId = await invoiceModel.create(data);
         
         // Auto-apply credit if exists
@@ -150,6 +161,17 @@ class InvoiceService {
 
         const invoice = await invoiceModel.findById(id);
         if (!invoice) throw new Error('Invoice not found');
+        
+        // RBAC Check: Ensure treasurer is assigned to this property
+        const lease = await leaseModel.findById(invoice.leaseId);
+        if (!lease) throw new Error('Lease not found');
+
+        const assigned = await staffModel.getAssignedProperties(user.id);
+        const assignedPropertyIds = assigned.map((p) => p.id.toString());
+        if (!assignedPropertyIds.includes(lease.propertyId.toString())) {
+            throw new Error('Access denied. You are not assigned to this property.');
+        }
+
         const oldStatus = invoice.status;
 
         if (status === 'overdue') {

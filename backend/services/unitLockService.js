@@ -18,8 +18,10 @@ class UnitLockService {
       await connection.beginTransaction();
 
       // 1. Clean up expired locks for THIS unit first or check existing
+      // Using FOR UPDATE ensures that if another process is also trying to lock this unit,
+      // it will wait until our transaction finishes (atomicity).
       const [existing] = await connection.query(
-        "SELECT * FROM unit_locks WHERE unit_id = ?",
+        "SELECT * FROM unit_locks WHERE unit_id = ? FOR UPDATE",
         [id]
       );
 

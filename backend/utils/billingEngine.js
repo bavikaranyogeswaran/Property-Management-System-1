@@ -45,7 +45,7 @@ export const calculateMonthlyRent = (lease, year, month) => {
     if (leaseStart.getFullYear() === year && (leaseStart.getMonth() + 1) === month) {
         if (leaseStart.getDate() > 1) {
             const billableDays = daysInMonth - leaseStart.getDate() + 1;
-            effectiveAmount = moneyMath(monthlyRent).div(daysInMonth).mul(billableDays).toCents();
+            effectiveAmount = moneyMath(monthlyRent).div(daysInMonth).mul(billableDays).toDecimal();
             prorationDetails.push(`${billableDays}/${daysInMonth} days (Starts ${formatToLocalDate(leaseStart)})`);
         }
     }
@@ -58,12 +58,12 @@ export const calculateMonthlyRent = (lease, year, month) => {
             const startDay = (leaseStart > billingMonthStart) ? leaseStart.getDate() : 1;
             const actualBillable = leaseEnd.getDate() - startDay + 1;
             
-            effectiveAmount = moneyMath(monthlyRent).div(daysInMonth).mul(actualBillable).toCents();
+            effectiveAmount = moneyMath(monthlyRent).div(daysInMonth).mul(actualBillable).toDecimal();
             prorationDetails.push(`${actualBillable}/${daysInMonth} days (Ends ${formatToLocalDate(leaseEnd)})`);
         }
     }
 
-    // effectiveAmount is now an integer (cents). No more rounding hack needed.
+    // effectiveAmount is now a decimal (e.g. 100.50). No more 100x multiplier bug.
 
     if (prorationDetails.length > 0) {
         description += ` (Prorated: ${prorationDetails.join(', ')})`;
