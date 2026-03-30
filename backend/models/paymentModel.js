@@ -28,7 +28,7 @@ class PaymentModel {
           paymentMethod,
           referenceNumber,
           evidenceUrl,
-          'pending',
+          data.status || 'pending',
         ]
       );
       return result.insertId;

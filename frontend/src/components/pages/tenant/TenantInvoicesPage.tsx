@@ -31,6 +31,7 @@ import { Badge } from '@/components/ui/badge';
 import { FileText, CreditCard, AlertCircle, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import { ReceiptViewer } from '@/components/common/ReceiptViewer';
+import apiClient from '@/services/api';
 
 export function TenantInvoicesPage() {
   const { user } = useAuth();
@@ -62,6 +63,9 @@ export function TenantInvoicesPage() {
     referenceNumber: '',
     paymentDate: new Date().toISOString().split('T')[0],
   });
+  
+  const [preparingPayHere, setPreparingPayHere] = useState(false);
+  const [payHereData, setPayHereData] = useState<any>(null);
 
   // In a real app, filter by actual tenant ID
   const tenantInvoices = invoices;
@@ -180,6 +184,30 @@ export function TenantInvoicesPage() {
       });
       setSelectedFile(null);
       setIsPaymentDialogOpen(true);
+    }
+  };
+
+  const handlePayOnline = async () => {
+    if (!selectedInvoice) return;
+    
+    try {
+      setPreparingPayHere(true);
+      const response = await apiClient.post('/payhere/checkout', { invoiceId: selectedInvoice });
+      const checkoutData = response.data.data;
+      
+      setPayHereData(checkoutData);
+      
+      // Auto-submit PayHere form after a short delay
+      setTimeout(() => {
+        const form = document.getElementById('payhere-checkout-tenant-form') as HTMLFormElement;
+        if (form) form.submit();
+      }, 100);
+
+    } catch (err: any) {
+      toast.error('Failed to initialize online payment. Please use bank transfer or try again.');
+      console.error('PayHere Tenant Init Error:', err);
+    } finally {
+      setPreparingPayHere(false);
     }
   };
 
@@ -477,39 +505,53 @@ export function TenantInvoicesPage() {
                   <SelectItem value="Check">Check</SelectItem>
                   <SelectItem value="Cash">Cash</SelectItem>
                   <SelectItem value="Mobile Payment">Mobile Payment</SelectItem>
+                  <SelectItem value="Online Payment">Online Payment (PayHere)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="referenceNumber">Reference Number</Label>
-              <Input
-                id="referenceNumber"
-                placeholder="e.g., Transaction ID or Check number"
-                value={paymentData.referenceNumber}
-                onChange={(e) =>
-                  setPaymentData({
-                    ...paymentData,
-                    referenceNumber: e.target.value,
-                  })
-                }
-                required
-              />
-            </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="proof">Payment Proof (Required)</Label>
-              <Input
-                id="proof"
-                type="file"
-                accept="image/*,.pdf"
-                onChange={handleFileChange}
-                className="cursor-pointer"
-                required
-              />
-              <p className="text-xs text-gray-500">
-                Upload a screenshot or photo of your payment receipt
-              </p>
-            </div>
+            {paymentData.paymentMethod === 'Online Payment' ? (
+               <div className="p-6 bg-blue-50 rounded-xl border border-blue-100 flex flex-col items-center text-center space-y-4 animate-in zoom-in duration-300">
+                  <img src="https://www.payhere.lk/downloads/images/payhere_short_banner.png" alt="PayHere" className="h-8" />
+                  <div>
+                    <h4 className="font-bold text-blue-900">Secure Instant Payment</h4>
+                    <p className="text-xs text-blue-700">Pay using Visa, Mastercard, or Mobile Wallets. Your invoice will be marked as paid <strong>immediately</strong>.</p>
+                  </div>
+               </div>
+            ) : (
+              <div className="space-y-4 animate-in slide-in-from-top-2 duration-300">
+                <div className="space-y-2">
+                  <Label htmlFor="referenceNumber">Reference Number</Label>
+                  <Input
+                    id="referenceNumber"
+                    placeholder="e.g., Transaction ID or Check number"
+                    value={paymentData.referenceNumber}
+                    onChange={(e) =>
+                      setPaymentData({
+                        ...paymentData,
+                        referenceNumber: e.target.value,
+                      })
+                    }
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="proof">Payment Proof (Required)</Label>
+                  <Input
+                    id="proof"
+                    type="file"
+                    accept="image/*,.pdf"
+                    onChange={handleFileChange}
+                    className="cursor-pointer"
+                    required
+                  />
+                  <p className="text-xs text-gray-500">
+                    Upload a screenshot or photo of your payment receipt
+                  </p>
+                </div>
+              </div>
+            )}
 
             <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
               <p className="text-sm text-blue-900">
@@ -536,9 +578,47 @@ export function TenantInvoicesPage() {
               >
                 Cancel
               </Button>
-              <Button type="submit">Submit Payment</Button>
+              {paymentData.paymentMethod === 'Online Payment' ? (
+                <Button 
+                  type="button" 
+                  onClick={handlePayOnline}
+                  disabled={preparingPayHere}
+                  className="bg-blue-600 hover:bg-blue-700 font-bold"
+                >
+                  {preparingPayHere ? 'Redirecting...' : 'Pay Online Now'}
+                </Button>
+              ) : (
+                <Button type="submit">Submit Payment</Button>
+              )}
             </div>
           </form>
+
+          {/* PayHere Hidden Form for Tenant Portal */}
+          {payHereData && (
+            <form 
+              id="payhere-checkout-tenant-form" 
+              method="post" 
+              action="https://sandbox.payhere.lk/pay/checkout"
+              className="hidden"
+            >
+              <input type="hidden" name="merchant_id" value={payHereData.merchant_id} />
+              <input type="hidden" name="return_url" value={payHereData.return_url} />
+              <input type="hidden" name="cancel_url" value={payHereData.cancel_url} />
+              <input type="hidden" name="notify_url" value={payHereData.notify_url} />
+              <input type="hidden" name="order_id" value={payHereData.order_id} />
+              <input type="hidden" name="items" value={payHereData.items} />
+              <input type="hidden" name="currency" value={payHereData.currency} />
+              <input type="hidden" name="amount" value={payHereData.amount} />
+              <input type="hidden" name="first_name" value={payHereData.first_name} />
+              <input type="hidden" name="last_name" value={payHereData.last_name} />
+              <input type="hidden" name="email" value={payHereData.email} />
+              <input type="hidden" name="phone" value={payHereData.phone || ''} />
+              <input type="hidden" name="address" value={payHereData.address} />
+              <input type="hidden" name="city" value={payHereData.city} />
+              <input type="hidden" name="country" value={payHereData.country} />
+              <input type="hidden" name="hash" value={payHereData.hash} />
+            </form>
+          )}
         </DialogContent>
       </Dialog>
 

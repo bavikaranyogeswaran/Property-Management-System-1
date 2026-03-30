@@ -334,6 +334,69 @@ class PaymentService {
         }
     }
 
+
+    /**
+     * Records a payment that has already been verified by an automated gateway (e.g. PayHere).
+     * Skips manual treasurer verification and triggers all post-payment workflows.
+     */
+    async recordAutomatedPayment(data, connection = null) {
+        const { invoiceId, amount, paymentMethod, referenceNumber } = data;
+        
+        const conn = connection || await pool.getConnection();
+        const isExternalConn = !!connection;
+
+        try {
+            if (!isExternalConn) await conn.beginTransaction();
+
+            const invoice = await invoiceModel.findById(invoiceId, conn);
+            if (!invoice) throw new Error(`Invoice #${invoiceId} not found`);
+
+            // 1. Create Verified Payment
+            const paymentId = await paymentModel.create({
+                invoiceId,
+                amount,
+                paymentDate: today(),
+                paymentMethod: paymentMethod || 'online',
+                referenceNumber,
+                evidenceUrl: null,
+                status: 'verified' // Support for verified status was added to model
+            }, conn);
+
+            const payment = await paymentModel.findById(paymentId, conn);
+
+            // 2. Finalize actions (ledger, receipt, activation, notifications)
+            // Use a dummy system user for automated actions
+            const systemUser = { id: null, role: 'system' };
+            await this._finalizeVerifiedPayment(paymentId, invoice, payment, systemUser, conn);
+
+            if (!isExternalConn) await conn.commit();
+
+            // 3. Fire-and-forget emails
+            try {
+                const tenant = await userModel.findById(invoice.tenantId || invoice.tenant_id, conn);
+                if (tenant && tenant.email) {
+                    await emailService.sendPaymentConfirmation(tenant.email, {
+                        amount: amount,
+                        paymentMethod: paymentMethod || 'online',
+                        referenceNumber,
+                        invoiceId: invoiceId
+                    });
+                }
+            } catch (emailErr) {
+                console.error('Failed to send automated payment confirmation email:', emailErr);
+            }
+
+            return paymentId;
+
+        } catch (error) {
+            if (!isExternalConn) await conn.rollback();
+            console.error('[PaymentService] Automated Payment Failed:', error);
+            throw error;
+        } finally {
+            if (!isExternalConn) conn.release();
+        }
+    }
+
     async verifyPayment(paymentId, status, user, reason = null) {
         if (user.role !== 'treasurer') {
             throw new Error('Access denied. Only Treasurers can verify payments.');
@@ -355,149 +418,10 @@ class PaymentService {
             if (status === 'verified') {
                 const payment = updatedPayment;
                 if (payment) {
-                    // Logic Check: Partial Payments
-                    const allPayments = await paymentModel.findByInvoiceId(payment.invoiceId, connection);
-                    const totalVerified = allPayments
-                        .filter((p) => p.status === 'verified')
-                        .reduce((sum, p) => sum + Number(p.amount), 0);
-
                     const invoice = await invoiceModel.findById(payment.invoiceId, connection);
-
-                    if (!invoice) {
-                        throw new Error('Invoice not found for verification');
-                    }
-
-                    // Lease Status Warning
-                    const lease = await leaseModel.findById(invoice.leaseId, connection);
-                    if (lease && lease.status === 'ended') {
-                        console.warn(`Verified payment ${paymentId} for invoice linked to ENDED lease ${lease.id}`);
-                    }
-
-                    const previousVerified = totalVerified - Number(payment.amount);
-                    const amountAppliedToInvoice = Math.min(Number(payment.amount), Math.max(0, invoice.amount - previousVerified));
-                    const incrementalOverpayment = Number(payment.amount) - amountAppliedToInvoice;
-
-                    if (totalVerified >= invoice.amount) {
-                        await invoiceModel.updateStatus(payment.invoiceId, 'paid', connection);
-                        
-                        // Overpayment Logic (Bug B5 Fix)
-                        if (incrementalOverpayment > 0) {
-                            await tenantModel.addCredit(invoice.tenantId, incrementalOverpayment, connection);
-                            await notificationModel.create({
-                                userId: invoice.tenantId,
-                                message: `Overpayment of ${fromCents(incrementalOverpayment).toFixed(2)} has been credited to your account balance.`,
-                                type: 'payment',
-                            }, connection);
-                        }
-
-                    } else if (totalVerified > 0) {
-                         await invoiceModel.updateStatus(payment.invoiceId, 'partially_paid', connection);
-                    }
-
-                    // Generate Receipt
-                     const existingReceipt = await receiptModel.findByPaymentId(paymentId, connection);
-                     if (!existingReceipt) {
-                        await receiptModel.create({
-                            paymentId: paymentId,
-                            invoiceId: payment.invoiceId,
-                            tenantId: invoice.tenantId,
-                            amount: payment.amount,
-                            generatedDate: today(),
-                            receiptNumber: `REC-${randomUUID()}`,
-                        }, connection);
-
-                        // [CRITICAL FIX] Post Ledger Entry BEFORE activation
-                        // This ensures that lease status checks (deposit balance) can see the verified funds.
-                        await this._postToLedger(
-                            paymentId,
-                            invoice,
-                            payment.amount,
-                            `Payment verified for ${invoice.description || invoice.invoiceType}`,
-                            connection
-                        );
-
-                        // Deposit Status Logic
-                        if (invoice.invoiceType === 'deposit') {
-                             const newHeld = Number(lease.securityDeposit || 0) + amountAppliedToInvoice;
-                             
-                             const finalInvoice = await invoiceModel.findById(payment.invoiceId, connection);
-                             const finalStatus = finalInvoice.status === 'paid' ? 'paid' : 'pending';
-                             
-                             await leaseModel.update(invoice.leaseId, {
-                                 depositStatus: finalStatus,
-                                 securityDeposit: newHeld,
-                             }, connection);
-                        }
-
-                        // Notify Tenant
-                        await notificationModel.create({
-                            userId: invoice.tenantId,
-                            message: `Payment of ${fromCents(payment.amount).toFixed(2)} for Invoice #${payment.invoiceId} has been verified.`,
-                            type: 'payment',
-                        }, connection);
-
-                        // [AUTO-ACTIVATION] If full deposit is paid on a draft lease, activate it immediately.
-                        const finalInvoice = await invoiceModel.findById(payment.invoiceId, connection);
-                        if (finalInvoice.status === 'paid' && invoice.invoiceType === 'deposit') {
-                            const lease = await leaseModel.findById(invoice.leaseId, connection);
-                            if (lease && lease.status === 'draft') {
-                                if (lease.isDocumentsVerified) {
-                                    const leaseService = (await import('./leaseService.js')).default;
-                                    await leaseService.signLease(lease.id, user, connection);
-                                    
-                                    // Trigger Onboarding (Set Password email)
-                                    const userService = (await import('./userService.js')).default;
-                                    await userService.triggerOnboarding(lease.tenantId, connection);
-                                } else {
-                                    // Notify Treasurers and Owners that payment is done but documents need review
-                                    const [propertyInfo] = await connection.query("SELECT owner_id FROM properties WHERE property_id = ?", [lease.propertyId]);
-                                    const ownerId = propertyInfo[0]?.owner_id;
-                                    
-                                    const [assignedStaff] = await connection.query(
-                                        "SELECT user_id FROM staff_property_assignments WHERE property_id = ?",
-                                        [lease.propertyId]
-                                    );
-
-                                    const userIdsToNotify = new Set();
-                                    if (ownerId) userIdsToNotify.add(ownerId);
-                                    assignedStaff.forEach(s => userIdsToNotify.add(s.user_id));
-
-                                    for (const userId of userIdsToNotify) {
-                                        await notificationModel.create({
-                                            userId: userId,
-                                            message: `URGENT: Deposit Paid for Lease #${lease.id} (Unit ${lease.unitNumber}). Documents are PENDING verification. Please review and activate.`,
-                                            type: 'lease',
-                                            severity: 'urgent'
-                                        }, connection);
-                                    }
-                                    
-                                    console.log(`[PaymentService] Deposit paid for Lease ${lease.id}, notified ${userIdsToNotify.size} staff members. Auto-activation pending document verification.`);
-                                }
-                            }
-                        }
-
-                        await auditLogger.log({
-                            userId: user.id,
-                            actionType: 'PAYMENT_VERIFIED',
-                            entityId: paymentId,
-                            details: { invoiceId: payment.invoiceId, amount: payment.amount },
-                        }, null, connection);
-
-                        // Behavior Score
-                        try {
-                            const paymentDate = parseLocalDate(payment.paymentDate);
-                            const dueDate = parseLocalDate(invoice.dueDate);
-                            const payStr = formatToLocalDate(paymentDate);
-                            const dueStr = formatToLocalDate(dueDate);
-
-                            if (payStr <= dueStr) {
-                                 await behaviorLogModel.logPositivePayment(invoice.tenantId, 5, connection);
-                                 await tenantModel.incrementBehaviorScore(invoice.tenantId, 5, connection);
-                            }
-                        } catch (scoreErr) {
-                             console.error('Failed to update positive score:', scoreErr);
-                        }
-                     }
+                    if (!invoice) throw new Error('Invoice not found for verification');
+                    
+                    await this._finalizeVerifiedPayment(paymentId, invoice, payment, user, connection);
                 }
             } else if (status === 'rejected') {
                  const payment = updatedPayment;
@@ -591,7 +515,150 @@ class PaymentService {
             connection.release();
         }
     }
-    
+
+    /**
+     * Shared logic for finalizing a verified payment.
+     * Handles invoice status updates, ledger entries, receipts, notifications, 
+     * and auto-lease activation.
+     */
+    async _finalizeVerifiedPayment(paymentId, invoice, payment, user, connection) {
+        // Logic Check: Partial Payments
+        const allPayments = await paymentModel.findByInvoiceId(payment.invoiceId, connection);
+        const totalVerified = allPayments
+            .filter((p) => p.status === 'verified')
+            .reduce((sum, p) => sum + Number(p.amount), 0);
+
+        // Lease Status Warning
+        const lease = await leaseModel.findById(invoice.leaseId, connection);
+        if (lease && lease.status === 'ended') {
+            console.warn(`Verified payment ${paymentId} for invoice linked to ENDED lease ${lease.id}`);
+        }
+
+        const previousVerified = totalVerified - Number(payment.amount);
+        const amountAppliedToInvoice = Math.min(Number(payment.amount), Math.max(0, invoice.amount - previousVerified));
+        const incrementalOverpayment = Number(payment.amount) - amountAppliedToInvoice;
+
+        if (totalVerified >= invoice.amount) {
+            await invoiceModel.updateStatus(payment.invoiceId, 'paid', connection);
+            
+            // Overpayment Logic (Bug B5 Fix)
+            if (incrementalOverpayment > 0) {
+                await tenantModel.addCredit(invoice.tenantId, incrementalOverpayment, connection);
+                await notificationModel.create({
+                    userId: invoice.tenantId,
+                    message: `Overpayment of ${fromCents(incrementalOverpayment).toFixed(2)} has been credited to your account balance.`,
+                    type: 'payment',
+                }, connection);
+            }
+
+        } else if (totalVerified > 0) {
+             await invoiceModel.updateStatus(payment.invoiceId, 'partially_paid', connection);
+        }
+
+        // Generate Receipt
+        const existingReceipt = await receiptModel.findByPaymentId(paymentId, connection);
+        if (!existingReceipt) {
+            await receiptModel.create({
+                paymentId: paymentId,
+                invoiceId: payment.invoiceId,
+                tenantId: invoice.tenantId || invoice.tenant_id,
+                amount: payment.amount,
+                generatedDate: today(),
+                receiptNumber: `REC-${randomUUID()}`,
+            }, connection);
+
+            // [CRITICAL FIX] Post Ledger Entry BEFORE activation
+            // This ensures that lease status checks (deposit balance) can see the verified funds.
+            await this._postToLedger(
+                paymentId,
+                invoice,
+                payment.amount,
+                `Payment verified for ${invoice.description || invoice.invoiceType}`,
+                connection
+            );
+
+            // Deposit Status Logic
+            if (invoice.invoiceType === 'deposit' || (invoice.invoice_type === 'deposit')) {
+                 const newHeld = Number(lease.securityDeposit || 0) + amountAppliedToInvoice;
+                 
+                 const finalInvoice = await invoiceModel.findById(payment.invoiceId, connection);
+                 const finalStatus = finalInvoice.status === 'paid' ? 'paid' : 'pending';
+                 
+                 await leaseModel.update(invoice.leaseId, {
+                     depositStatus: finalStatus,
+                     securityDeposit: newHeld,
+                 }, connection);
+            }
+
+            // Notify Tenant
+            await notificationModel.create({
+                userId: invoice.tenantId || invoice.tenant_id,
+                message: `Payment of ${fromCents(payment.amount).toFixed(2)} for Invoice #${payment.invoiceId} has been verified.`,
+                type: 'payment',
+            }, connection);
+
+            // [AUTO-ACTIVATION] If full deposit is paid on a draft lease, activate it immediately.
+            const finalInvoice = await invoiceModel.findById(payment.invoiceId, connection);
+            if (finalInvoice.status === 'paid' && (invoice.invoiceType === 'deposit' || invoice.invoice_type === 'deposit')) {
+                const lease = await leaseModel.findById(invoice.leaseId, connection);
+                if (lease && lease.status === 'draft') {
+                    if (lease.isDocumentsVerified) {
+                        const leaseService = (await import('./leaseService.js')).default;
+                        await leaseService.signLease(lease.id, user, connection);
+                        
+                        // Trigger Onboarding (Set Password email)
+                        const userService = (await import('./userService.js')).default;
+                        await userService.triggerOnboarding(lease.tenantId, connection);
+                    } else {
+                        // Notify Treasurers and Owners that payment is done but documents need review
+                        const [propertyInfo] = await connection.query("SELECT owner_id FROM properties WHERE property_id = ?", [lease.propertyId]);
+                        const ownerId = propertyInfo[0]?.owner_id;
+                        
+                        const [assignedStaff] = await connection.query(
+                            "SELECT user_id FROM staff_property_assignments WHERE property_id = ?",
+                            [lease.propertyId]
+                        );
+
+                        const userIdsToNotify = new Set();
+                        if (ownerId) userIdsToNotify.add(ownerId);
+                        assignedStaff.forEach(s => userIdsToNotify.add(s.user_id));
+
+                        for (const userId of userIdsToNotify) {
+                            await notificationModel.create({
+                                userId: userId,
+                                message: `URGENT: Deposit Paid for Lease #${lease.id} (Unit ${lease.unitNumber}). Documents are PENDING verification. Please review and activate.`,
+                                type: 'lease',
+                                severity: 'urgent'
+                            }, connection);
+                        }
+                    }
+                }
+            }
+
+            await auditLogger.log({
+                userId: user?.id || null,
+                actionType: 'PAYMENT_VERIFIED',
+                entityId: paymentId,
+                details: { invoiceId: payment.invoiceId, amount: payment.amount, automated: user.role === 'system' },
+            }, null, connection);
+
+            // Behavior Score
+            try {
+                const paymentDate = parseLocalDate(payment.paymentDate || today());
+                const dueDate = parseLocalDate(invoice.dueDate);
+                const payStr = formatToLocalDate(paymentDate);
+                const dueStr = formatToLocalDate(dueDate);
+
+                if (payStr <= dueStr) {
+                     await behaviorLogModel.logPositivePayment(invoice.tenantId || invoice.tenant_id, 5, connection);
+                     await tenantModel.incrementBehaviorScore(invoice.tenantId || invoice.tenant_id, 5, connection);
+                }
+            } catch (scoreErr) {
+                 console.error('Failed to update positive score:', scoreErr);
+            }
+        }
+    }
+
     async getPayments(user) {
          if (user.role === 'tenant') {
              return await paymentModel.findByTenantId(user.id);

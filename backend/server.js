@@ -45,6 +45,7 @@ app.use(
   })
 );
 app.use(json());
+app.use(express.urlencoded({ extended: true })); // Added for PayHere form data
 app.use(xss()); // Add XSS protection
 
 //  Rate Limiting: Prevents hackers from guessing passwords by trying too fast.
@@ -98,6 +99,7 @@ import payoutRoutes from './routes/payoutRoutes.js';
 import messageRoutes from './routes/messageRoutes.js';
 import leaseTermRoutes from './routes/leaseTermRoutes.js';
 import documentRoutes from './routes/documentRoutes.js';
+import payhereRoutes from './routes/payhereRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import renewalRoutes from './routes/renewalRoutes.js';
 import systemRoutes from './routes/systemRoutes.js';
@@ -137,6 +139,7 @@ app.use('/api/payouts', payoutRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/lease-terms', leaseTermRoutes);
 app.use('/api/documents', documentRoutes);
+app.use('/api/payhere', payhereRoutes);
 app.use('/api/renewal-requests', renewalRoutes);
 app.use('/api/system', systemRoutes);
 app.use('/api/audit-logs', auditRoutes);

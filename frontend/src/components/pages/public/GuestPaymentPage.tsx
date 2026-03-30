@@ -9,7 +9,9 @@ import {
   CheckCircle2, 
   AlertCircle,
   ArrowRight,
-  Info
+  Info,
+  CreditCard,
+  Banknote
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -40,9 +42,13 @@ export function GuestPaymentPage() {
   const [success, setSuccess] = useState(false);
 
   // Form State
-  const [paymentMethod, setPaymentMethod] = useState('Bank Transfer');
+  const [paymentMethod, setPaymentMethod] = useState('bank_transfer');
   const [referenceNumber, setReferenceNumber] = useState('');
   const [file, setFile] = useState<File | null>(null);
+  
+  // PayHere State
+  const [payHereData, setPayHereData] = useState<any>(null);
+  const [preparingPayHere, setPreparingPayHere] = useState(false);
 
   useEffect(() => {
     const fetchInvoice = async () => {
@@ -88,6 +94,28 @@ export function GuestPaymentPage() {
       toast.error(err.response?.data?.error || 'Failed to submit payment.');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handlePayOnline = async () => {
+    try {
+      setPreparingPayHere(true);
+      const response = await apiClient.get(`/payhere/checkout/public/${token}`);
+      const checkoutData = response.data.data;
+      
+      setPayHereData(checkoutData);
+      
+      // We'll use a timeout to let the form render before submitting
+      setTimeout(() => {
+        const form = document.getElementById('payhere-checkout-form') as HTMLFormElement;
+        if (form) form.submit();
+      }, 100);
+
+    } catch (err: any) {
+      toast.error('Failed to initialize online payment. Please use bank transfer or try again.');
+      console.error('PayHere Init Error:', err);
+    } finally {
+      setPreparingPayHere(false);
     }
   };
 
@@ -229,57 +257,99 @@ export function GuestPaymentPage() {
                 <CardDescription>Upload proof of your bank transfer.</CardDescription>
               </CardHeader>
               <CardContent className="p-6 space-y-6">
-                <div className="space-y-2">
-                    <Label className="text-gray-700">Payment Method</Label>
-                    <div className="grid grid-cols-1 gap-2">
-                        <div className="flex items-center gap-3 p-3 rounded-lg border-2 border-blue-100 bg-blue-50/30">
-                            <div className="w-4 h-4 rounded-full border-4 border-blue-600 bg-white"></div>
-                            <span className="font-medium text-gray-900">Bank Transfer / Depost</span>
+                <div className="space-y-4">
+                    <Label className="text-gray-700 font-semibold">Select Payment Method</Label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div 
+                          onClick={() => setPaymentMethod('online')}
+                          className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all cursor-pointer ${paymentMethod === 'online' ? 'border-blue-600 bg-blue-50 shadow-md' : 'border-gray-100 bg-white hover:border-blue-200'}`}
+                        >
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${paymentMethod === 'online' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-500'}`}>
+                                <CreditCard className="w-5 h-5" />
+                            </div>
+                            <div className="flex-1">
+                                <span className={`block font-bold text-sm ${paymentMethod === 'online' ? 'text-blue-900' : 'text-gray-900'}`}>Pay Online</span>
+                                <span className="text-[10px] text-gray-500">Instant Verification</span>
+                            </div>
+                            {paymentMethod === 'online' && <div className="w-4 h-4 rounded-full bg-blue-600 flex items-center justify-center"><CheckCircle2 className="w-3 h-3 text-white" /></div>}
+                        </div>
+
+                        <div 
+                          onClick={() => setPaymentMethod('bank_transfer')}
+                          className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all cursor-pointer ${paymentMethod === 'bank_transfer' ? 'border-orange-600 bg-orange-50 shadow-md' : 'border-gray-100 bg-white hover:border-orange-200'}`}
+                        >
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${paymentMethod === 'bank_transfer' ? 'bg-orange-600 text-white' : 'bg-gray-100 text-gray-500'}`}>
+                                <Banknote className="w-5 h-5" />
+                            </div>
+                            <div className="flex-1">
+                                <span className={`block font-bold text-sm ${paymentMethod === 'bank_transfer' ? 'text-orange-900' : 'text-gray-900'}`}>Bank Transfer</span>
+                                <span className="text-[10px] text-gray-500">2-4h Verification</span>
+                            </div>
+                            {paymentMethod === 'bank_transfer' && <div className="w-4 h-4 rounded-full bg-orange-600 flex items-center justify-center"><CheckCircle2 className="w-3 h-3 text-white" /></div>}
                         </div>
                     </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="ref" className="text-gray-700">Reference Number</Label>
-                  <Input 
-                    id="ref"
-                    placeholder="e.g. TXN12345678"
-                    value={referenceNumber}
-                    onChange={(e) => setReferenceNumber(e.target.value)}
-                    required
-                    className="h-11 focus-visible:ring-blue-500"
-                  />
-                  <p className="text-[10px] text-gray-400">Please enter the transaction ID from your bank statement.</p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-gray-700">Upload Receipt</Label>
-                  <div className={`relative border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center transition-all cursor-pointer ${file ? 'border-green-200 bg-green-50/30' : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'}`}>
-                    <input 
-                      type="file" 
-                      className="absolute inset-0 opacity-0 cursor-pointer" 
-                      onChange={(e) => setFile(e.target.files?.[0] || null)}
-                      accept="image/*"
-                    />
-                    {file ? (
-                      <>
-                        <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mb-2">
-                            <CheckCircle2 className="w-6 h-6 text-green-600" />
-                        </div>
-                        <p className="text-sm font-semibold text-green-700">{file.name}</p>
-                        <p className="text-xs text-green-600 mt-1">File selected</p>
-                      </>
-                    ) : (
-                      <>
-                        <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center mb-2 text-gray-400">
-                            <Upload className="w-6 h-6" />
-                        </div>
-                        <p className="text-sm font-semibold text-gray-700">Drop your receipt here</p>
-                        <p className="text-xs text-gray-500 mt-1">Or click to browse (Max 5MB)</p>
-                      </>
-                    )}
+                {paymentMethod === 'online' ? (
+                  <div className="p-6 bg-blue-50 rounded-2xl border border-blue-100 space-y-4 animate-in fade-in zoom-in duration-300">
+                      <div className="flex items-center gap-3">
+                          <div className="p-2 bg-white rounded-lg shadow-sm">
+                              <img src="https://www.payhere.lk/downloads/images/payhere_short_banner.png" alt="PayHere" className="h-6" />
+                          </div>
+                          <div>
+                              <p className="text-sm font-bold text-blue-900">Instant Activation</p>
+                              <p className="text-xs text-blue-700">Pay using Visa, Mastercard, or Mobile Wallets.</p>
+                          </div>
+                      </div>
+                      <Alert className="bg-white/50 border-blue-200 py-2">
+                        <Info className="h-4 w-4 text-blue-600" />
+                        <AlertDescription className="text-[11px] text-blue-800">
+                          Your unit will be reserved <strong>immediately</strong> upon successful payment.
+                        </AlertDescription>
+                      </Alert>
                   </div>
-                </div>
+                ) : (
+                  <div className="space-y-6 animate-in fade-in slide-in-from-top-2 duration-300">
+                    <div className="space-y-2">
+                      <Label htmlFor="ref" className="text-gray-700">Reference Number</Label>
+                      <Input 
+                        id="ref"
+                        placeholder="e.g. TXN12345678"
+                        value={referenceNumber}
+                        onChange={(e) => setReferenceNumber(e.target.value)}
+                        required
+                        className="h-11 focus-visible:ring-blue-500"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-gray-700">Upload Receipt</Label>
+                      <div className={`relative border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center transition-all cursor-pointer ${file ? 'border-green-200 bg-green-50/30' : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'}`}>
+                        <input 
+                          type="file" 
+                          className="absolute inset-0 opacity-0 cursor-pointer" 
+                          onChange={(e) => setFile(e.target.files?.[0] || null)}
+                          accept="image/*"
+                        />
+                        {file ? (
+                          <>
+                            <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mb-2">
+                                <CheckCircle2 className="w-6 h-6 text-green-600" />
+                            </div>
+                            <p className="text-sm font-semibold text-green-700">{file.name}</p>
+                          </>
+                        ) : (
+                          <>
+                            <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center mb-2 text-gray-400">
+                                <Upload className="w-6 h-6" />
+                            </div>
+                            <p className="text-sm font-semibold text-gray-700">Drop your receipt here</p>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </CardContent>
               <CardFooter className="bg-gray-50/50 p-6 flex flex-col gap-4 items-start border-t">
                  <div className="flex items-start gap-3">
@@ -289,26 +359,74 @@ export function GuestPaymentPage() {
                         False submissions may lead to immediate cancellation of your reservation.
                     </p>
                  </div>
-                 <Button 
-                    type="submit" 
-                    className="w-full h-12 text-lg font-bold bg-blue-600 hover:bg-blue-700 transition-all shadow-lg group"
-                    disabled={submitting}
-                 >
-                    {submitting ? (
-                        <>
-                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                            Submitting...
-                        </>
-                    ) : (
-                        <>
-                            Submit Payment Proof
-                            <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
-                        </>
-                    )}
-                 </Button>
+                 {paymentMethod === 'online' ? (
+                   <Button 
+                      type="button" 
+                      onClick={handlePayOnline}
+                      className="w-full h-12 text-lg font-bold bg-blue-600 hover:bg-blue-700 transition-all shadow-lg group"
+                      disabled={preparingPayHere}
+                   >
+                      {preparingPayHere ? (
+                          <>
+                              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                              Redirecting to Secure Gateway...
+                          </>
+                      ) : (
+                          <>
+                              Pay & Secure Now
+                              <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
+                          </>
+                      )}
+                   </Button>
+                 ) : (
+                   <Button 
+                      type="submit" 
+                      className="w-full h-12 text-lg font-bold bg-orange-600 hover:bg-orange-700 transition-all shadow-lg group"
+                      disabled={submitting}
+                   >
+                      {submitting ? (
+                          <>
+                              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                              Submitting...
+                          </>
+                      ) : (
+                          <>
+                              Submit Payment Proof
+                              <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
+                          </>
+                      )}
+                   </Button>
+                 )}
               </CardFooter>
             </Card>
           </form>
+
+          {/* PayHere Hidden Form */}
+          {payHereData && (
+            <form 
+              id="payhere-checkout-form" 
+              method="post" 
+              action="https://sandbox.payhere.lk/pay/checkout"
+              className="hidden"
+            >
+              <input type="hidden" name="merchant_id" value={payHereData.merchant_id} />
+              <input type="hidden" name="return_url" value={payHereData.return_url} />
+              <input type="hidden" name="cancel_url" value={payHereData.cancel_url} />
+              <input type="hidden" name="notify_url" value={payHereData.notify_url} />
+              <input type="hidden" name="order_id" value={payHereData.order_id} />
+              <input type="hidden" name="items" value={payHereData.items} />
+              <input type="hidden" name="currency" value={payHereData.currency} />
+              <input type="hidden" name="amount" value={payHereData.amount} />
+              <input type="hidden" name="first_name" value={payHereData.first_name} />
+              <input type="hidden" name="last_name" value={payHereData.last_name} />
+              <input type="hidden" name="email" value={payHereData.email} />
+              <input type="hidden" name="phone" value={payHereData.phone || ''} />
+              <input type="hidden" name="address" value={payHereData.address} />
+              <input type="hidden" name="city" value={payHereData.city} />
+              <input type="hidden" name="country" value={payHereData.country} />
+              <input type="hidden" name="hash" value={payHereData.hash} />
+            </form>
+          )}
         </div>
       </div>
 
