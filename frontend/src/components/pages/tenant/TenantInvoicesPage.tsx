@@ -198,11 +198,32 @@ export function TenantInvoicesPage() {
       
       setPayHereData(checkoutData);
       
+      // Simulation mode bypass (Forced in development or if flag is set)
+      const SHOULD_SIMULATE = String(import.meta.env.VITE_ENABLE_PAYMENT_SIMULATION) === 'true' || import.meta.env.DEV;
+      
+      if (SHOULD_SIMULATE) {
+        console.log('%c[PAYMENT SIMULATOR] Redirecting...', 'background: #2563eb; color: #fff; padding: 5px; border-radius: 5px; font-weight: bold;');
+        const queryParams = new URLSearchParams({
+          ...checkoutData,
+          items: checkoutData.items || `Invoice #${selectedInvoice}`
+        }).toString();
+        
+        setTimeout(() => {
+          // Close dialog then navigate
+          setIsPaymentDialogOpen(false);
+          window.location.href = `/payhere-simulation?${queryParams}`;
+        }, 500);
+        return;
+      }
+
+
+
       // Auto-submit PayHere form after a short delay
       setTimeout(() => {
         const form = document.getElementById('payhere-checkout-tenant-form') as HTMLFormElement;
         if (form) form.submit();
       }, 100);
+
 
     } catch (err: any) {
       toast.error('Failed to initialize online payment. Please use bank transfer or try again.');

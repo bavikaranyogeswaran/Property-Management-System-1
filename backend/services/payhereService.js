@@ -78,7 +78,21 @@ class PayHereService {
         }
 
         const { order_id, status_code, payhere_amount, payment_id } = payload;
-        const invoiceId = order_id.split('-')[1];
+        
+        // Extract invoice ID (Format: INV-ID-TIMESTAMP)
+        const parts = order_id.split('-');
+        let invoiceId;
+        
+        if (parts.length >= 2) {
+            invoiceId = Number(parts[1]);
+        } else {
+            invoiceId = Number(order_id);
+        }
+
+        if (isNaN(invoiceId)) {
+            console.error(`[PayHereService] Failed to extract valid Invoice ID from Order ID: ${order_id}`);
+            throw new Error(`Invalid Order ID format: ${order_id}`);
+        }
 
         // 2. Handle Status Code
         // 2 = Success, 0 = Pending, -1 = Cancelled, -2 = Failed, -3 = Chargedback
@@ -87,11 +101,12 @@ class PayHereService {
 
             // 3. Record the payment in our system
             await paymentService.recordAutomatedPayment({
-                invoiceId: Number(invoiceId),
+                invoiceId: invoiceId,
                 amount: Number(payhere_amount),
                 paymentMethod: 'payhere',
                 referenceNumber: payment_id
             });
+
 
             return { success: true, message: 'Payment recorded' };
         } else {
