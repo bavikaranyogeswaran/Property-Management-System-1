@@ -107,6 +107,7 @@ class InvoiceModel {
       // Late Fee Config (if joined)
       lateFeePercentage: row.late_fee_percentage ? parseFloat(row.late_fee_percentage) : null,
       lateFeeGracePeriod: row.late_fee_grace_period ? parseInt(row.late_fee_grace_period) : null,
+      lastOrderId: row.last_order_id,
     };
   }
 
@@ -145,13 +146,39 @@ class InvoiceModel {
      return rows.length > 0 ? this.mapRow(rows[0]) : null;
    }
 
-   async clearMagicToken(invoiceId, connection = null) {
-     const db = connection || pool;
-     await db.query(
-       'UPDATE rent_invoices SET magic_token_hash = NULL, magic_token_expires_at = NULL WHERE invoice_id = ?',
-       [invoiceId]
-     );
-   }
+    async clearMagicToken(invoiceId, connection = null) {
+      const db = connection || pool;
+      await db.query(
+        'UPDATE rent_invoices SET magic_token_hash = NULL, magic_token_expires_at = NULL WHERE invoice_id = ?',
+        [invoiceId]
+      );
+    }
+ 
+    async updateLastOrderId(invoiceId, orderId, connection = null) {
+      const db = connection || pool;
+      await db.query(
+        'UPDATE rent_invoices SET last_order_id = ? WHERE invoice_id = ?',
+        [orderId, invoiceId]
+      );
+    }
+ 
+    async findByOrderId(orderId, connection = null) {
+      const db = connection || pool;
+      const [rows] = await db.query(
+        `
+              SELECT ri.*, l.tenant_id, l.unit_id,
+                     p.name as property_name, un.unit_number, un.status as unit_status,
+                     COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id = ri.invoice_id AND status = 'verified'), 0) AS amount_paid
+              FROM rent_invoices ri 
+              JOIN leases l ON ri.lease_id = l.lease_id 
+              JOIN units un ON l.unit_id = un.unit_id
+              JOIN properties p ON un.property_id = p.property_id
+              WHERE ri.last_order_id = ?
+          `,
+        [orderId]
+      );
+      return rows.length > 0 ? this.mapRow(rows[0]) : null;
+    }
 
   async findByTenantId(tenantId) {
     const [rows] = await pool.query(

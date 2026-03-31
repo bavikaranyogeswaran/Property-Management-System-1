@@ -70,7 +70,7 @@ interface LeaseContextType {
   updateLeaseDocument: (id: string, documentUrl: string) => Promise<void>;
   updateNoticeStatus: (id: string, status: 'undecided' | 'vacating' | 'renewing') => Promise<void>;
   leaseTerms: LeaseTerm[];
-  addLeaseTerm: (term: Omit<LeaseTerm, 'id' | 'ownerId' | 'createdAt'>) => Promise<void>;
+  addLeaseTerm: (term: Omit<LeaseTerm, 'id' | 'ownerId' | 'createdAt' | 'leaseTermId'>) => Promise<void>;
   updateLeaseTerm: (id: number, term: Partial<LeaseTerm>) => Promise<void>;
   deleteLeaseTerm: (id: number) => Promise<void>;
   finalizeCheckout: (id: string) => Promise<void>;
@@ -257,7 +257,7 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const addLeaseTerm = async (term: Omit<LeaseTerm, 'id' | 'ownerId' | 'createdAt'>) => {
+  const addLeaseTerm = async (term: Omit<LeaseTerm, 'id' | 'ownerId' | 'createdAt' | 'leaseTermId'>) => {
     try {
       await apiClient.post('/lease-terms', term);
       await fetchLeaseTerms();

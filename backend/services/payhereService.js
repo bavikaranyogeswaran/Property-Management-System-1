@@ -38,10 +38,13 @@ class PayHereService {
 
         const hash = generateCheckoutHash(orderId, amount, currency);
 
+        // Save the orderId to the invoice so the success page can find it later
+        await invoiceModel.updateLastOrderId(invoice.id || invoice.invoice_id, orderId);
+
         return {
             sandbox: true, // Initially using sandbox
             merchant_id: MERCHANT_ID,
-            return_url: RETURN_URL,
+            return_url: `${RETURN_URL}?token=${magicToken}`,
             cancel_url: CANCEL_URL,
             notify_url: NOTIFY_URL,
             order_id: orderId,
@@ -55,7 +58,8 @@ class PayHereService {
             phone: tenant.phone || '',
             address: 'Colombo, Sri Lanka', // Placeholder as required by PayHere
             city: 'Colombo',
-            country: 'Sri Lanka'
+            country: 'Sri Lanka',
+            custom_1: magicToken
         };
     }
 

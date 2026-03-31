@@ -106,6 +106,11 @@ export function GuestPaymentPage() {
       const response = await apiClient.get(`/payhere/checkout/public/${token}`);
       const checkoutData = response.data.data;
       
+      // Save token to localStorage so PaymentSuccessPage can find it if PayHere strips URL params
+      if (token) {
+        localStorage.setItem('last_payment_token', token);
+      }
+      
       setPayHereData(checkoutData);
       
       // We'll use a timeout to let the form render before submitting
@@ -428,6 +433,7 @@ export function GuestPaymentPage() {
               <input type="hidden" name="city" value={payHereData.city} />
               <input type="hidden" name="country" value={payHereData.country} />
               <input type="hidden" name="hash" value={payHereData.hash} />
+              <input type="hidden" name="custom_1" value={payHereData.custom_1} />
             </form>
           )}
         </div>

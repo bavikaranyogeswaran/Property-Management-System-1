@@ -113,6 +113,7 @@ import { NotificationsPage } from '@/components/pages/common/NotificationsPage';
 import { PublicListingPage } from '@/components/pages/public/PublicListingPage';
 import { PublicPropertyDetailsPage } from '@/components/pages/public/PublicPropertyDetailsPage';
 import CancelVisitPage from '@/components/pages/public/CancelVisitPage';
+import PaymentSuccessPage from '@/components/pages/public/PaymentSuccessPage';
 import AuditLogsPage from '@/components/pages/AuditLogsPage';
 import { GuestPaymentPage } from '@/components/pages/public/GuestPaymentPage';
 
@@ -171,6 +172,7 @@ function AppContent() {
       <Route path="/verify-email" element={<VerifyEmailPage />} />
       <Route path="/setup-password" element={<SetupPasswordPage />} />
       <Route path="/cancel-visit" element={<CancelVisitPage />} />
+      <Route path="/payment-success" element={<PaymentSuccessPage />} />
       <Route path="/pay/:token" element={<PublicPropertiesWrapper><GuestPaymentPage /></PublicPropertiesWrapper>} />
 
       {/* Public/Shared Properties Route */}
