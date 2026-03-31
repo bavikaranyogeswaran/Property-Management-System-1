@@ -85,6 +85,7 @@ class GuestPaymentController {
       res.json({
         paid: isPaid,
         active: isActive,
+        type: invoice.invoiceType,
         setupToken: setupToken
       });
     } catch (error) {
@@ -123,6 +124,7 @@ class GuestPaymentController {
       res.json({
         paid: isPaid,
         active: isActive,
+        type: invoice.invoiceType,
         setupToken: setupToken
       });
     } catch (error) {

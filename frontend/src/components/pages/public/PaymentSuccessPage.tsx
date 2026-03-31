@@ -26,6 +26,7 @@ export default function PaymentSuccessPage() {
 
   const [status, setStatus] = useState<'verifying' | 'success' | 'timeout' | 'error'>('verifying');
   const [setupToken, setSetupToken] = useState<string | null>(null);
+  const [invoiceType, setInvoiceType] = useState<string | null>(null);
   const [attempts, setAttempts] = useState(0);
   const MAX_ATTEMPTS = 30; // 60 seconds total with 2s interval
 
@@ -47,15 +48,27 @@ export default function PaymentSuccessPage() {
           response = await apiClient.get(`/public/invoice/checkout-status/${orderId}`);
         }
 
-        const { paid, active, setupToken: receivedToken } = response.data;
+        const { paid, active, setupToken: receivedToken, type } = response.data;
+        setInvoiceType(type);
 
-        if (paid && active && receivedToken) {
+        // Scenario A: Reservation (Deposit) - Wait for full lease activation
+        if (type === 'deposit') {
+          if (paid && active && receivedToken) {
+            localStorage.removeItem('last_payment_token');
+            setSetupToken(receivedToken);
+            setStatus('success');
+            toast.success('Your reservation is finalized!');
+            return true; // Stop polling
+          }
+        } 
+        // Scenario B: Regular Payment (Rent/Utility/etc) - Just check if paid
+        else if (paid) {
           localStorage.removeItem('last_payment_token');
-          setSetupToken(receivedToken);
           setStatus('success');
-          toast.success('Your reservation is finalized!');
+          toast.success('Payment successfully received!');
           return true; // Stop polling
         }
+        
         return false; // Continue polling
       } catch (err) {
         console.error('Polling error:', err);
@@ -127,22 +140,30 @@ export default function PaymentSuccessPage() {
               )}
             </div>
             <CardTitle className="text-3xl font-bold text-gray-900">
-              {status === 'success' ? 'Payment Verified!' : 'Finalizing Your Reservation'}
+              {status === 'success' 
+                ? 'Payment Verified!' 
+                : invoiceType === 'deposit' 
+                  ? 'Finalizing Your Reservation' 
+                  : 'Processing Your Payment'}
             </CardTitle>
             <CardDescription className="text-lg mt-2 font-medium">
               {status === 'success' 
-                ? 'Redirecting you to set up your account...' 
-                : 'We are confirming your payment with the bank.'}
+                ? invoiceType === 'deposit' ? 'Redirecting you to set up your account...' : 'Thank you for your payment!'
+                : invoiceType === 'deposit' 
+                  ? 'We are confirming your payment with the bank.' 
+                  : 'We are verifying your transaction status.'}
             </CardDescription>
           </CardHeader>
 
           <CardContent className="px-8 pb-10 space-y-6">
             {status === 'verifying' && (
-               <div className="space-y-4">
+                <div className="space-y-4">
                   <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 flex items-start gap-3">
                      <ShieldCheck className="w-5 h-5 text-blue-600 mt-1 shrink-0" />
                      <div className="text-sm text-blue-800 leading-relaxed">
-                        Your unit has been **hard-reserved**. We are now finalizing the lease documents and generating your tenant portal access.
+                        {invoiceType === 'deposit' 
+                          ? 'Your unit has been **hard-reserved**. We are now finalizing the lease documents and generating your tenant portal access.'
+                          : 'Your payment is being synchronized with our ledger. This usually takes just a few moments.'}
                      </div>
                   </div>
                   <div className="flex justify-center items-center gap-2 text-xs text-gray-400">
@@ -164,9 +185,25 @@ export default function PaymentSuccessPage() {
 
             {status === 'success' && (
                <div className="bg-green-50 p-6 rounded-2xl border border-green-100 text-center animate-in fade-in slide-in-from-bottom-2 duration-500">
-                  <p className="text-green-800 font-medium mb-4">Verification Complete! Your account is ready for setup.</p>
-                  <Button className="bg-green-600 hover:bg-green-700 w-full font-bold h-12 shadow-lg" onClick={() => {/* navigate handled by effect */}}>
-                    Proceed to Account Setup
+                  <p className="text-green-800 font-medium mb-4">
+                    {invoiceType === 'deposit' 
+                      ? 'Verification Complete! Your account is ready for setup.'
+                      : 'Payment Successful! Your invoice has been updated.'}
+                  </p>
+                  <Button 
+                    className="bg-green-600 hover:bg-green-700 w-full font-bold h-12 shadow-lg" 
+                    onClick={() => {
+                      if (invoiceType === 'deposit') {
+                        // Redirect handled by effect if setupToken is set? 
+                        // Actually the button should probably do it if we didn't auto-redirect
+                        // But let's follow the standard portal path for others
+                        navigate('/setup-password?token=' + setupToken);
+                      } else {
+                        navigate('/dashboard'); // Go to portal dashboard
+                      }
+                    }}
+                  >
+                    {invoiceType === 'deposit' ? 'Proceed to Account Setup' : 'Go to Dashboard'}
                     <ArrowRight className="ml-2 w-5 h-5" />
                   </Button>
                </div>
