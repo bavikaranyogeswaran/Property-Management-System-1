@@ -1,7 +1,8 @@
 import React, { useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { Download, Printer, CheckCircle } from 'lucide-react';
+import { CheckCircle, Printer, Download } from 'lucide-react';
 import { Receipt } from '@/app/context/AppContext';
+import { formatLKR } from '@/utils/formatters';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import { toast } from 'sonner';
@@ -335,7 +336,7 @@ export function ReceiptViewer({
                 Total Amount Paid
               </div>
               <div className="text-4xl font-bold">
-                LKR {receipt.amount.toLocaleString()}
+                {formatLKR(receipt.amount)}
               </div>
             </div>
           </div>

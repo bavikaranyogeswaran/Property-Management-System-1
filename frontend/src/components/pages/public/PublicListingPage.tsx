@@ -31,6 +31,7 @@ import {
 import { toast } from 'sonner';
 
 import { ScheduleVisitDialog } from './ScheduleVisitDialog';
+import { formatLKR, toLKRFromCents } from '@/utils/formatters';
 
 export function PublicListingPage({
   onNavigate,
@@ -76,7 +77,7 @@ export function PublicListingPage({
             unitNumber: u.unitNumber,
             unitTypeId: u.unitTypeId,
             type: u.type,
-            monthlyRent: u.monthlyRent / 100,
+            monthlyRent: toLKRFromCents(u.monthlyRent),
             status: u.status,
             imageUrl: u.imageUrl,
             createdAt: u.createdAt,
@@ -319,14 +320,13 @@ export function PublicListingPage({
                     </p>
                     <p className="text-lg font-semibold text-gray-900">
                       {/* Calculate min rent logic */}
-                      LKR{' '}
                       {(() => {
                         const rents = units
                           .filter((u) => u.propertyId === property.id)
                           .map((u) => u.monthlyRent);
                         const validRents = rents.filter(r => r > 0);
                         const minRent = validRents.length > 0 ? Math.min(...validRents) : 0;
-                        return minRent > 0 ? minRent.toLocaleString() : 'N/A';
+                        return minRent > 0 ? formatLKR(minRent) : 'N/A';
                       })()}
                     </p>
                   </div>
@@ -532,8 +532,7 @@ export function PublicListingPage({
                           </option>
                           {avail.map((u) => (
                             <option key={u.id} value={u.id}>
-                              Unit {u.unitNumber} - {u.type} (LKR{' '}
-                              {u.monthlyRent}/mo)
+                              Unit {u.unitNumber} - {u.type} ({formatLKR(u.monthlyRent)}/mo)
                             </option>
                           ))}
                         </>

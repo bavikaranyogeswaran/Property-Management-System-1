@@ -3,6 +3,7 @@ import apiClient from '../../services/api';
 import { useAuth } from './AuthContext';
 import { useProperty } from './PropertyContext';
 import { toast } from 'sonner';
+import { toLKRFromCents, toCentsFromLKR } from '../../utils/formatters';
 
 export interface Lease {
   id: string;
@@ -112,11 +113,11 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
       if (lRes.data) {
         setLeases(lRes.data.map((l: any) => ({
           ...l,
-          monthlyRent: l.monthlyRent / 100,
-          securityDeposit: (l.securityDeposit || 0) / 100,
-          proposedRefundAmount: (l.proposedRefundAmount || 0) / 100,
-          refundedAmount: (l.refundedAmount || 0) / 100,
-          targetDeposit: (l.targetDeposit || 0) / 100,
+          monthlyRent: toLKRFromCents(l.monthlyRent),
+          securityDeposit: toLKRFromCents(l.securityDeposit || 0),
+          proposedRefundAmount: toLKRFromCents(l.proposedRefundAmount || 0),
+          refundedAmount: toLKRFromCents(l.refundedAmount || 0),
+          targetDeposit: toLKRFromCents(l.targetDeposit || 0),
         })));
       }
     } catch (e) {
@@ -138,9 +139,9 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
     try {
       const response = await apiClient.post('/leases', {
         ...lease,
-        monthlyRent: Math.round(lease.monthlyRent * 100),
-        securityDeposit: Math.round((lease.securityDeposit || 0) * 100),
-        targetDeposit: Math.round((lease.targetDeposit || 0) * 100),
+        monthlyRent: toCentsFromLKR(lease.monthlyRent),
+        securityDeposit: toCentsFromLKR(lease.securityDeposit || 0),
+        targetDeposit: toCentsFromLKR(lease.targetDeposit || 0),
       });
       const constructedLease: Lease = {
         ...lease,
@@ -173,7 +174,7 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
     try {
       await apiClient.post(`/leases/${id}/instant-renew`, { 
         newEndDate, 
-        newMonthlyRent: newMonthlyRent ? Math.round(newMonthlyRent * 100) : undefined 
+        newMonthlyRent: newMonthlyRent ? toCentsFromLKR(newMonthlyRent) : undefined 
       });
       await fetchLeases();
       toast.success('Renewal approved. A new draft lease is ready.');
@@ -187,7 +188,7 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
   const refundDeposit = async (id: string, amount: number, notes?: string) => {
     try {
       await apiClient.post(`/leases/${id}/refund`, { 
-        amount: Math.round(amount * 100), 
+        amount: toCentsFromLKR(amount), 
         notes 
       });
       await fetchLeases(); // Easier to refetch instead of manual mapping
@@ -369,8 +370,8 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
       const response = await apiClient.get('/renewal-requests');
       setRenewalRequests(response.data.map((r: any) => ({
         ...r,
-        currentMonthlyRent: r.currentMonthlyRent / 100,
-        proposedMonthlyRent: r.proposedMonthlyRent ? r.proposedMonthlyRent / 100 : null,
+        currentMonthlyRent: toLKRFromCents(r.currentMonthlyRent),
+        proposedMonthlyRent: r.proposedMonthlyRent ? toLKRFromCents(r.proposedMonthlyRent) : null,
       })));
     } catch (e) {
       console.error('Failed to fetch renewal requests', e);
@@ -381,7 +382,7 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
     try {
       await apiClient.post(`/renewal-requests/${id}/propose`, {
         ...data,
-        proposedMonthlyRent: Math.round(data.proposedMonthlyRent * 100)
+        proposedMonthlyRent: toCentsFromLKR(data.proposedMonthlyRent)
       });
       toast.success('Renewal terms proposed successfully');
       fetchRenewalRequests();

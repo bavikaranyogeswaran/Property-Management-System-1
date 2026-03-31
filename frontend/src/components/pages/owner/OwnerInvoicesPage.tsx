@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ReceiptViewer } from '@/components/common/ReceiptViewer';
+import { formatLKR } from '@/utils/formatters';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
@@ -145,21 +146,21 @@ export function OwnerInvoicesPage() {
     {
       label: 'Pending',
       value: pendingInvoices.length,
-      subtitle: `LKR ${pendingInvoices.reduce((sum, i) => sum + i.amount, 0).toLocaleString()}`,
+      subtitle: formatLKR(pendingInvoices.reduce((sum, i) => sum + i.amount, 0)),
       icon: Clock,
       color: 'bg-orange-50 text-orange-700',
     },
     {
       label: 'Overdue',
       value: overdueInvoices.length,
-      subtitle: `LKR ${overdueInvoices.reduce((sum, i) => sum + i.amount, 0).toLocaleString()}`,
+      subtitle: formatLKR(overdueInvoices.reduce((sum, i) => sum + i.amount, 0)),
       icon: AlertCircle,
       color: 'bg-red-50 text-red-700',
     },
     {
       label: 'Paid',
       value: paidInvoices.length,
-      subtitle: `LKR ${paidInvoices.reduce((sum, i) => sum + i.amount, 0).toLocaleString()}`,
+      subtitle: formatLKR(paidInvoices.reduce((sum, i) => sum + i.amount, 0)),
       icon: CheckCircle,
       color: 'bg-green-50 text-green-700',
     },
@@ -216,7 +217,7 @@ export function OwnerInvoicesPage() {
                 <TableCell>{propertyName}</TableCell>
                 <TableCell>{unitNumber}</TableCell>
                 <TableCell className="font-semibold">
-                  LKR {invoice.amount}
+                  {formatLKR(invoice.amount)}
                 </TableCell>
                 <TableCell className="align-middle h-14">
                   <div className={`flex flex-col gap-0.5 ${isOverdue ? 'text-red-600 font-medium' : ''}`}>

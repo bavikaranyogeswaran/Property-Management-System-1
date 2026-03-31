@@ -14,6 +14,7 @@ import {
 import apiClient from '@/services/api';
 import { Skeleton } from '@/components/ui/skeleton';
 import { TrendingUp, TrendingDown, DollarSign } from 'lucide-react';
+import { formatLKR } from '@/utils/formatters';
 
 interface MonthlyData {
   month: string;
@@ -39,13 +40,7 @@ export function MonthlyCashFlowCard() {
       });
   }, []);
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-LK', {
-      style: 'currency',
-      currency: 'LKR',
-      maximumFractionDigits: 0,
-    }).format(value);
-  };
+
 
   const formatMonth = (monthStr: string) => {
     const [year, month] = monthStr.split('-');
@@ -85,7 +80,7 @@ export function MonthlyCashFlowCard() {
         <div className="text-right hidden sm:block">
           <p className="text-xs text-slate-500 uppercase font-bold tracking-wider">Annual Net Position</p>
           <p className={`text-lg font-bold ${netProfit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-            {netProfit >= 0 ? '+' : ''}{formatCurrency(netProfit)}
+            {netProfit >= 0 ? '+' : ''}{formatLKR(netProfit)}
           </p>
         </div>
       </CardHeader>
@@ -120,7 +115,7 @@ export function MonthlyCashFlowCard() {
                 axisLine={false}
                 tickLine={false}
                 tick={{ fill: '#64748b', fontSize: 11 }}
-                tickFormatter={(val) => `LKR ${val > 1000 ? (val/1000).toFixed(0) + 'k' : val}`}
+                tickFormatter={(val) => val > 1000 ? `LKR ${(val/1000).toFixed(0)}k` : `LKR ${val}`}
               />
               <Tooltip 
                 cursor={{ fill: '#f8fafc' }}
@@ -129,7 +124,7 @@ export function MonthlyCashFlowCard() {
                   border: 'none', 
                   boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)' 
                 }}
-                formatter={(value: number) => [formatCurrency(value), '']}
+                formatter={(value: number) => [formatLKR(value), '']}
                 labelFormatter={(label) => {
                   const [year, month] = label.split('-');
                   return new Date(parseInt(year), parseInt(month) - 1).toLocaleString('default', { month: 'long', year: 'numeric' });
@@ -163,12 +158,12 @@ export function MonthlyCashFlowCard() {
         <div className="grid grid-cols-2 gap-4 mt-6 sm:hidden border-t border-slate-100 pt-4">
           <div>
             <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Revenue</p>
-            <p className="text-sm font-bold text-emerald-600">{formatCurrency(totalRevenue)}</p>
+            <p className="text-sm font-bold text-emerald-600">{formatLKR(totalRevenue)}</p>
           </div>
           <div className="text-right">
             <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Net Profit</p>
             <p className={`text-sm font-bold ${netProfit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-              {formatCurrency(netProfit)}
+              {formatLKR(netProfit)}
             </p>
           </div>
         </div>

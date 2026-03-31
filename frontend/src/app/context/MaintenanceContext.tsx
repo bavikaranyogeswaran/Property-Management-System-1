@@ -3,6 +3,7 @@ import { maintenanceApi, invoiceApi } from '../../services/api';
 import { useAuth } from './AuthContext';
 import { useFinancial } from './FinancialContext';
 import { toast } from 'sonner';
+import { toLKRFromCents, toCentsFromLKR } from '../../utils/formatters';
 
 export interface MaintenanceRequest {
   id: string;
@@ -59,7 +60,7 @@ export function MaintenanceProvider({ children }: { children: ReactNode }) {
         if (mcRes.data) {
           setMaintenanceCosts(mcRes.data.map((c: any) => ({
             ...c,
-            amount: c.amount / 100,
+            amount: toLKRFromCents(c.amount),
             recordedDate: (c.recordedDate || '').split('T')[0],
           })));
         }
@@ -99,7 +100,7 @@ export function MaintenanceProvider({ children }: { children: ReactNode }) {
     try {
       await maintenanceApi.addCost({
         ...cost,
-        amount: Math.round(cost.amount * 100)
+        amount: toCentsFromLKR(cost.amount)
       });
       toast.success(cost.billToTenant ? 'Cost recorded & Invoice generated' : 'Cost recorded');
       await fetchMaintenanceData();
@@ -122,7 +123,7 @@ export function MaintenanceProvider({ children }: { children: ReactNode }) {
     try {
       await maintenanceApi.createInvoice({ 
         requestId, 
-        amount: Math.round(amount * 100), 
+        amount: toCentsFromLKR(amount), 
         description, 
         dueDate 
       });

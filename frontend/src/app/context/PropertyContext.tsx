@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import apiClient from '../../services/api';
 import { useAuth } from './AuthContext';
 import { toast } from 'sonner';
+import { toLKRFromCents, toCentsFromLKR } from '../../utils/formatters';
 
 export interface Property {
   id: string;
@@ -121,7 +122,7 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
       if (response.status === 200) {
         setUnits(response.data.map((u: any) => ({
           ...u,
-          monthlyRent: u.monthlyRent / 100
+          monthlyRent: toLKRFromCents(u.monthlyRent)
         })));
       }
     } catch (e) {
@@ -224,7 +225,7 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
     try {
       const response = await apiClient.post('/units', {
         ...unit,
-        monthlyRent: Math.round(unit.monthlyRent * 100)
+        monthlyRent: toCentsFromLKR(unit.monthlyRent)
       });
       if (response.status === 201) {
         const newUnit: Unit = { ...response.data, id: response.data.id };
@@ -241,7 +242,7 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
     try {
       const response = await apiClient.put(`/units/${id}`, {
         ...updates,
-        monthlyRent: updates.monthlyRent ? Math.round(updates.monthlyRent * 100) : undefined
+        monthlyRent: updates.monthlyRent ? toCentsFromLKR(updates.monthlyRent) : undefined
       });
       if (response.status === 200) {
         setUnits(prev => prev.map(u => (u.id === id ? { ...u, ...response.data, id: response.data.id || u.id } : u)));

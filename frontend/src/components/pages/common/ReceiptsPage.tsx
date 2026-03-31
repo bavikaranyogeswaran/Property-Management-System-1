@@ -19,17 +19,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  FileText,
-  Download,
-  Search,
-  Calendar,
-  User,
-  Building2,
-  Hash,
-  Eye,
-} from 'lucide-react';
+import { Eye, Download, FileText, Search, Calendar, User, Building2, Hash } from 'lucide-react';
 import { ReceiptViewer } from '@/components/common/ReceiptViewer';
+import { formatLKR } from '@/utils/formatters';
 
 export function ReceiptsPage() {
   const { user } = useAuth();
@@ -162,7 +154,7 @@ export function ReceiptsPage() {
     },
     {
       label: 'Total Amount',
-      value: `LKR ${totalAmount.toLocaleString()}`,
+      value: formatLKR(totalAmount),
       subtitle: 'All time',
       icon: Download,
       color: 'text-green-600 bg-green-50',
@@ -336,7 +328,7 @@ export function ReceiptsPage() {
                           </div>
                         </TableCell>
                         <TableCell className="text-right align-middle h-14 font-semibold">
-                          LKR {receipt.amount.toLocaleString()}
+                          {formatLKR(receipt.amount)}
                         </TableCell>
                         <TableCell className="text-right align-middle h-14">
                           <div className="flex gap-2 justify-end">

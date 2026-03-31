@@ -43,6 +43,7 @@ import { MultiImageUpload } from '@/components/ui/multi-image-upload';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { unitSchema, type UnitFormValues } from '@/schemas/ownerSchemas';
+import { formatLKR } from '@/utils/formatters';
 import {
   Form,
   FormControl,
@@ -622,7 +623,7 @@ export function UnitsPage() {
                       </TableCell>
                       <TableCell>{property?.name}</TableCell>
                       <TableCell>{unit.type}</TableCell>
-                      <TableCell>LKR {unit.monthlyRent}</TableCell>
+                      <TableCell>{formatLKR(unit.monthlyRent)}</TableCell>
                       <TableCell>
                         <Badge variant={statusBadge.variant}>
                           {statusBadge.label}
@@ -743,7 +744,7 @@ export function UnitsPage() {
                     </p>
                     <p className="flex items-center gap-2">
                       <span className="font-medium text-gray-900">Rent:</span>{' '}
-                      LKR {viewUnit.monthlyRent}/month
+                      {formatLKR(viewUnit.monthlyRent)}/month
                     </p>
                   </div>
                 </div>

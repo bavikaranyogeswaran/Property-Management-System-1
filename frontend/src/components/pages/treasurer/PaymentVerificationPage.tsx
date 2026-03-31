@@ -25,6 +25,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { formatLKR } from '@/utils/formatters';
 
 export function PaymentVerificationPage() {
   const { payments, invoices, tenants, units, properties, verifyPayment } =
@@ -49,7 +50,7 @@ export function PaymentVerificationPage() {
     {
       label: 'Pending Verification',
       value: pendingPayments.length,
-      subtitle: `LKR ${pendingPayments.reduce((sum, p) => sum + p.amount, 0).toLocaleString()}`,
+      subtitle: formatLKR(pendingPayments.reduce((sum, p) => sum + p.amount, 0)),
       color: 'bg-orange-50 text-orange-700',
     },
     {
@@ -62,7 +63,7 @@ export function PaymentVerificationPage() {
     {
       label: 'Total Verified',
       value: verifiedPayments.length,
-      subtitle: `LKR ${verifiedPayments.reduce((sum, p) => sum + p.amount, 0).toLocaleString()}`,
+      subtitle: formatLKR(verifiedPayments.reduce((sum, p) => sum + p.amount, 0)),
       color: 'bg-blue-50 text-blue-700',
     },
     {
@@ -105,7 +106,7 @@ export function PaymentVerificationPage() {
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Amount</p>
-                  <p className="text-lg font-semibold">LKR {payment.amount}</p>
+                  <p className="text-lg font-semibold">{formatLKR(payment.amount)}</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Payment Method</p>
@@ -201,7 +202,7 @@ export function PaymentVerificationPage() {
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">Invoice Amount</p>
-                    <p className="font-semibold">LKR {invoice.amount}</p>
+                    <p className="font-semibold">{formatLKR(invoice.amount)}</p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">Due Date</p>
@@ -325,7 +326,7 @@ export function PaymentVerificationPage() {
                         </div>
                       </TableCell>
                       <TableCell className="font-semibold">
-                        LKR {payment.amount}
+                        {formatLKR(payment.amount)}
                       </TableCell>
                       <TableCell>{payment.paymentMethod}</TableCell>
                       <TableCell className="font-mono text-sm">
@@ -397,7 +398,7 @@ export function PaymentVerificationPage() {
                       </div>
                       <div className="text-right">
                         <p className="text-sm font-semibold">
-                          LKR {payment.amount}
+                          {formatLKR(payment.amount)}
                         </p>
                         <Badge variant="default" className="text-xs">
                           Verified
@@ -435,7 +436,7 @@ export function PaymentVerificationPage() {
                       </div>
                       <div className="text-right">
                         <p className="text-sm font-semibold">
-                          LKR {payment.amount}
+                          {formatLKR(payment.amount)}
                         </p>
                         <Badge variant="destructive" className="text-xs">
                           Rejected

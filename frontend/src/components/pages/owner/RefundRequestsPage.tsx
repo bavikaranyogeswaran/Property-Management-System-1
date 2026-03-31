@@ -36,6 +36,7 @@ import {
   Home,
   RotateCcw,
 } from 'lucide-react';
+import { formatLKR } from '@/utils/formatters';
 
 export function RefundRequestsPage() {
   const { user } = useAuth();
@@ -135,7 +136,7 @@ export function RefundRequestsPage() {
                       </TableCell>
                       <TableCell>
                         <div className="font-semibold text-orange-600">
-                          {lease.proposedRefundAmount?.toLocaleString()}
+                          {formatLKR(lease.proposedRefundAmount || 0)}
                         </div>
                         {lease.refundNotes && (
                           <div className="text-xs text-gray-500 italic mt-1 max-w-[200px] truncate" title={lease.refundNotes}>
@@ -206,7 +207,7 @@ export function RefundRequestsPage() {
           <form onSubmit={handleAction} className="space-y-4 pt-4">
             {actionType === 'approve' ? (
               <div className="bg-blue-50 text-blue-800 p-4 rounded-lg text-sm">
-                <p>Confirming this will finalize the refund of <strong>LKR {leases.find(l => l.id === selectedLeaseId)?.proposedRefundAmount?.toLocaleString()}</strong> and record it in the ledger.</p>
+                <p>Confirming this will finalize the refund of <strong>{formatLKR(leases.find(l => l.id === selectedLeaseId)?.proposedRefundAmount || 0)}</strong> and record it in the ledger.</p>
               </div>
             ) : (
               <div className="space-y-2">

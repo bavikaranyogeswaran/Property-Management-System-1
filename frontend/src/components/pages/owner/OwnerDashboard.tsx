@@ -11,6 +11,7 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import { NotificationBanner } from '@/components/common/NotificationBanner';
+import { formatLKR } from '@/utils/formatters';
 
 // ============================================================================
 //  OWNER DASHBOARD (The Command Center)
@@ -132,7 +133,7 @@ export function OwnerDashboard() {
     },
     {
       title: 'Monthly Revenue',
-      value: `LKR ${monthlyRevenue.toLocaleString()}`,
+      value: formatLKR(monthlyRevenue),
       subtitle: 'Expected',
       icon: DollarSign,
       color: 'text-emerald-600',
@@ -224,25 +225,25 @@ export function OwnerDashboard() {
               <div className="bg-white p-4 rounded-lg shadow-sm border border-indigo-50">
                 <p className="text-sm text-gray-500 font-medium">Net Operating Income</p>
                 <p className="text-2xl font-bold text-indigo-700">
-                  LKR {ledgerSummary.netOperatingIncome.toLocaleString()}
+                  {formatLKR(ledgerSummary.netOperatingIncome)}
                 </p>
               </div>
               <div className="bg-white p-4 rounded-lg shadow-sm border border-indigo-50">
                 <p className="text-sm text-gray-500 font-medium">True Revenue</p>
                 <p className="text-xl font-semibold text-emerald-600">
-                  LKR {ledgerSummary.totalRevenue.toLocaleString()}
+                  {formatLKR(ledgerSummary.totalRevenue)}
                 </p>
               </div>
               <div className="bg-white p-4 rounded-lg shadow-sm border border-indigo-50">
                 <p className="text-sm text-gray-500 font-medium">Deposits Held (Liability)</p>
                 <p className="text-xl font-semibold text-blue-600">
-                  LKR {ledgerSummary.totalLiabilityHeld.toLocaleString()}
+                  {formatLKR(ledgerSummary.totalLiabilityHeld)}
                 </p>
               </div>
               <div className="bg-white p-4 rounded-lg shadow-sm border border-indigo-50">
                 <p className="text-sm text-gray-500 font-medium">Expenses (Maintenance)</p>
                 <p className="text-xl font-semibold text-red-600">
-                  LKR {ledgerSummary.totalExpense.toLocaleString()}
+                  {formatLKR(ledgerSummary.totalExpense)}
                 </p>
               </div>
             </div>
@@ -274,7 +275,7 @@ export function OwnerDashboard() {
                       <p className="text-lg font-semibold">{alert.count}</p>
                       {alert.amount !== undefined && (
                         <p className="text-xs text-gray-500">
-                          LKR {alert.amount.toLocaleString()}
+                          {formatLKR(alert.amount)}
                         </p>
                       )}
                     </div>
@@ -414,11 +415,11 @@ export function OwnerDashboard() {
                       </div>
                       <div className="text-right">
                         <p className="text-sm font-semibold">
-                          LKR {balance.toLocaleString()}
+                          {formatLKR(balance)}
                         </p>
                         {isPartial && (
                           <p className="text-[10px] text-gray-500">
-                            of LKR {invoice.amount.toLocaleString()}
+                            of {formatLKR(invoice.amount)}
                           </p>
                         )}
                         {isOverdue && (

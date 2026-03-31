@@ -13,6 +13,7 @@ import {
   CreditCard,
   BarChart3,
 } from 'lucide-react';
+import { formatLKR } from '@/utils/formatters';
 
 export function TenantPaymentSummaryPage() {
   const { user } = useAuth();
@@ -85,7 +86,7 @@ export function TenantPaymentSummaryPage() {
   const stats = [
     {
       title: 'Total Paid',
-      value: `LKR ${totalPaid.toLocaleString()}`,
+      value: formatLKR(totalPaid),
       subtitle: `${verifiedPayments.length} verified payments`,
       icon: DollarSign,
       color: 'text-green-600',
@@ -93,7 +94,7 @@ export function TenantPaymentSummaryPage() {
     },
     {
       title: 'Pending Amount',
-      value: `LKR ${totalPending.toLocaleString()}`,
+      value: formatLKR(totalPending),
       subtitle: `${pendingPayments.length} awaiting verification`,
       icon: Clock,
       color: 'text-yellow-600',
@@ -233,7 +234,7 @@ export function TenantPaymentSummaryPage() {
                       >
                         {month.paid > 0 && (
                           <span className="text-[10px] text-white font-medium whitespace-nowrap">
-                            LKR {month.paid.toLocaleString()}
+                            {formatLKR(month.paid)}
                           </span>
                         )}
                       </div>
@@ -378,7 +379,7 @@ export function TenantPaymentSummaryPage() {
                           )}
                         </td>
                         <td className="py-3 font-medium">
-                          LKR {payment.amount.toLocaleString()}
+                          {formatLKR(payment.amount)}
                         </td>
                         <td className="py-3 text-gray-600 capitalize">
                           {payment.paymentMethod.replace('_', ' ')}

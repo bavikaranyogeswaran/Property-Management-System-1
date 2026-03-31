@@ -48,6 +48,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { formatLKR } from '@/utils/formatters';
 
 import apiClient from '@/services/api';
 
@@ -390,8 +391,7 @@ export function LeasesPage() {
         </TableCell>
         <TableCell>
           <div className="flex items-center gap-1 font-medium">
-            <span className="text-xs text-gray-500">LKR</span>
-            {lease.monthlyRent}
+            {formatLKR(lease.monthlyRent)}
           </div>
         </TableCell>
         <TableCell>
@@ -1067,8 +1067,7 @@ export function LeasesPage() {
                       <div>
                         <p className="text-sm text-gray-600">Monthly Rent</p>
                         <p className="font-medium flex items-center gap-1">
-                          <span className="text-gray-500">LKR</span>
-                          {selectedLease.monthlyRent}
+                          {formatLKR(selectedLease.monthlyRent)}
                         </p>
                       </div>
                     </div>
@@ -1473,12 +1472,12 @@ export function LeasesPage() {
                   <div className="space-y-1">
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-600">Total Requirement:</span>
-                      <span className="font-medium">LKR {depositStatus.targetAmount?.toLocaleString()}</span>
+                      <span className="font-medium">{formatLKR(depositStatus.targetAmount || 0)}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-600">Paid Amount (Ledger):</span>
                       <span className={`font-bold ${depositStatus.isFullyPaid ? 'text-green-600' : 'text-red-600'}`}>
-                        LKR {depositStatus.paidAmount?.toLocaleString()}
+                        {formatLKR(depositStatus.paidAmount || 0)}
                       </span>
                     </div>
                   </div>

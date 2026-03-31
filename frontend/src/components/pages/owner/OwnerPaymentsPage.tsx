@@ -28,6 +28,7 @@ import {
   XCircle,
   ImageIcon,
 } from 'lucide-react';
+import { formatLKR } from '@/utils/formatters';
 
 export function OwnerPaymentsPage() {
   const { user } = useAuth();
@@ -52,14 +53,14 @@ export function OwnerPaymentsPage() {
     {
       label: 'Pending Verification',
       value: pendingPayments.length,
-      subtitle: `LKR ${totalPending.toLocaleString()}`,
+      subtitle: formatLKR(totalPending),
       icon: Clock,
       color: 'text-yellow-600 bg-yellow-50',
     },
     {
       label: 'Verified',
       value: verifiedPayments.length,
-      subtitle: `LKR ${totalVerified.toLocaleString()}`,
+      subtitle: formatLKR(totalVerified),
       icon: CheckCircle,
       color: 'text-green-600 bg-green-50',
     },
@@ -171,7 +172,7 @@ export function OwnerPaymentsPage() {
             </span>
           </TableCell>
           <TableCell className="text-right font-semibold">
-            LKR {payment.amount.toLocaleString()}
+            {formatLKR(payment.amount)}
           </TableCell>
           <TableCell>
             <Badge

@@ -32,6 +32,7 @@ import {
   FileText,
 } from 'lucide-react';
 import { ReceiptViewer } from '@/components/common/ReceiptViewer';
+import { formatLKR } from '@/utils/formatters';
 
 export function TenantPaymentsPage() {
   const { user } = useAuth();
@@ -81,7 +82,7 @@ export function TenantPaymentsPage() {
     },
     {
       label: 'Total Paid',
-      value: `LKR ${totalPaid.toLocaleString()}`,
+      value: formatLKR(totalPaid),
       subtitle: 'All time',
       icon: FileText,
       color: 'bg-purple-50 text-purple-700',
@@ -122,7 +123,7 @@ export function TenantPaymentsPage() {
             </div>
           </div>
         </TableCell>
-        <TableCell className="font-semibold">LKR {payment.amount}</TableCell>
+        <TableCell className="font-semibold">{formatLKR(payment.amount)}</TableCell>
         <TableCell>
           <div className="text-sm">
             <div className="font-medium">{payment.paymentMethod}</div>
@@ -462,7 +463,7 @@ export function TenantPaymentsPage() {
                     <div>
                       <p className="text-sm text-gray-600">Amount</p>
                       <p className="font-semibold text-lg">
-                        LKR {selectedPayment.amount}
+                        {formatLKR(selectedPayment.amount)}
                       </p>
                     </div>
                     <div>

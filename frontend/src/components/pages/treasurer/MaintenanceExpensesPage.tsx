@@ -40,6 +40,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { formatLKR } from '@/utils/formatters';
 
 export function MaintenanceExpensesPage() {
   const {
@@ -209,7 +210,7 @@ export function MaintenanceExpensesPage() {
                         </TableCell>
                         <TableCell className="align-top font-medium">
                           {totalCost > 0
-                            ? `LKR ${totalCost.toLocaleString()}`
+                            ? formatLKR(totalCost)
                             : '-'}
                         </TableCell>
                         <TableCell className="align-top text-right">
@@ -243,7 +244,7 @@ export function MaintenanceExpensesPage() {
                                   </div>
                                   <div className="flex items-center gap-3">
                                     <span className="font-medium">
-                                      LKR {cost.amount.toLocaleString()}
+                                      {formatLKR(cost.amount)}
                                     </span>
                                     <button
                                       onClick={() => handleRemoveExpense(cost)}

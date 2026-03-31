@@ -16,6 +16,7 @@ import {
   Check,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { formatLKR } from '@/utils/formatters';
 
 export function TenantLeasePage() {
   const { user } = useAuth();
@@ -242,7 +243,7 @@ export function TenantLeasePage() {
                                  </div>
                                  {request.proposedMonthlyRent ? (
                                    <div className="text-sm text-gray-700">
-                                     <p>Proposed Rent: <span className="font-bold text-emerald-600">LKR {request.proposedMonthlyRent}</span></p>
+                                     <p>Proposed Rent: <span className="font-bold text-emerald-600">{formatLKR(request.proposedMonthlyRent)}</span></p>
                                      <p>Proposed End Date: <span className="font-medium">{formatDate(request.proposedEndDate)}</span></p>
                                    </div>
                                  ) : (
@@ -333,13 +334,13 @@ export function TenantLeasePage() {
                       <div>
                         <p className="text-sm text-gray-500">Monthly Rent</p>
                         <p className="text-xl font-semibold text-green-700 mt-1">
-                          LKR {currentLease.monthlyRent.toLocaleString()}
+                          {formatLKR(currentLease.monthlyRent)}
                         </p>
                       </div>
                       <div>
                         <p className="text-sm text-gray-500">Total Lease Value</p>
                         <p className="text-xl font-semibold text-gray-700 mt-1">
-                          LKR {(currentLease.monthlyRent * Math.ceil(totalDays / 30)).toLocaleString()}
+                          {formatLKR(currentLease.monthlyRent * Math.ceil(totalDays / 30))}
                         </p>
                       </div>
                     </div>
@@ -366,10 +367,7 @@ export function TenantLeasePage() {
                         <div>
                           <p className="text-sm text-gray-500">Deposit Amount</p>
                           <p className="font-medium mt-1">
-                            LKR{' '}
-                            {currentLease.securityDeposit
-                              ? currentLease.securityDeposit.toLocaleString()
-                              : '0'}
+                            {formatLKR(currentLease.securityDeposit || 0)}
                           </p>
                         </div>
                         {currentLease.depositStatus === 'awaiting_acknowledgment' && (
@@ -379,7 +377,7 @@ export function TenantLeasePage() {
                               <div className="space-y-3">
                                 <h4 className="font-semibold text-blue-900">Refund Settlement Ready</h4>
                                 <p className="text-sm text-blue-800">
-                                  Owner has approved a refund of <strong>LKR {currentLease.proposedRefundAmount?.toLocaleString()}</strong>.
+                                  Owner has approved a refund of <strong>{formatLKR(currentLease.proposedRefundAmount || 0)}</strong>.
                                   Please acknowledge this settlement to finalize the process.
                                 </p>
                                 <Button 
@@ -402,7 +400,7 @@ export function TenantLeasePage() {
                                   Refunded Amount
                                 </p>
                                 <p className="font-medium mt-1 text-blue-600">
-                                  LKR {currentLease.refundedAmount.toLocaleString()}
+                                  {formatLKR(currentLease.refundedAmount)}
                                 </p>
                               </div>
                               {currentLease.refundNotes && (
@@ -513,7 +511,7 @@ export function TenantLeasePage() {
                           {formatDate(lease.endDate)}
                         </td>
                         <td className="py-3">
-                          LKR {lease.monthlyRent.toLocaleString()}
+                          {formatLKR(lease.monthlyRent)}
                         </td>
                         <td className="py-3">
                           <Badge

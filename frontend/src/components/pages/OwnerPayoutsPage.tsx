@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../app/context/AuthContext';
 import { payoutApi } from '../../services/api';
 import { OwnerPayout } from '../../types/models';
+import { formatLKR } from '../../utils/formatters';
 
 const OwnerPayoutsPage: React.FC = () => {
   const { user } = useAuth();
@@ -148,7 +149,7 @@ const OwnerPayoutsPage: React.FC = () => {
                   Total Rent Collected
                 </span>
                 <span className="text-lg text-green-600 font-bold">
-                  LKR {previewData.totalIncome.toFixed(2)}
+                  {formatLKR(previewData.totalIncome)}
                 </span>
               </div>
               <div>
@@ -156,13 +157,13 @@ const OwnerPayoutsPage: React.FC = () => {
                   Total Expenses
                 </span>
                 <span className="text-lg text-red-600 font-bold">
-                  LKR {previewData.totalExpenses.toFixed(2)}
+                  {formatLKR(previewData.totalExpenses)}
                 </span>
               </div>
               <div>
                 <span className="block text-sm text-gray-600">Net Payout</span>
                 <span className="text-xl font-bold">
-                  LKR {previewData.netPayout.toFixed(2)}
+                  {formatLKR(previewData.netPayout)}
                 </span>
               </div>
             </div>
@@ -221,10 +222,7 @@ const OwnerPayoutsPage: React.FC = () => {
                     {new Date(p.periodEnd).toLocaleDateString()}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
-                    {Number(p.amount).toLocaleString('en-LK', {
-                      style: 'currency',
-                      currency: 'LKR',
-                    })}
+                    {formatLKR(p.amount)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span

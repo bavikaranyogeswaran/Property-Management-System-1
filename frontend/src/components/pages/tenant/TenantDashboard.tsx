@@ -26,6 +26,7 @@ import { ChatInterface } from '@/components/common/ChatInterface';
 import apiClient from '@/services/api';
 import { TenantBehaviorHistory } from './TenantBehaviorHistory';
 import { Trophy } from 'lucide-react';
+import { formatLKR } from '@/utils/formatters';
 
 export function TenantDashboard() {
   const { user } = useAuth();
@@ -105,7 +106,7 @@ export function TenantDashboard() {
   const stats = [
     {
       title: 'Current Rent',
-      value: currentLease ? `LKR ${currentLease.monthlyRent}` : 'N/A',
+      value: currentLease ? formatLKR(currentLease.monthlyRent) : 'N/A',
       subtitle: 'Monthly',
       icon: Home,
       color: 'text-blue-600',
@@ -114,7 +115,7 @@ export function TenantDashboard() {
     {
       title: 'Pending Invoices',
       value: pendingInvoices.length,
-      subtitle: `LKR ${totalDue} due`,
+      subtitle: `${formatLKR(totalDue)} due`,
       icon: FileText,
       color: 'text-orange-600',
       bgColor: 'bg-orange-50',
@@ -187,7 +188,7 @@ export function TenantDashboard() {
               <div>
                 <p className="text-sm text-gray-600">Monthly Rent</p>
                 <p className="text-lg font-semibold mt-1">
-                  LKR {currentLease.monthlyRent}
+                  {formatLKR(currentLease.monthlyRent)}
                 </p>
               </div>
             </div>
@@ -279,8 +280,8 @@ export function TenantDashboard() {
                   {overdueInvoices.length > 1 ? 's' : ''}
                 </p>
                 <p className="text-sm text-red-700">
-                  Total amount: LKR{' '}
-                  {overdueInvoices.reduce((sum, inv) => sum + inv.amount, 0)}
+                  Total amount:{' '}
+                  {formatLKR(overdueInvoices.reduce((sum, inv) => sum + inv.amount, 0))}
                 </p>
               </div>
             </div>
@@ -327,7 +328,7 @@ export function TenantDashboard() {
                       </div>
                       <div className="text-right">
                         <p className="text-sm font-semibold">
-                          LKR {invoice.amount}
+                          {formatLKR(invoice.amount)}
                         </p>
                         <p
                           className={`text-xs ${

@@ -20,6 +20,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { toast } from 'sonner';
 import apiClient from '@/services/api';
+import { formatLKR, toLKRFromCents } from '@/utils/formatters';
 
 interface InvoiceDetails {
   id: number;
@@ -57,7 +58,7 @@ export function GuestPaymentPage() {
         const response = await apiClient.get(`/public/invoice/${token}`);
         setInvoice({
           ...response.data,
-          amount: response.data.amount / 100
+          amount: toLKRFromCents(response.data.amount)
         });
       } catch (err: any) {
         setError(err.response?.data?.error || 'Invalid or expired payment link.');
@@ -224,7 +225,7 @@ export function GuestPaymentPage() {
               <Receipt className="w-4 h-4 opacity-60" />
             </CardHeader>
             <CardContent className="p-4 pt-0">
-              <div className="text-2xl font-bold">LKR {invoice.amount.toLocaleString()}</div>
+              <div className="text-2xl font-bold">{formatLKR(invoice.amount)}</div>
               <p className="text-[10px] opacity-70 mt-1">Non-refundable holding deposit</p>
             </CardContent>
             <div className="absolute -right-4 -bottom-4 bg-white/10 w-24 h-24 rounded-full blur-2xl"></div>

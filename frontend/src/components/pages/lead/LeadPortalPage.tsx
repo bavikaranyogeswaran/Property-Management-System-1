@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { API_BASE_URL } from '@/services/api';
 import { toast } from 'sonner';
+import { formatLKR, toLKRFromCents } from '@/utils/formatters';
 
 // ============================================================================
 //  LEAD PORTAL PAGE (Guest Access via Token Link)
@@ -163,17 +164,17 @@ export function LeadPortalPage() {
           ...portalRes.data,
           unit: portalRes.data.unit ? {
             ...portalRes.data.unit,
-            monthlyRent: portalRes.data.unit.monthlyRent / 100
+            monthlyRent: toLKRFromCents(portalRes.data.unit.monthlyRent)
           } : null,
           activeLease: portalRes.data.activeLease ? {
             ...portalRes.data.activeLease,
-            monthlyRent: portalRes.data.activeLease.monthlyRent / 100,
-            securityDeposit: (portalRes.data.activeLease.securityDeposit || 0) / 100,
-            targetDeposit: (portalRes.data.activeLease.targetDeposit || 0) / 100,
+            monthlyRent: toLKRFromCents(portalRes.data.activeLease.monthlyRent),
+            securityDeposit: toLKRFromCents(portalRes.data.activeLease.securityDeposit || 0),
+            targetDeposit: toLKRFromCents(portalRes.data.activeLease.targetDeposit || 0),
             depositStatus: portalRes.data.activeLease.depositStatus ? {
               ...portalRes.data.activeLease.depositStatus,
-              paidAmount: portalRes.data.activeLease.depositStatus.paidAmount / 100,
-              targetAmount: portalRes.data.activeLease.depositStatus.targetAmount / 100
+              paidAmount: toLKRFromCents(portalRes.data.activeLease.depositStatus.paidAmount),
+              targetAmount: toLKRFromCents(portalRes.data.activeLease.targetAmount)
             } : null
           } : null
         });
@@ -369,7 +370,7 @@ export function LeadPortalPage() {
                           <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-blue-700 mt-2">
                               <div className="flex items-center gap-2">
                                   <div className={`size-2 rounded-full ${portalData.activeLease.depositStatus.isFullyPaid ? 'bg-green-500' : 'bg-yellow-500'}`} />
-                                  Deposit: {portalData.activeLease.depositStatus.isFullyPaid ? 'Paid' : `Pending (LKR ${ (portalData.activeLease.depositStatus.targetAmount - portalData.activeLease.depositStatus.paidAmount).toLocaleString() } left)`}
+                                  Deposit: {portalData.activeLease.depositStatus.isFullyPaid ? 'Paid' : `Pending (${formatLKR(portalData.activeLease.depositStatus.targetAmount - portalData.activeLease.depositStatus.paidAmount)} left)`}
                               </div>
                               <div className="flex items-center gap-2">
                                   <div className={`size-2 rounded-full ${
@@ -460,8 +461,7 @@ export function LeadPortalPage() {
                 </p>
                 {unit && (
                   <p className="text-sm text-blue-600 font-semibold mt-1">
-                    LKR{' '}
-                    {Number(unit.monthlyRent).toLocaleString('en-LK')}/month
+                    {formatLKR(unit.monthlyRent)}/month
                   </p>
                 )}
               </div>

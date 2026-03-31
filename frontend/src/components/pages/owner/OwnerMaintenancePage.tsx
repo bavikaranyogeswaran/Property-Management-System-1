@@ -53,6 +53,7 @@ import {
   FileText,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { formatLKR } from '@/utils/formatters';
 
 export function OwnerMaintenancePage() {
   const {
@@ -223,7 +224,7 @@ export function OwnerMaintenancePage() {
     },
     {
       label: 'Total Cost',
-      value: `LKR ${totalMaintenanceCost.toLocaleString()}`,
+      value: formatLKR(totalMaintenanceCost),
       icon: DollarSign,
       color: 'bg-purple-50 text-purple-700',
     },
@@ -289,7 +290,7 @@ export function OwnerMaintenancePage() {
                 <TableCell>
                   {costs.length > 0 ? (
                     <div>
-                      <span className="font-semibold">LKR {totalCost}</span>
+                      <span className="font-semibold">{formatLKR(totalCost)}</span>
                       <span className="text-xs text-gray-500 ml-1">
                         ({costs.length})
                       </span>
@@ -595,7 +596,7 @@ export function OwnerMaintenancePage() {
                         </div>
                         <div className="flex items-center gap-3">
                           <span className="font-semibold">
-                            LKR {cost.amount}
+                            {formatLKR(cost.amount)}
                           </span>
                           <button
                             type="button"
@@ -613,7 +614,7 @@ export function OwnerMaintenancePage() {
                     ))}
                     <div className="pt-2 border-t flex justify-between font-semibold">
                       <span>Total:</span>
-                      <span>LKR {getTotalCost(selectedRequest.id)}</span>
+                      <span>{formatLKR(getTotalCost(selectedRequest.id))}</span>
                     </div>
                   </div>
                 </div>
@@ -800,7 +801,7 @@ export function OwnerMaintenancePage() {
                 <div className="flex justify-between items-center mb-2">
                   <h4 className="font-medium">Maintenance Costs</h4>
                   <span className="font-semibold">
-                    LKR {getTotalCost(selectedRequest.id)}
+                    {formatLKR(getTotalCost(selectedRequest.id))}
                   </span>
                 </div>
                 {getRequestCosts(selectedRequest.id).length > 0 ? (
@@ -813,7 +814,7 @@ export function OwnerMaintenancePage() {
                         <span className="text-gray-600">
                           {cost.description}
                         </span>
-                        <span className="font-medium">LKR {cost.amount}</span>
+                        <span className="font-medium">{formatLKR(cost.amount)}</span>
                       </div>
                     ))}
                   </div>
@@ -876,7 +877,7 @@ export function OwnerMaintenancePage() {
                 <p className="font-medium">{selectedRequest.title}</p>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Total Recorded Cost:</span>
-                  <span className="font-semibold">LKR {getTotalCost(selectedRequest.id)}</span>
+                  <span className="font-semibold">{formatLKR(getTotalCost(selectedRequest.id))}</span>
                 </div>
               </div>
 

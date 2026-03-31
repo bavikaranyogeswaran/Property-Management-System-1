@@ -35,6 +35,7 @@ import {
   validateName,
 } from '@/utils/validators';
 import apiClient from '@/services/api';
+import { formatLKR } from '@/utils/formatters';
 
 export function PublicPropertyDetailsPage() {
   const { id } = useParams<{ id: string }>();
@@ -335,7 +336,7 @@ export function PublicPropertyDetailsPage() {
                   Starting Price
                 </p>
                 <p className="text-2xl font-bold text-gray-900">
-                  {minRent > 0 ? `LKR ${minRent.toLocaleString()}` : 'N/A'}
+                  {minRent > 0 ? `${formatLKR(minRent)}` : 'N/A'}
                   <span className="text-sm font-normal text-gray-400 ml-1">
                     /mo
                   </span>
@@ -530,12 +531,12 @@ export function PublicPropertyDetailsPage() {
                               </h3>
                               <p className="text-gray-500">{unit.type}</p>
                             </div>
-                            <p className="text-xl font-bold text-blue-600">
-                              LKR {unit.monthlyRent.toLocaleString()}
-                              <span className="text-sm font-normal text-gray-500">
-                                /mo
-                              </span>
-                            </p>
+                             <p className="text-xl font-bold text-blue-600">
+                               {formatLKR(unit.monthlyRent)}
+                               <span className="text-sm font-normal text-gray-500">
+                                 /mo
+                               </span>
+                             </p>
                           </div>
                         </div>
 
@@ -712,7 +713,7 @@ export function PublicPropertyDetailsPage() {
                 <div>
                   <p className="text-sm text-gray-500">Monthly Rent</p>
                   <p className="text-xl font-bold text-blue-600">
-                    LKR {selectedUnit.monthlyRent.toLocaleString()}
+                    {formatLKR(selectedUnit.monthlyRent)}
                   </p>
                 </div>
                 <div>
@@ -873,7 +874,7 @@ export function PublicPropertyDetailsPage() {
                     .filter((u) => u.status !== 'maintenance')
                     .map((u) => (
                       <option key={u.id} value={u.id}>
-                        Unit {u.unitNumber} - {u.type} (LKR {u.monthlyRent.toLocaleString()}/mo) 
+                        Unit {u.unitNumber} - {u.type} ({formatLKR(u.monthlyRent)}/mo) 
                         {u.status !== 'available' ? ` (${u.status.toUpperCase()})` : ''}
                       </option>
                     ))}

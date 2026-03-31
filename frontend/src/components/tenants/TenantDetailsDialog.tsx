@@ -13,6 +13,7 @@ import { Tenant, Lease, Unit, Property } from '@/app/context/AppContext';
 import { TenantScoreCard } from './TenantScoreCard';
 import { BehaviorLogList } from './BehaviorLogList';
 import { AddBehaviorModal, BehaviorLogFormData } from './AddBehaviorModal';
+import { formatLKR } from '@/utils/formatters';
 import { useApp } from '@/app/context/AppContext';
 import { useAuth } from '@/app/context/AuthContext';
 
@@ -166,7 +167,7 @@ export const TenantDetailsDialog: React.FC<TenantDetailsDialogProps> = ({
                         <p className="text-sm text-gray-600">Monthly Income</p>
                         <p className="font-medium">
                           {tenant.monthlyIncome
-                            ? `LKR ${Number(tenant.monthlyIncome).toLocaleString()}`
+                            ? formatLKR(Number(tenant.monthlyIncome))
                             : 'Not provided'}
                         </p>
                       </div>

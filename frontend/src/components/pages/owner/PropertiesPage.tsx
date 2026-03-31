@@ -24,6 +24,7 @@ import {
 import { Building2, Plus, Edit, Trash2, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 import { MultiImageUpload } from '@/components/ui/multi-image-upload';
+import { formatLKR } from '@/utils/formatters';
 
 import { useAuth } from '@/app/context/AuthContext';
 import { useForm } from 'react-hook-form';
@@ -703,7 +704,6 @@ export function PropertiesPage() {
                       </div>
                     </div>
 
-                    {/* Business Rules */}
                     <div className="border-t pt-6 space-y-4">
                       <h3 className="text-lg font-medium">Business Rules</h3>
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -966,7 +966,7 @@ export function PropertiesPage() {
                                         )?.name || 'Unknown'}
                                       </td>
                                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                        LKR {unit.monthlyRent}
+                                        {formatLKR(unit.monthlyRent)}
                                       </td>
                                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                         <button

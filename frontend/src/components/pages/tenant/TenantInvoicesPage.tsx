@@ -32,6 +32,7 @@ import { FileText, CreditCard, AlertCircle, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import { ReceiptViewer } from '@/components/common/ReceiptViewer';
 import apiClient from '@/services/api';
+import { formatLKR } from '@/utils/formatters';
 
 export function TenantInvoicesPage() {
   const { user } = useAuth();
@@ -150,24 +151,24 @@ export function TenantInvoicesPage() {
     {
       label: 'Pending Invoices',
       value: pendingInvoices.length,
-      subtitle: `LKR ${pendingInvoices.reduce((sum, i) => sum + getInvoiceBalance(i.id, i.amount), 0).toLocaleString()}`,
+      subtitle: formatLKR(pendingInvoices.reduce((sum, i) => sum + getInvoiceBalance(i.id, i.amount), 0)),
       color: 'bg-orange-50 text-orange-700',
     },
     {
       label: 'Overdue',
       value: overdueInvoices.length,
-      subtitle: `LKR ${overdueInvoices.reduce((sum, i) => sum + getInvoiceBalance(i.id, i.amount), 0).toLocaleString()}`,
+      subtitle: formatLKR(overdueInvoices.reduce((sum, i) => sum + getInvoiceBalance(i.id, i.amount), 0)),
       color: 'bg-red-50 text-red-700',
     },
     {
       label: 'Paid',
       value: paidInvoices.length,
-      subtitle: `LKR ${paidInvoices.reduce((sum, i) => sum + i.amount, 0).toLocaleString()}`,
+      subtitle: formatLKR(paidInvoices.reduce((sum, i) => sum + i.amount, 0)),
       color: 'bg-green-50 text-green-700',
     },
     {
       label: 'Total Spent',
-      value: `LKR ${paidInvoices.reduce((sum, i) => sum + i.amount, 0).toLocaleString()}`,
+      value: formatLKR(paidInvoices.reduce((sum, i) => sum + i.amount, 0)),
       subtitle: 'All time',
       color: 'bg-blue-50 text-blue-700',
     },
@@ -232,13 +233,12 @@ export function TenantInvoicesPage() {
                   {overdueInvoices.length > 1 ? 's' : ''}
                 </p>
                 <p className="text-sm text-red-700">
-                  Total overdue amount: LKR{' '}
-                  {overdueInvoices
+                  Total overdue amount:{' '}
+                  {formatLKR(overdueInvoices
                     .reduce(
                       (sum, i) => sum + getInvoiceBalance(i.id, i.amount),
                       0
-                    )
-                    .toLocaleString()}
+                    ))}
                 </p>
               </div>
             </div>
@@ -330,10 +330,10 @@ export function TenantInvoicesPage() {
                       <TableCell>{unit?.unitNumber || 'N/A'}</TableCell>
                       <TableCell className="font-semibold">
                         <div className="flex flex-col">
-                          <span>LKR {balance.toLocaleString()}</span>
+                          <span>{formatLKR(balance)}</span>
                           {isPartial && (
                             <span className="text-[10px] text-gray-500">
-                              of {invoice.amount.toLocaleString()}
+                              of {formatLKR(invoice.amount)}
                             </span>
                           )}
                         </div>

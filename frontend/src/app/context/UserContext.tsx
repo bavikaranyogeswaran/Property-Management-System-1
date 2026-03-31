@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import apiClient from '../../services/api';
 import { useAuth } from './AuthContext';
 import { toast } from 'sonner';
+import { toLKRFromCents } from '../../utils/formatters';
 
 export interface Tenant {
   id: string;
@@ -69,7 +70,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
         if (tRes.data) {
           setTenants(tRes.data.map((t: any) => ({
             ...t,
-            monthlyIncome: t.monthlyIncome ? Number(t.monthlyIncome) / 100 : undefined
+            monthlyIncome: t.monthlyIncome ? toLKRFromCents(t.monthlyIncome) : undefined
           })));
         }
       } catch (e) {

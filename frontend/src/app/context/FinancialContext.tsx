@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import apiClient, { invoiceApi, paymentApi, receiptApi } from '../../services/api';
 import { useAuth } from './AuthContext';
 import { toast } from 'sonner';
+import { toLKRFromCents, toCentsFromLKR } from '../../utils/formatters';
 
 export interface RentInvoice {
   id: string;
@@ -85,8 +86,8 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
       if (invRes.data) {
         setInvoices(invRes.data.map((i: any) => ({
           ...i,
-          amount: i.amount / 100,
-          amountPaid: (i.amountPaid || 0) / 100,
+          amount: toLKRFromCents(i.amount),
+          amountPaid: toLKRFromCents(i.amountPaid || 0),
           dueDate: i.dueDate ? new Date(i.dueDate).toLocaleDateString('en-CA') : '',
           generatedDate: i.createdAt ? new Date(i.createdAt).toLocaleDateString('en-CA') : '',
         })));
@@ -97,7 +98,7 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
       if (payRes.data) {
         setPayments(payRes.data.map((p: any) => ({
           ...p,
-          amount: p.amount / 100,
+          amount: toLKRFromCents(p.amount),
           paymentDate: (p.paymentDate || '').split('T')[0],
           submittedAt: p.createdAt || '',
           proofUrl: p.receiptUrl,
@@ -109,7 +110,7 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
       if (receiptRes.data) {
         setReceipts(receiptRes.data.map((r: any) => ({
           ...r,
-          amount: r.amount / 100,
+          amount: toLKRFromCents(r.amount),
           generatedDate: r.receiptDate || r.createdAt,
           paymentDate: (r.paymentDate || '').split('T')[0] || r.receiptDate,
         })));
@@ -127,12 +128,12 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
     const { data } = await apiClient.get(`/reports/ledger-summary?year=${year}`);
     // Normalize subunit cents to display decimals
     return {
-      totalRevenue: data.totalRevenue / 100,
-      totalLiabilityHeld: data.totalLiabilityHeld / 100,
-      totalLiabilityRefunded: data.totalLiabilityRefunded / 100,
-      netLiability: data.netLiability / 100,
-      totalExpense: data.totalExpense / 100,
-      netOperatingIncome: data.netOperatingIncome / 100,
+      totalRevenue: toLKRFromCents(data.totalRevenue),
+      totalLiabilityHeld: toLKRFromCents(data.totalLiabilityHeld),
+      totalLiabilityRefunded: toLKRFromCents(data.totalLiabilityRefunded),
+      netLiability: toLKRFromCents(data.netLiability),
+      totalExpense: toLKRFromCents(data.totalExpense),
+      netOperatingIncome: toLKRFromCents(data.netOperatingIncome),
     };
   };
 
@@ -149,7 +150,7 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
     try {
       const res = await paymentApi.submitPayment({
         ...payment,
-        amount: Math.round(payment.amount * 100)
+        amount: toCentsFromLKR(payment.amount)
       });
       if (res.status === 201) {
         toast.success('Payment submitted successfully');
@@ -173,7 +174,7 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
 
   const recordCashPayment = async (invoiceId: string, amount: number, paymentDate: string, referenceNumber?: string) => {
     try {
-      await paymentApi.recordCashPayment(invoiceId, Math.round(amount * 100), paymentDate, referenceNumber);
+      await paymentApi.recordCashPayment(invoiceId, toCentsFromLKR(amount), paymentDate, referenceNumber);
       toast.success('Cash payment recorded');
       await fetchFinancialData();
     } catch (e: any) {

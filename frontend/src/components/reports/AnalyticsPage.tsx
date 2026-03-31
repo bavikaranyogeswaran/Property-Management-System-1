@@ -35,6 +35,7 @@ import {
   Calendar,
 } from 'lucide-react';
 import { MonthlyCashFlowCard } from '../pages/owner/MonthlyCashFlowCard';
+import { formatLKR } from '@/utils/formatters';
 
 export function AnalyticsPage() {
   const {
@@ -212,7 +213,7 @@ export function AnalyticsPage() {
   const kpiCards = [
     {
       title: 'Total Revenue',
-      value: `LKR ${totalRevenue.toLocaleString()}`,
+      value: formatLKR(totalRevenue),
       subtitle: 'Collected to date',
       icon: DollarSign,
       color: 'text-green-600',
@@ -220,7 +221,7 @@ export function AnalyticsPage() {
     },
     {
       title: 'Expected Monthly',
-      value: `LKR ${expectedMonthlyRevenue.toLocaleString()}`,
+      value: formatLKR(expectedMonthlyRevenue),
       subtitle: 'From active leases',
       icon: TrendingUp,
       color: 'text-blue-600',
@@ -228,7 +229,7 @@ export function AnalyticsPage() {
     },
     {
       title: 'Pending Payments',
-      value: `LKR ${pendingPayments.toLocaleString()}`,
+      value: formatLKR(pendingPayments),
       subtitle: `${invoices.filter((i) => i.status === 'pending').length} invoices`,
       icon: FileText,
       color: 'text-orange-600',
@@ -236,15 +237,15 @@ export function AnalyticsPage() {
     },
     {
       title: 'Maintenance Cost',
-      value: `LKR ${totalMaintenanceCost.toLocaleString()}`,
-      subtitle: `Avg: LKR ${avgMaintenanceCost} per request`,
+      value: formatLKR(totalMaintenanceCost),
+      subtitle: `Avg: ${formatLKR(Number(avgMaintenanceCost))} per request`,
       icon: Wrench,
       color: 'text-red-600',
       bgColor: 'bg-red-50',
     },
     {
       title: 'Net Income',
-      value: `LKR ${netIncome.toLocaleString()}`,
+      value: formatLKR(netIncome),
       subtitle: 'Revenue - Expenses',
       icon: TrendingUp,
       color: 'text-purple-600',
@@ -396,7 +397,7 @@ export function AnalyticsPage() {
                         <td className="py-3">{prop.units}</td>
                         <td className="py-3">{prop.occupied}</td>
                         <td className="py-3 font-semibold">
-                          LKR {prop.revenue.toLocaleString()}
+                          {formatLKR(prop.revenue)}
                         </td>
                         <td className="py-3">
                           <span
@@ -628,7 +629,7 @@ export function AnalyticsPage() {
                     <div className="flex justify-between items-center">
                       <span className="text-sm font-medium">Total Cost</span>
                       <span className="text-xl font-semibold">
-                        LKR {totalMaintenanceCost.toLocaleString()}
+                        {formatLKR(totalMaintenanceCost)}
                       </span>
                     </div>
                     <div className="flex justify-between items-center mt-2">
@@ -636,7 +637,7 @@ export function AnalyticsPage() {
                         Average per Request
                       </span>
                       <span className="font-semibold">
-                        LKR {avgMaintenanceCost}
+                        {formatLKR(Number(avgMaintenanceCost))}
                       </span>
                     </div>
                   </div>
@@ -698,9 +699,9 @@ export function AnalyticsPage() {
                           <td className="py-3">{propRequests.length}</td>
                           <td className="py-3">{propCompleted}</td>
                           <td className="py-3 font-semibold">
-                            LKR {propCost.toLocaleString()}
+                            {formatLKR(propCost)}
                           </td>
-                          <td className="py-3">LKR {propAvg}</td>
+                          <td className="py-3">{formatLKR(Number(propAvg))}</td>
                         </tr>
                       );
                     })}
@@ -709,9 +710,9 @@ export function AnalyticsPage() {
                       <td className="py-3">{maintenanceRequests.length}</td>
                       <td className="py-3">{completedRequests}</td>
                       <td className="py-3">
-                        LKR {totalMaintenanceCost.toLocaleString()}
+                        {formatLKR(totalMaintenanceCost)}
                       </td>
-                      <td className="py-3">LKR {avgMaintenanceCost}</td>
+                      <td className="py-3">{formatLKR(Number(avgMaintenanceCost))}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -761,19 +762,19 @@ export function AnalyticsPage() {
                     <div className="flex justify-between p-2 bg-gray-50 rounded">
                       <span className="text-sm">Expected Revenue</span>
                       <span className="font-semibold">
-                        LKR {expectedMonthlyRevenue.toLocaleString()}
+                        {formatLKR(expectedMonthlyRevenue)}
                       </span>
                     </div>
                     <div className="flex justify-between p-2 bg-green-50 rounded">
                       <span className="text-sm text-green-900">Collected</span>
                       <span className="font-semibold text-green-700">
-                        LKR {totalRevenue.toLocaleString()}
+                        {formatLKR(totalRevenue)}
                       </span>
                     </div>
                     <div className="flex justify-between p-2 bg-orange-50 rounded">
                       <span className="text-sm text-orange-900">Pending</span>
                       <span className="font-semibold text-orange-700">
-                        LKR {pendingPayments.toLocaleString()}
+                        {formatLKR(pendingPayments)}
                       </span>
                     </div>
                     <div className="flex justify-between p-2 bg-blue-50 rounded">
@@ -838,7 +839,7 @@ export function AnalyticsPage() {
                     <div>
                       <p className="text-sm font-medium">{stat.label}</p>
                       <p className="text-xs text-gray-600 mt-1">
-                        LKR {stat.amount.toLocaleString()}
+                        {formatLKR(stat.amount)}
                       </p>
                     </div>
                     <span
@@ -916,7 +917,7 @@ export function AnalyticsPage() {
                             {tenantPending}
                           </td>
                           <td className="py-3 font-semibold">
-                            LKR {tenantTotal.toLocaleString()}
+                            {formatLKR(tenantTotal)}
                           </td>
                         </tr>
                       );

@@ -2,6 +2,7 @@ import React from 'react';
 import { useApp } from '@/app/context/AppContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DollarSign, CheckCircle, Clock, AlertCircle } from 'lucide-react';
+import { formatLKR } from '@/utils/formatters';
 
 export function TreasurerDashboard() {
   const { invoices, payments, receipts, leases } = useApp();
@@ -35,7 +36,7 @@ export function TreasurerDashboard() {
     {
       title: 'Pending Verification',
       value: pendingPayments.length,
-      subtitle: `LKR ${totalPendingAmount.toLocaleString()}`,
+      subtitle: formatLKR(totalPendingAmount),
       icon: Clock,
       color: 'text-orange-600',
       bgColor: 'bg-orange-50',
@@ -43,7 +44,7 @@ export function TreasurerDashboard() {
     {
       title: 'Verified This Month',
       value: verifiedPayments.length,
-      subtitle: `LKR ${totalVerifiedAmount.toLocaleString()}`,
+      subtitle: formatLKR(totalVerifiedAmount),
       icon: CheckCircle,
       color: 'text-green-600',
       bgColor: 'bg-green-50',
@@ -153,7 +154,7 @@ export function TreasurerDashboard() {
                       </div>
                       <div className="text-right">
                         <p className="text-sm font-semibold">
-                          LKR {payment.amount}
+                          {formatLKR(payment.amount)}
                         </p>
                         <span
                           className={`text-xs px-2 py-1 rounded-full ${
@@ -186,13 +187,13 @@ export function TreasurerDashboard() {
               <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
                 <span className="text-sm text-gray-700">Expected Revenue</span>
                 <span className="text-lg font-semibold">
-                  LKR {expectedMonthlyRevenue.toLocaleString()}
+                  {formatLKR(expectedMonthlyRevenue)}
                 </span>
               </div>
               <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
                 <span className="text-sm text-gray-700">Collected</span>
                 <span className="text-lg font-semibold text-green-700">
-                  LKR {totalVerifiedAmount.toLocaleString()}
+                  {formatLKR(totalVerifiedAmount)}
                 </span>
               </div>
               <div className="flex justify-between items-center p-3 bg-orange-50 rounded-lg">
@@ -200,18 +201,13 @@ export function TreasurerDashboard() {
                   Pending Verification
                 </span>
                 <span className="text-lg font-semibold text-orange-700">
-                  LKR {totalPendingAmount.toLocaleString()}
+                  {formatLKR(totalPendingAmount)}
                 </span>
               </div>
               <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
                 <span className="text-sm text-gray-700">Outstanding</span>
                 <span className="text-lg font-semibold text-gray-700">
-                  LKR{' '}
-                  {(
-                    expectedMonthlyRevenue -
-                    totalVerifiedAmount -
-                    totalPendingAmount
-                  ).toLocaleString()}
+                  {formatLKR(expectedMonthlyRevenue - totalVerifiedAmount - totalPendingAmount)}
                 </span>
               </div>
             </div>
@@ -232,10 +228,7 @@ export function TreasurerDashboard() {
                 {paidInvoices.length}
               </p>
               <p className="text-xs text-gray-600 mt-1">
-                LKR{' '}
-                {paidInvoices
-                  .reduce((sum, i) => sum + i.amount, 0)
-                  .toLocaleString()}
+                {formatLKR(paidInvoices.reduce((sum, i) => sum + i.amount, 0))}
               </p>
             </div>
             <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
@@ -244,10 +237,7 @@ export function TreasurerDashboard() {
                 {pendingInvoices.length}
               </p>
               <p className="text-xs text-gray-600 mt-1">
-                LKR{' '}
-                {pendingInvoices
-                  .reduce((sum, i) => sum + i.amount, 0)
-                  .toLocaleString()}
+                {formatLKR(pendingInvoices.reduce((sum, i) => sum + i.amount, 0))}
               </p>
             </div>
             <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
@@ -256,10 +246,7 @@ export function TreasurerDashboard() {
                 {invoices.length}
               </p>
               <p className="text-xs text-gray-600 mt-1">
-                LKR{' '}
-                {invoices
-                  .reduce((sum, i) => sum + i.amount, 0)
-                  .toLocaleString()}
+                {formatLKR(invoices.reduce((sum, i) => sum + i.amount, 0))}
               </p>
             </div>
           </div>
