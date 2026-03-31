@@ -581,13 +581,25 @@ class PaymentService {
             if (invoice.invoiceType === 'deposit' || (invoice.invoice_type === 'deposit')) {
                  const newHeld = Number(lease.securityDeposit || 0) + amountAppliedToInvoice;
                  
-                 const finalInvoice = await invoiceModel.findById(payment.invoiceId, connection);
-                 const finalStatus = finalInvoice.status === 'paid' ? 'paid' : 'pending';
-                 
-                 await leaseModel.update(invoice.leaseId, {
-                     depositStatus: finalStatus,
-                     securityDeposit: newHeld,
-                 }, connection);
+                  const finalInvoice = await invoiceModel.findById(payment.invoiceId, connection);
+                  const finalStatus = finalInvoice.status === 'paid' ? 'paid' : 'pending';
+                  
+                  // [NEW] Extend reservation to 7 days from creation once deposit is paid (to allow doc verification)
+                  const extendedExpiry = formatToLocalDate(addDays(new Date(lease.createdAt), 7));
+
+                  await leaseModel.update(invoice.leaseId, {
+                      depositStatus: finalStatus,
+                      securityDeposit: newHeld,
+                      reservationExpiresAt: extendedExpiry, // Give them 7 full days from creation
+                  }, connection);
+                  
+                  const auditLogger = (await import('../utils/auditLogger.js')).default;
+                  await auditLogger.log({
+                      userId: null,
+                      actionType: 'RESERVATION_EXTENDED',
+                      entityId: invoice.leaseId,
+                      details: { newExpiry: extendedExpiry, reason: 'Deposit payment received' }
+                  }, null, connection);
             }
 
             // Notify Tenant

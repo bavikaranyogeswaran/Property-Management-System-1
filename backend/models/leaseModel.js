@@ -23,8 +23,8 @@ class LeaseModel {
     } = data;
     const dbConn = connection || db;
     const [result] = await dbConn.query(
-      `INSERT INTO leases (tenant_id, unit_id, start_date, end_date, monthly_rent, status, security_deposit, deposit_status, document_url, target_deposit)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO leases (tenant_id, unit_id, start_date, end_date, monthly_rent, status, security_deposit, deposit_status, document_url, target_deposit, reservation_expires_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         tenantId,
         unitId,
@@ -36,6 +36,7 @@ class LeaseModel {
         depositStatus || 'pending',
         data.documentUrl || null,
         data.targetDeposit || 0.0,
+        data.reservationExpiresAt || null,
       ]
     );
     return result.insertId;
@@ -61,6 +62,7 @@ class LeaseModel {
     isDocumentsVerified: 'is_documents_verified',
     verificationStatus: 'verification_status',
     verificationRejectionReason: 'verification_rejection_reason',
+    reservationExpiresAt: 'reservation_expires_at',
   };
 
   async update(id, data, connection = null) {
@@ -284,6 +286,7 @@ class LeaseModel {
       isDocumentsVerified: !!row.is_documents_verified,
       verificationStatus: row.verification_status,
       verificationRejectionReason: row.verification_rejection_reason,
+      reservationExpiresAt: row.reservation_expires_at,
       createdAt: row.created_at,
       // Extra info useful for frontend listing
       unitNumber: row.unit_number,

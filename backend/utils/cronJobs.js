@@ -593,25 +593,16 @@ export const expireStaleRenewals = async () => {
 export const expireDraftLeases = async () => {
   console.log('Running draft lease expiry check...');
   try {
-    const cutoffDate = addDays(now(), -2); // 48 hours ago
-    
-    // Find draft leases that are too old AND have no pending/verified payments 
-    // for their deposit invoice.
+    // [FIXED] Use the hardened reservation_expires_at deadline
     const [staleDrafts] = await db.query(
       `
       SELECT l.lease_id, l.unit_id 
       FROM leases l
       WHERE l.status = 'draft' 
-      AND l.created_at < ?
-      AND NOT EXISTS (
-        SELECT 1 FROM rent_invoices ri
-        JOIN payments p ON ri.invoice_id = p.invoice_id
-        WHERE ri.lease_id = l.lease_id 
-        AND ri.invoice_type = 'deposit'
-        AND p.status IN ('pending', 'verified')
-      )
+      AND l.reservation_expires_at IS NOT NULL
+      AND l.reservation_expires_at < ?
       `,
-      [cutoffDate]
+      [now()]
     );
 
     if (staleDrafts.length > 0) {

@@ -125,6 +125,7 @@ class LeaseService {
         targetDeposit: securityDeposit || 0.0,
         documentUrl: documentUrl || null,
         leaseTermId: data.leaseTermId || null,
+        reservationExpiresAt: formatToLocalDate(addDays(today(), 2)), // [REVISED] 48 hours to pay holding deposit
       };
 
       // 3. Create Lease
@@ -330,7 +331,11 @@ class LeaseService {
         throw new Error('Cannot activate lease: Tenant documents have not been verified by staff.');
       }
 
-      await leaseModel.update(leaseId, { status: 'active', signedAt: getLocalTime() }, conn);
+      await leaseModel.update(leaseId, { 
+        status: 'active', 
+        signedAt: getLocalTime(),
+        reservationExpiresAt: null // [NEW] Clear deadline upon activation
+      }, conn);
 
       await visitModel.cancelVisitsForUnit(lease.unitId, todayDate, conn);
 

@@ -272,6 +272,7 @@ CREATE TABLE leases (
     verification_rejection_reason TEXT, -- [NEW] Reason if documents are rejected
     actual_checkout_at DATETIME, -- [ADDED] Actual checkout time
     signed_at DATETIME, -- [NEW] Time when lease moved to active
+    reservation_expires_at DATETIME, -- [NEW] Hard deadline for draft stage
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (tenant_id) REFERENCES users(user_id) ON DELETE RESTRICT,
     FOREIGN KEY (unit_id) REFERENCES units(unit_id) ON DELETE RESTRICT
