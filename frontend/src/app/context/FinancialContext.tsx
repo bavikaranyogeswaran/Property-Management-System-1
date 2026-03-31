@@ -69,9 +69,11 @@ interface FinancialContextType {
   verifyPayment: (id: string, approved: boolean) => Promise<void>;
   recordCashPayment: (invoiceId: string, amount: number, paymentDate: string, referenceNumber?: string) => Promise<void>;
   runLateFeeAudit: () => Promise<void>;
+  refreshData: () => Promise<void>;
 }
 
 const FinancialContext = createContext<FinancialContextType | undefined>(undefined);
+
 
 export function FinancialProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
@@ -79,7 +81,7 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [receipts, setReceipts] = useState<Receipt[]>([]);
 
-  const fetchFinancialData = async () => {
+  const fetchFinancialData = React.useCallback(async () => {
     try {
       // Invoices
       const invRes = await invoiceApi.getInvoices();
@@ -118,7 +120,8 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       console.error('Failed to fetch financial data', e);
     }
-  };
+  }, []);
+
 
   useEffect(() => {
     if (user) fetchFinancialData();
@@ -194,10 +197,22 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <FinancialContext.Provider value={{ invoices, payments, receipts, fetchLedgerSummary, generateMonthlyInvoices, submitPayment, verifyPayment, recordCashPayment, runLateFeeAudit }}>
+    <FinancialContext.Provider value={{ 
+      invoices, 
+      payments, 
+      receipts, 
+      fetchLedgerSummary, 
+      generateMonthlyInvoices, 
+      submitPayment, 
+      verifyPayment, 
+      recordCashPayment, 
+      runLateFeeAudit,
+      refreshData: fetchFinancialData
+    }}>
       {children}
     </FinancialContext.Provider>
   );
+
 }
 
 export function useFinancial() {

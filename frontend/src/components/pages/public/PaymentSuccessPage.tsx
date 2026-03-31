@@ -10,6 +10,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { useAuth } from '@/app/context/AuthContext';
+import { useFinancial } from '@/app/context/FinancialContext';
+import { useEffect } from 'react';
 
 /**
  * PaymentSuccessPage
@@ -20,6 +22,15 @@ export default function PaymentSuccessPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { refreshData } = useFinancial();
+  
+  // Refresh data on mount to ensure dashboard shows "Paid" instead of "Overdue"
+  useEffect(() => {
+    if (user) {
+      refreshData();
+    }
+  }, [user, refreshData]);
+
   
   // Potential tokens from URL (sent by PayHere or our Simulator)
   const token = searchParams.get('token');

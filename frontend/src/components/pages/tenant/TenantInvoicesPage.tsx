@@ -351,14 +351,15 @@ export function TenantInvoicesPage() {
                       <TableCell>{unit?.unitNumber || 'N/A'}</TableCell>
                       <TableCell className="font-semibold">
                         <div className="flex flex-col">
-                          <span>{formatLKR(balance)}</span>
+                          <span>{formatLKR(invoice.amount)}</span>
                           {isPartial && (
-                            <span className="text-[10px] text-gray-500">
-                              of {formatLKR(invoice.amount)}
+                            <span className="text-[10px] text-blue-600 font-medium">
+                              {formatLKR(balance)} remaining
                             </span>
                           )}
                         </div>
                       </TableCell>
+
                       <TableCell>
                         <div
                           className={

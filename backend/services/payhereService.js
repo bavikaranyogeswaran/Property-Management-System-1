@@ -2,8 +2,10 @@ import { generateCheckoutHash, validateNotificationHash } from '../utils/payhere
 import invoiceModel from '../models/invoiceModel.js';
 import userModel from '../models/userModel.js';
 import paymentService from './paymentService.js';
+import { toCents } from '../utils/moneyUtils.js';
 import pool from '../config/db.js';
 import dotenv from 'dotenv';
+
 
 dotenv.config();
 
@@ -102,7 +104,7 @@ class PayHereService {
             // 3. Record the payment in our system
             await paymentService.recordAutomatedPayment({
                 invoiceId: invoiceId,
-                amount: Number(payhere_amount),
+                amount: toCents(payhere_amount),
                 paymentMethod: 'payhere',
                 referenceNumber: payment_id
             });
