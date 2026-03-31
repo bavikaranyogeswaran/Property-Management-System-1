@@ -168,6 +168,15 @@ class PaymentModel {
     return rows.map(row => this.mapRow(row));
   }
 
+  async findByReferenceNumber(referenceNumber, connection = null) {
+    const db = connection || pool;
+    const [rows] = await db.query(
+      'SELECT * FROM payments WHERE reference_number = ?',
+      [referenceNumber]
+    );
+    return this.mapRow(rows[0]);
+  }
+
   async updateStatus(id, status, verifiedBy = null, connection = null) {
     const db = connection || pool;
     // verifiedBy could be stored if we add that column, for now just status

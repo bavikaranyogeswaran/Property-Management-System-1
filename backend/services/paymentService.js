@@ -351,7 +351,20 @@ class PaymentService {
             const invoice = await invoiceModel.findById(invoiceId, conn);
             if (!invoice) throw new Error(`Invoice #${invoiceId} not found`);
 
-            // 1. Create Verified Payment
+            // 1. [IDEMPOTENCY CHECK] Prevent double-processing of the same gateway transaction
+            const existingPayment = await paymentModel.findByReferenceNumber(referenceNumber, conn);
+            if (existingPayment) {
+                if (existingPayment.status === 'verified') {
+                    console.log(`[PaymentService] Idempotent trigger: Payment for ref ${referenceNumber} already verified. Skipping duplicate.`);
+                    if (!isExternalConn) await conn.rollback();
+                    return Number(existingPayment.id);
+                }
+                // If it exists but is pending, we might want to update it to verified, 
+                // but the current logic is based on 'record' being the entry point.
+                // For now, we skip if already verified as that's the "Happy path duplicate".
+            }
+
+            // 2. Create Verified Payment
             const paymentId = await paymentModel.create({
                 invoiceId,
                 amount,
@@ -359,7 +372,7 @@ class PaymentService {
                 paymentMethod: paymentMethod || 'online',
                 referenceNumber,
                 evidenceUrl: null,
-                status: 'verified' // Support for verified status was added to model
+                status: 'verified'
             }, conn);
 
             const payment = await paymentModel.findById(paymentId, conn);
