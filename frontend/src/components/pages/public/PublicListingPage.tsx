@@ -27,6 +27,7 @@ import {
   ArrowLeft,
   Search,
   X,
+  Flame,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -297,18 +298,46 @@ export function PublicListingPage({
                       (u) => u.status === 'available'
                     ).length;
 
+                    const pendingCount = propertyUnits.reduce(
+                      (sum, u) => sum + (u.pendingApplicationsCount || 0),
+                      0
+                    );
+                    const isHighDemand = pendingCount > availableCount && availableCount > 0;
+
                     // Show block if there are ANY units (even if 0 available)
                     // Hide only if property has NO units created (Total = 0)
                     return totalCount > 0 ? (
-                      <div>
-                        <p className="text-xs text-gray-500 uppercase tracking-wide">
-                          Available Units
-                        </p>
-                        <p
-                          className={`text-2xl font-bold ${availableCount > 0 ? 'text-green-600' : 'text-gray-400'}`}
-                        >
-                          {availableCount}
-                        </p>
+                      <div className="flex gap-6">
+                        <div>
+                          <p className="text-xs text-gray-500 uppercase tracking-wide">
+                            Available
+                          </p>
+                          <p
+                            className={`text-2xl font-bold ${availableCount > 0 ? 'text-green-600' : 'text-gray-400'}`}
+                          >
+                            {availableCount}
+                          </p>
+                        </div>
+                        {pendingCount > 0 && (
+                          <div className="relative">
+                            <p className="text-xs text-gray-500 uppercase tracking-wide">
+                              Pending
+                            </p>
+                            <div className="flex items-center gap-1">
+                              <p className="text-2xl font-bold text-orange-500">
+                                {pendingCount}
+                              </p>
+                              {isHighDemand && (
+                                <Flame className="size-5 text-orange-600 animate-pulse" />
+                              )}
+                            </div>
+                            {isHighDemand && (
+                              <span className="absolute -bottom-4 left-0 text-[10px] text-orange-600 font-bold whitespace-nowrap uppercase tracking-tighter">
+                                High Demand
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
                     ) : null;
                   })()}

@@ -41,9 +41,10 @@ export interface Unit {
   unitTypeId: number;
   type: string;
   monthlyRent: number;
-  status: 'available' | 'occupied' | 'maintenance';
+  status: 'available' | 'occupied' | 'maintenance' | 'reserved';
   createdAt: string;
   imageUrl?: string;
+  pendingApplicationsCount?: number;
 }
 
 interface PropertyContextType {
