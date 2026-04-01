@@ -141,7 +141,7 @@ class LeaseService {
       if (securityDeposit > 0) {
         rawToken = randomUUID();
         const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
-        const expiresAt = formatToLocalDate(addDays(today(), 2)); // 48 hours to pay holding deposit
+        const expiresAt = formatToLocalDate(addDays(today(), 7)); // Increased to 7 days for verification phase
 
         await invoiceModel.create({
           leaseId,

@@ -38,15 +38,18 @@ export default function PaymentSuccessPage() {
 
   // Logic to determine where to send the user back
   const handleReturnAction = () => {
+    // [ONBOARDING FIX] Check for guest token first to redirect to status tracker
+    const guestToken = localStorage.getItem('guestToken') || token;
+    
+    if (guestToken && !user) {
+      navigate(`/onboarding/${guestToken}`);
+      return;
+    }
+
     if (user?.role === 'tenant') {
       navigate('/invoices');
     } else if (user?.role === 'owner') {
       navigate('/payments');
-    } else if (token && token.startsWith('DEP-')) {
-       // A guest who just paid a deposit - they might need to set up their password
-       // We'll trust the onboarding system has sent the email, but we can also
-       // offer them to try the portal which will guide them.
-       navigate('/login');
     } else {
       navigate('/');
     }

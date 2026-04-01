@@ -143,4 +143,15 @@ export const adminApi = {
   triggerLateFees: () => apiClient.post('/admin/trigger-late-fees'),
 };
 
+// Guest / Public API (No Auth Token Required)
+export const guestApi = {
+  getInvoiceDetails: (token: string) => apiClient.get(`/public/invoice/${token}`),
+  submitPayment: (token: string, data: FormData) => 
+    apiClient.post(`/public/invoice/${token}/submit`, data, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    }),
+  getOnboardingStatus: (token: string) => apiClient.get(`/public/invoice/${token}/onboarding-status`),
+  getActivationStatus: (token: string) => apiClient.get(`/public/invoice/${token}/status`),
+};
+
 export default apiClient;

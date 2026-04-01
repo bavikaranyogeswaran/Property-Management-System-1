@@ -178,8 +178,9 @@ class PaymentService {
                 evidenceUrl,
             }, connection);
 
-            // [HARDENED] Invalidate Magic Token after submission to prevent data leakage/link reuse
-            await invoiceModel.clearMagicToken(invoiceId, connection);
+            // [ONBOARDING FIX] DO NOT clear the token after payment submission.
+            // We want it to persist so the guest can track their verification status.
+            // await invoiceModel.clearMagicToken(invoiceId, connection);
 
             // 3. Notify Treasurers
             const [treasurers] = await connection.query("SELECT user_id FROM users WHERE role = 'treasurer' AND status = 'active'");

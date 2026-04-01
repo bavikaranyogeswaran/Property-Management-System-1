@@ -94,6 +94,10 @@ export function GuestPaymentPage() {
       });
       setSuccess(true);
       toast.success('Payment submitted successfully!');
+      // [ONBOARDING FIX] Redirect to the persistent status tracker
+      setTimeout(() => {
+        navigate(`/onboarding/${token}`);
+      }, 2000);
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Failed to submit payment.');
     } finally {

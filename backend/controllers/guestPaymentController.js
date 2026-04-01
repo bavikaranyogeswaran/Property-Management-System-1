@@ -132,6 +132,54 @@ class GuestPaymentController {
        res.status(500).json({ error: 'Failed to check order status' });
     }
   }
+
+  /**
+   * Comprehensive Onboarding Status for the Status Tracker.
+   * Returns invoice, lease, and verification status for a given magic token.
+   */
+  async getStatus(req, res) {
+    try {
+      const { token } = req.params;
+      const invoice = await invoiceModel.findByMagicToken(token);
+      
+      if (!invoice) {
+        return res.status(404).json({ error: 'Invalid or expired onboarding link.' });
+      }
+
+      // Fetch the full lease to get verification details
+      const lease = await leaseModel.findById(invoice.leaseId);
+      if (!lease) {
+        return res.status(404).json({ error: 'Lease not found.' });
+      }
+
+      res.json({
+        invoice: {
+          id: invoice.id,
+          amount: invoice.amount,
+          status: invoice.status,
+          type: invoice.invoiceType,
+          description: invoice.description
+        },
+        lease: {
+          id: lease.id,
+          status: lease.status,
+          verification: {
+            isVerified: lease.isDocumentsVerified,
+            status: lease.verificationStatus, // pending, verified, rejected
+            reason: lease.verificationRejectionReason,
+            documentUrl: lease.documentUrl
+          }
+        },
+        property: {
+          name: invoice.propertyName,
+          unitNumber: invoice.unitNumber
+        }
+      });
+    } catch (error) {
+      console.error('Get Onboarding Status Error:', error);
+      res.status(500).json({ error: 'Failed to fetch status' });
+    }
+  }
 }
 
 export default new GuestPaymentController();
