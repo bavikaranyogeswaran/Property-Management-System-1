@@ -69,68 +69,97 @@ class MaintenanceService {
              throw new Error('Only owners and treasurers can update status');
         }
 
-        // Treasurer RBAC: Check assigned property
-        if (user.role === 'treasurer') {
+        const connection = await pool.getConnection();
+        try {
+            await connection.beginTransaction();
+
             const request = await maintenanceRequestModel.findById(id);
             if (!request) throw new Error('Request not found');
-            
-            const unit = await unitModel.findById(request.unitId);
-            const staffModel = (await import('../models/staffModel.js')).default;
-            const assigned = await staffModel.getAssignedProperties(user.id);
-            const assignedPropertyIds = assigned.map((p) => p.property_id.toString());
-            
-            if (!assignedPropertyIds.includes(unit.propertyId.toString())) {
-                throw new Error('Access denied. You are not assigned to this property.');
+
+            // Treasurer RBAC: Check assigned property
+            if (user.role === 'treasurer') {
+                const unit = await unitModel.findById(request.unitId, connection);
+                const staffModel = (await import('../models/staffModel.js')).default;
+                const assigned = await staffModel.getAssignedProperties(user.id);
+                const assignedPropertyIds = assigned.map((p) => p.property_id.toString());
+                
+                if (!assignedPropertyIds.includes(unit.propertyId.toString())) {
+                    throw new Error('Access denied. You are not assigned to this property.');
+                }
             }
-        }
 
-        const updated = await maintenanceRequestModel.updateStatus(id, status);
+            const updated = await maintenanceRequestModel.updateStatus(id, status);
 
-        // Notification Logic
-        if (status === 'completed' || status === 'in_progress') {
-            try {
-                const request = await maintenanceRequestModel.findById(id);
-                if (request && request.tenant_id) {
-                    // Internal Notification
-                    await notificationModel.create({
-                        userId: request.tenant_id,
-                        message: status === 'completed' 
-                            ? `Maintenance Request '${request.title}' has been marked as completed.`
-                            : `Maintenance Request '${request.title}' is now In Progress. Technician assigned.`,
-                        type: 'maintenance',
-                    });
-
-                    // Email Notification
-                    const tenant = await userModel.findById(request.tenant_id);
-                    if (tenant && tenant.email) {
-                        const unit = await unitModel.findById(request.unitId);
-                        const property = unit ? await propertyModel.findById(unit.propertyId) : null;
-                        
-                        await emailService.sendMaintenanceStatusUpdate(tenant.email, {
-                            title: request.title,
-                            status: status,
-                            propertyName: property ? property.name : null,
-                            unitNumber: unit ? unit.unitNumber : null
-                        });
+            // [MAINTENANCE LOOP FIX] Automatically release unit status
+            if (status === 'completed' || status === 'closed') {
+                const openCount = await maintenanceRequestModel.countOpenByUnitId(request.unitId, connection);
+                
+                // If this request was just completed, we must ensure NO other submitted/in-progress ones exist
+                if (openCount === 0) {
+                    const unit = await unitModel.findById(request.unitId, connection);
+                    
+                    // Critical Guardrail: Only revert if the unit was specifically in 'maintenance' status
+                    // This prevents accidentally marking an 'occupied' or 'reserved' unit as 'available'
+                    if (unit && unit.status === 'maintenance') {
+                         await unitModel.update(request.unitId, { status: 'available' }, connection);
+                         console.log(`[MaintenanceService] Auto-released Unit ${unit.unitNumber} back to 'available' after repairs.`);
                     }
                 }
+            }
 
-                // If completed, also notify treasurers
-                if (status === 'completed') {
-                    const treasurers = await userModel.findByRole('treasurer');
-                    for (const treasurer of treasurers) {
+            await connection.commit();
+
+            // Notification Logic (Async, outside transaction)
+            if (status === 'completed' || status === 'in_progress') {
+                try {
+                    if (request && request.tenant_id) {
+                        // Internal Notification
                         await notificationModel.create({
-                            userId: treasurer.user_id,
-                            message: `Maintenance Request '${request.title}' has been completed. Please record final costs.`,
+                            userId: request.tenant_id,
+                            message: status === 'completed' 
+                                ? `Maintenance Request '${request.title}' has been marked as completed.`
+                                : `Maintenance Request '${request.title}' is now In Progress. Technician assigned.`,
                             type: 'maintenance',
                         });
+
+                        // Email Notification
+                        const tenant = await userModel.findById(request.tenant_id);
+                        if (tenant && tenant.email) {
+                            const unit = await unitModel.findById(request.unitId);
+                            const property = unit ? await propertyModel.findById(unit.propertyId) : null;
+                            
+                            await emailService.sendMaintenanceStatusUpdate(tenant.email, {
+                                title: request.title,
+                                status: status,
+                                propertyName: property ? property.name : null,
+                                unitNumber: unit ? unit.unitNumber : null
+                            });
+                        }
                     }
+
+                    if (status === 'completed') {
+                        const treasurers = await userModel.findByRole('treasurer');
+                        for (const treasurer of treasurers) {
+                            await notificationModel.create({
+                                userId: treasurer.user_id,
+                                message: `Maintenance Request '${request.title}' has been completed. Please record final costs.`,
+                                type: 'maintenance',
+                            });
+                        }
+                    }
+                } catch (err) {
+                    console.error('Failed to send maintenance status update notifications:', err);
                 }
-            } catch (err) {
-                console.error('Failed to send maintenance status update notifications:', err);
             }
+
+            return updated;
+
+        } catch (error) {
+            await connection.rollback();
+            throw error;
+        } finally {
+            connection.release();
         }
-        return updated;
     }
 
     async createInvoice(data, user) {
