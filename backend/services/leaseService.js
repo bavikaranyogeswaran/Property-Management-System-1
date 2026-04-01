@@ -421,7 +421,8 @@ class LeaseService {
     const lease = await leaseModel.findById(leaseId);
     if (!lease) throw new Error('Lease not found');
 
-    if (lease.securityDeposit <= 0) {
+    const ledgerBalance = await leaseModel.getDepositBalance(leaseId);
+    if (ledgerBalance <= 0) {
       throw new Error('No security deposit available to refund.');
     }
 
@@ -433,7 +434,7 @@ class LeaseService {
       throw new Error('Cannot refund deposit that has not been fully paid.');
     }
 
-    const ledgerBalance = await leaseModel.getDepositBalance(leaseId);
+    ledgerBalance = await leaseModel.getDepositBalance(leaseId);
     if (amount > ledgerBalance) {
       throw new Error(`Refund amount (LKR ${amount.toLocaleString()}) cannot exceed verified ledger balance (LKR ${ledgerBalance.toLocaleString()}).`);
     }
@@ -618,7 +619,6 @@ class LeaseService {
 
       await leaseModel.update(leaseId, {
         refundedAmount: Number(lease.refundedAmount || 0) + Number(amount),
-        securityDeposit: 0, // Decrement to zero as it's fully disbursed/withheld
         depositStatus: status,
         proposedRefundAmount: 0
       }, connection);
@@ -694,7 +694,8 @@ class LeaseService {
       throw new Error('No refund settlement is currently awaiting your acknowledgment.');
     }
 
-    const finalStatus = lease.proposedRefundAmount >= lease.securityDeposit ? 'refunded' : 'partially_refunded';
+    const currentBalance = await leaseModel.getDepositBalance(leaseId, connection);
+    const finalStatus = lease.proposedRefundAmount >= currentBalance ? 'refunded' : 'partially_refunded';
 
     const connection = await pool.getConnection();
     try {
@@ -702,9 +703,6 @@ class LeaseService {
 
       await leaseModel.update(leaseId, {
         depositStatus: finalStatus,
-        // The security deposit field tracks the "held" balance. 
-        // We set it to 0 as it's been disbursed/applied.
-        securityDeposit: 0, 
       }, connection);
 
       const auditLogger = (await import('../utils/auditLogger.js')).default;

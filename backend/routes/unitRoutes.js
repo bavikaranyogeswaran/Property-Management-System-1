@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import unitController from '../controllers/unitController.js';
 import { authenticateToken, authorizeRoles } from '../middleware/authMiddleware.js';
+import { authorizeResource } from '../middleware/resourceAuthMiddleware.js';
 
 const router = Router();
 
@@ -19,12 +20,14 @@ router.put(
   '/:id',
   authenticateToken,
   authorizeRoles('owner'),
+  authorizeResource('unit'),
   unitController.updateUnit
 );
 router.delete(
   '/:id',
   authenticateToken,
   authorizeRoles('owner'),
+  authorizeResource('unit'),
   unitController.deleteUnit
 );
 
@@ -32,7 +35,8 @@ router.delete(
 router.patch(
   '/:id/mark-available',
   authenticateToken,
-  authorizeRoles('owner'),
+  authorizeRoles('owner', 'treasurer'),
+  authorizeResource('unit'),
   unitController.markAvailable
 );
 

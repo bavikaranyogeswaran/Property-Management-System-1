@@ -90,17 +90,19 @@ class LeaseModel {
 
   async findAll(ownerId = null, treasurerId = null) {
     let query = `
-            SELECT l.*, 
-                   u.unit_number,
-                   u.property_id,
-                   p.name as property_name,
-                   p.name as property_name,
-                   t_usr.name as tenant_name
-            FROM leases l
-            JOIN units u ON l.unit_id = u.unit_id
-            JOIN properties p ON u.property_id = p.property_id
-            JOIN users t_usr ON l.tenant_id = t_usr.user_id
-            LEFT JOIN rent_invoices ri ON l.lease_id = ri.lease_id AND ri.invoice_type = 'deposit'`;
+             SELECT l.*, 
+                    u.unit_number,
+                    u.property_id,
+                    p.name as property_name,
+                    t_usr.name as tenant_name,
+                    (SELECT (COALESCE(SUM(credit), 0) - COALESCE(SUM(debit), 0)) 
+                     FROM accounting_ledger 
+                     WHERE lease_id = l.lease_id AND category IN ('deposit_held', 'deposit_withheld', 'deposit_refund')) as real_deposit_balance
+             FROM leases l
+             JOIN units u ON l.unit_id = u.unit_id
+             JOIN properties p ON u.property_id = p.property_id
+             JOIN users t_usr ON l.tenant_id = t_usr.user_id
+             LEFT JOIN rent_invoices ri ON l.lease_id = ri.lease_id AND ri.invoice_type = 'deposit'`;
     const params = [];
 
     if (ownerId) {
@@ -130,13 +132,14 @@ class LeaseModel {
                    u.unit_number,
                    u.property_id,
                    p.name as property_name,
-                   p.name as property_name,
-                   t_usr.name as tenant_name
+                   t_usr.name as tenant_name,
+                   (SELECT (COALESCE(SUM(credit), 0) - COALESCE(SUM(debit), 0)) 
+                    FROM accounting_ledger 
+                    WHERE lease_id = l.lease_id AND category IN ('deposit_held', 'deposit_withheld', 'deposit_refund')) as real_deposit_balance
             FROM leases l
             JOIN units u ON l.unit_id = u.unit_id
             JOIN properties p ON u.property_id = p.property_id
             JOIN users t_usr ON l.tenant_id = t_usr.user_id
-            LEFT JOIN rent_invoices ri ON l.lease_id = ri.lease_id AND ri.invoice_type = 'deposit'
             WHERE l.lease_id = ?
         `,
       [id]
@@ -152,13 +155,14 @@ class LeaseModel {
                    u.unit_number,
                    u.property_id,
                    p.name as property_name,
-                   p.name as property_name,
-                   t_usr.name as tenant_name
+                   t_usr.name as tenant_name,
+                   (SELECT (COALESCE(SUM(credit), 0) - COALESCE(SUM(debit), 0)) 
+                    FROM accounting_ledger 
+                    WHERE lease_id = l.lease_id AND category IN ('deposit_held', 'deposit_withheld', 'deposit_refund')) as real_deposit_balance
             FROM leases l
             JOIN units u ON l.unit_id = u.unit_id
             JOIN properties p ON u.property_id = p.property_id
             JOIN users t_usr ON l.tenant_id = t_usr.user_id
-            LEFT JOIN rent_invoices ri ON l.lease_id = ri.lease_id AND ri.invoice_type = 'deposit'
             WHERE l.tenant_id = ?
         `,
       [tenantId]
@@ -172,13 +176,14 @@ class LeaseModel {
                    u.unit_number,
                    u.property_id,
                    p.name as property_name,
-                   p.name as property_name,
-                   t_usr.name as tenant_name
+                   t_usr.name as tenant_name,
+                   (SELECT (COALESCE(SUM(credit), 0) - COALESCE(SUM(debit), 0)) 
+                    FROM accounting_ledger 
+                    WHERE lease_id = l.lease_id AND category IN ('deposit_held', 'deposit_withheld', 'deposit_refund')) as real_deposit_balance
             FROM leases l
             JOIN units u ON l.unit_id = u.unit_id
             JOIN properties p ON u.property_id = p.property_id
             JOIN users t_usr ON l.tenant_id = t_usr.user_id
-            LEFT JOIN rent_invoices ri ON l.lease_id = ri.lease_id AND ri.invoice_type = 'deposit'
             WHERE l.status = 'active'
         `);
     return this.mapRows(rows);
@@ -275,7 +280,7 @@ class LeaseModel {
       endDate: this.formatDate(row.end_date),
       monthlyRent: Number(row.monthly_rent),
       status: row.status,
-      securityDeposit: Number(row.security_deposit || 0),
+      securityDeposit: Number(row.real_deposit_balance || 0),
       depositStatus: row.deposit_status,
       proposedRefundAmount: Number(row.proposed_refund_amount || 0),
       refundNotes: row.refund_notes,

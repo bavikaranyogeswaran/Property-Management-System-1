@@ -603,8 +603,6 @@ class PaymentService {
 
             // Deposit Status Logic
             if (invoice.invoiceType === 'deposit' || (invoice.invoice_type === 'deposit')) {
-                 const newHeld = Number(lease.securityDeposit || 0) + amountAppliedToInvoice;
-                 
                   const finalInvoice = await invoiceModel.findById(payment.invoiceId, connection);
                   const finalStatus = finalInvoice.status === 'paid' ? 'paid' : 'pending';
                   
@@ -613,7 +611,6 @@ class PaymentService {
 
                   await leaseModel.update(invoice.leaseId, {
                       depositStatus: finalStatus,
-                      securityDeposit: newHeld,
                       reservationExpiresAt: extendedExpiry, // Give them 7 full days from creation
                   }, connection);
                   
