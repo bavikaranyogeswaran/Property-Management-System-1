@@ -39,9 +39,9 @@ CREATE TABLE tenants (
     emergency_contact_name VARCHAR(100),
     emergency_contact_phone VARCHAR(20),
     employment_status ENUM('employed', 'self-employed', 'student', 'unemployed'),
-    monthly_income DECIMAL(15,2),        -- LKR
+    monthly_income BIGINT,        -- LKR in Cents
     behavior_score INT DEFAULT 100,      -- [ADDED] Tenant scoring
-    credit_balance DECIMAL(10, 2) DEFAULT 0.00, -- [ADDED] Overpayment balance
+    credit_balance BIGINT DEFAULT 0, -- [ADDED] Overpayment balance in Cents
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 );
 
@@ -131,7 +131,7 @@ CREATE TABLE units (
     property_id INT NOT NULL,
     unit_number VARCHAR(50) NOT NULL,
     unit_type_id INT NOT NULL,               -- [MODIFIED] FK to unit_types
-    monthly_rent DECIMAL(10,2) NOT NULL,
+    monthly_rent BIGINT NOT NULL,
     status ENUM('available', 'occupied', 'maintenance', 'reserved', 'inactive') DEFAULT 'available',
     is_archived BOOLEAN DEFAULT FALSE,
     archived_at DATETIME,
@@ -258,14 +258,14 @@ CREATE TABLE leases (
     unit_id INT NOT NULL,
     start_date DATE NOT NULL,
     end_date DATE,
-    monthly_rent DECIMAL(10,2) NOT NULL,
+    monthly_rent BIGINT NOT NULL,
     status ENUM('draft', 'active', 'expired', 'ended', 'cancelled') DEFAULT 'active',
     notice_status ENUM('undecided', 'vacating', 'renewing') DEFAULT 'undecided', -- [ADDED] Tenant's intent
-    security_deposit DECIMAL(10, 2) DEFAULT 0.00,
+    security_deposit BIGINT DEFAULT 0,
     deposit_status ENUM('pending', 'paid', 'awaiting_approval', 'disputed', 'partially_refunded', 'refunded') DEFAULT 'pending',
-    proposed_refund_amount DECIMAL(10, 2) DEFAULT 0.00,
+    proposed_refund_amount BIGINT DEFAULT 0,
     refund_notes TEXT,
-    refunded_amount DECIMAL(10, 2) DEFAULT 0.00,
+    refunded_amount BIGINT DEFAULT 0,
     document_url VARCHAR(500), -- [ADDED] Lease document URL
     is_documents_verified BOOLEAN DEFAULT FALSE, -- [NEW] Manual verification step
     verification_status ENUM('pending', 'verified', 'rejected') DEFAULT 'pending', -- [NEW] Explicit verification state
@@ -285,7 +285,7 @@ CREATE TABLE lease_rent_adjustments (
     adjustment_id INT AUTO_INCREMENT PRIMARY KEY,
     lease_id INT NOT NULL,
     effective_date DATE NOT NULL,
-    new_monthly_rent DECIMAL(10,2) NOT NULL,
+    new_monthly_rent BIGINT NOT NULL,
     notes TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (lease_id) REFERENCES leases(lease_id) ON DELETE CASCADE
@@ -299,7 +299,7 @@ CREATE TABLE rent_invoices (
     lease_id INT NOT NULL,
     year SMALLINT NOT NULL,
     month TINYINT NOT NULL,
-    amount DECIMAL(10,2) NOT NULL,
+    amount BIGINT NOT NULL,
     due_date DATE NOT NULL,
     status ENUM('pending','partially_paid','paid','overdue','void') DEFAULT 'pending',
     invoice_type ENUM('rent', 'maintenance', 'late_fee', 'deposit', 'other') DEFAULT 'rent',
@@ -315,7 +315,7 @@ CREATE TABLE rent_invoices (
 CREATE TABLE payments (
     payment_id INT AUTO_INCREMENT PRIMARY KEY,
     invoice_id INT NOT NULL,
-    amount DECIMAL(10,2) NOT NULL,
+    amount BIGINT NOT NULL,
     payment_date DATE NOT NULL,
     payment_method VARCHAR(30),
     proof_url VARCHAR(255),
@@ -336,7 +336,7 @@ CREATE TABLE payments (
 CREATE TABLE receipts (
     receipt_id INT AUTO_INCREMENT PRIMARY KEY,
     payment_id INT UNIQUE NOT NULL,
-    amount DECIMAL(10,2) NOT NULL,
+    amount BIGINT NOT NULL,
     receipt_date DATE NOT NULL,
     receipt_number VARCHAR(50) UNIQUE NOT NULL,
     FOREIGN KEY (payment_id) REFERENCES payments(payment_id) ON DELETE CASCADE
@@ -373,7 +373,7 @@ CREATE TABLE maintenance_costs (
     cost_id INT AUTO_INCREMENT PRIMARY KEY,
     request_id INT NOT NULL,
     description VARCHAR(255),
-    amount DECIMAL(10,2) NOT NULL,
+    amount BIGINT NOT NULL,
     recorded_date DATE NOT NULL,
     payout_id INT,
     status ENUM('active', 'voided') DEFAULT 'active',
@@ -402,7 +402,7 @@ CREATE TABLE notifications (
 CREATE TABLE owner_payouts (
     payout_id INT AUTO_INCREMENT PRIMARY KEY,
     owner_id INT NOT NULL,
-    amount DECIMAL(15,2) NOT NULL, -- Net Amount
+    amount BIGINT NOT NULL, -- Net Amount in Cents
     period_start DATE NOT NULL,
     period_end DATE NOT NULL,
     status ENUM('pending', 'processed') DEFAULT 'pending',
@@ -470,8 +470,8 @@ CREATE TABLE accounting_ledger (
     lease_id INT NOT NULL,
     account_type ENUM('revenue', 'liability', 'expense') NOT NULL,
     category VARCHAR(50) NOT NULL,
-    debit DECIMAL(10,2) DEFAULT 0.00,
-    credit DECIMAL(10,2) DEFAULT 0.00,
+    debit BIGINT DEFAULT 0,
+    credit BIGINT DEFAULT 0,
     description VARCHAR(255),
     entry_date DATE NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -507,8 +507,8 @@ CREATE INDEX idx_invoices_status_due_date ON rent_invoices(status, due_date);
 CREATE TABLE IF NOT EXISTS renewal_requests (
     request_id INT AUTO_INCREMENT PRIMARY KEY,
     lease_id INT NOT NULL,
-    current_monthly_rent DECIMAL(10,2) NOT NULL,
-    proposed_monthly_rent DECIMAL(10,2) NULL,
+    current_monthly_rent BIGINT NOT NULL,
+    proposed_monthly_rent BIGINT NULL,
     proposed_end_date DATE NULL,
     status ENUM('pending', 'negotiating', 'approved', 'rejected', 'cancelled') DEFAULT 'pending',
     negotiation_notes TEXT,

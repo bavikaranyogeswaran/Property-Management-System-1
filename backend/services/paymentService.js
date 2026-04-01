@@ -12,7 +12,7 @@ import auditLogger from '../utils/auditLogger.js';
 import ledgerModel from '../models/ledgerModel.js';
 import emailService from '../utils/emailService.js';
 import { getCurrentDateString, getLocalTime, today, now, parseLocalDate, addDays, formatToLocalDate } from '../utils/dateUtils.js';
-import { fromCents } from '../utils/moneyUtils.js';
+import { fromCents, toCentsFromMajor } from '../utils/moneyUtils.js';
 
 /**
  * Maps an invoice_type to the correct accounting ledger classification.
@@ -75,7 +75,7 @@ class PaymentService {
 
             const paymentId = await paymentModel.create({
                 invoiceId,
-                amount,
+                amount: toCentsFromMajor(amount),
                 paymentDate,
                 paymentMethod,
                 referenceNumber,
@@ -235,7 +235,7 @@ class PaymentService {
 
             const paymentId = await paymentModel.create({
                 invoiceId,
-                amount,
+                amount: toCentsFromMajor(amount),
                 paymentDate,
                 paymentMethod: 'cash',
                 referenceNumber: referenceNumber || `CASH-${Date.now()}`,
@@ -350,6 +350,16 @@ class PaymentService {
 
             const invoice = await invoiceModel.findById(invoiceId, conn);
             if (!invoice) throw new Error(`Invoice #${invoiceId} not found`);
+
+            // [SECURITY FIX] 100x Revenue Bleed and Tampering Guard
+            // Compare the PAID amount (in cents) with the INVOICE amount (translated to cents).
+            const expectedCents = Number(invoice.amount);
+            if (Number(amount) < expectedCents) {
+                console.error(`[Security Alert] Underpayment detected for automated invoice #${invoiceId}. Expected ${expectedCents} cents, but received ${amount} cents.`);
+                // We record it as a rejected or partial payment?
+                // For PayHere integration, we expect a 1:1 match for activation.
+                throw new Error('Payment amount mismatch. Security verification failed.');
+            }
 
             // 1. [IDEMPOTENCY CHECK] Prevent double-processing of the same gateway transaction
             const existingPayment = await paymentModel.findByReferenceNumber(referenceNumber, conn);

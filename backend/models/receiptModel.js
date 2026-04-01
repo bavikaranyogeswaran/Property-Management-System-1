@@ -113,7 +113,7 @@ class ReceiptModel {
       paymentId: row.payment_id.toString(),
       invoiceId: row.invoice_id ? row.invoice_id.toString() : null,
       tenantId: row.tenant_id ? row.tenant_id.toString() : null,
-      amount: parseFloat(row.amount),
+      amount: Number(row.amount),
       receiptDate: row.receipt_date,
       receiptNumber: row.receipt_number,
       createdAt: row.receipt_date,

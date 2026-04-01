@@ -11,6 +11,7 @@ import maintenanceCostModel from '../models/maintenanceCostModel.js';
 import ledgerModel from '../models/ledgerModel.js';
 import pool from '../config/db.js';
 import { getCurrentDateString, getLocalTime, today, now } from '../utils/dateUtils.js';
+import { toCentsFromMajor } from '../utils/moneyUtils.js';
 
 class MaintenanceService {
 
@@ -215,7 +216,7 @@ class MaintenanceService {
 
         const invoiceId = await invoiceModel.create({
             leaseId: targetLease.id,
-            amount,
+            amount: toCentsFromMajor(amount),
             dueDate: dueDate || today(),
             description: proposedDescription,
             type: 'maintenance',
@@ -269,7 +270,7 @@ class MaintenanceService {
             // 1. Record the cost
             const costId = await maintenanceCostModel.create({
                 requestId,
-                amount,
+                amount: toCentsFromMajor(amount),
                 description,
                 recordedDate: recordedDate || getLocalTime(),
                 invoiceId: data.invoiceId || null,

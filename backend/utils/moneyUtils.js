@@ -1,23 +1,27 @@
 import Decimal from 'decimal.js';
 
 /**
- * Money Utility
- * Converts currency amounts between float (LKR 100.50) and integer (10050 cents).
- * Standardizes on 2 decimal places for subunits.
+ * Money Utility (Cent-First Architecture)
+ * Standardizes on integer cents (LKR 1.00 = 100 cents) for all internal logic.
  */
 
 /**
- * Converts a dollar/rupee amount to cents.
- * Handles strings or numbers. 100.50 -> 10050
+ * Converts a major unit amount (LKR 100.50) to cents (10050).
+ * Use this only for USER INPUT or EXTERNAL API data that is in major units.
  */
-export const toCents = (amount) => {
+export const toCentsFromMajor = (amount) => {
     if (amount === null || amount === undefined) return 0;
-    // We use Decimal to avoid (100.51 * 100) = 10050.9999999
     return new Decimal(amount).mul(100).toDecimalPlaces(0, Decimal.ROUND_HALF_UP).toNumber();
 };
 
 /**
- * Converts cents back to a float for display/legacy use.
+ * Legacy alias for toCentsFromMajor. 
+ * @deprecated Use toCentsFromMajor for clarity.
+ */
+export const toCents = toCentsFromMajor;
+
+/**
+ * Converts cents back to a float (major units) for display or external gateways.
  * 10050 -> 100.50
  */
 export const fromCents = (cents) => {
@@ -26,25 +30,37 @@ export const fromCents = (cents) => {
 };
 
 /**
- * Perform precise currency math.
- * Usage: moneyMath(100.51).add(20.10).toCents()
+ * Rounds a value that is already in the cent scale (e.g. from division/multiplication).
+ * 150000.0000001 -> 150000
  */
-export const moneyMath = (amount) => {
-    const d = new Decimal(amount);
+export const roundToCents = (val) => {
+    return new Decimal(val).toDecimalPlaces(0, Decimal.ROUND_HALF_UP).toNumber();
+};
+
+/**
+ * Perform precise currency math on cent values.
+ * Usage: moneyMath(50000).mul(1.03).round().value()
+ */
+export const moneyMath = (amountInCents) => {
+    const d = new Decimal(amountInCents);
     return {
         add: (val) => moneyMath(d.add(val)),
         sub: (val) => moneyMath(d.sub(val)),
         mul: (val) => moneyMath(d.mul(val)),
         div: (val) => moneyMath(d.div(val)),
         round: () => moneyMath(d.toDecimalPlaces(0, Decimal.ROUND_HALF_UP)),
-        toCents: () => d.mul(100).toDecimalPlaces(0, Decimal.ROUND_HALF_UP).toNumber(),
-        toDecimal: () => d.toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber(),
-        value: () => d.toNumber()
+        /** @deprecated Use value() for cents or fromCents() for decimals */
+        toCents: () => d.toDecimalPlaces(0, Decimal.ROUND_HALF_UP).toNumber(),
+        /** @deprecated Internal logic should stay in cents. Use fromCents(math.value()) for display. */
+        toDecimal: () => d.toDecimalPlaces(0, Decimal.ROUND_HALF_UP).toNumber(),
+        value: () => d.toDecimalPlaces(0, Decimal.ROUND_HALF_UP).toNumber()
     };
 };
 
 export default {
+    toCentsFromMajor,
     toCents,
     fromCents,
+    roundToCents,
     moneyMath
 };

@@ -48,7 +48,7 @@ export const calculateMonthlyRent = (lease, year, month) => {
         if (leaseStart.getDate() > 1) {
             // [LOGIC FIX] Fixed 30-Day billing: treat 31st as 30th to get 1 day of rent.
             const billableDays = FIXED_DAYS_IN_MONTH - Math.min(leaseStart.getDate(), 30) + 1;
-            effectiveAmount = moneyMath(monthlyRent).div(FIXED_DAYS_IN_MONTH).mul(billableDays).toDecimal();
+            effectiveAmount = moneyMath(monthlyRent).div(FIXED_DAYS_IN_MONTH).mul(billableDays).round().value();
             prorationDetails.push(`${billableDays}/30 days (Starts ${formatToLocalDate(leaseStart)})`);
         }
     }
@@ -60,7 +60,7 @@ export const calculateMonthlyRent = (lease, year, month) => {
             const startDay = (leaseStart > billingMonthStart) ? Math.min(leaseStart.getDate(), 30) : 1;
             const actualBillable = Math.min(leaseEnd.getDate(), 30) - startDay + 1;
             
-            effectiveAmount = moneyMath(monthlyRent).div(FIXED_DAYS_IN_MONTH).mul(actualBillable).toDecimal();
+            effectiveAmount = moneyMath(monthlyRent).div(FIXED_DAYS_IN_MONTH).mul(actualBillable).round().value();
             prorationDetails.push(`${actualBillable}/30 days (Ends ${formatToLocalDate(leaseEnd)})`);
         }
     }

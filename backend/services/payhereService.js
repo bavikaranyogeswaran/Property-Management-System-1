@@ -35,7 +35,8 @@ class PayHereService {
         if (!tenant) throw new Error('Tenant record not found');
 
         const orderId = `INV-${invoice.id || invoice.invoice_id}-${Date.now()}`;
-        const amount = invoice.amount / 100;
+        // [FIXED] Database stores Decimal (Major units). PayHere Sandbox/Production also expects Major units.
+        const amount = fromCents(invoice.amount); 
         const currency = 'LKR';
 
         const hash = generateCheckoutHash(orderId, amount, currency);
@@ -102,9 +103,12 @@ class PayHereService {
             console.log(`[PayHereService] Payment Successful for Invoice #${invoiceId}`);
 
             // 3. Record the payment in our system
+            // [HARDENED] Ensure the recorded amount is converted to integer cents for the ledger.
+            const paidCents = toCents(payhere_amount);
+
             await paymentService.recordAutomatedPayment({
                 invoiceId: invoiceId,
-                amount: toCents(payhere_amount),
+                amount: paidCents,
                 paymentMethod: 'payhere',
                 referenceNumber: payment_id
             });

@@ -311,7 +311,7 @@ export const applyLateFees = async () => {
 
       // Use property-specific fee if available, otherwise fallback to system default
       const feePercentage = inv.lateFeePercentage !== null ? (inv.lateFeePercentage / 100) : LATE_FEE_PERCENTAGE;
-      const lateFeeAmount = moneyMath(inv.amount).mul(feePercentage).toCents();
+      const lateFeeAmount = moneyMath(inv.amount).mul(feePercentage).round().value();
 
       // Create Late Fee Invoice
       const lateFeeInvoiceId = await invoiceModel.createLateFeeInvoice({

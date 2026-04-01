@@ -8,6 +8,7 @@ import visitModel from '../models/visitModel.js';
 import leadModel from '../models/leadModel.js';
 import { validateLeaseDuration } from '../utils/validators.js';
 import { getCurrentDateString, getLocalTime, today, parseLocalDate, addDays, formatToLocalDate, getDaysInMonth } from '../utils/dateUtils.js';
+import { toCentsFromMajor } from '../utils/moneyUtils.js';
 import renewalService from './renewalService.js';
 
 class LeaseService {
@@ -119,13 +120,13 @@ class LeaseService {
         unitId,
         startDate,
         endDate,
-        monthlyRent,
-        securityDeposit: 0, // Held amount starts at 0. Target is in Invoice.
+        monthlyRent: toCentsFromMajor(monthlyRent),
+        securityDeposit: 0, 
         status: 'draft',
-        targetDeposit: securityDeposit || 0.0,
+        targetDeposit: toCentsFromMajor(securityDeposit || 0.0),
         documentUrl: documentUrl || null,
         leaseTermId: data.leaseTermId || null,
-        reservationExpiresAt: formatToLocalDate(addDays(today(), 2)), // [REVISED] 48 hours to pay holding deposit
+        reservationExpiresAt: formatToLocalDate(addDays(today(), 2)), 
       };
 
       // 3. Create Lease

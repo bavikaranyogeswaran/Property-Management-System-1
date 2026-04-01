@@ -6,6 +6,7 @@ import propertyModel from '../models/propertyModel.js';
 import pool from '../config/db.js';
 import emailService from '../utils/emailService.js';
 import { addDays, parseLocalDate, formatToLocalDate } from '../utils/dateUtils.js';
+import { toCentsFromMajor } from '../utils/moneyUtils.js';
 
 class RenewalService {
     async createFromNotice(leaseId, user = null) {
@@ -49,7 +50,7 @@ class RenewalService {
         }
 
         await renewalRequestModel.updateTerms(requestId, {
-            proposedMonthlyRent: data.proposedMonthlyRent,
+            proposedMonthlyRent: toCentsFromMajor(data.proposedMonthlyRent),
             proposedEndDate: data.proposedEndDate,
             notes: data.notes,
             status: 'negotiating'
