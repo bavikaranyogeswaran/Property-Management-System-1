@@ -296,7 +296,11 @@ class LeaseController {
   async resolveRefundDispute(req, res) {
     try {
       const { id } = req.params;
-      const result = await leaseService.resolveRefundDispute(id, req.user);
+      const { adjustedAmount } = req.body;
+      if (adjustedAmount === undefined || adjustedAmount < 0) {
+         return res.status(400).json({ error: 'Valid adjustedAmount is required' });
+      }
+      const result = await leaseService.resolveRefundDispute(id, req.user, adjustedAmount);
       res.json(result);
     } catch (error) {
       console.error(error);

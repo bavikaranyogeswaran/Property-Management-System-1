@@ -20,7 +20,7 @@ import { formatLKR } from '@/utils/formatters';
 
 export function TenantLeasePage() {
   const { user } = useAuth();
-  const { leases, units, properties, updateNoticeStatus, renewalRequests, acknowledgeRefund } = useApp();
+  const { leases, units, properties, updateNoticeStatus, renewalRequests, acknowledgeRefund, disputeRefund } = useApp();
 
   // Separate active and past leases
   const activeLeases = leases.filter((l) => l.status === 'active');
@@ -380,14 +380,28 @@ export function TenantLeasePage() {
                                   Owner has approved a refund of <strong>{formatLKR(currentLease.proposedRefundAmount || 0)}</strong>.
                                   Please acknowledge this settlement to finalize the process.
                                 </p>
-                                <Button 
-                                  size="sm" 
-                                  className="bg-blue-600 hover:bg-blue-700 text-white"
-                                  onClick={() => acknowledgeRefund(currentLease.id)}
-                                >
-                                  <CheckCircle className="size-4 mr-2" />
-                                  Confirm & Acknowledge Settlement
-                                </Button>
+                                <div className="flex gap-2">
+                                  <Button 
+                                    size="sm" 
+                                    className="bg-blue-600 hover:bg-blue-700 text-white flex-1"
+                                    onClick={() => acknowledgeRefund(currentLease.id)}
+                                  >
+                                    <CheckCircle className="size-4 mr-2" />
+                                    Confirm Settlement
+                                  </Button>
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline"
+                                    className="text-red-600 border-red-200 hover:bg-red-50 flex-1"
+                                    onClick={() => {
+                                      const notes = window.prompt("Why are you disputing this deduction?");
+                                      if (notes) disputeRefund(currentLease.id, notes);
+                                    }}
+                                  >
+                                    <AlertTriangle className="size-4 mr-2" />
+                                    Dispute Deduction
+                                  </Button>
+                                </div>
                               </div>
                             </div>
                           </div>

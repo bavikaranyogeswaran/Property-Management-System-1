@@ -726,6 +726,64 @@ export const deactivateFormerTenants = async (targetDate = null) => {
     console.error('Error in former tenant deactivation:', error);
   }
 };
+/**
+ * [C4 FIX] Auto-acknowledge refunds if over 7 days in awaiting_acknowledgment
+ */
+export const autoAcknowledgeRefunds = async () => {
+  try {
+    const [leases] = await db.query(
+      `SELECT l.lease_id, l.deposit_status, l.proposed_refund_amount, 
+              (SELECT (COALESCE(SUM(credit), 0) - COALESCE(SUM(debit), 0)) 
+               FROM accounting_ledger 
+               WHERE lease_id = l.lease_id AND category IN ('deposit_held', 'deposit_withheld', 'deposit_refund')) as real_deposit_balance
+       FROM leases l
+       WHERE l.deposit_status = 'awaiting_acknowledgment'`
+    );
+
+    for (const lease of leases) {
+      const [approvalLogs] = await db.query(
+        `SELECT created_at FROM audit_logs 
+         WHERE entity_id = ? AND action_type = 'DEPOSIT_REFUND_APPROVED' 
+         ORDER BY created_at DESC LIMIT 1`,
+        [lease.lease_id]
+      );
+      
+      let approvalDateStr;
+      if (approvalLogs.length > 0) {
+         approvalDateStr = formatToLocalDate(approvalLogs[0].created_at);
+      } else {
+         const fallbackDate = new Date();
+         fallbackDate.setDate(fallbackDate.getDate() - 8);
+         approvalDateStr = formatToLocalDate(fallbackDate);
+      }
+
+      const diffDays = (parseLocalDate(today()) - parseLocalDate(approvalDateStr)) / (1000 * 60 * 60 * 24);
+      if (diffDays >= 7) {
+        console.log(`[Auto-Ack] Auto-acknowledging refund for lease ${lease.lease_id} after 7 days.`);
+        
+        const currentBalance = Number(lease.real_deposit_balance || 0);
+        const proposedAmount = Number(lease.proposed_refund_amount || 0);
+        const finalStatus = proposedAmount >= currentBalance ? 'refunded' : 'partially_refunded';
+
+        await db.query(`UPDATE leases SET deposit_status = ? WHERE lease_id = ?`, [finalStatus, lease.lease_id]);
+
+        try {
+          const auditLogger = (await import('./auditLogger.js')).default;
+          await auditLogger.log({
+            userId: null,
+            actionType: 'DEPOSIT_REFUND_ACKNOWLEDGED',
+            entityId: lease.lease_id,
+            details: { status: finalStatus, amount: proposedAmount, mechanism: 'auto_timeout' },
+          });
+        } catch (auditErr) {
+          console.error(`Failed to log auto-ack audit for ${lease.lease_id}:`, auditErr);
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Error auto-acknowledging refunds:', error);
+  }
+};
 
 /**
  * Unified Nightly Cron Job (Locking + Backfill)
@@ -752,6 +810,9 @@ export const runNightlyCron = async (targetDate = null) => {
     await expireStaleRenewals();
     await expireDraftLeases();
     await deactivateFormerTenants(executionDate);
+    
+    // 5. Refund Operations
+    await autoAcknowledgeRefunds();
 
     await logCronExecution('nightly_billing', executionDate, 'success');
   } catch (err) {

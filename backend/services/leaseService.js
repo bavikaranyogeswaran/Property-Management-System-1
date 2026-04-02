@@ -750,7 +750,7 @@ class LeaseService {
     }
   }
 
-  async resolveRefundDispute(leaseId, user) {
+  async resolveRefundDispute(leaseId, user, adjustedAmount) {
     if (user.role !== 'owner' && user.role !== 'treasurer') {
       throw new Error('Access denied');
     }
@@ -758,13 +758,18 @@ class LeaseService {
     const lease = await leaseModel.findById(leaseId);
     if (!lease) throw new Error('Lease not found');
 
-    // [B3 FIX] Changed deposit_status → depositStatus (model returns camelCase)
     if (lease.depositStatus !== 'disputed') {
       throw new Error('Only disputed refunds can be resolved.');
     }
+    
+    const ledgerBalance = await leaseModel.getDepositBalance(leaseId);
+    if (adjustedAmount > ledgerBalance) {
+      throw new Error(`Adjusted refund amount (LKR ${adjustedAmount.toLocaleString()}) cannot exceed verified ledger balance (LKR ${ledgerBalance.toLocaleString()}).`);
+    }
 
     await leaseModel.update(leaseId, {
-      depositStatus: 'pending' // Move back to pending for re-approval
+      depositStatus: 'awaiting_acknowledgment',
+      proposedRefundAmount: adjustedAmount
     });
 
     const auditLogger = (await import('../utils/auditLogger.js')).default;
@@ -772,10 +777,10 @@ class LeaseService {
       userId: user.id,
       actionType: 'DEPOSIT_REFUND_RESOLVED',
       entityId: leaseId,
-      details: { previousStatus: 'disputed' },
+      details: { previousStatus: 'disputed', newProposedAmount: adjustedAmount },
     });
 
-    return { status: 'pending' };
+    return { status: 'awaiting_acknowledgment', proposedRefundAmount: adjustedAmount };
   }
 
   async refundDeposit(leaseId, amount, user) {
