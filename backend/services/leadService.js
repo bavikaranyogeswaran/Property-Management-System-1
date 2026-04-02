@@ -85,6 +85,21 @@ class LeadService {
 
         if (existingLeadId) {
             leadId = existingLeadId;
+
+            // [C1 FIX] Log unit interest change before overwriting
+            if (finalUnitId) {
+                const existingLead = await leadModel.findById(leadId);
+                if (existingLead && existingLead.interestedUnit && 
+                    String(existingLead.interestedUnit) !== String(finalUnitId)) {
+                    await leadStageHistoryModel.create(
+                        leadId,
+                        existingLead.status,
+                        existingLead.status, // status stays the same
+                        `Unit interest changed from Unit #${existingLead.interestedUnit} to Unit #${finalUnitId}`
+                    );
+                }
+            }
+
             await leadModel.update(leadId, {
                 lastContactedAt: getLocalTime(),
                 notes: notes ? `${notes} (Re-inquiry)` : undefined,

@@ -46,6 +46,7 @@ import {
   Unlock,
   Share2,
   ShieldCheck,
+  RefreshCw,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatLKR } from '@/utils/formatters';
@@ -475,6 +476,7 @@ export function LeasesPage() {
               </>
             )}
             {lease.status === 'draft' && lease.magicToken && (
+              <>
               <Button
                 size="sm"
                 variant="ghost"
@@ -488,6 +490,23 @@ export function LeasesPage() {
               >
                 <Share2 className="size-4" />
               </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={async () => {
+                  try {
+                    await apiClient.post(`/leases/${lease.id}/regenerate-token`);
+                    toast.success('Payment link resent to tenant\'s email');
+                  } catch (err: any) {
+                    toast.error(err.response?.data?.error || 'Failed to resend payment link');
+                  }
+                }}
+                className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                title="Resend Payment Link via Email"
+              >
+                <RefreshCw className="size-4" />
+              </Button>
+              </>
             )}
             {lease.status === 'expired' && (
               <Button

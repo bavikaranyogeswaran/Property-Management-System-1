@@ -359,6 +359,30 @@ class LeaseService {
         }
         
         await leadModel.dropLeadsForUnit(lease.unitId, conn);
+
+        // [C1 FIX] Notify dropped leads that the unit is no longer available
+        try {
+          const [droppedLeads] = await conn.query(
+            `SELECT l.email, l.name, u.unit_number, p.name AS property_name 
+             FROM leads l
+             JOIN units u ON l.unit_id = u.unit_id
+             JOIN properties p ON l.property_id = p.property_id
+             WHERE l.unit_id = ? AND l.status = 'dropped' 
+             AND l.notes LIKE '%Unit Leased%'`,
+            [lease.unitId]
+          );
+          const emailService = (await import('../utils/emailService.js')).default;
+          for (const lead of droppedLeads) {
+            if (lead.email) {
+              await emailService.sendGenericNotification(lead.email, {
+                subject: `Unit ${lead.unit_number} at ${lead.property_name} is no longer available`,
+                message: `Dear ${lead.name}, Unit ${lead.unit_number} at ${lead.property_name} is no longer available. Please contact us for alternative units.`
+              }).catch(err => console.error(`Failed to notify dropped lead ${lead.email}:`, err));
+            }
+          }
+        } catch (notifyErr) {
+          console.error('[LeaseService] Failed to notify dropped leads:', notifyErr);
+        }
       }
       
       // [IMPROVEMENT] Backfill Missing Rent Invoices if activated late
