@@ -55,6 +55,12 @@ class VisitService {
             }
         }
 
+        // 5. Property-Wide Capacity Detection (Max 1 concurrent visit per property)
+        const concurrentVisits = await visitModel.countInSlotByProperty(propertyId, scheduledDate);
+        if (concurrentVisits >= 1) {
+            throw new Error('Property viewing capacity reached for this time slot (Max 1). Please select another time.');
+        }
+
         let leadId = await leadModel.findIdByEmailAndProperty(email, propertyId);
         if (!leadId) {
             leadId = await leadModel.create({
@@ -149,9 +155,18 @@ class VisitService {
     }
 
     async getVisits(user) {
-        // Owner only? Or Treasurer? usually Owner.
-        const ownerId = user.id; // Model handles filtering by ownerId if provided
-        return await visitModel.findAll({ ownerId });
+        if (user.role === 'owner') {
+            return await visitModel.findAll({ ownerId: user.id });
+        } else if (user.role === 'treasurer') {
+            const staffModel = (await import('../models/staffModel.js')).default;
+            const assigned = await staffModel.getAssignedProperties(user.id);
+            const propertyIds = assigned.map(p => p.property_id);
+            
+            if (propertyIds.length === 0) return [];
+            return await visitModel.findAll({ propertyIds });
+        } else {
+            throw new Error('Access denied. Insufficient permissions to view visits.');
+        }
     }
 
     async updateStatus(id, status, user) {

@@ -57,6 +57,11 @@ class VisitModel {
       params.push(filters.propertyId);
     }
 
+    if (filters.propertyIds && filters.propertyIds.length > 0) {
+      query += ` AND v.property_id IN (?)`;
+      params.push(filters.propertyIds);
+    }
+
     query += ` ORDER BY v.scheduled_date ASC`;
 
     const [rows] = await db.query(query, params);
@@ -136,6 +141,16 @@ class VisitModel {
       [unitId, scheduledDate]
     );
     return rows.length > 0;
+  }
+
+  async countInSlotByProperty(propertyId, scheduledDate) {
+    if (!propertyId) return 0;
+    const [rows] = await db.query(
+      `SELECT COUNT(*) as count FROM property_visits 
+             WHERE property_id = ? AND scheduled_date = ? AND status IN ('pending', 'confirmed')`,
+      [propertyId, scheduledDate]
+    );
+    return rows[0].count;
   }
 
   async findUpcoming(hoursAhead = 24) {
