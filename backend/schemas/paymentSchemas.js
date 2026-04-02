@@ -9,12 +9,7 @@ export const submitPaymentSchema = Joi.object({
   evidenceUrl: Joi.string().uri().allow('', null),
 });
 
-export const recordCashPaymentSchema = Joi.object({
-  invoiceId: Joi.number().integer().required(),
-  amount: Joi.number().positive().required(),
-  paymentDate: Joi.date().iso().required(),
-  referenceNumber: Joi.string().allow('', null),
-});
+
 
 export const verifyPaymentSchema = Joi.object({
   status: Joi.string().valid('verified', 'rejected').required(),

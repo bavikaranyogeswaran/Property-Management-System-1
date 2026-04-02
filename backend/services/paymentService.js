@@ -217,123 +217,7 @@ class PaymentService {
         }, connection);
     }
 
-    async recordCashPayment(data, treasurerUser) {
-        if (treasurerUser.role !== 'treasurer') {
-            throw new Error('Access denied. Only Treasurers can record cash payments.');
-        }
 
-        const { invoiceId, amount, paymentDate, referenceNumber } = data;
-
-        // Integrity Check
-        const invoiceCheck = await invoiceModel.findById(invoiceId);
-        if (!invoiceCheck) {
-            throw new Error('Invoice not found');
-        }
-
-        const connection = await pool.getConnection();
-        try {
-            await connection.beginTransaction();
-
-            const paymentId = await paymentModel.create({
-                invoiceId,
-                amount: toCentsFromMajor(amount),
-                paymentDate,
-                paymentMethod: 'cash',
-                referenceNumber: referenceNumber || `CASH-${Date.now()}`,
-                evidenceUrl: null,
-            }, connection);
-
-            const { payment: updatedPayment } = await paymentModel.updateStatus(paymentId, 'verified', null, connection);
-
-            // Calculate total verified payments for this invoice
-            const allPayments = await paymentModel.findByInvoiceId(invoiceId, connection);
-            const totalVerified = allPayments
-                .filter((p) => p.status === 'verified')
-                .reduce((sum, p) => sum + Number(p.amount), 0);
-
-            const invoice = await invoiceModel.findById(invoiceId, connection);
-
-            if (invoice) {
-                const previousVerified = totalVerified - Number(amount);
-                const amountAppliedToInvoice = Math.min(Number(amount), Math.max(0, invoice.amount - previousVerified));
-                const incrementalOverpayment = Number(amount) - amountAppliedToInvoice;
-
-                if (totalVerified >= invoice.amount) {
-                    await invoiceModel.updateStatus(invoiceId, 'paid', connection);
-
-                    // Overpayment Logic: Credit excess to tenant account (Bug B5 Fix)
-                    if (incrementalOverpayment > 0) {
-                        await tenantModel.addCredit(invoice.tenantId || invoice.tenant_id, incrementalOverpayment, connection);
-                        await notificationModel.create({
-                            userId: invoice.tenantId || invoice.tenant_id,
-                            message: `Overpayment of ${fromCents(incrementalOverpayment).toFixed(2)} has been credited to your account balance.`,
-                            type: 'payment',
-                        }, connection);
-                    }
-                } else if (totalVerified > 0) {
-                    await invoiceModel.updateStatus(invoiceId, 'partially_paid', connection);
-                }
-
-                await receiptModel.create({
-                    paymentId,
-                    invoiceId,
-                    tenantId: invoice.tenant_id,
-                    amount,
-                    generatedDate: today(),
-                    receiptNumber: `REC-CASH-${randomUUID()}`,
-                }, connection);
-
-                await auditLogger.log(
-                    {
-                        userId: treasurerUser.id,
-                        actionType: 'PAYMENT_RECEIVED_CASH',
-                        entityId: paymentId,
-                        details: { invoiceId, amount, receiptGenerated: true },
-                    },
-                    null,
-                    connection
-                );
-
-                // Post Ledger Entry (Centralized)
-                await this._postToLedger(
-                    paymentId, 
-                    invoice, 
-                    amount, 
-                    `Cash payment for ${invoice.description || invoice.invoice_type}`, 
-                    connection
-                );
-
-                await connection.commit();
-
-                // Fire-and-forget emails outside transaction
-                try {
-                    const tenant = await userModel.findById(invoice.tenantId || invoice.tenant_id);
-                    if (tenant && tenant.email) {
-                        await emailService.sendPaymentConfirmation(tenant.email, {
-                            amount: amount,
-                            paymentMethod: 'cash',
-                            referenceNumber: referenceNumber || `CASH-${Date.now()}`,
-                            invoiceId: invoiceId
-                        });
-                    }
-                } catch (emailErr) {
-                    console.error('Failed to send cash payment confirmation email:', emailErr);
-                }
-
-                return paymentId;
-
-            } else {
-                throw new Error('Invoice vanished during transaction');
-            }
-
-        } catch (error) {
-            await connection.rollback();
-            console.error('Record Cash Payment Transaction Failed:', error);
-            throw error;
-        } finally {
-            connection.release();
-        }
-    }
 
 
     /**
@@ -430,28 +314,46 @@ class PaymentService {
         try {
             await connection.beginTransaction();
 
+            const payment = await paymentModel.findById(paymentId, connection);
+            if (!payment) throw new Error('Payment not found');
+
+            const invoice = await invoiceModel.findById(payment.invoiceId || payment.invoice_id, connection);
+            if (!invoice) throw new Error('Invoice not found');
+
+            // [C3 FIX - Problem 3] Block verification for voided/cancelled invoices
+            if (invoice.status === 'void' || invoice.status === 'cancelled') {
+                throw new Error("Cannot verify payment for a voided or cancelled invoice.");
+            }
+
+            // [C3 FIX - Problem 2] Strict Treasurer Assignment RBAC
+            const lease = await leaseModel.findById(invoice.leaseId || invoice.lease_id, connection);
+            if (!lease) throw new Error('Lease not found');
+            
+            const unitModel = (await import('../models/unitModel.js')).default;
+            const unit = await unitModel.findById(lease.unitId || lease.unit_id, connection);
+            
+            const staffModel = (await import('../models/staffModel.js')).default;
+            const assignedProperties = await staffModel.getAssignedProperties(user.id);
+            if (!assignedProperties.some(p => String(p.property_id) === String(unit.propertyId || unit.property_id))) {
+                throw new Error('Access denied. You are not assigned to this property.');
+            }
+
             const { payment: updatedPayment, changed } = await paymentModel.updateStatus(paymentId, status, null, connection);
 
-            // Concurrency Lock: If this payment was ALREADY set to this status by another request, halt.
+            // [C3 FIX - Problem 4] Concurrency Lock: Throw explicit error on Idempotency catch
             if (!changed) {
-                 console.warn(`Idempotency caught duplicate status update for Payment ${paymentId}`);
                  await connection.rollback();
-                 return updatedPayment;
+                 throw new Error('This payment was already verified or rejected by another user.');
             }
 
             if (status === 'verified') {
                 const payment = updatedPayment;
                 if (payment) {
-                    const invoice = await invoiceModel.findById(payment.invoiceId, connection);
-                    if (!invoice) throw new Error('Invoice not found for verification');
-                    
                     await this._finalizeVerifiedPayment(paymentId, invoice, payment, user, connection);
                 }
             } else if (status === 'rejected') {
                  const payment = updatedPayment;
                  if (payment) {
-                     const invoice = await invoiceModel.findById(payment.invoiceId, connection);
-                     if (invoice) {
                          const allPayments = await paymentModel.findByInvoiceId(payment.invoiceId, connection);
                          const totalVerified = allPayments
                             .filter((p) => p.status === 'verified')
@@ -493,7 +395,6 @@ class PaymentService {
                          }, { user: user }, connection);
                      }
                  }
-            }
 
             await connection.commit();
 

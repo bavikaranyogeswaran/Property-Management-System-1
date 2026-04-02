@@ -29,25 +29,7 @@ class PaymentController {
     }
   }
 
-  //  RECORD CASH: Treasurer takes physical cash. Checks it instantly.
-  async recordCashPayment(req, res) {
-    try {
-      const paymentId = await paymentService.recordCashPayment(req.body, req.user);
-      
-      res
-        .status(201)
-        .json({
-          message: 'Cash payment recorded and verified, receipt generated',
-          paymentId,
-        });
-    } catch (error) {
-      console.error(error);
-      if (error.message.includes('Access denied')) {
-          return res.status(403).json({ error: error.message });
-      }
-      res.status(500).json({ error: 'Failed to record cash payment' });
-    }
-  }
+
 
   //  VERIFY PAYMENT: Treasurer looks at bank statement and says "Yes, money is here".
   async verifyPayment(req, res) {
