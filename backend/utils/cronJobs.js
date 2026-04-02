@@ -786,6 +786,58 @@ export const autoAcknowledgeRefunds = async () => {
 };
 
 /**
+ * [C5 FIX] SLA Escalation for Maintenance Requests
+ */
+export const escalateOverdueMaintenance = async () => {
+  try {
+    const [openRequests] = await db.query(
+      `SELECT r.request_id, r.title, r.priority, r.created_at, r.status, u.unit_number, p.name as property_name, p.owner_id
+       FROM maintenance_requests r
+       JOIN units u ON r.unit_id = u.unit_id
+       JOIN properties p ON u.property_id = p.property_id
+       WHERE r.status IN ('submitted', 'in_progress')`
+    );
+
+    const nowTime = getLocalTime().getTime();
+
+    for (const req of openRequests) {
+      const createdTime = new Date(req.created_at).getTime();
+      let thresholdHours = 0;
+
+      if (req.priority === 'urgent') thresholdHours = 24;
+      else if (req.priority === 'high') thresholdHours = 72;
+      else if (req.priority === 'normal') thresholdHours = 168;
+
+      if (thresholdHours > 0) {
+        const elapsedHours = (nowTime - createdTime) / (1000 * 60 * 60);
+        if (elapsedHours > thresholdHours) {
+          const alertMsg = `[SLA BREACH] Maintenance request '${req.title}' for Unit ${req.unit_number} (${req.property_name}) is overdue based on its ${req.priority} priority. Action required.`;
+          
+          await notificationModel.create({
+            userId: req.owner_id,
+            message: alertMsg,
+            type: 'maintenance',
+            severity: 'urgent'
+          });
+
+          const [treasurers] = await db.query(`SELECT user_id FROM users WHERE role = 'treasurer'`);
+          for (const t of treasurers) {
+            await notificationModel.create({
+              userId: t.user_id,
+              message: alertMsg,
+              type: 'maintenance',
+              severity: 'urgent'
+            });
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Error escalating overdue maintenance:', error);
+  }
+};
+
+/**
  * Unified Nightly Cron Job (Locking + Backfill)
  */
 export const runNightlyCron = async (targetDate = null) => {
@@ -810,6 +862,7 @@ export const runNightlyCron = async (targetDate = null) => {
     await expireStaleRenewals();
     await expireDraftLeases();
     await deactivateFormerTenants(executionDate);
+    await escalateOverdueMaintenance();
     
     // 5. Refund Operations
     await autoAcknowledgeRefunds();

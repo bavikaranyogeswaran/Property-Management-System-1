@@ -89,6 +89,16 @@ class MaintenanceService {
                 }
             }
 
+            // State Machine Guardrails
+            if (request.status === 'completed' || request.status === 'closed') {
+                 if (status !== request.status) {
+                     throw new Error(`Cannot update status of a ${request.status} request.`);
+                 }
+            }
+            if (request.status === 'in_progress' && status === 'submitted') {
+                 throw new Error('Cannot move a request backwards from in_progress to submitted.');
+            }
+
             const updated = await maintenanceRequestModel.updateStatus(id, status);
 
             // [MAINTENANCE LOOP FIX] Automatically release unit status
@@ -199,37 +209,46 @@ class MaintenanceService {
              throw new Error('No active or recently ended lease (within 30 days) found for this tenant/unit. Cannot invoice.');
         }
 
+        const [unbilledCosts] = await pool.query(
+            'SELECT cost_id, amount FROM maintenance_costs WHERE request_id = ? AND invoice_id IS NULL',
+            [requestId]
+        );
+
+        if (unbilledCosts.length === 0) {
+             throw new Error('No unbilled costs found for this maintenance request to invoice.');
+        }
+
+        const aggregatedTotalCents = unbilledCosts.reduce((sum, cost) => sum + Number(cost.amount), 0);
+        const costIds = unbilledCosts.map(c => c.cost_id);
+
         let proposedDescription = description || `Maintenance Bill: ${request.title}`;
         const existingInvoices = await invoiceModel.findByLeaseAndDescription(
             targetLease.id,
             proposedDescription
         );
 
-        // [BILLING FIX] If an invoice with this description already exists, append unique cost info
         if (existingInvoices.length > 0) {
-            if (data.costId) {
-                proposedDescription = `${proposedDescription} (Ref: Cost #${data.costId})`;
-            } else {
-                proposedDescription = `${proposedDescription} (${new Date().getTime()})`;
-            }
+            proposedDescription = `${proposedDescription} (${new Date().getTime()})`;
         }
 
         const invoiceId = await invoiceModel.create({
             leaseId: targetLease.id,
-            amount: toCentsFromMajor(amount),
+            amount: aggregatedTotalCents, // Native cents summation
             dueDate: dueDate || today(),
             description: proposedDescription,
             type: 'maintenance',
         });
 
-        // Link cost if provided and mark as reimbursable if not already
-        if (data.costId) {
-            await pool.query('UPDATE maintenance_costs SET invoice_id = ?, is_reimbursable = TRUE WHERE cost_id = ?', [invoiceId, data.costId]);
+        // Link all aggregated costs to this new invoice
+        if (costIds.length > 0) {
+            await pool.query('UPDATE maintenance_costs SET invoice_id = ?, is_reimbursable = TRUE WHERE cost_id IN (?)', [invoiceId, costIds]);
         }
+
+        const displayAmountMajor = aggregatedTotalCents / 100;
 
         await notificationModel.create({
             userId: request.tenantId,
-            message: `You have been billed ${amount} for maintenance: ${request.title}`,
+            message: `You have been billed ${displayAmountMajor} for maintenance: ${request.title}`,
             type: 'invoice',
         });
 
@@ -239,7 +258,7 @@ class MaintenanceService {
             if (tenant && tenant.email) {
                 const currentNow = now();
                 await emailService.sendInvoiceNotification(tenant.email, {
-                    amount,
+                    amount: displayAmountMajor,
                     dueDate: dueDate || today(),
                     month: currentNow.getMonth() + 1,
                     year: currentNow.getFullYear(),
@@ -303,7 +322,7 @@ class MaintenanceService {
                     leaseId: targetLease.id,
                     accountType: 'expense',
                     category: 'maintenance_repair',
-                    credit: Number(amount), 
+                    credit: toCentsFromMajor(amount), 
                     description: `Maintenance Cost: ${description || request.title} (Req #${requestId})`,
                     entryDate: recordedDate || getCurrentDateString(),
                 }, connection);

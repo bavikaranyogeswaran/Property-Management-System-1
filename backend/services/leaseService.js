@@ -831,6 +831,12 @@ class LeaseService {
         await leaseModel.update(leaseId, { status: 'ended', endDate: terminationDate }, connection);
         await invoiceModel.voidFuturePendingByLeaseId(leaseId, terminationDate, connection);
         await unitModel.update(lease.unitId, { status: 'maintenance' }, connection);
+
+        // [C5 FIX] Auto-close non-invoiced open maintenance requests upon lease termination
+        await connection.query(
+            "UPDATE maintenance_requests SET status = 'closed' WHERE tenant_id = ? AND unit_id = ? AND status IN ('submitted', 'in_progress')",
+            [lease.tenantId, lease.unitId]
+        );
       }
 
       const auditLogger = (await import('../utils/auditLogger.js')).default;
