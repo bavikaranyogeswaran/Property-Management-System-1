@@ -292,6 +292,7 @@ class LeaseModel {
       verificationStatus: row.verification_status,
       verificationRejectionReason: row.verification_rejection_reason,
       reservationExpiresAt: row.reservation_expires_at,
+      actualCheckoutAt: row.actual_checkout_at,
       createdAt: row.created_at,
       // Extra info useful for frontend listing
       unitNumber: row.unit_number,

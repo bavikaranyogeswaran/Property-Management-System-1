@@ -5,7 +5,7 @@ import unitModel from '../models/unitModel.js';
 import propertyModel from '../models/propertyModel.js';
 import pool from '../config/db.js';
 import emailService from '../utils/emailService.js';
-import { addDays, parseLocalDate, formatToLocalDate } from '../utils/dateUtils.js';
+import { addDays, parseLocalDate, formatToLocalDate, getLocalTime } from '../utils/dateUtils.js';
 import { toCentsFromMajor } from '../utils/moneyUtils.js';
 
 class RenewalService {
@@ -99,6 +99,8 @@ class RenewalService {
                 throw new Error(`The proposed renewal end date (${request.proposed_end_date}) must be AFTER the calculated start date (${nextStartDateStr})`);
             }
 
+            // [C2 FIX - Problem 1] Auto-activate renewal lease.
+            // Renewal tenants are already verified — no deposit or document re-check needed.
             const newLeaseId = await leaseModel.create({
                 tenantId: lease.tenantId,
                 unitId: lease.unitId,
@@ -106,8 +108,11 @@ class RenewalService {
                 endDate: request.proposed_end_date,
                 monthlyRent: request.proposed_monthly_rent,
                 securityDeposit: 0,
-                status: 'draft',
-                documentUrl: null
+                status: 'active',
+                documentUrl: lease.documentUrl, // Carry forward from previous lease
+                isDocumentsVerified: true,
+                signedAt: getLocalTime(),
+                reservationExpiresAt: null // Not needed for active lease
             }, connection);
 
             const auditLogger = (await import('../utils/auditLogger.js')).default;

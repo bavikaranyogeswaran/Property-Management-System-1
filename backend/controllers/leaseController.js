@@ -288,7 +288,7 @@ class LeaseController {
       res.json({ message: 'Lease checkout finalized successfully', ...result });
     } catch (error) {
       if (error.message.includes('not found')) return res.status(404).json({ error: error.message });
-      if (error.message.includes('Only expired')) return res.status(400).json({ error: error.message });
+      if (error.message.includes('Only expired or ended')) return res.status(400).json({ error: error.message });
       res.status(500).json({ error: error.message });
     }
   }

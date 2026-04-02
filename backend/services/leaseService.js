@@ -82,8 +82,9 @@ class LeaseService {
       if (unit.status === 'maintenance') {
         throw new Error('Unit is currently under maintenance and cannot be leased.');
       }
-      if (unit.status === 'trashed') {
-        throw new Error('Unit is no longer available (trashed).');
+      // [C2 FIX - Problem 3] Changed 'trashed' → 'inactive' (matches actual ENUM)
+      if (unit.status === 'inactive') {
+        throw new Error('Unit is no longer available (inactive).');
       }
 
       // 2a. Check for Same-tenant overlap
@@ -303,7 +304,8 @@ class LeaseService {
       if (lease.status !== 'draft') throw new Error('Only draft leases can be signed');
 
       const unit = await unitModel.findByIdForUpdate(lease.unitId, conn);
-      if (!unit || unit.status === 'maintenance' || unit.status === 'trashed') {
+      // [C2 FIX - Problem 3] Changed 'trashed' → 'inactive' (matches actual ENUM)
+      if (!unit || unit.status === 'maintenance' || unit.status === 'inactive') {
          throw new Error('Unit is no longer available for occupancy.');
       }
 
@@ -867,8 +869,9 @@ class LeaseService {
     const lease = await leaseModel.findById(leaseId);
     if (!lease) throw new Error('Lease not found');
 
-    if (lease.status !== 'expired') {
-      throw new Error('Only expired leases can be finalized for checkout');
+    // [C2 FIX - Problem 2] Accept both 'expired' and 'ended' leases for checkout
+    if (lease.status !== 'expired' && lease.status !== 'ended') {
+      throw new Error('Only expired or ended leases can be finalized for checkout');
     }
 
     // Check if security deposit is settled (refunded or offset)
@@ -885,11 +888,12 @@ class LeaseService {
       const today = getLocalTime();
       const actualCheckoutAt = today.toISOString().slice(0, 19).replace('T', ' ');
 
-      // 1. Update lease status to 'ended' and set actual_checkout_at
-      await leaseModel.update(leaseId, {
-        status: 'ended',
-        actualCheckoutAt: actualCheckoutAt
-      }, connection);
+      // 1. Update lease: set actual_checkout_at (and status to 'ended' if it was 'expired')
+      const updateData = { actualCheckoutAt };
+      if (lease.status === 'expired') {
+        updateData.status = 'ended';
+      }
+      await leaseModel.update(leaseId, updateData, connection);
 
       // 2. Update unit status back to 'available' (from 'maintenance')
       await unitModel.update(lease.unitId, { status: 'available' }, connection);

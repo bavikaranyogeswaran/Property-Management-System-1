@@ -508,7 +508,8 @@ export function LeasesPage() {
               </Button>
               </>
             )}
-            {lease.status === 'expired' && (
+            {/* [C2 FIX] Show Finalize Move-Out for expired AND ended leases (if unit still in maintenance) */}
+            {(lease.status === 'expired' || (lease.status === 'ended' && unit?.status === 'maintenance' && !lease.actualCheckoutAt)) && (
               <Button
                 size="sm"
                 variant="ghost"

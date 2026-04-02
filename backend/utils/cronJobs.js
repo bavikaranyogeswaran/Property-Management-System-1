@@ -165,16 +165,27 @@ export const checkLeaseExpiration = async () => {
           [lease.lease_id]
         );
 
-        // Update Unit to 'maintenance' (Turnover Buffer)
-        // Instead of 'available' immediately.
-        await connection.query(
-          "UPDATE units SET status = 'maintenance' WHERE unit_id = ?",
-          [lease.unit_id]
+        // [C2 FIX - Problem 1] Check for active successor lease (renewal) before setting maintenance
+        const [successorLeases] = await connection.query(
+          "SELECT lease_id FROM leases WHERE unit_id = ? AND status = 'active' AND lease_id != ?",
+          [lease.unit_id, lease.lease_id]
         );
 
-        console.log(
-          `Lease ${lease.lease_id} is now EXPIRED. Unit ${lease.unit_id} set to Maintenance (Turnover).`
-        );
+        if (successorLeases.length > 0) {
+          // Renewal already active — unit stays 'occupied', no maintenance turnover
+          console.log(
+            `Lease ${lease.lease_id} expired but Unit ${lease.unit_id} has active successor lease. Skipping maintenance.`
+          );
+        } else {
+          // No successor — unit goes to 'maintenance' (Turnover Buffer)
+          await connection.query(
+            "UPDATE units SET status = 'maintenance' WHERE unit_id = ?",
+            [lease.unit_id]
+          );
+          console.log(
+            `Lease ${lease.lease_id} is now EXPIRED. Unit ${lease.unit_id} set to Maintenance (Turnover).`
+          );
+        }
 
         // Notify Owner
         if (lease.owner_id) {

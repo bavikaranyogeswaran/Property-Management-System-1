@@ -28,6 +28,7 @@ export interface Lease {
   tenantName?: string;
   magicToken?: string;
   targetDeposit?: number;
+  actualCheckoutAt?: string;
   createdAt: string;
 }
 
