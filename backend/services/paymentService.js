@@ -12,7 +12,7 @@ import auditLogger from '../utils/auditLogger.js';
 import ledgerModel from '../models/ledgerModel.js';
 import emailService from '../utils/emailService.js';
 import { getCurrentDateString, getLocalTime, today, now, parseLocalDate, addDays, formatToLocalDate } from '../utils/dateUtils.js';
-import { fromCents } from '../utils/moneyUtils.js';
+import { fromCents, toCentsFromMajor } from '../utils/moneyUtils.js';
 
 /**
  * Maps an invoice_type to the correct accounting ledger classification.
@@ -75,7 +75,7 @@ class PaymentService {
 
             const paymentId = await paymentModel.create({
                 invoiceId,
-                amount,
+                amount: toCentsFromMajor(amount),
                 paymentDate,
                 paymentMethod,
                 referenceNumber,
@@ -178,8 +178,9 @@ class PaymentService {
                 evidenceUrl,
             }, connection);
 
-            // [HARDENED] Invalidate Magic Token after submission to prevent data leakage/link reuse
-            await invoiceModel.clearMagicToken(invoiceId, connection);
+            // [ONBOARDING FIX] DO NOT clear the token after payment submission.
+            // We want it to persist so the guest can track their verification status.
+            // await invoiceModel.clearMagicToken(invoiceId, connection);
 
             // 3. Notify Treasurers
             const [treasurers] = await connection.query("SELECT user_id FROM users WHERE role = 'treasurer' AND status = 'active'");
@@ -235,7 +236,7 @@ class PaymentService {
 
             const paymentId = await paymentModel.create({
                 invoiceId,
-                amount,
+                amount: toCentsFromMajor(amount),
                 paymentDate,
                 paymentMethod: 'cash',
                 referenceNumber: referenceNumber || `CASH-${Date.now()}`,
@@ -351,7 +352,30 @@ class PaymentService {
             const invoice = await invoiceModel.findById(invoiceId, conn);
             if (!invoice) throw new Error(`Invoice #${invoiceId} not found`);
 
-            // 1. Create Verified Payment
+            // [SECURITY FIX] 100x Revenue Bleed and Tampering Guard
+            // Compare the PAID amount (in cents) with the INVOICE amount (translated to cents).
+            const expectedCents = Number(invoice.amount);
+            if (Number(amount) < expectedCents) {
+                console.error(`[Security Alert] Underpayment detected for automated invoice #${invoiceId}. Expected ${expectedCents} cents, but received ${amount} cents.`);
+                // We record it as a rejected or partial payment?
+                // For PayHere integration, we expect a 1:1 match for activation.
+                throw new Error('Payment amount mismatch. Security verification failed.');
+            }
+
+            // 1. [IDEMPOTENCY CHECK] Prevent double-processing of the same gateway transaction
+            const existingPayment = await paymentModel.findByReferenceNumber(referenceNumber, conn);
+            if (existingPayment) {
+                if (existingPayment.status === 'verified') {
+                    console.log(`[PaymentService] Idempotent trigger: Payment for ref ${referenceNumber} already verified. Skipping duplicate.`);
+                    if (!isExternalConn) await conn.rollback();
+                    return Number(existingPayment.id);
+                }
+                // If it exists but is pending, we might want to update it to verified, 
+                // but the current logic is based on 'record' being the entry point.
+                // For now, we skip if already verified as that's the "Happy path duplicate".
+            }
+
+            // 2. Create Verified Payment
             const paymentId = await paymentModel.create({
                 invoiceId,
                 amount,
@@ -359,7 +383,7 @@ class PaymentService {
                 paymentMethod: paymentMethod || 'online',
                 referenceNumber,
                 evidenceUrl: null,
-                status: 'verified' // Support for verified status was added to model
+                status: 'verified'
             }, conn);
 
             const payment = await paymentModel.findById(paymentId, conn);
@@ -579,15 +603,24 @@ class PaymentService {
 
             // Deposit Status Logic
             if (invoice.invoiceType === 'deposit' || (invoice.invoice_type === 'deposit')) {
-                 const newHeld = Number(lease.securityDeposit || 0) + amountAppliedToInvoice;
-                 
-                 const finalInvoice = await invoiceModel.findById(payment.invoiceId, connection);
-                 const finalStatus = finalInvoice.status === 'paid' ? 'paid' : 'pending';
-                 
-                 await leaseModel.update(invoice.leaseId, {
-                     depositStatus: finalStatus,
-                     securityDeposit: newHeld,
-                 }, connection);
+                  const finalInvoice = await invoiceModel.findById(payment.invoiceId, connection);
+                  const finalStatus = finalInvoice.status === 'paid' ? 'paid' : 'pending';
+                  
+                  // [NEW] Extend reservation to 7 days from creation once deposit is paid (to allow doc verification)
+                  const extendedExpiry = formatToLocalDate(addDays(new Date(lease.createdAt), 7));
+
+                  await leaseModel.update(invoice.leaseId, {
+                      depositStatus: finalStatus,
+                      reservationExpiresAt: extendedExpiry, // Give them 7 full days from creation
+                  }, connection);
+                  
+                  const auditLogger = (await import('../utils/auditLogger.js')).default;
+                  await auditLogger.log({
+                      userId: null,
+                      actionType: 'RESERVATION_EXTENDED',
+                      entityId: invoice.leaseId,
+                      details: { newExpiry: extendedExpiry, reason: 'Deposit payment received' }
+                  }, null, connection);
             }
 
             // Notify Tenant

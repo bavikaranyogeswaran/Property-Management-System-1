@@ -5,6 +5,7 @@ import {
   authorizeRoles,
   optionalAuthenticateToken,
 } from '../middleware/authMiddleware.js';
+import { authorizeResource } from '../middleware/resourceAuthMiddleware.js';
 import upload from '../middleware/upload.js';
 
 const router = Router();
@@ -28,27 +29,30 @@ router.post(
 router.get('/:id', optionalAuthenticateToken, propertyController.getPropertyById);
 router.get('/:id/lease-terms', propertyController.getLeaseTermsByPropertyId);
 
-// PUT /:id - Owner only
+// PUT /:id - Owner only (with ownership check)
 router.put(
   '/:id',
   authenticateToken,
   authorizeRoles('owner'),
+  authorizeResource('property'),
   propertyController.updateProperty
 );
 
-// DELETE /:id - Owner only
+// DELETE /:id - Owner only (with ownership check)
 router.delete(
   '/:id',
   authenticateToken,
   authorizeRoles('owner'),
+  authorizeResource('property'),
   propertyController.deleteProperty
 );
 
-// POST /:id/images - Upload images
+// POST /:id/images - Upload images (with ownership check)
 router.post(
   '/:id/images',
   authenticateToken,
   authorizeRoles('owner'),
+  authorizeResource('property'),
   upload.array('images', 10),
   propertyController.uploadImages
 );

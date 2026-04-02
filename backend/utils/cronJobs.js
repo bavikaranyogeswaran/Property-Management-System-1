@@ -37,17 +37,18 @@ const runWithLock = async (jobName, taskFn) => {
 };
 
 /**
- * Log Cron Execution outcome
+ * [B5 FIX] Write checkpoint to cron_checkpoints table (UPSERT — one row per job)
  */
 const logCronExecution = async (jobName, executionDate, status, message = null) => {
   try {
     await db.query(
-      `INSERT INTO cron_logs (job_name, execution_date, status, message, ended_at) 
-       VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+      `INSERT INTO cron_checkpoints (job_name, last_success_date, status, message) 
+       VALUES (?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE last_success_date = VALUES(last_success_date), status = VALUES(status), message = VALUES(message)`,
       [jobName, executionDate, status, message]
     );
   } catch (err) {
-    console.error('[Cron] Failed to log execution:', err);
+    console.error('[Cron] Failed to write checkpoint:', err);
   }
 };
 
@@ -311,7 +312,7 @@ export const applyLateFees = async () => {
 
       // Use property-specific fee if available, otherwise fallback to system default
       const feePercentage = inv.lateFeePercentage !== null ? (inv.lateFeePercentage / 100) : LATE_FEE_PERCENTAGE;
-      const lateFeeAmount = moneyMath(inv.amount).mul(feePercentage).toCents();
+      const lateFeeAmount = moneyMath(inv.amount).mul(feePercentage).round().value();
 
       // Create Late Fee Invoice
       const lateFeeInvoiceId = await invoiceModel.createLateFeeInvoice({
@@ -593,25 +594,16 @@ export const expireStaleRenewals = async () => {
 export const expireDraftLeases = async () => {
   console.log('Running draft lease expiry check...');
   try {
-    const cutoffDate = addDays(now(), -2); // 48 hours ago
-    
-    // Find draft leases that are too old AND have no pending/verified payments 
-    // for their deposit invoice.
+    // [FIXED] Use the hardened reservation_expires_at deadline
     const [staleDrafts] = await db.query(
       `
       SELECT l.lease_id, l.unit_id 
       FROM leases l
       WHERE l.status = 'draft' 
-      AND l.created_at < ?
-      AND NOT EXISTS (
-        SELECT 1 FROM rent_invoices ri
-        JOIN payments p ON ri.invoice_id = p.invoice_id
-        WHERE ri.lease_id = l.lease_id 
-        AND ri.invoice_type = 'deposit'
-        AND p.status IN ('pending', 'verified')
-      )
+      AND l.reservation_expires_at IS NOT NULL
+      AND l.reservation_expires_at < ?
       `,
-      [cutoffDate]
+      [now()]
     );
 
     if (staleDrafts.length > 0) {
@@ -762,9 +754,9 @@ export const runNightlyCron = async (targetDate = null) => {
  */
 export const executeNightlyPayload = async () => {
   await runWithLock('nightly_billing', async () => {
-    // BACKFILL LOGIC: Check last successful run
+    // [B5 FIX] BACKFILL LOGIC: Read from cron_checkpoints instead of cron_logs
     const [lastRun] = await db.query(
-      "SELECT execution_date FROM cron_logs WHERE job_name = 'nightly_billing' AND status = 'success' ORDER BY execution_date DESC LIMIT 1"
+      "SELECT last_success_date AS execution_date FROM cron_checkpoints WHERE job_name = 'nightly_billing' AND status = 'success' LIMIT 1"
     );
 
     const todayDate = parseLocalDate(today());

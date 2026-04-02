@@ -257,8 +257,9 @@ class MaintenanceRequestModel {
     return this.findById(id);
   }
 
-  async countOpenByUnitId(unitId) {
-    const [rows] = await pool.query(
+  async countOpenByUnitId(unitId, connection = null) {
+    const db = connection || pool;
+    const [rows] = await db.query(
       "SELECT COUNT(*) as count FROM maintenance_requests WHERE unit_id = ? AND status IN ('submitted', 'in_progress')",
       [unitId]
     );

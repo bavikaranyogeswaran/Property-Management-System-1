@@ -2,8 +2,10 @@ import { generateCheckoutHash, validateNotificationHash } from '../utils/payhere
 import invoiceModel from '../models/invoiceModel.js';
 import userModel from '../models/userModel.js';
 import paymentService from './paymentService.js';
+import { toCents, fromCents } from '../utils/moneyUtils.js';
 import pool from '../config/db.js';
 import dotenv from 'dotenv';
+
 
 dotenv.config();
 
@@ -33,7 +35,8 @@ class PayHereService {
         if (!tenant) throw new Error('Tenant record not found');
 
         const orderId = `INV-${invoice.id || invoice.invoice_id}-${Date.now()}`;
-        const amount = invoice.amount / 100;
+        // [FIXED] Database stores Decimal (Major units). PayHere Sandbox/Production also expects Major units.
+        const amount = fromCents(invoice.amount); 
         const currency = 'LKR';
 
         const hash = generateCheckoutHash(orderId, amount, currency);
@@ -78,7 +81,21 @@ class PayHereService {
         }
 
         const { order_id, status_code, payhere_amount, payment_id } = payload;
-        const invoiceId = order_id.split('-')[1];
+        
+        // Extract invoice ID (Format: INV-ID-TIMESTAMP)
+        const parts = order_id.split('-');
+        let invoiceId;
+        
+        if (parts.length >= 2) {
+            invoiceId = Number(parts[1]);
+        } else {
+            invoiceId = Number(order_id);
+        }
+
+        if (isNaN(invoiceId)) {
+            console.error(`[PayHereService] Failed to extract valid Invoice ID from Order ID: ${order_id}`);
+            throw new Error(`Invalid Order ID format: ${order_id}`);
+        }
 
         // 2. Handle Status Code
         // 2 = Success, 0 = Pending, -1 = Cancelled, -2 = Failed, -3 = Chargedback
@@ -86,12 +103,16 @@ class PayHereService {
             console.log(`[PayHereService] Payment Successful for Invoice #${invoiceId}`);
 
             // 3. Record the payment in our system
+            // [HARDENED] Ensure the recorded amount is converted to integer cents for the ledger.
+            const paidCents = toCents(payhere_amount);
+
             await paymentService.recordAutomatedPayment({
-                invoiceId: Number(invoiceId),
-                amount: Number(payhere_amount),
+                invoiceId: invoiceId,
+                amount: paidCents,
                 paymentMethod: 'payhere',
                 referenceNumber: payment_id
             });
+
 
             return { success: true, message: 'Payment recorded' };
         } else {

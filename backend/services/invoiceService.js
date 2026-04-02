@@ -193,17 +193,11 @@ class InvoiceService {
 
         const updatedInvoice = await invoiceModel.updateStatus(id, status);
         
-        // Logic Fix: If it's a deposit invoice being paid, update the Lease's security_deposit column.
+        // Logic Fix: If it's a deposit invoice being paid, update the Lease's deposit_status.
         if (status === 'paid' && invoice.invoice_type === 'deposit') {
-             // We need to mirror the logic in paymentService.js
-             const lease = await leaseModel.findById(invoice.lease_id);
-             if (lease) {
-                 const newHeld = Number(lease.securityDeposit || 0) + Number(invoice.amount);
-                 await leaseModel.update(invoice.lease_id, {
-                     deposit_status: 'paid',
-                     security_deposit: newHeld
-                 });
-             }
+             await leaseModel.update(invoice.lease_id, {
+                 depositStatus: 'paid',
+             });
         }
 
         // Scoring Logic

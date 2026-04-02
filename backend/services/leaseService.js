@@ -8,6 +8,7 @@ import visitModel from '../models/visitModel.js';
 import leadModel from '../models/leadModel.js';
 import { validateLeaseDuration } from '../utils/validators.js';
 import { getCurrentDateString, getLocalTime, today, parseLocalDate, addDays, formatToLocalDate, getDaysInMonth } from '../utils/dateUtils.js';
+import { toCentsFromMajor } from '../utils/moneyUtils.js';
 import renewalService from './renewalService.js';
 
 class LeaseService {
@@ -119,12 +120,13 @@ class LeaseService {
         unitId,
         startDate,
         endDate,
-        monthlyRent,
-        securityDeposit: 0, // Held amount starts at 0. Target is in Invoice.
+        monthlyRent: toCentsFromMajor(monthlyRent),
+        securityDeposit: 0, 
         status: 'draft',
-        targetDeposit: securityDeposit || 0.0,
+        targetDeposit: toCentsFromMajor(securityDeposit || 0.0),
         documentUrl: documentUrl || null,
         leaseTermId: data.leaseTermId || null,
+        reservationExpiresAt: formatToLocalDate(addDays(today(), 2)), 
       };
 
       // 3. Create Lease
@@ -139,7 +141,7 @@ class LeaseService {
       if (securityDeposit > 0) {
         rawToken = randomUUID();
         const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
-        const expiresAt = formatToLocalDate(addDays(today(), 2)); // 48 hours to pay holding deposit
+        const expiresAt = formatToLocalDate(addDays(today(), 7)); // Increased to 7 days for verification phase
 
         await invoiceModel.create({
           leaseId,
@@ -330,7 +332,11 @@ class LeaseService {
         throw new Error('Cannot activate lease: Tenant documents have not been verified by staff.');
       }
 
-      await leaseModel.update(leaseId, { status: 'active', signedAt: getLocalTime() }, conn);
+      await leaseModel.update(leaseId, { 
+        status: 'active', 
+        signedAt: getLocalTime(),
+        reservationExpiresAt: null // [NEW] Clear deadline upon activation
+      }, conn);
 
       await visitModel.cancelVisitsForUnit(lease.unitId, todayDate, conn);
 
@@ -415,7 +421,8 @@ class LeaseService {
     const lease = await leaseModel.findById(leaseId);
     if (!lease) throw new Error('Lease not found');
 
-    if (lease.securityDeposit <= 0) {
+    const ledgerBalance = await leaseModel.getDepositBalance(leaseId);
+    if (ledgerBalance <= 0) {
       throw new Error('No security deposit available to refund.');
     }
 
@@ -427,7 +434,7 @@ class LeaseService {
       throw new Error('Cannot refund deposit that has not been fully paid.');
     }
 
-    const ledgerBalance = await leaseModel.getDepositBalance(leaseId);
+    // [B2 FIX] Removed duplicate getDepositBalance call that reassigned a const
     if (amount > ledgerBalance) {
       throw new Error(`Refund amount (LKR ${amount.toLocaleString()}) cannot exceed verified ledger balance (LKR ${ledgerBalance.toLocaleString()}).`);
     }
@@ -612,7 +619,6 @@ class LeaseService {
 
       await leaseModel.update(leaseId, {
         refundedAmount: Number(lease.refundedAmount || 0) + Number(amount),
-        securityDeposit: 0, // Decrement to zero as it's fully disbursed/withheld
         depositStatus: status,
         proposedRefundAmount: 0
       }, connection);
@@ -651,7 +657,8 @@ class LeaseService {
     const lease = await leaseModel.findById(leaseId);
     if (!lease) throw new Error('Lease not found');
 
-    if (lease.deposit_status !== 'pending') {
+    // [B3 FIX] Changed deposit_status → depositStatus (model returns camelCase)
+    if (lease.depositStatus !== 'pending') {
       throw new Error('Only pending refund requests can be disputed.');
     }
 
@@ -688,17 +695,15 @@ class LeaseService {
       throw new Error('No refund settlement is currently awaiting your acknowledgment.');
     }
 
-    const finalStatus = lease.proposedRefundAmount >= lease.securityDeposit ? 'refunded' : 'partially_refunded';
-
+    // [B1 FIX] Moved connection declaration BEFORE its first use
     const connection = await pool.getConnection();
+    const currentBalance = await leaseModel.getDepositBalance(leaseId, connection);
+    const finalStatus = lease.proposedRefundAmount >= currentBalance ? 'refunded' : 'partially_refunded';
     try {
       await connection.beginTransaction();
 
       await leaseModel.update(leaseId, {
         depositStatus: finalStatus,
-        // The security deposit field tracks the "held" balance. 
-        // We set it to 0 as it's been disbursed/applied.
-        securityDeposit: 0, 
       }, connection);
 
       const auditLogger = (await import('../utils/auditLogger.js')).default;
@@ -727,7 +732,8 @@ class LeaseService {
     const lease = await leaseModel.findById(leaseId);
     if (!lease) throw new Error('Lease not found');
 
-    if (lease.deposit_status !== 'disputed') {
+    // [B3 FIX] Changed deposit_status → depositStatus (model returns camelCase)
+    if (lease.depositStatus !== 'disputed') {
       throw new Error('Only disputed refunds can be resolved.');
     }
 
@@ -1004,6 +1010,8 @@ class LeaseService {
         );
       }
 
+      // [B4 FIX] Added missing auditLogger import
+      const auditLogger = (await import('../utils/auditLogger.js')).default;
       await auditLogger.log({
         userId: user.id,
         actionType: 'LEASE_CANCELLED_BY_STAFF',

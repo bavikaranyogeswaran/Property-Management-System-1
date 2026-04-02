@@ -13,6 +13,9 @@ router.post('/:token/submit', upload.single('proof'), guestPaymentController.sub
 // GET /api/public/invoice/:token/status (Polling for successful activation)
 router.get('/:token/status', guestPaymentController.getActivationStatus);
 
+// GET /api/public/invoice/:token/onboarding-status (Comprehensive Funnel Status)
+router.get('/:token/onboarding-status', guestPaymentController.getStatus);
+
 // GET /api/public/invoice/checkout-status/:orderId (Polling using PayHere Order ID)
 router.get('/checkout-status/:orderId', guestPaymentController.getActivationStatusByOrder);
 

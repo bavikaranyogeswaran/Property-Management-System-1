@@ -103,7 +103,7 @@ class PaymentModel {
       id: row.payment_id.toString(),
       invoiceId: row.invoice_id.toString(),
       tenantId: row.tenant_id.toString(),
-      amount: parseFloat(row.amount),
+      amount: Number(row.amount),
       paymentDate: row.payment_date,
       paymentMethod: row.payment_method,
       status: row.status,
@@ -166,6 +166,15 @@ class PaymentModel {
       [tenantId]
     );
     return rows.map(row => this.mapRow(row));
+  }
+
+  async findByReferenceNumber(referenceNumber, connection = null) {
+    const db = connection || pool;
+    const [rows] = await db.query(
+      'SELECT * FROM payments WHERE reference_number = ?',
+      [referenceNumber]
+    );
+    return this.mapRow(rows[0]);
   }
 
   async updateStatus(id, status, verifiedBy = null, connection = null) {

@@ -24,4 +24,12 @@ router.get('/checkout/public/:token', payhereController.preparePublicCheckout);
  */
 router.post('/notify', payhereController.handleNotification);
 
+/**
+ * @route   POST /api/payhere/simulate-webhook
+ * @desc    Simulate a PayHere webhook (Development Only)
+ * @access  Public (Should be restricted in production)
+ */
+router.post('/simulate-webhook', payhereController.simulateWebhook);
+
 export default router;
+

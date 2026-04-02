@@ -94,6 +94,10 @@ export function GuestPaymentPage() {
       });
       setSuccess(true);
       toast.success('Payment submitted successfully!');
+      // [ONBOARDING FIX] Redirect to the persistent status tracker
+      setTimeout(() => {
+        navigate(`/onboarding/${token}`);
+      }, 2000);
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Failed to submit payment.');
     } finally {
@@ -114,11 +118,29 @@ export function GuestPaymentPage() {
       
       setPayHereData(checkoutData);
       
+      // Simulation mode bypass (Forced in development or if flag is set)
+      const SHOULD_SIMULATE = String(import.meta.env.VITE_ENABLE_PAYMENT_SIMULATION) === 'true' || import.meta.env.DEV;
+
+      if (SHOULD_SIMULATE) {
+        console.log('%c[PAYMENT SIMULATOR] Redirecting...', 'background: #2563eb; color: #fff; padding: 5px; border-radius: 5px; font-weight: bold;');
+        const queryParams = new URLSearchParams({
+          ...checkoutData,
+          items: checkoutData.items || 'Security Deposit'
+        }).toString();
+        
+        setTimeout(() => {
+          navigate(`/payhere-simulation?${queryParams}`);
+        }, 500);
+        return;
+      }
+
+
       // We'll use a timeout to let the form render before submitting
       setTimeout(() => {
         const form = document.getElementById('payhere-checkout-form') as HTMLFormElement;
         if (form) form.submit();
       }, 100);
+
 
     } catch (err: any) {
       toast.error('Failed to initialize online payment. Please use bank transfer or try again.');

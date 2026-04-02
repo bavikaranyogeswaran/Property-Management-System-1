@@ -116,8 +116,11 @@ import CancelVisitPage from '@/components/pages/public/CancelVisitPage';
 import PaymentSuccessPage from '@/components/pages/public/PaymentSuccessPage';
 import AuditLogsPage from '@/components/pages/AuditLogsPage';
 import { GuestPaymentPage } from '@/components/pages/public/GuestPaymentPage';
+import { OnboardingStatusPage } from '@/components/pages/public/OnboardingStatusPage';
+import PayHereSimulationPage from '@/components/pages/public/PayHereSimulationPage';
 
 // Lead Pages
+
 import { LeadPortalPage } from '@/components/pages/lead/LeadPortalPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -174,6 +177,9 @@ function AppContent() {
       <Route path="/cancel-visit" element={<CancelVisitPage />} />
       <Route path="/payment-success" element={<PaymentSuccessPage />} />
       <Route path="/pay/:token" element={<PublicPropertiesWrapper><GuestPaymentPage /></PublicPropertiesWrapper>} />
+      <Route path="/onboarding/:token" element={<PublicPropertiesWrapper><OnboardingStatusPage /></PublicPropertiesWrapper>} />
+      <Route path="/payhere-simulation" element={<PayHereSimulationPage />} />
+
 
       {/* Public/Shared Properties Route */}
       <Route

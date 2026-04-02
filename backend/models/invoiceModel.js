@@ -7,6 +7,7 @@
 
 import pool from '../config/db.js';
 import { getCurrentDateString, parseLocalDate } from '../utils/dateUtils.js';
+import { fromCents } from '../utils/moneyUtils.js';
 
 class InvoiceModel {
   //  CREATE: Writing a new bill to the ledger.
@@ -343,7 +344,7 @@ class InvoiceModel {
     );
     return rows.map(row => ({
       propertyName: row.property_name,
-      totalIncome: parseFloat(row.total_income || 0)
+      totalIncome: fromCents(row.total_income || 0)
     }));
   }
 }

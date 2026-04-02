@@ -22,6 +22,7 @@ import {
   Star,
   Phone,
   AlertCircle,
+  Flame,
 } from 'lucide-react';
 import {
   Dialog,
@@ -225,6 +226,12 @@ export function PublicPropertyDetailsPage() {
   const availableUnitsCount = propertyUnits.filter(
     (u) => u.status === 'available'
   ).length;
+  const pendingCount = propertyUnits.reduce(
+    (sum, u) => sum + (u.pendingApplicationsCount || 0),
+    0
+  );
+  const isHighDemand = pendingCount > availableUnitsCount && availableUnitsCount > 0;
+
   const minRent =
     propertyUnits.length > 0
       ? Math.min(...propertyUnits.map((u) => u.monthlyRent))
@@ -244,20 +251,7 @@ export function PublicPropertyDetailsPage() {
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back to Listings
             </Button>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                className="text-gray-600 border-gray-200 hover:bg-gray-50"
-                onClick={() => {
-                  navigator.clipboard.writeText(window.location.href);
-                  toast.success('Link copied to clipboard');
-                }}
-              >
-                <Share2 className="w-4 h-4 mr-2" />
-                Share
-              </Button>
-            </div>
+            
           </div>
         </nav>
 
@@ -298,6 +292,15 @@ export function PublicPropertyDetailsPage() {
                       className="bg-gray-500/90 text-white backdrop-blur-sm border-none"
                     >
                       No Vacancy
+                    </Badge>
+                  )}
+                  {pendingCount > 0 && (
+                    <Badge
+                      variant="secondary"
+                      className={`backdrop-blur-sm border-none flex items-center gap-1 ${isHighDemand ? 'bg-orange-600 text-white animate-pulse' : 'bg-orange-500/80 text-white'}`}
+                    >
+                      {isHighDemand && <Flame className="w-3.5 h-3.5" />}
+                      {pendingCount} Applications Pending
                     </Badge>
                   )}
                 </div>
@@ -508,16 +511,23 @@ export function PublicPropertyDetailsPage() {
                             <Home className="w-10 h-10" />
                           </div>
                         )}
-                        <div className="absolute top-3 left-3">
+                        <div className="absolute top-3 left-3 flex flex-col gap-1">
                           <Badge
                             className={
                               unit.status === 'available'
                                 ? 'bg-green-500 hover:bg-green-600 border-none'
+                                : unit.status === 'reserved'
+                                ? 'bg-orange-500 hover:bg-orange-600 border-none'
                                 : 'bg-gray-500 hover:bg-gray-600 border-none'
                             }
                           >
-                            {unit.status.toUpperCase()}
+                            {unit.status === 'reserved' ? 'UNDER APPLICATION' : unit.status.toUpperCase()}
                           </Badge>
+                          {(unit.pendingApplicationsCount || 0) > 0 && unit.status === 'available' && (
+                            <Badge className="bg-orange-500/90 hover:bg-orange-600 border-none text-[10px]">
+                              {unit.pendingApplicationsCount} PENDING
+                            </Badge>
+                          )}
                         </div>
                       </div>
 

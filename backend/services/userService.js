@@ -17,6 +17,7 @@ import { getLocalTime, parseLocalDate, addMonths, today } from '../utils/dateUti
 import pool from '../config/db.js';
 import unitLockService from '../services/unitLockService.js';
 import leadTokenModel from '../models/leadTokenModel.js';
+import { toCentsFromMajor, fromCents } from '../utils/moneyUtils.js';
 
 const SALT_ROUNDS = 10;
 
@@ -254,7 +255,7 @@ class UserService {
             emergencyContactName: tenantData.emergencyContactName || null,
             emergencyContactPhone: tenantData.emergencyContactPhone || null,
             employmentStatus: 'Employed',
-            monthlyIncome: tenantData.monthlyIncome || 0,
+            monthlyIncome: toCentsFromMajor(tenantData.monthlyIncome || 0),
           },
           connection
         );
@@ -319,8 +320,8 @@ class UserService {
               startDate: leaseStart,
               endDate: leaseEnd,
               leaseTermId: leaseTermId,
-              monthlyRent: unit.monthlyRent,
-              securityDeposit: unit.monthlyRent, // Default 1 month deposit
+              monthlyRent: fromCents(unit.monthlyRent),
+              securityDeposit: fromCents(unit.monthlyRent), // Default 1 month deposit
               documentUrl: tenantData.documentUrl || null,
             },
             connection,

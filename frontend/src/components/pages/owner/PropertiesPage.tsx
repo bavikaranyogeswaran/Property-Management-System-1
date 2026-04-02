@@ -335,6 +335,15 @@ export function PropertiesPage() {
         ? [{ id: 'primary-preview', url: property.imageUrl, isPrimary: true }]
         : []
     );
+    
+    // Reset unit related state to avoid state leaks from previous dialog sessions
+    setQuickUnits([]);
+    setNewUnitNumber('');
+    setNewUnitType(0);
+    setNewUnitRent(0);
+    setIsSingleUnit(false);
+    setSingleUnitRent(0);
+
     setIsAddDialogOpen(true);
 
     try {
@@ -372,6 +381,10 @@ export function PropertiesPage() {
     });
     setExistingImages([]);
     setUploadFiles([]);
+    setQuickUnits([]);
+    setNewUnitNumber('');
+    setNewUnitType(0);
+    setNewUnitRent(0);
     setIsSingleUnit(false);
     setSingleUnitRent(0);
     setIsAddDialogOpen(true);
