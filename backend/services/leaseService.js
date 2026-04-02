@@ -434,7 +434,7 @@ class LeaseService {
       throw new Error('Cannot refund deposit that has not been fully paid.');
     }
 
-    ledgerBalance = await leaseModel.getDepositBalance(leaseId);
+    // [B2 FIX] Removed duplicate getDepositBalance call that reassigned a const
     if (amount > ledgerBalance) {
       throw new Error(`Refund amount (LKR ${amount.toLocaleString()}) cannot exceed verified ledger balance (LKR ${ledgerBalance.toLocaleString()}).`);
     }
@@ -657,7 +657,8 @@ class LeaseService {
     const lease = await leaseModel.findById(leaseId);
     if (!lease) throw new Error('Lease not found');
 
-    if (lease.deposit_status !== 'pending') {
+    // [B3 FIX] Changed deposit_status → depositStatus (model returns camelCase)
+    if (lease.depositStatus !== 'pending') {
       throw new Error('Only pending refund requests can be disputed.');
     }
 
@@ -694,10 +695,10 @@ class LeaseService {
       throw new Error('No refund settlement is currently awaiting your acknowledgment.');
     }
 
+    // [B1 FIX] Moved connection declaration BEFORE its first use
+    const connection = await pool.getConnection();
     const currentBalance = await leaseModel.getDepositBalance(leaseId, connection);
     const finalStatus = lease.proposedRefundAmount >= currentBalance ? 'refunded' : 'partially_refunded';
-
-    const connection = await pool.getConnection();
     try {
       await connection.beginTransaction();
 
@@ -731,7 +732,8 @@ class LeaseService {
     const lease = await leaseModel.findById(leaseId);
     if (!lease) throw new Error('Lease not found');
 
-    if (lease.deposit_status !== 'disputed') {
+    // [B3 FIX] Changed deposit_status → depositStatus (model returns camelCase)
+    if (lease.depositStatus !== 'disputed') {
       throw new Error('Only disputed refunds can be resolved.');
     }
 
@@ -1008,6 +1010,8 @@ class LeaseService {
         );
       }
 
+      // [B4 FIX] Added missing auditLogger import
+      const auditLogger = (await import('../utils/auditLogger.js')).default;
       await auditLogger.log({
         userId: user.id,
         actionType: 'LEASE_CANCELLED_BY_STAFF',

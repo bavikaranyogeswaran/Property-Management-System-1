@@ -37,17 +37,18 @@ const runWithLock = async (jobName, taskFn) => {
 };
 
 /**
- * Log Cron Execution outcome
+ * [B5 FIX] Write checkpoint to cron_checkpoints table (UPSERT — one row per job)
  */
 const logCronExecution = async (jobName, executionDate, status, message = null) => {
   try {
     await db.query(
-      `INSERT INTO cron_logs (job_name, execution_date, status, message, ended_at) 
-       VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+      `INSERT INTO cron_checkpoints (job_name, last_success_date, status, message) 
+       VALUES (?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE last_success_date = VALUES(last_success_date), status = VALUES(status), message = VALUES(message)`,
       [jobName, executionDate, status, message]
     );
   } catch (err) {
-    console.error('[Cron] Failed to log execution:', err);
+    console.error('[Cron] Failed to write checkpoint:', err);
   }
 };
 
@@ -753,9 +754,9 @@ export const runNightlyCron = async (targetDate = null) => {
  */
 export const executeNightlyPayload = async () => {
   await runWithLock('nightly_billing', async () => {
-    // BACKFILL LOGIC: Check last successful run
+    // [B5 FIX] BACKFILL LOGIC: Read from cron_checkpoints instead of cron_logs
     const [lastRun] = await db.query(
-      "SELECT execution_date FROM cron_logs WHERE job_name = 'nightly_billing' AND status = 'success' ORDER BY execution_date DESC LIMIT 1"
+      "SELECT last_success_date AS execution_date FROM cron_checkpoints WHERE job_name = 'nightly_billing' AND status = 'success' LIMIT 1"
     );
 
     const todayDate = parseLocalDate(today());

@@ -121,6 +121,9 @@ CREATE TABLE properties (
     is_archived BOOLEAN DEFAULT FALSE,
     archived_at DATETIME,
     image_url VARCHAR(255),                  -- [DEPRECATED] Use property_images table instead
+    late_fee_percentage DECIMAL(5,2) DEFAULT NULL, -- Property-specific late fee override
+    late_fee_grace_period INT DEFAULT 5,       -- Days after due date before late fee applies
+    tenant_deactivation_days INT DEFAULT 30,   -- [B6 FIX] Days after lease end to deactivate tenant account
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (owner_id) REFERENCES users(user_id) ON DELETE CASCADE,
     FOREIGN KEY (property_type_id) REFERENCES property_types(type_id)
@@ -262,7 +265,7 @@ CREATE TABLE leases (
     status ENUM('draft', 'active', 'expired', 'ended', 'cancelled') DEFAULT 'active',
     notice_status ENUM('undecided', 'vacating', 'renewing') DEFAULT 'undecided', -- [ADDED] Tenant's intent
     security_deposit BIGINT DEFAULT 0,
-    deposit_status ENUM('pending', 'paid', 'awaiting_approval', 'disputed', 'partially_refunded', 'refunded') DEFAULT 'pending',
+    deposit_status ENUM('pending', 'paid', 'awaiting_approval', 'awaiting_acknowledgment', 'disputed', 'partially_refunded', 'refunded') DEFAULT 'pending', -- [B7 FIX] Added awaiting_acknowledgment
     proposed_refund_amount BIGINT DEFAULT 0,
     refund_notes TEXT,
     refunded_amount BIGINT DEFAULT 0,
@@ -515,4 +518,16 @@ CREATE TABLE IF NOT EXISTS renewal_requests (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (lease_id) REFERENCES leases(lease_id) ON DELETE CASCADE
+);
+
+-- =========================
+-- CRON CHECKPOINTS (Backfill State)
+-- =========================
+-- [B5 FIX] Required by cronJobs.js backfill logic to track last successful execution
+CREATE TABLE cron_checkpoints (
+    job_name VARCHAR(50) PRIMARY KEY,
+    last_success_date DATE NOT NULL,
+    status ENUM('success', 'failed') DEFAULT 'success',
+    message TEXT,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
