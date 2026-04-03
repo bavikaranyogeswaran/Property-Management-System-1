@@ -201,13 +201,16 @@ class ReportService {
     }
 
     async getLeadConversionStats(user) {
+        // Retrieve explicit owner context
+        const ownerId = user?.role === 'owner' ? user.id : null;
+        
         // Fetch pre-aggregated values from DB to avoid O(N) memory allocation and processing
-        const stats = await leadModel.getLeadConversionStats();
+        const stats = await leadModel.getLeadConversionStats(ownerId);
         return {
-            Total: Number(stats.Total),
-            Interested: Number(stats.Interested),
-            Converted: Number(stats.Converted),
-            Dropped: Number(stats.Dropped)
+            Total: Number(stats.Total || 0),
+            Interested: Number(stats.Interested || 0),
+            Converted: Number(stats.Converted || 0),
+            Dropped: Number(stats.Dropped || 0)
         };
     }
 

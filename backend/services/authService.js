@@ -5,7 +5,8 @@ const { sign } = jwt;
 import userModel from '../models/userModel.js';
 import tenantModel from '../models/tenantModel.js';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'secret';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) throw new Error('FATAL: JWT_SECRET is not set in the environment variables.');
 
 class AuthService {
   async login(email, password) {

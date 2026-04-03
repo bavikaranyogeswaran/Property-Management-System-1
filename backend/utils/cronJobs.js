@@ -4,6 +4,7 @@ import leaseModel from '../models/leaseModel.js';
 import invoiceModel from '../models/invoiceModel.js';
 import notificationModel from '../models/notificationModel.js';
 import emailService from './emailService.js';
+import tenantModel from '../models/tenantModel.js';
 import billingEngine from './billingEngine.js';
 import paymentService from '../services/paymentService.js';
 import { getCurrentDateString, getLocalTime, today, now, parseLocalDate, addDays, formatToLocalDate } from './dateUtils.js';

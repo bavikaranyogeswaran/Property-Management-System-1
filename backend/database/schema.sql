@@ -120,7 +120,7 @@ CREATE TABLE properties (
     status ENUM('active','inactive') DEFAULT 'active',
     is_archived BOOLEAN DEFAULT FALSE,
     archived_at DATETIME,
-    image_url VARCHAR(255),                  -- [DEPRECATED] Use property_images table instead
+
     late_fee_percentage DECIMAL(5,2) DEFAULT NULL, -- Property-specific late fee override
     late_fee_grace_period INT DEFAULT 5,       -- Days after due date before late fee applies
     tenant_deactivation_days INT DEFAULT 30,   -- [B6 FIX] Days after lease end to deactivate tenant account
@@ -138,7 +138,7 @@ CREATE TABLE units (
     status ENUM('available', 'occupied', 'maintenance', 'reserved', 'inactive') DEFAULT 'available',
     is_archived BOOLEAN DEFAULT FALSE,
     archived_at DATETIME,
-    image_url VARCHAR(255),                  -- [DEPRECATED] Use unit_images table instead
+
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     UNIQUE (property_id, unit_number),
     FOREIGN KEY (property_id) REFERENCES properties(property_id) ON DELETE CASCADE,

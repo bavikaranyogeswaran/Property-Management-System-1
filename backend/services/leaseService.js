@@ -999,10 +999,12 @@ class LeaseService {
     if (eff < start) throw new Error('Adjustment date cannot be before lease start');
     if (lease.endDate && eff > parseLocalDate(lease.endDate)) throw new Error('Adjustment date cannot be after lease end');
 
+    const newRentCents = toCentsFromMajor(newMonthlyRent);
+
     const adjustmentId = await leaseModel.createAdjustment({
       leaseId,
       effectiveDate,
-      newMonthlyRent,
+      newMonthlyRent: newRentCents,
       notes
     });
 

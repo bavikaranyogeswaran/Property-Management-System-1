@@ -9,7 +9,6 @@
 import express, { json } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import xss from 'xss-clean';
 import rateLimit from 'express-rate-limit'; // Controls how many requests someone can make (Security)
 import 'dotenv/config';
 import path from 'path';
@@ -30,7 +29,8 @@ const PORT = process.env.PORT || 3000;
 //  - Helmet: Puts secure locks on the messages (Security Headers).
 //  - JSON: Translates incoming messages into a language the app matches (JavaScript Objects).
 // ============================================================================
-app.use(cors());
+app.use(cors({ origin: process.env.FRONTEND_URL || 'http://localhost:5173', credentials: true }));
+app.set('trust proxy', 1);
 app.use(
   helmet({
     crossOriginResourcePolicy: { policy: 'cross-origin' }, // Allow images/files to be accessed by frontend
@@ -46,8 +46,6 @@ app.use(
 );
 app.use(json());
 app.use(express.urlencoded({ extended: true })); // Added for PayHere form data
-app.use(xss()); // Add XSS protection
-
 //  Rate Limiting: Prevents hackers from guessing passwords by trying too fast.
 //  If someone fails login 100 times in 15 minutes, we block them.
 const authLimiter = rateLimit({
@@ -118,7 +116,6 @@ app.use('/api/public/invoice', guestPaymentRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/users', userRoutes);
-app.use(express.urlencoded({ extended: true }));
 
 app.use('/api/leads', leadRoutes);
 app.use('/api/properties', propertyRoutes);

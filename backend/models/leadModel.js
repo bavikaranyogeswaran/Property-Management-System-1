@@ -283,17 +283,21 @@ class LeadModel {
 
   // Analytics optimized query to avoid O(N) memory buildup
   // DB enum: 'interested', 'converted', 'dropped'
-  async getLeadConversionStats() {
-    const [rows] = await db.query(
-      `
+  async getLeadConversionStats(ownerId) {
+    let query = `
       SELECT 
         COUNT(*) AS Total,
-        SUM(CASE WHEN status = 'interested' THEN 1 ELSE 0 END) AS Interested,
-        SUM(CASE WHEN status = 'converted' THEN 1 ELSE 0 END) AS Converted,
-        SUM(CASE WHEN status = 'dropped' THEN 1 ELSE 0 END) AS Dropped
-      FROM leads
-      `
-    );
+        SUM(CASE WHEN l.status = 'interested' THEN 1 ELSE 0 END) AS Interested,
+        SUM(CASE WHEN l.status = 'converted' THEN 1 ELSE 0 END) AS Converted,
+        SUM(CASE WHEN l.status = 'dropped' THEN 1 ELSE 0 END) AS Dropped
+      FROM leads l
+    `;
+    const params = [];
+    if (ownerId) {
+      query += ` INNER JOIN properties p ON l.property_id = p.property_id WHERE p.owner_id = ?`;
+      params.push(ownerId);
+    }
+    const [rows] = await db.query(query, params);
     return rows[0];
   }
 
