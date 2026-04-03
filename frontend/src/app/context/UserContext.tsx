@@ -35,6 +35,7 @@ export interface Treasurer {
 interface UserContextType {
   tenants: Tenant[];
   treasurers: Treasurer[];
+  owners: any[]; // Using any for now to avoid complex type export issues
   addTenant: (tenant: Omit<Tenant, 'id' | 'createdAt'>) => void;
   addTreasurer: (treasurer: Omit<Treasurer, 'id' | 'createdAt'> & { id?: string }) => void;
   updateTreasurer: (id: string, treasurer: Partial<Treasurer>) => void;
@@ -47,6 +48,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [treasurers, setTreasurers] = useState<Treasurer[]>([]);
+  const [owners, setOwners] = useState<any[]>([]);
 
   const fetchUsers = async () => {
     if (!user) return;
@@ -75,6 +77,16 @@ export function UserProvider({ children }: { children: ReactNode }) {
         }
       } catch (e) {
         console.error('Failed to fetch tenants', e);
+      }
+
+      // [NEW] Fetch Owners for Treasurers (to select for payout)
+      try {
+        const oRes = await apiClient.get('/users/owners');
+        if (oRes.data) {
+          setOwners(oRes.data);
+        }
+      } catch (e) {
+        console.error('Failed to fetch owners', e);
       }
     }
   };
@@ -110,7 +122,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <UserContext.Provider value={{ tenants, treasurers, addTenant, addTreasurer, updateTreasurer, deleteTreasurer }}>
+    <UserContext.Provider value={{ tenants, treasurers, owners, addTenant, addTreasurer, updateTreasurer, deleteTreasurer }}>
       {children}
     </UserContext.Provider>
   );

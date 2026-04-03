@@ -124,6 +124,7 @@ CREATE TABLE properties (
     late_fee_percentage DECIMAL(5,2) DEFAULT NULL, -- Property-specific late fee override
     late_fee_grace_period INT DEFAULT 5,       -- Days after due date before late fee applies
     tenant_deactivation_days INT DEFAULT 30,   -- [B6 FIX] Days after lease end to deactivate tenant account
+    management_fee_percentage DECIMAL(5,2) DEFAULT 0.00, -- [NEW] Agency commission %
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (owner_id) REFERENCES users(user_id) ON DELETE CASCADE,
     FOREIGN KEY (property_type_id) REFERENCES property_types(type_id)
@@ -412,13 +413,22 @@ CREATE TABLE notifications (
 CREATE TABLE owner_payouts (
     payout_id INT AUTO_INCREMENT PRIMARY KEY,
     owner_id INT NOT NULL,
-    amount BIGINT NOT NULL, -- Net Amount in Cents
+    gross_amount BIGINT NOT NULL DEFAULT 0, -- Total rent in Cents
+    commission_amount BIGINT NOT NULL DEFAULT 0, -- Agency fee in Cents
+    expenses_amount BIGINT NOT NULL DEFAULT 0, -- Maintenance in Cents
+    amount BIGINT NOT NULL, -- Final Net in Cents
     period_start DATE NOT NULL,
     period_end DATE NOT NULL,
-    status ENUM('pending', 'processed') DEFAULT 'pending',
+    status ENUM('pending', 'paid', 'acknowledged', 'disputed') DEFAULT 'pending',
+    bank_reference VARCHAR(100) DEFAULT NULL,
+    proof_url VARCHAR(500) DEFAULT NULL,
+    treasurer_id INT DEFAULT NULL,
     generated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    processed_at DATETIME,
+    processed_at DATETIME DEFAULT NULL, -- Date mark as PAID
+    acknowledged_at DATETIME DEFAULT NULL,
+    dispute_reason TEXT DEFAULT NULL,
     FOREIGN KEY (owner_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    FOREIGN KEY (treasurer_id) REFERENCES users(user_id) ON DELETE SET NULL,
     UNIQUE KEY unique_owner_payout_period (owner_id, period_start, period_end)
 );
 

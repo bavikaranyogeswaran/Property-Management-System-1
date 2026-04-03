@@ -135,12 +135,20 @@ export interface BehaviorLog {
 export interface OwnerPayout {
   id: string;
   ownerId: string;
+  grossAmount: number;
+  commissionAmount: number;
+  expensesAmount: number;
   amount: number;
   periodStart: string;
   periodEnd: string;
-  status: 'pending' | 'processed';
+  status: 'pending' | 'paid' | 'acknowledged' | 'disputed';
+  bankReference?: string;
+  proofUrl?: string;
+  treasurerId?: string;
   generatedAt: string;
   processedAt?: string;
+  acknowledgedAt?: string;
+  disputeReason?: string;
 }
 
 export interface AuditLog {

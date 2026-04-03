@@ -103,11 +103,18 @@ export const invoiceApi = {
 };
 
 export const payoutApi = {
-  preview: (startDate: string, endDate: string) =>
-    apiClient.get(`/payouts/preview?startDate=${startDate}&endDate=${endDate}`),
-  create: (data: { startDate: string; endDate: string }) =>
+  preview: (ownerId: string, startDate: string, endDate: string) =>
+    apiClient.get(`/payouts/preview?ownerId=${ownerId}&startDate=${startDate}&endDate=${endDate}`),
+  create: (data: { ownerId: string; startDate: string; endDate: string }) =>
     apiClient.post('/payouts/create', data),
-  getHistory: () => apiClient.get('/payouts/history'),
+  getHistory: (ownerId?: string) => 
+    apiClient.get(`/payouts/history${ownerId ? `?ownerId=${ownerId}` : ''}`),
+  markAsPaid: (id: string, data: { bankReference: string; proofUrl?: string }) =>
+    apiClient.put(`/payouts/${id}/paid`, data),
+  acknowledge: (id: string) =>
+    apiClient.put(`/payouts/${id}/acknowledge`),
+  dispute: (id: string, reason: string) =>
+    apiClient.put(`/payouts/${id}/dispute`, { reason }),
   getDetails: (id: string) => apiClient.get(`/payouts/${id}/details`),
   exportCSV: (id: string) =>
     apiClient.get(`/payouts/${id}/export`, { responseType: 'blob' }),

@@ -56,6 +56,9 @@ router.get(
 // Get all tenants (Owner only)
 router.get('/tenants', authenticateToken, userController.getTenants);
 
+// Get all owners (Owner and Treasurer)
+router.get('/owners', authenticateToken, userController.getOwners);
+
 // Get user by ID (Generic)
 router.get('/:id', authenticateToken, userController.getUserById);
 

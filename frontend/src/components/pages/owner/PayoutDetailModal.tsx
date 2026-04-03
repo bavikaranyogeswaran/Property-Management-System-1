@@ -98,20 +98,60 @@ export function PayoutDetailModal({ payoutId, onClose }: PayoutDetailModalProps)
           ) : data ? (
             <div className="space-y-8">
               {/* Summary Banner */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 p-6 bg-gray-50 border rounded-2xl border-gray-200">
-                <div className="space-y-1">
-                  <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Gross Income</span>
-                  <p className="text-xl md:text-2xl font-bold text-green-600 break-all">{formatLKR(data.summary.totalIncome)}</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 p-6 bg-gray-50 border rounded-2xl border-gray-200">
+                <div className="space-y-1 text-center sm:text-left">
+                  <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Gross Rent</span>
+                  <p className="text-xl md:text-2xl font-bold text-gray-900 break-all">{formatLKR(data.summary.totalGross)}</p>
                 </div>
-                <div className="sm:border-l sm:pl-6 space-y-1 border-gray-200">
-                  <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Total Deductions</span>
+                <div className="sm:border-l sm:pl-6 space-y-1 text-center sm:text-left border-gray-200">
+                  <span className="text-xs font-bold text-red-400 uppercase tracking-wider">Agency Fee</span>
+                  <p className="text-xl md:text-2xl font-bold text-red-500 break-all">-{formatLKR(data.summary.totalCommission)}</p>
+                </div>
+                <div className="lg:border-l lg:pl-6 space-y-1 text-center sm:text-left border-gray-200">
+                  <span className="text-xs font-bold text-red-400 uppercase tracking-wider">Maintenance</span>
                   <p className="text-xl md:text-2xl font-bold text-red-600 break-all">-{formatLKR(data.summary.totalExpenses)}</p>
                 </div>
-                <div className="sm:border-l sm:pl-6 space-y-1 border-gray-200 bg-white sm:bg-transparent rounded-xl p-4 sm:p-0 shadow-sm sm:shadow-none border border-blue-100 sm:border-0 grow">
-                  <span className="text-xs font-bold text-blue-600 uppercase tracking-wider">Net Payout</span>
+                <div className="lg:border-l lg:pl-6 space-y-1 border-gray-200 bg-white sm:bg-transparent rounded-xl p-4 sm:p-0 shadow-sm sm:shadow-none border border-blue-100 sm:border-0 grow text-center sm:text-left">
+                  <span className="text-xs font-bold text-blue-600 uppercase tracking-wider">Final Net Payout</span>
                   <p className="text-2xl md:text-3xl font-black text-gray-900 break-all">{formatLKR(data.summary.netPayout)}</p>
                 </div>
               </div>
+
+              {/* Disbursement Info (If Paid/Ack) */}
+              {(data.summary.status !== 'pending') && (
+                <div className="bg-white border rounded-2xl p-6 shadow-sm space-y-4">
+                    <div className="flex items-center gap-2 pb-2 border-b">
+                        <Wallet className="size-4 text-blue-600" />
+                        <h3 className="font-bold text-gray-900 text-lg">Disbursement Details</h3>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <div>
+                            <span className="text-xs font-bold text-gray-400 uppercase">Bank Reference</span>
+                            <p className="font-mono text-sm font-semibold">{data.summary.bankReference || 'N/A'}</p>
+                        </div>
+                        <div>
+                            <span className="text-xs font-bold text-gray-400 uppercase">Status</span>
+                            <div className="mt-1">
+                                <Badge variant={data.summary.status === 'acknowledged' ? 'default' : data.summary.status === 'disputed' ? 'destructive' : 'secondary'}>
+                                    {data.summary.status.toUpperCase()}
+                                </Badge>
+                            </div>
+                        </div>
+                        {data.summary.acknowledgedAt && (
+                             <div>
+                                <span className="text-xs font-bold text-gray-400 uppercase">Acknowledged On</span>
+                                <p className="text-sm font-medium">{new Date(data.summary.acknowledgedAt).toLocaleString()}</p>
+                             </div>
+                        )}
+                        {data.summary.disputeReason && (
+                             <div className="col-span-full bg-red-50 p-3 rounded border border-red-100">
+                                <span className="text-xs font-bold text-red-600 uppercase">Dispute Reason</span>
+                                <p className="text-sm text-red-800 mt-1">{data.summary.disputeReason}</p>
+                             </div>
+                        )}
+                    </div>
+                </div>
+              )}
 
               {/* Income Section */}
               <div className="space-y-4">

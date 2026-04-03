@@ -12,18 +12,11 @@ const OwnerPayoutsPage: React.FC = () => {
   const [payouts, setPayouts] = useState<OwnerPayout[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // Generation State
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
-  const [previewData, setPreviewData] = useState<{
-    totalIncome: number;
-    totalExpenses: number;
-    netPayout: number;
-  } | null>(null);
-  const [previewLoading, setPreviewLoading] = useState(false);
+  // Action States
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [selectedPayoutId, setSelectedPayoutId] = useState<string | null>(null);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   useEffect(() => {
     fetchHistory();
@@ -41,41 +34,32 @@ const OwnerPayoutsPage: React.FC = () => {
     }
   };
 
-  const handlePreview = async () => {
-    if (!endDate) {
-      setError('Please select an end date.');
-      return;
-    }
-    setError('');
-    setPreviewLoading(true);
+  const handleAcknowledge = async (payoutId: string) => {
+    if (!confirm('Are you sure you want to acknowledge receipt of this payout?')) return;
     try {
-      const res = await payoutApi.preview(startDate, endDate);
-      setPreviewData(res.data);
+      setActionLoading(payoutId);
+      await payoutApi.acknowledge(payoutId);
+      toast.success('Payout acknowledged');
+      fetchHistory();
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to preview payout');
+      toast.error(err.response?.data?.error || 'Failed to acknowledge');
     } finally {
-      setPreviewLoading(false);
+      setActionLoading(null);
     }
   };
 
-  const handleCreate = async () => {
-    if (!endDate) return;
-    if (
-      !confirm(
-        'Are you sure you want to record this payout? This action is permanent.'
-      )
-    )
-      return;
-
+  const handleDispute = async (payoutId: string) => {
+    const reason = prompt('Please enter the reason for this dispute:');
+    if (!reason) return;
     try {
-      await payoutApi.create({ startDate, endDate });
-      setSuccess('Payout recorded successfully!');
-      setPreviewData(null);
-      setStartDate('');
-      setEndDate('');
+      setActionLoading(payoutId);
+      await payoutApi.dispute(payoutId, reason);
+      toast.success('Dispute recorded');
       fetchHistory();
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to create payout');
+      toast.error(err.response?.data?.error || 'Failed to record dispute');
+    } finally {
+      setActionLoading(null);
     }
   };
 
@@ -112,98 +96,18 @@ const OwnerPayoutsPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Payout Generator Card */}
-      <div className="bg-white p-6 rounded-lg shadow-md mb-8">
-        <h2 className="text-xl font-semibold mb-2">Generate New Payout</h2>
-        <p className="text-sm text-gray-600 mb-4">
-          This will capture all verified payments and maintenance expenses that have not yet been paid out, up to the selected end date (<b>Cash-Basis Accounting</b>).
-        </p>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Start Date
-            </label>
-            <input
-              type="date"
-              className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              placeholder="Optional"
-            />
-            <p className="text-[10px] text-gray-500 mt-1">Leave empty to include all previous unpaid items.</p>
+      {/* Info Card */}
+      <div className="bg-blue-50 border-l-4 border-blue-400 p-4 rounded shadow-sm">
+        <div className="flex">
+          <div className="flex-shrink-0">
+             <FileText className="h-5 w-5 text-blue-400" />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              End Date
-            </label>
-            <input
-              type="date"
-              className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-            />
-            <div className="h-4"></div> {/* Alignment spacer to match Start Date subtext */}
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-white mb-1">
-              Action
-            </label>
-            <button
-              onClick={handlePreview}
-              disabled={previewLoading}
-              className="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700 disabled:opacity-50 transition-colors shadow-sm"
-            >
-              {previewLoading ? 'Calculating...' : 'Preview Payout'}
-            </button>
+          <div className="ml-3">
+            <p className="text-sm text-blue-700">
+              Payouts are generated and processed by the Treasurer. Once a payout is marked as <strong>Paid</strong>, please verify the transfer in your bank and click <strong>Acknowledge</strong> to confirm receipt.
+            </p>
           </div>
         </div>
-
-        {error && (
-          <div className="mt-4 p-3 bg-red-100 text-red-700 rounded">
-            {error}
-          </div>
-        )}
-        {success && (
-          <div className="mt-4 p-3 bg-green-100 text-green-700 rounded">
-            {success}
-          </div>
-        )}
-
-        {previewData && (
-          <div className="mt-6 p-4 border rounded bg-gray-50">
-            <h3 className="font-semibold mb-3">Payout Preview</h3>
-            <div className="grid grid-cols-3 gap-4 mb-4">
-              <div>
-                <span className="block text-sm text-gray-600">
-                  Total Rent Collected
-                </span>
-                <span className="text-lg text-green-600 font-bold">
-                  {formatLKR(previewData.totalIncome)}
-                </span>
-              </div>
-              <div>
-                <span className="block text-sm text-gray-600">
-                  Total Expenses
-                </span>
-                <span className="text-lg text-red-600 font-bold">
-                  {formatLKR(previewData.totalExpenses)}
-                </span>
-              </div>
-              <div>
-                <span className="block text-sm text-gray-600">Net Payout</span>
-                <span className="text-xl font-bold">
-                  {formatLKR(previewData.netPayout)}
-                </span>
-              </div>
-            </div>
-            <button
-              onClick={handleCreate}
-              className="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700"
-            >
-              Confirm & Record Payout
-            </button>
-          </div>
-        )}
       </div>
 
       {/* History Table */}
@@ -230,7 +134,7 @@ const OwnerPayoutsPage: React.FC = () => {
                   Period
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Amount (LKR)
+                  Amount (Net)
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Status
@@ -259,8 +163,12 @@ const OwnerPayoutsPage: React.FC = () => {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span
                       className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        p.status === 'processed'
+                        p.status === 'acknowledged'
                           ? 'bg-green-100 text-green-800'
+                          : p.status === 'paid'
+                          ? 'bg-blue-100 text-blue-800'
+                          : p.status === 'disputed'
+                          ? 'bg-red-100 text-red-800'
                           : 'bg-yellow-100 text-yellow-800'
                       }`}
                     >
@@ -271,11 +179,29 @@ const OwnerPayoutsPage: React.FC = () => {
                     {new Date(p.generatedAt).toLocaleDateString()}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <div className="flex justify-end gap-2">
+                    <div className="flex justify-end gap-2 items-center">
+                      {p.status === 'paid' && (
+                        <>
+                          <button
+                            onClick={() => handleAcknowledge(p.id)}
+                            disabled={!!actionLoading}
+                            className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 text-xs shadow-sm"
+                          >
+                            {actionLoading === p.id ? '...' : 'Acknowledge'}
+                          </button>
+                          <button
+                            onClick={() => handleDispute(p.id)}
+                            disabled={!!actionLoading}
+                            className="bg-red-100 text-red-600 px-3 py-1 rounded hover:bg-red-200 text-xs"
+                          >
+                            Dispute
+                          </button>
+                        </>
+                      )}
                        <button
                         onClick={() => setSelectedPayoutId(p.id)}
                         className="p-1 text-blue-600 hover:bg-blue-50 rounded"
-                        title="View Breakdown"
+                        title="View Reconciliation"
                       >
                         <Eye className="size-4" />
                       </button>

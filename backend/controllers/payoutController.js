@@ -4,19 +4,18 @@ class PayoutController {
   // 1. Preview (Calculate but don't save)
   async previewPayout(req, res) {
     try {
-      const { startDate, endDate } = req.query;
-      const ownerId = req.user.id; // Assuming Owner calling
+      const { ownerId, startDate, endDate } = req.query;
 
-      if (req.user.role !== 'owner') {
+      if (req.user.role !== 'treasurer') {
         return res
           .status(403)
-          .json({ error: 'Only owners can generate their payouts' });
+          .json({ error: 'Access denied: Only treasurers can generate payouts' });
       }
 
-      if (!endDate) {
+      if (!ownerId || !endDate) {
         return res
           .status(400)
-          .json({ error: 'End date is required' });
+          .json({ error: 'Owner ID and End date are required' });
       }
 
       const calculation = await payoutService.previewPayout(
@@ -34,11 +33,14 @@ class PayoutController {
   // 2. Create (Calculate and Save)
   async createPayout(req, res) {
     try {
-      const { startDate, endDate } = req.body;
-      const ownerId = req.user.id;
+      const { ownerId, startDate, endDate } = req.body;
 
-      if (req.user.role !== 'owner') {
-        return res.status(403).json({ error: 'Access denied' });
+      if (req.user.role !== 'treasurer') {
+        return res.status(403).json({ error: 'Access denied: Only treasurers can generate payouts' });
+      }
+
+      if (!ownerId) {
+          return res.status(400).json({ error: 'Owner ID is required' });
       }
 
       const { payoutId, netPayout } = await payoutService.createPayout(
@@ -58,10 +60,13 @@ class PayoutController {
 
   async getHistory(req, res) {
     try {
-      const ownerId = req.user.id;
-      if (req.user.role !== 'owner') {
-        return res.status(403).json({ error: 'Access denied' });
+      const ownerId = req.query.ownerId || req.user.id;
+      
+      // If owner, they can only see their own. If treasurer, they can see anyone's.
+      if (req.user.role === 'owner' && String(ownerId) !== String(req.user.id)) {
+          return res.status(403).json({ error: 'Access denied: You cannot view this history' });
       }
+
       const payouts = await payoutService.getHistory(ownerId);
       res.json(payouts);
     } catch (error) {
@@ -70,16 +75,21 @@ class PayoutController {
     }
   }
 
-  async processPayout(req, res) {
+  async markAsPaid(req, res) {
     try {
-      if (req.user.role !== 'owner') {
-        return res.status(403).json({ error: 'Access denied' });
+      if (req.user.role !== 'treasurer') {
+        return res.status(403).json({ error: 'Access denied: Only treasurers can process payments' });
       }
 
       const { id } = req.params;
+      const { bankReference, proofUrl } = req.body;
 
-      await payoutService.processPayout(req.user.id, id);
-      res.json({ message: 'Payout marked as processed' });
+      if (!bankReference) {
+          return res.status(400).json({ error: 'Bank reference is required for payment verification' });
+      }
+
+      await payoutService.markAsPaid(id, req.user.id, bankReference, proofUrl);
+      res.json({ message: 'Payout marked as paid and sent to owner for acknowledgment' });
     } catch (error) {
       console.error(error);
       res.status(500).json({ error: 'Failed to process payout' });
@@ -88,31 +98,59 @@ class PayoutController {
 
   async getPayoutDetails(req, res) {
     try {
-      const ownerId = req.user.id;
       const { id } = req.params;
+      // Get internal details then check ownerId
+      const fullPayout = await payoutService.getPayoutById(id);
+      if (!fullPayout) return res.status(404).json({ error: 'Payout not found' });
 
-      if (req.user.role !== 'owner') {
-        return res.status(403).json({ error: 'Access denied' });
+      // RBAC
+      if (req.user.role === 'owner' && String(fullPayout.owner_id) !== String(req.user.id)) {
+          return res.status(403).json({ error: 'Access denied' });
       }
 
-      const details = await payoutService.getPayoutDetails(ownerId, id);
+      const details = await payoutService.getPayoutDetails(fullPayout.owner_id, id);
       res.json(details);
     } catch (error) {
       console.error(error);
-      res.status(error.message.includes('denied') ? 403 : 500).json({ error: error.message });
+      res.status(500).json({ error: error.message });
+    }
+  }
+
+  async acknowledgePayout(req, res) {
+    try {
+        if (req.user.role !== 'owner') return res.status(403).json({ error: 'Access denied' });
+        const { id } = req.params;
+        await payoutService.acknowledgePayout(req.user.id, id);
+        res.json({ message: 'Payout acknowledged successfully' });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+  }
+
+  async disputePayout(req, res) {
+    try {
+        if (req.user.role !== 'owner') return res.status(403).json({ error: 'Access denied' });
+        const { id } = req.params;
+        const { reason } = req.body;
+        if (!reason) return res.status(400).json({ error: 'Reason for dispute is required' });
+        await payoutService.disputePayout(req.user.id, id, reason);
+        res.json({ message: 'Payout marked as disputed' });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
     }
   }
 
   async exportPayoutCSV(req, res) {
     try {
-      const ownerId = req.user.id;
       const { id } = req.params;
+      const fullPayout = await payoutService.getPayoutById(id);
+      if (!fullPayout) return res.status(404).json({ error: 'Payout not found' });
 
-      if (req.user.role !== 'owner') {
+      if (req.user.role === 'owner' && String(fullPayout.owner_id) !== String(req.user.id)) {
         return res.status(403).json({ error: 'Access denied' });
       }
 
-      const csv = await payoutService.exportPayoutCSV(ownerId, id);
+      const csv = await payoutService.exportPayoutCSV(fullPayout.owner_id, id);
       
       res.setHeader('Content-Type', 'text/csv');
       res.setHeader('Content-Disposition', `attachment; filename=payout_reconciliation_${id}.csv`);

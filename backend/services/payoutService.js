@@ -13,34 +13,32 @@ class PayoutService {
       throw new Error('End date is required');
     }
 
-    // Overlap Fix: New payout must not end before a previous one ends, 
-    // but we can have multiple payouts for different records in the same month.
     const hasOverlap = await payoutModel.checkOverlap(ownerId, startDate, endDate);
     if (hasOverlap) {
       throw new Error('A payout record already exists that covers part of this period.');
     }
 
-    // Use a transaction to ensure payout calculation and record linking are atomic
     const connection = await (await import('../config/db.js')).default.getConnection();
     try {
       await connection.beginTransaction();
 
-      // 1. Calculate within transaction to lock/snapshot records
-      const { netPayout, incomeIds, expenseIds } = await payoutModel.calculateNetPayout(ownerId, startDate, endDate, connection);
+      const { totalGross, totalCommission, totalExpenses, netPayout, incomeIds, expenseIds } = 
+        await payoutModel.calculateNetPayout(ownerId, startDate, endDate, connection);
 
       if (incomeIds.length === 0 && expenseIds.length === 0) {
           throw new Error('No eligible records found for this payout period.');
       }
 
-      // 2. Create Payout record
       const payoutId = await payoutModel.create({
         ownerId,
-        amount: netPayout,
+        grossAmount: totalGross,
+        commissionAmount: totalCommission,
+        expensesAmount: totalExpenses,
+        netAmount: netPayout,
         periodStart: startDate,
         periodEnd: endDate,
       }, connection);
 
-      // 3. Link only the specific IDs that were included in the calculation
       await payoutModel.linkRecordsToPayout(payoutId, incomeIds, expenseIds, connection);
 
       await connection.commit();
@@ -57,20 +55,36 @@ class PayoutService {
     return await payoutModel.findByOwnerId(ownerId);
   }
 
-  async processPayout(ownerId, payoutId) {
-    // Verify payout belongs to the requesting owner
-    const payouts = await payoutModel.findByOwnerId(ownerId);
-    const payout = payouts.find((p) => String(p.payout_id) === String(payoutId));
-    
-    if (!payout) {
-      throw new Error('Payout not found');
-    }
+  async getPayoutById(payoutId) {
+    // Note: This is an internal helper or for admins. Standard usage should go through role-aware finders.
+    const [row] = await (await import ('../config/db.js')).default.query("SELECT * FROM owner_payouts WHERE payout_id = ?", [payoutId]);
+    if (!row[0]) return null;
+    return row[0];
+  }
 
-    if (payout.status === 'processed') {
-      throw new Error('Payout already processed');
-    }
+  async markAsPaid(payoutId, treasurerId, bankReference, proofUrl = null) {
+      // Logic moved to model for transactional safety if needed, here we just trigger it
+      await payoutModel.markAsPaid(payoutId, treasurerId, bankReference, proofUrl);
+      return true;
+  }
 
-    await payoutModel.markAsProcessed(payoutId);
+  async acknowledgePayout(ownerId, payoutId) {
+    const history = await payoutModel.findByOwnerId(ownerId);
+    const payout = history.find(p => String(p.id) === String(payoutId));
+    if (!payout) throw new Error('Payout not found or access denied');
+    if (payout.status !== 'paid') throw new Error('Only paid payouts can be acknowledged');
+
+    await payoutModel.acknowledge(payoutId);
+    return true;
+  }
+
+  async disputePayout(ownerId, payoutId, reason) {
+    const history = await payoutModel.findByOwnerId(ownerId);
+    const payout = history.find(p => String(p.id) === String(payoutId));
+    if (!payout) throw new Error('Payout not found or access denied');
+    if (payout.status !== 'paid') throw new Error('Only paid payouts can be disputed');
+
+    await payoutModel.dispute(payoutId, reason);
     return true;
   }
 
@@ -85,19 +99,20 @@ class PayoutService {
 
     const details = await payoutModel.getPayoutDetails(payoutId);
     
-    // Add summary
-    const totalIncome = details.income.reduce((sum, r) => sum + Number(r.amount), 0);
-    const totalExpenses = details.expenses.reduce((sum, r) => sum + Number(r.amount), 0);
-    
     return {
       ...details,
       summary: {
-        totalIncome,
-        totalExpenses,
-        netPayout: totalIncome - totalExpenses,
+        totalGross: payout.grossAmount,
+        totalCommission: payout.commissionAmount,
+        totalExpenses: payout.expensesAmount,
+        netPayout: payout.amount,
         periodStart: payout.periodStart,
         periodEnd: payout.periodEnd,
-        status: payout.status
+        status: payout.status,
+        bankReference: payout.bankReference,
+        proofUrl: payout.proofUrl,
+        acknowledgedAt: payout.acknowledgedAt,
+        disputeReason: payout.disputeReason
       }
     };
   }
@@ -143,9 +158,11 @@ class PayoutService {
 
     // Summary Row
     rows.push([]);
-    rows.push(['TOTAL INCOME', '', '', '', '', (details.summary.totalIncome / 100).toFixed(2), '']);
-    rows.push(['TOTAL EXPENSES', '', '', '', '', '', (details.summary.totalExpenses / 100).toFixed(2)]);
-    rows.push(['NET PAYOUT', '', '', '', '', (details.summary.netPayout / 100).toFixed(2), '']);
+    rows.push(['TOTAL RENT COLLECTED', '', '', '', '', (details.summary.totalGross / 100).toFixed(2), '']);
+    rows.push(['AGENCY MANAGEMENT FEE', '', '', '', '', '', (details.summary.totalCommission / 100).toFixed(2)]);
+    rows.push(['TOTAL EXPENSES (MAINTENANCE)', '', '', '', '', '', (details.summary.totalExpenses / 100).toFixed(2)]);
+    rows.push([]);
+    rows.push(['NET PAYOUT TO OWNER', '', '', '', '', (details.summary.netPayout / 100).toFixed(2), '']);
 
     return rows.map(r => r.join(',')).join('\n');
   }

@@ -18,34 +18,36 @@ class PropertyModel {
       street,
       city,
       district,
-      imageUrl,
-      description,
-      features,
-    } = propertyData;
-
-    // Ensure features is a JSON string if it's an array/object, or null if empty
-    const featuresJson = features ? JSON.stringify(features) : null;
-
-    const [result] = await db.query(
-      `INSERT INTO properties 
-            (owner_id, name, property_type_id, property_no, street, city, district, image_url, description, features, late_fee_percentage, late_fee_grace_period, tenant_deactivation_days) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        ownerId,
-        name,
-        propertyTypeId,
-        propertyNo,
-        street,
-        city,
-        district,
         imageUrl,
         description,
-        featuresJson,
-        propertyData.lateFeePercentage || 3.00,
-        propertyData.lateFeeGracePeriod || 5,
-        propertyData.tenantDeactivationDays || 30,
-      ]
-    );
+        features,
+        managementFeePercentage,
+      } = propertyData;
+  
+      // Ensure features is a JSON string if it's an array/object, or null if empty
+      const featuresJson = features ? JSON.stringify(features) : null;
+  
+      const [result] = await db.query(
+        `INSERT INTO properties 
+              (owner_id, name, property_type_id, property_no, street, city, district, image_url, description, features, late_fee_percentage, late_fee_grace_period, tenant_deactivation_days, management_fee_percentage) 
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          ownerId,
+          name,
+          propertyTypeId,
+          propertyNo,
+          street,
+          city,
+          district,
+          imageUrl,
+          description,
+          featuresJson,
+          propertyData.lateFeePercentage || 3.00,
+          propertyData.lateFeeGracePeriod || 5,
+          propertyData.tenantDeactivationDays || 30,
+          managementFeePercentage || 0.00,
+        ]
+      );
     return result.insertId;
   }
 
@@ -68,6 +70,7 @@ class PropertyModel {
                 p.late_fee_percentage,
                 p.late_fee_grace_period,
                 p.tenant_deactivation_days,
+                p.management_fee_percentage,
                 pt.name as type_name,
                 pt.type_id as type_id
             FROM properties p
@@ -101,6 +104,7 @@ class PropertyModel {
       lateFeePercentage: parseFloat(row.late_fee_percentage),
       lateFeeGracePeriod: parseInt(row.late_fee_grace_period),
       tenantDeactivationDays: parseInt(row.tenant_deactivation_days),
+      managementFeePercentage: parseFloat(row.management_fee_percentage),
     }));
   }
 
@@ -124,6 +128,7 @@ class PropertyModel {
                 p.late_fee_percentage,
                 p.late_fee_grace_period,
                 p.tenant_deactivation_days,
+                p.management_fee_percentage,
                 pt.name as type_name,
                 pt.type_id as type_id
             FROM properties p
@@ -153,6 +158,7 @@ class PropertyModel {
       lateFeePercentage: parseFloat(rows[0].late_fee_percentage),
       lateFeeGracePeriod: parseInt(rows[0].late_fee_grace_period),
       tenantDeactivationDays: parseInt(rows[0].tenant_deactivation_days),
+      managementFeePercentage: parseFloat(rows[0].management_fee_percentage),
     };
   }
 
@@ -169,7 +175,8 @@ class PropertyModel {
     features: 'features',
     lateFeePercentage: 'late_fee_percentage',
     lateFeeGracePeriod: 'late_fee_grace_period',
-    tenantDeactivationDays: 'tenant_deactivation_days'
+    tenantDeactivationDays: 'tenant_deactivation_days',
+    managementFeePercentage: 'management_fee_percentage'
   };
 
   async update(id, updates) {

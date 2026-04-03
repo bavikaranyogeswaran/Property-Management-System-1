@@ -170,6 +170,20 @@ class UserController {
     }
   }
 
+  async getOwners(req, res) {
+    try {
+      // Treasurers need to see owners to pick one for payout.
+      // Owners can see owners (self mainly, but for listing in settings etc).
+      if (req.user.role !== 'owner' && req.user.role !== 'treasurer') {
+        return res.status(403).json({ error: 'Access denied.' });
+      }
+      const result = await userService.getOwners();
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+
   //  GET TENANTS: Fetches the list of people living in the properties.
   //  - Owner sees EVERYONE.
   //  - Treasurer sees only tenants in properties assigned to them.

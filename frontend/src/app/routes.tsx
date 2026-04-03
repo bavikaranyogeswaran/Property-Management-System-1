@@ -19,6 +19,7 @@ import { OwnerMaintenancePage } from '@/components/pages/owner/OwnerMaintenanceP
 import { AnalyticsPage } from '@/components/reports/AnalyticsPage';
 import { SettingsPage } from '@/components/pages/common/SettingsPage';
 import OwnerPayoutsPage from '@/components/pages/OwnerPayoutsPage';
+import TreasurerPayoutsPage from '@/components/pages/treasurer/TreasurerPayoutsPage';
 import AuditLogsPage from '@/components/pages/AuditLogsPage';
 import { VisitsPage } from '@/components/pages/owner/VisitsPage';
 import { NotificationsPage } from '@/components/pages/common/NotificationsPage';
@@ -86,6 +87,7 @@ export const renderPage = (activePage: string, user: User | null) => {
     if (activePage === 'leases') return <LeasesPage />;
     if (activePage === 'tenants') return <TenantsPage />;
     if (activePage === 'analytics') return <AnalyticsPage />;
+    if (activePage === 'payouts') return <TreasurerPayoutsPage />;
   }
 
   // Placeholder for other pages

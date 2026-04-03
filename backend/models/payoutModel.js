@@ -2,12 +2,12 @@ import pool from '../config/db.js';
 
 class PayoutModel {
   async create(data, connection) {
-    const { ownerId, amount, periodStart, periodEnd } = data;
+    const { ownerId, grossAmount, commissionAmount, expensesAmount, netAmount, periodStart, periodEnd } = data;
     const db = connection || pool;
     try {
       const [result] = await db.query(
-        'INSERT INTO owner_payouts (owner_id, amount, period_start, period_end) VALUES (?, ?, ?, ?)',
-        [ownerId, amount, periodStart, periodEnd]
+        'INSERT INTO owner_payouts (owner_id, gross_amount, commission_amount, expenses_amount, amount, period_start, period_end) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [ownerId, grossAmount, commissionAmount, expensesAmount, netAmount, periodStart, periodEnd]
       );
       return result.insertId;
     } catch (error) {
@@ -26,19 +26,43 @@ class PayoutModel {
     return rows.map(row => ({
       id: row.payout_id.toString(),
       ownerId: row.owner_id.toString(),
-      amount: parseFloat(row.amount),
+      grossAmount: Number(row.gross_amount),
+      commissionAmount: Number(row.commission_amount),
+      expensesAmount: Number(row.expenses_amount),
+      amount: Number(row.amount),
       periodStart: row.period_start,
       periodEnd: row.period_end,
-      generatedAt: row.generated_at,
       status: row.status,
-      processedAt: row.processed_at
+      bankReference: row.bank_reference,
+      proofUrl: row.proof_url,
+      treasurerId: row.treasurer_id ? row.treasurer_id.toString() : null,
+      generatedAt: row.generated_at,
+      processedAt: row.processed_at,
+      acknowledgedAt: row.acknowledged_at,
+      disputeReason: row.dispute_reason
     }));
   }
 
-  async markAsProcessed(payoutId) {
+  async markAsPaid(payoutId, treasurerId, bankReference, proofUrl = null) {
     await pool.query(
-      'UPDATE owner_payouts SET status = "processed", processed_at = NOW() WHERE payout_id = ?',
+      'UPDATE owner_payouts SET status = "paid", processed_at = NOW(), treasurer_id = ?, bank_reference = ?, proof_url = ? WHERE payout_id = ?',
+      [treasurerId, bankReference, proofUrl, payoutId]
+    );
+    return true;
+  }
+
+  async acknowledge(payoutId) {
+    await pool.query(
+      'UPDATE owner_payouts SET status = "acknowledged", acknowledged_at = NOW() WHERE payout_id = ?',
       [payoutId]
+    );
+    return true;
+  }
+
+  async dispute(payoutId, reason) {
+    await pool.query(
+      'UPDATE owner_payouts SET status = "disputed", dispute_reason = ? WHERE payout_id = ?',
+      [reason, payoutId]
     );
     return true;
   }
@@ -61,10 +85,10 @@ class PayoutModel {
   // Core Logic: Rent - Expenses (Captures snapshot of IDs to prevent race conditions)
   async calculateNetPayout(ownerId, startDate, endDate, connection) {
     const db = connection || pool;
-    // 1. Snapshot Income IDs and Total
+    // 1. Snapshot Income IDs and Total (incl. per-property fees)
     const [incomeRows] = await db.query(
       `
-            SELECT p.payment_id as paymentId, p.amount
+            SELECT p.payment_id as paymentId, p.amount, prop.management_fee_percentage as fee
             FROM payments p
             JOIN rent_invoices ri ON p.invoice_id = ri.invoice_id
             JOIN leases l ON ri.lease_id = l.lease_id
@@ -72,7 +96,7 @@ class PayoutModel {
             JOIN properties prop ON u.property_id = prop.property_id
             WHERE prop.owner_id = ? 
             AND p.status = 'verified'
-            AND ri.invoice_type != 'deposit'
+            AND ri.invoice_type NOT IN ('deposit')
             AND p.payout_id IS NULL
             AND p.payment_date <= ?
         `,
@@ -80,7 +104,12 @@ class PayoutModel {
     );
 
     const incomeIds = incomeRows.map(r => r.paymentId);
-    const totalIncome = incomeRows.reduce((sum, r) => sum + Number(r.amount), 0);
+    const totalGross = incomeRows.reduce((sum, r) => sum + Number(r.amount), 0);
+    const totalCommission = incomeRows.reduce((sum, r) => {
+        const fee = Number(r.fee || 0);
+        const comm = Math.round(Number(r.amount) * (fee / 100));
+        return sum + comm;
+    }, 0);
 
     // 2. Snapshot Expense IDs and Total
     const [expenseRows] = await db.query(
@@ -102,9 +131,10 @@ class PayoutModel {
     const totalExpenses = expenseRows.reduce((sum, r) => sum + Number(r.amount), 0);
 
     return {
-      totalIncome,
+      totalGross,
+      totalCommission,
       totalExpenses,
-      netPayout: totalIncome - totalExpenses,
+      netPayout: totalGross - totalCommission - totalExpenses,
       incomeIds,
       expenseIds,
     };
