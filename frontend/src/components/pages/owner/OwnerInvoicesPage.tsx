@@ -34,67 +34,7 @@ import { formatLKR } from '@/utils/formatters';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
-// Helper Form Component
-function RecordCashPaymentForm({
-  invoice,
-  tenantName,
-}: {
-  invoice: any;
-  tenantName?: string;
-}) {
-  const { recordCashPayment } = useApp();
-  const [amount, setAmount] = useState(invoice.amount.toString());
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      await recordCashPayment(invoice.id, parseFloat(amount), date);
-      // Close dialog? Ideally parent handles logic, but simple form submission here.
-      // We rely on toast from context.
-      // To close dialog, we might need a prop or use DialogClose.
-      // For now, let it submit.
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <Label>Tenant</Label>
-        <div className="p-2 bg-gray-50 rounded border">
-          {tenantName || 'Unknown'}
-        </div>
-      </div>
-      <div>
-        <Label>Amount (LKR)</Label>
-        <Input
-          type="number"
-          min="0"
-          step="0.01"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          required
-        />
-      </div>
-      <div>
-        <Label>Payment Date</Label>
-        <Input
-          type="date"
-          value={date}
-          onChange={(e) => setDate(e.target.value)}
-          required
-        />
-      </div>
-      <Button type="submit" disabled={loading} className="w-full">
-        {loading ? 'Recording...' : 'Confirm Cash Payment'}
-      </Button>
-    </form>
-  );
-}
 
 export function OwnerInvoicesPage() {
   const { user } = useAuth();
@@ -263,33 +203,7 @@ export function OwnerInvoicesPage() {
                 {(user?.role === 'treasurer' || (invoicesList.length > 0 && invoicesList.every(i => i.status === 'paid'))) && (
                   <TableCell className="text-right align-middle h-14">
                     <div className="flex items-center justify-end gap-2">
-                    {user?.role === 'treasurer' && invoice.status !== 'paid' && (
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="text-green-600 border-green-200 hover:bg-green-50"
-                          >
-                            <DollarSign className="size-3 mr-1" />
-                            Cash Pay
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="max-w-md p-0 overflow-hidden">
-                          <div className="flex flex-col max-h-[90vh]">
-                            <DialogHeader className="p-6 pb-2">
-                              <DialogTitle>Record Cash Payment</DialogTitle>
-                            </DialogHeader>
-                            <div className="flex-1 overflow-y-auto p-6 pt-2">
-                              <RecordCashPaymentForm
-                                invoice={invoice}
-                                tenantName={tenant?.name}
-                              />
-                            </div>
-                          </div>
-                        </DialogContent>
-                      </Dialog>
-                    )}
+
 
                     {invoice.status === 'paid' &&
                       receipt &&

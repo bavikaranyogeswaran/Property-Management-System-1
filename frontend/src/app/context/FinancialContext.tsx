@@ -67,7 +67,6 @@ interface FinancialContextType {
   generateMonthlyInvoices: () => Promise<void>;
   submitPayment: (payment: Omit<Payment, 'id' | 'submittedAt'>) => Promise<void>;
   verifyPayment: (id: string, approved: boolean) => Promise<void>;
-  recordCashPayment: (invoiceId: string, amount: number, paymentDate: string, referenceNumber?: string) => Promise<void>;
   runLateFeeAudit: () => Promise<void>;
   refreshData: () => Promise<void>;
 }
@@ -175,15 +174,7 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const recordCashPayment = async (invoiceId: string, amount: number, paymentDate: string, referenceNumber?: string) => {
-    try {
-      await paymentApi.recordCashPayment(invoiceId, toCentsFromLKR(amount), paymentDate, referenceNumber);
-      toast.success('Cash payment recorded');
-      await fetchFinancialData();
-    } catch (e: any) {
-      toast.error(e.response?.data?.error || 'Failed to record cash payment');
-    }
-  };
+
   
   const runLateFeeAudit = async () => {
     try {
@@ -205,7 +196,6 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
       generateMonthlyInvoices, 
       submitPayment, 
       verifyPayment, 
-      recordCashPayment, 
       runLateFeeAudit,
       refreshData: fetchFinancialData
     }}>

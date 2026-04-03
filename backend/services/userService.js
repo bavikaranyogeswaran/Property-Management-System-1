@@ -277,8 +277,6 @@ class UserService {
         [userId, leadId]
       );
 
-      // 4c. Record stage history (positional args: leadId, fromStatus, toStatus, notes, connection)
-      const leadStageHistoryModel = (await import('../models/leadStageHistoryModel.js')).default;
       await leadStageHistoryModel.create(
           leadId,
           lead.status,        // fromStatus — captured before the update above
@@ -286,6 +284,31 @@ class UserService {
           'System: Lead formally converted into an active tenant.',
           connection
       );
+
+      // [C1.2 FIX] Auto-drop other leads for this specific unit
+      if (lead.interestedUnit || tenantData.unitId) {
+        const affectedUnit = tenantData.unitId || lead.interestedUnit;
+        const [otherLeads] = await connection.query(
+          "SELECT lead_id, status FROM leads WHERE unit_id = ? AND lead_id != ? AND status NOT IN ('converted', 'dropped')", 
+          [affectedUnit, leadId]
+        );
+
+        for (const otherLead of otherLeads) {
+          await connection.query(
+            "UPDATE leads SET status = 'dropped' WHERE lead_id = ?",
+            [otherLead.lead_id]
+          );
+          // Log history for each dropped lead
+          await leadStageHistoryModel.create(
+            otherLead.lead_id,
+            otherLead.status,
+            'dropped',
+            `System: Unit #${affectedUnit} has been leased to another applicant.`,
+            connection
+          );
+        }
+        console.log(`[CLEANUP] Dropped ${otherLeads.length} other leads for unit #${affectedUnit}`);
+      }
 
       // 5. Lease & Unit Logic
       // Use provided unitId (from conversion dialog) OR the lead's original interest
@@ -319,6 +342,12 @@ class UserService {
             leaseEnd = addMonths(leaseStart, 12);
           }
 
+          // [C1.3 FIX] Make security deposit configurable
+          const monthlyRent = fromCents(unit.monthlyRent);
+          const securityDepositLKR = tenantData.securityDeposit !== undefined 
+            ? parseFloat(tenantData.securityDeposit) 
+            : monthlyRent; // Fallback to 1 month
+
           // Use LeaseService with the existing transaction connection
           const { leaseId, magicToken: internalMagicToken } = await leaseService.createLease(
             {
@@ -327,8 +356,8 @@ class UserService {
               startDate: leaseStart,
               endDate: leaseEnd,
               leaseTermId: leaseTermId,
-              monthlyRent: fromCents(unit.monthlyRent),
-              securityDeposit: fromCents(unit.monthlyRent), // Default 1 month deposit
+              monthlyRent: monthlyRent,
+              securityDeposit: securityDepositLKR, 
               documentUrl: tenantData.documentUrl || null,
             },
             connection,
@@ -340,7 +369,7 @@ class UserService {
           mailData.magicToken = internalMagicToken; // [NEW] Capture raw token from Service
           mailData.propertyName = unit.propertyName;
           mailData.unitNumber = unit.unitNumber;
-          mailData.depositAmount = unit.monthlyRent; // [NEW] Capture amount
+          mailData.depositAmount = securityDepositLKR; // [FIXED] Use the actual deposit value
         }
       }
 
@@ -351,25 +380,35 @@ class UserService {
         unitLockService.releaseLock(targetUnitId);
       }
 
-      // [CRITICAL FIX] Send email ONLY after successful transaction commit
-      // [NEW] Use the magicToken returned by LeaseService
-      if (mailData.leaseId && mailData.magicToken) {
-              // Send Deposit Magic Link instead of Account Invitation
-              // (Account Invitation will be sent automatically AFTER deposit is verified)
-              await emailService.sendDepositMagicLink(
-                  mailData.email,
-                  mailData.name,
-                  mailData.propertyName || 'Property',
-                  mailData.unitNumber || 'N/A',
-                  mailData.depositAmount,
-                  mailData.magicToken
-              );
-              return { message: 'Lead converted successfully. Deposit payment link sent.', tenantId: userId, magicLinkSent: true };
-      }
+      try {
+        // [CRITICAL FIX] Send email ONLY after successful transaction commit
+        // [NEW] Use the magicToken returned by LeaseService
+        if (mailData.leaseId && mailData.magicToken) {
+                // Send Deposit Magic Link instead of Account Invitation
+                // (Account Invitation will be sent automatically AFTER deposit is verified)
+                await emailService.sendDepositMagicLink(
+                    mailData.email,
+                    mailData.name,
+                    mailData.propertyName || 'Property',
+                    mailData.unitNumber || 'N/A',
+                    mailData.depositAmount,
+                    mailData.magicToken
+                );
+                return { message: 'Lead converted successfully. Deposit payment link sent.', tenantId: userId, magicLinkSent: true };
+        }
 
-      // Fallback: If no deposit magic link, and it's a new user, send account setup invitation
-      if (invitationToken) {
+        // Fallback: If no deposit magic link, and it's a new user, send account setup invitation
+        if (invitationToken) {
           await emailService.sendInvitationEmail(mailData.email, 'tenant', invitationToken);
+        }
+      } catch (err) {
+        console.error('Failed to send conversion notification email:', err);
+        return { 
+          message: 'Lead converted successfully, but notification email failed to send. Please resend manually.', 
+          tenantId: userId, 
+          magicLinkSent: false,
+          error: 'Email delivery failed'
+        };
       }
 
       return { message: 'Lead converted successfully', tenantId: userId };

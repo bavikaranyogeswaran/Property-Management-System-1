@@ -85,18 +85,6 @@ export const paymentApi = {
   getPayments: () => apiClient.get('/payments'),
   verifyPayment: (id: string, status: string) =>
     apiClient.put(`/payments/${id}/verify`, { status }),
-  recordCashPayment: (
-    invoiceId: string,
-    amount: number,
-    paymentDate: string,
-    referenceNumber?: string
-  ) =>
-    apiClient.post('/payments/cash', {
-      invoiceId,
-      amount,
-      paymentDate,
-      referenceNumber,
-    }),
 };
 
 // Notification API
