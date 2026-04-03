@@ -11,8 +11,14 @@ import { getLocalTime, parseLocalDate } from '../utils/dateUtils.js';
 function drawKpiBox(doc, x, y, width, label, value, color = '#2563eb') {
   doc.save();
   doc.roundedRect(x, y, width, 55, 6).fill(color);
-  doc.fillColor('white').font('Helvetica-Bold').fontSize(18).text(value, x, y + 8, { width, align: 'center' });
-  doc.fillColor('white').font('Helvetica').fontSize(9).text(label, x, y + 32, { width, align: 'center' });
+  
+  // Dynamic font size for high values to prevent overflow
+  let fontSize = 16;
+  if (value.length > 16) fontSize = 12;
+  else if (value.length > 13) fontSize = 14;
+
+  doc.fillColor('white').font('Helvetica-Bold').fontSize(fontSize).text(value, x, y + 10, { width, align: 'center' });
+  doc.fillColor('white').font('Helvetica').fontSize(8.5).text(label, x, y + 34, { width, align: 'center' });
   doc.restore();
   doc.fillColor('black').font('Helvetica');
 }
@@ -98,10 +104,11 @@ class ReportController {
       // --- KPI Panel ---
       let y = doc.y + 5;
       const kpiWidth = 120;
+      const spacing = 6;
       drawKpiBox(doc, 50, y, kpiWidth, 'TOTAL REVENUE', `LKR ${totalIncome.toLocaleString()}`, '#22c55e');
-      drawKpiBox(doc, 180, y, kpiWidth, 'TOTAL EXPENSES', `LKR ${totalExpense.toLocaleString()}`, '#ef4444');
-      drawKpiBox(doc, 310, y, kpiWidth, 'NET INCOME', `LKR ${totalNet.toLocaleString()}`, totalNet >= 0 ? '#2563eb' : '#ef4444');
-      drawKpiBox(doc, 440, y, kpiWidth, 'PROFIT MARGIN', `${totalMargin}%`, Number(totalMargin) >= 20 ? '#22c55e' : '#f59e0b');
+      drawKpiBox(doc, 50 + kpiWidth + spacing, y, kpiWidth, 'TOTAL EXPENSES', `LKR ${totalExpense.toLocaleString()}`, '#ef4444');
+      drawKpiBox(doc, 50 + (kpiWidth + spacing) * 2, y, kpiWidth, 'NET INCOME', `LKR ${totalNet.toLocaleString()}`, totalNet >= 0 ? '#2563eb' : '#ef4444');
+      drawKpiBox(doc, 50 + (kpiWidth + spacing) * 3, y, kpiWidth, 'PROFIT MARGIN', `${totalMargin}%`, Number(totalMargin) >= 20 ? '#22c55e' : '#f59e0b');
       y += 70;
 
       // --- Property Breakdown Table ---
@@ -109,10 +116,10 @@ class ReportController {
 
       doc.fontSize(9).font('Helvetica-Bold');
       doc.text('Property', 50, y);
-      doc.text('Income', 220, y, { width: 80, align: 'right' });
-      doc.text('Expenses', 310, y, { width: 80, align: 'right' });
-      doc.text('Net Income', 400, y, { width: 80, align: 'right' });
-      doc.text('Margin', 490, y, { width: 60, align: 'right' });
+      doc.text('Income', 200, y, { width: 85, align: 'right' });
+      doc.text('Expenses', 285, y, { width: 85, align: 'right' });
+      doc.text('Net Income', 370, y, { width: 110, align: 'right' });
+      doc.text('Margin', 485, y, { width: 65, align: 'right' });
       doc.moveTo(50, y + 14).lineTo(550, y + 14).strokeColor('#e2e8f0').stroke();
       y += 22;
 
@@ -120,11 +127,11 @@ class ReportController {
       for (const p of propertyMetrics) {
         y = checkPageBreak(doc, y, 20);
         const isLoss = p.net < 0;
-        doc.fillColor('#334155').text(p.name, 50, y, { width: 165 });
-        doc.text(`LKR ${p.income.toLocaleString()}`, 220, y, { width: 80, align: 'right' });
-        doc.text(`LKR ${p.expense.toLocaleString()}`, 310, y, { width: 80, align: 'right' });
-        doc.fillColor(isLoss ? '#ef4444' : '#22c55e').text(`LKR ${p.net.toLocaleString()}`, 400, y, { width: 80, align: 'right' });
-        doc.fillColor(p.margin < 10 ? '#ef4444' : p.margin < 30 ? '#f59e0b' : '#22c55e').text(`${p.margin}%`, 490, y, { width: 60, align: 'right' });
+        doc.fillColor('#334155').text(p.name, 50, y, { width: 145 });
+        doc.text(`LKR ${p.income.toLocaleString()}`, 200, y, { width: 85, align: 'right' });
+        doc.text(`LKR ${p.expense.toLocaleString()}`, 285, y, { width: 85, align: 'right' });
+        doc.fillColor(isLoss ? '#ef4444' : '#22c55e').text(`LKR ${p.net.toLocaleString()}`, 370, y, { width: 110, align: 'right' });
+        doc.fillColor(p.margin < 10 ? '#ef4444' : p.margin < 30 ? '#f59e0b' : '#22c55e').text(`${p.margin}%`, 485, y, { width: 65, align: 'right' });
         doc.fillColor('black');
         y += 18;
       }
@@ -133,10 +140,10 @@ class ReportController {
       y += 8;
       doc.font('Helvetica-Bold').fontSize(9);
       doc.text('TOTAL', 50, y);
-      doc.text(`LKR ${totalIncome.toLocaleString()}`, 220, y, { width: 80, align: 'right' });
-      doc.text(`LKR ${totalExpense.toLocaleString()}`, 310, y, { width: 80, align: 'right' });
-      doc.fillColor(totalNet >= 0 ? '#22c55e' : '#ef4444').text(`LKR ${totalNet.toLocaleString()}`, 400, y, { width: 80, align: 'right' });
-      doc.fillColor('#1e293b').text(`${totalMargin}%`, 490, y, { width: 60, align: 'right' });
+      doc.text(`LKR ${totalIncome.toLocaleString()}`, 200, y, { width: 85, align: 'right' });
+      doc.text(`LKR ${totalExpense.toLocaleString()}`, 285, y, { width: 85, align: 'right' });
+      doc.fillColor(totalNet >= 0 ? '#22c55e' : '#ef4444').text(`LKR ${totalNet.toLocaleString()}`, 370, y, { width: 110, align: 'right' });
+      doc.fillColor('#1e293b').text(`${totalMargin}%`, 485, y, { width: 65, align: 'right' });
       doc.fillColor('black');
       y += 30;
 
@@ -204,10 +211,11 @@ class ReportController {
       // --- KPI Panel ---
       let y = doc.y + 5;
       const kpiWidth = 120;
+      const spacing = 6;
       drawKpiBox(doc, 50, y, kpiWidth, 'PORTFOLIO OCCUPANCY', `${portfolioRate}%`, portfolioRate >= 90 ? '#22c55e' : portfolioRate >= 70 ? '#f59e0b' : '#ef4444');
-      drawKpiBox(doc, 180, y, kpiWidth, 'TOTAL UNITS', `${totalUnits}`, '#2563eb');
-      drawKpiBox(doc, 310, y, kpiWidth, 'OCCUPIED', `${totalOccupied}`, '#22c55e');
-      drawKpiBox(doc, 440, y, kpiWidth, 'VACANT', `${totalVacant}`, totalVacant === 0 ? '#22c55e' : '#ef4444');
+      drawKpiBox(doc, 50 + kpiWidth + spacing, y, kpiWidth, 'TOTAL UNITS', `${totalUnits}`, '#2563eb');
+      drawKpiBox(doc, 50 + (kpiWidth + spacing) * 2, y, kpiWidth, 'OCCUPIED', `${totalOccupied}`, '#22c55e');
+      drawKpiBox(doc, 50 + (kpiWidth + spacing) * 3, y, kpiWidth, 'VACANT', `${totalVacant}`, totalVacant === 0 ? '#22c55e' : '#ef4444');
       y += 70;
 
       // --- Property Details ---
@@ -283,10 +291,11 @@ class ReportController {
       // --- KPI Panel ---
       let y = doc.y + 5;
       const kpiWidth = 120;
+      const spacing = 6;
       drawKpiBox(doc, 50, y, kpiWidth, 'TOTAL TENANTS', `${tenants.length}`, '#2563eb');
-      drawKpiBox(doc, 180, y, kpiWidth, 'HIGH RISK', `${highRisk.length}`, highRisk.length > 0 ? '#ef4444' : '#22c55e');
-      drawKpiBox(doc, 310, y, kpiWidth, 'MEDIUM RISK', `${medRisk.length}`, medRisk.length > 0 ? '#f59e0b' : '#22c55e');
-      drawKpiBox(doc, 440, y, kpiWidth, 'AVG SCORE', `${avgScore}/100`, avgScore >= 70 ? '#22c55e' : avgScore >= 50 ? '#f59e0b' : '#ef4444');
+      drawKpiBox(doc, 50 + kpiWidth + spacing, y, kpiWidth, 'HIGH RISK', `${highRisk.length}`, highRisk.length > 0 ? '#ef4444' : '#22c55e');
+      drawKpiBox(doc, 50 + (kpiWidth + spacing) * 2, y, kpiWidth, 'MEDIUM RISK', `${medRisk.length}`, medRisk.length > 0 ? '#f59e0b' : '#22c55e');
+      drawKpiBox(doc, 50 + (kpiWidth + spacing) * 3, y, kpiWidth, 'AVG SCORE', `${avgScore}/100`, avgScore >= 70 ? '#22c55e' : avgScore >= 50 ? '#f59e0b' : '#ef4444');
       y += 70;
 
       // --- Tenant Table ---
@@ -368,10 +377,11 @@ class ReportController {
       // --- KPI Panel ---
       let y = doc.y + 5;
       const kpiWidth = 120;
+      const spacing = 6;
       drawKpiBox(doc, 50, y, kpiWidth, 'TOTAL SPEND', totalCost > 0 ? `LKR ${totalCost.toLocaleString()}` : 'LKR 0', totalCost > 0 ? '#ef4444' : '#22c55e');
-      drawKpiBox(doc, 180, y, kpiWidth, 'CATEGORIES', `${categoryCount}`, '#2563eb');
-      drawKpiBox(doc, 310, y, kpiWidth, 'TOP CATEGORY', topCategory ? topCategory[0] : 'N/A', '#f59e0b');
-      drawKpiBox(doc, 440, y, kpiWidth, 'TOP CATEGORY %', `${topPct}%`, Number(topPct) > 50 ? '#ef4444' : '#22c55e');
+      drawKpiBox(doc, 50 + kpiWidth + spacing, y, kpiWidth, 'CATEGORIES', `${categoryCount}`, '#2563eb');
+      drawKpiBox(doc, 50 + (kpiWidth + spacing) * 2, y, kpiWidth, 'TOP CATEGORY', topCategory ? topCategory[0] : 'N/A', '#f59e0b');
+      drawKpiBox(doc, 50 + (kpiWidth + spacing) * 3, y, kpiWidth, 'TOP CATEGORY %', `${topPct}%`, Number(topPct) > 50 ? '#ef4444' : '#22c55e');
       y += 70;
 
       if (totalCost === 0) {
@@ -467,10 +477,11 @@ class ReportController {
       // --- KPI Panel ---
       let y = doc.y + 5;
       const kpiWidth = 120;
+      const spacing = 6;
       drawKpiBox(doc, 50, y, kpiWidth, 'EXPIRING LEASES', `${leasesWithDays.length}`, leasesWithDays.length > 0 ? '#f59e0b' : '#22c55e');
-      drawKpiBox(doc, 180, y, kpiWidth, 'CRITICAL (≤14d)', `${critical.length}`, critical.length > 0 ? '#ef4444' : '#22c55e');
-      drawKpiBox(doc, 310, y, kpiWidth, 'URGENT (15-30d)', `${urgent.length}`, urgent.length > 0 ? '#f59e0b' : '#22c55e');
-      drawKpiBox(doc, 440, y, kpiWidth, 'REVENUE AT RISK', `LKR ${revenueAtRisk.toLocaleString()}/mo`, revenueAtRisk > 0 ? '#ef4444' : '#22c55e');
+      drawKpiBox(doc, 50 + kpiWidth + spacing, y, kpiWidth, 'CRITICAL (≤14d)', `${critical.length}`, critical.length > 0 ? '#ef4444' : '#22c55e');
+      drawKpiBox(doc, 50 + (kpiWidth + spacing) * 2, y, kpiWidth, 'URGENT (15-30d)', `${urgent.length}`, urgent.length > 0 ? '#f59e0b' : '#22c55e');
+      drawKpiBox(doc, 50 + (kpiWidth + spacing) * 3, y, kpiWidth, 'REVENUE AT RISK', `LKR ${revenueAtRisk.toLocaleString()}/mo`, revenueAtRisk > 0 ? '#ef4444' : '#22c55e');
       y += 70;
 
       if (leasesWithDays.length === 0) {
@@ -482,10 +493,10 @@ class ReportController {
 
         doc.fontSize(9).font('Helvetica-Bold').fillColor('#64748b');
         doc.text('Property', 50, y);
-        doc.text('Unit', 195, y);
-        doc.text('Expiry Date', 255, y);
-        doc.text('Days Left', 345, y, { width: 55, align: 'center' });
-        doc.text('Monthly Rent', 405, y, { width: 75, align: 'right' });
+        doc.text('Unit', 190, y);
+        doc.text('Expiry Date', 245, y);
+        doc.text('Days Left', 335, y, { width: 55, align: 'center' });
+        doc.text('Monthly Rent', 395, y, { width: 90, align: 'right' });
         doc.text('Urgency', 490, y, { width: 60, align: 'center' });
         doc.moveTo(50, y + 14).lineTo(550, y + 14).strokeColor('#e2e8f0').stroke();
         y += 22;
@@ -495,11 +506,11 @@ class ReportController {
           y = checkPageBreak(doc, y, 20);
           const urgencyLabel = lease.urgency === 'critical' ? 'CRITICAL' : lease.urgency === 'urgent' ? 'URGENT' : 'Upcoming';
 
-          doc.fillColor('#334155').text(lease.propertyName || 'N/A', 50, y, { width: 140 });
-          doc.text(lease.unitNumber || 'N/A', 195, y);
-          doc.text(lease.endDate, 255, y);
-          doc.fillColor(lease.urgencyColor).font('Helvetica-Bold').text(`${lease.diffDays}d`, 345, y, { width: 55, align: 'center' });
-          doc.fillColor('#334155').font('Helvetica').text(`LKR ${(lease.monthlyRent || 0).toLocaleString()}`, 405, y, { width: 75, align: 'right' });
+          doc.fillColor('#334155').text(lease.propertyName || 'N/A', 50, y, { width: 135 });
+          doc.text(lease.unitNumber || 'N/A', 190, y);
+          doc.text(lease.endDate, 245, y);
+          doc.fillColor(lease.urgencyColor).font('Helvetica-Bold').text(`${lease.diffDays}d`, 335, y, { width: 55, align: 'center' });
+          doc.fillColor('#334155').font('Helvetica').text(`LKR ${(lease.monthlyRent || 0).toLocaleString()}`, 395, y, { width: 90, align: 'right' });
           doc.fillColor(lease.urgencyColor).font('Helvetica-Bold').text(urgencyLabel, 490, y, { width: 60, align: 'center' });
           doc.font('Helvetica').fillColor('black');
           y += 18;
@@ -552,10 +563,11 @@ class ReportController {
       // --- KPI Panel ---
       let y = doc.y + 5;
       const kpiWidth = 120;
+      const spacing = 6;
       drawKpiBox(doc, 50, y, kpiWidth, 'TOTAL LEADS', `${stats.Total}`, '#2563eb');
-      drawKpiBox(doc, 180, y, kpiWidth, 'CONVERSION RATE', `${convRate}%`, Number(convRate) >= 30 ? '#22c55e' : Number(convRate) >= 15 ? '#f59e0b' : '#ef4444');
-      drawKpiBox(doc, 310, y, kpiWidth, 'DROP-OFF RATE', `${dropRate}%`, Number(dropRate) <= 20 ? '#22c55e' : Number(dropRate) <= 40 ? '#f59e0b' : '#ef4444');
-      drawKpiBox(doc, 440, y, kpiWidth, 'ACTIVE PIPELINE', `${activeLeads}`, activeLeads > 0 ? '#2563eb' : '#64748b');
+      drawKpiBox(doc, 50 + kpiWidth + spacing, y, kpiWidth, 'CONVERSION RATE', `${convRate}%`, Number(convRate) >= 30 ? '#22c55e' : Number(convRate) >= 15 ? '#f59e0b' : '#ef4444');
+      drawKpiBox(doc, 50 + (kpiWidth + spacing) * 2, y, kpiWidth, 'DROP-OFF RATE', `${dropRate}%`, Number(dropRate) <= 20 ? '#22c55e' : Number(dropRate) <= 40 ? '#f59e0b' : '#ef4444');
+      drawKpiBox(doc, 50 + (kpiWidth + spacing) * 3, y, kpiWidth, 'ACTIVE PIPELINE', `${activeLeads}`, activeLeads > 0 ? '#2563eb' : '#64748b');
       y += 70;
 
       // --- Funnel Visualization ---
@@ -573,7 +585,7 @@ class ReportController {
         y = checkPageBreak(doc, y, 55);
         const fraction = stats.Total > 0 ? step.count / stats.Total : 0;
         const width = Math.max(80, maxWidth * fraction);
-        const x = 50 + (maxWidth - width) / 2;
+        const x = 50; // Aligned to left margin
 
         doc.save();
         doc.roundedRect(x, y, width, 35, 4).fill(step.color);
@@ -583,7 +595,7 @@ class ReportController {
 
         // Rate label to the right
         if (step.rate !== null) {
-          doc.fillColor('#64748b').font('Helvetica').fontSize(9).text(`${step.rate}% of total`, 50 + maxWidth + 15, y + 12);
+          doc.fillColor('#64748b').font('Helvetica').fontSize(9).text(`${step.rate}% of total`, x + width + 15, y + 12);
         }
         doc.fillColor('black');
         y += 48;
