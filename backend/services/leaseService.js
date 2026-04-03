@@ -14,7 +14,7 @@ import renewalService from './renewalService.js';
 class LeaseService {
   /**
    * Creates a new lease.
-   * @param {Object} data - { tenantId, unitId, startDate, endDate, monthlyRent, securityDeposit }
+   * @param {Object} data - { tenantId, unitId, startDate, endDate, monthlyRent, targetDeposit }
    * @param {Object} [connection] - Optional database connection for transactions
    * @param {Object} [user] - The acting user for audit logging
    * @returns {Promise<number>} - The ID of the created lease
@@ -26,7 +26,7 @@ class LeaseService {
       startDate,
       endDate,
       monthlyRent,
-      securityDeposit,
+      targetDeposit,
       documentUrl, // [ADDED] Document URL
     } = data;
 
@@ -122,9 +122,8 @@ class LeaseService {
         startDate,
         endDate,
         monthlyRent: toCentsFromMajor(monthlyRent),
-        securityDeposit: 0, 
         status: 'draft',
-        targetDeposit: toCentsFromMajor(securityDeposit || 0.0),
+        targetDeposit: toCentsFromMajor(targetDeposit || 0.0),
         documentUrl: documentUrl || null,
         leaseTermId: data.leaseTermId || null,
         reservationExpiresAt: formatToLocalDate(addDays(today(), 2)), 

@@ -410,7 +410,7 @@ class UserService {
               endDate: leaseEnd,
               leaseTermId: leaseTermId,
               monthlyRent: monthlyRent,
-              securityDeposit: securityDepositLKR, 
+              targetDeposit: securityDepositLKR, 
               documentUrl: tenantData.documentUrl || null,
             },
             connection,

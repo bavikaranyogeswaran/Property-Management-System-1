@@ -169,7 +169,7 @@ export function LeadPortalPage() {
           activeLease: portalRes.data.activeLease ? {
             ...portalRes.data.activeLease,
             monthlyRent: toLKRFromCents(portalRes.data.activeLease.monthlyRent),
-            securityDeposit: toLKRFromCents(portalRes.data.activeLease.securityDeposit || 0),
+            currentDepositBalance: toLKRFromCents(portalRes.data.activeLease.currentDepositBalance || 0),
             targetDeposit: toLKRFromCents(portalRes.data.activeLease.targetDeposit || 0),
             depositStatus: portalRes.data.activeLease.depositStatus ? {
               ...portalRes.data.activeLease.depositStatus,

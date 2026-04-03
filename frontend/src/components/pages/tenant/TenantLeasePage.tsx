@@ -365,11 +365,24 @@ export function TenantLeasePage() {
                       </div>
                       <div className="grid grid-cols-2 gap-4">
                         <div>
-                          <p className="text-sm text-gray-500">Deposit Amount</p>
+                          <p className="text-sm text-gray-500">Contractual Deposit</p>
                           <p className="font-medium mt-1">
-                            {formatLKR(currentLease.securityDeposit || 0)}
+                            {formatLKR(currentLease.targetDeposit || 0)}
                           </p>
                         </div>
+                        <div>
+                          <p className="text-sm text-gray-500 font-bold">Current Balance</p>
+                          <p className="text-lg font-black mt-1 text-blue-600">
+                            {formatLKR(currentLease.currentDepositBalance || 0)}
+                          </p>
+                        </div>
+                        {(currentLease.targetDeposit || 0) > (currentLease.currentDepositBalance || 0) && (
+                          <div className="col-span-2 mt-2">
+                            <Badge variant="outline" className="bg-amber-100 text-amber-700 border-amber-200">
+                              Payment Shortfall: {formatLKR((currentLease.targetDeposit || 0) - (currentLease.currentDepositBalance || 0))}
+                            </Badge>
+                          </div>
+                        )}
                         {currentLease.depositStatus === 'awaiting_acknowledgment' && (
                           <div className="col-span-2 mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                             <div className="flex items-start gap-3">

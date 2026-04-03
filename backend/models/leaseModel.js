@@ -23,8 +23,8 @@ class LeaseModel {
     } = data;
     const dbConn = connection || db;
     const [result] = await dbConn.query(
-      `INSERT INTO leases (tenant_id, unit_id, start_date, end_date, monthly_rent, status, security_deposit, deposit_status, document_url, target_deposit, reservation_expires_at, escalation_percentage, escalation_period_months, last_escalation_date)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO leases (tenant_id, unit_id, start_date, end_date, monthly_rent, status, deposit_status, document_url, target_deposit, reservation_expires_at, escalation_percentage, escalation_period_months, last_escalation_date)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         tenantId,
         unitId,
@@ -32,7 +32,6 @@ class LeaseModel {
         endDate,
         monthlyRent,
         status || 'active',
-        securityDeposit || 0.0,
         depositStatus || 'pending',
         data.documentUrl || null,
         data.targetDeposit || 0.0,
@@ -52,7 +51,6 @@ class LeaseModel {
     endDate: 'end_date',
     monthlyRent: 'monthly_rent',
     status: 'status',
-    securityDeposit: 'security_deposit',
     depositStatus: 'deposit_status',
     refundedAmount: 'refunded_amount',
     documentUrl: 'document_url',
@@ -286,7 +284,7 @@ class LeaseModel {
       endDate: this.formatDate(row.end_date),
       monthlyRent: Number(row.monthly_rent),
       status: row.status,
-      securityDeposit: Number(row.real_deposit_balance || 0),
+      currentDepositBalance: Number(row.real_deposit_balance || 0),
       depositStatus: row.deposit_status,
       proposedRefundAmount: Number(row.proposed_refund_amount || 0),
       refundNotes: row.refund_notes,

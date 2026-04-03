@@ -13,7 +13,7 @@ export interface Lease {
   endDate: string | null;
   monthlyRent: number;
   status: 'draft' | 'active' | 'expired' | 'ended' | 'cancelled';
-  securityDeposit?: number;
+  currentDepositBalance?: number;
   depositStatus?: 'pending' | 'paid' | 'awaiting_approval' | 'awaiting_acknowledgment' | 'disputed' | 'partially_refunded' | 'refunded';
   proposedRefundAmount?: number;
   refundNotes?: string;
@@ -115,7 +115,7 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
         setLeases(lRes.data.map((l: any) => ({
           ...l,
           monthlyRent: toLKRFromCents(l.monthlyRent),
-          securityDeposit: toLKRFromCents(l.securityDeposit || 0),
+          currentDepositBalance: toLKRFromCents(l.currentDepositBalance || 0),
           proposedRefundAmount: toLKRFromCents(l.proposedRefundAmount || 0),
           refundedAmount: toLKRFromCents(l.refundedAmount || 0),
           targetDeposit: toLKRFromCents(l.targetDeposit || 0),
@@ -141,7 +141,6 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
       const response = await apiClient.post('/leases', {
         ...lease,
         monthlyRent: toCentsFromLKR(lease.monthlyRent),
-        securityDeposit: toCentsFromLKR(lease.securityDeposit || 0),
         targetDeposit: toCentsFromLKR(lease.targetDeposit || 0),
       });
       const constructedLease: Lease = {

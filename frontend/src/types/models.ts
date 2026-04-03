@@ -58,7 +58,13 @@ export interface Lease {
   startDate: string;
   endDate: string;
   monthlyRent: number;
-  status: 'active' | 'ended' | 'cancelled';
+  status: 'draft' | 'active' | 'expired' | 'ended' | 'cancelled';
+  targetDeposit: number;
+  currentDepositBalance: number;
+  depositStatus: 'pending' | 'paid' | 'awaiting_approval' | 'awaiting_acknowledgment' | 'disputed' | 'partially_refunded' | 'refunded';
+  unitNumber?: string;
+  propertyName?: string;
+  tenantName?: string;
   createdAt?: string;
 }
 

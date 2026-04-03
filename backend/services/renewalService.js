@@ -107,7 +107,6 @@ class RenewalService {
                 startDate: nextStartDateStr,
                 endDate: request.proposed_end_date,
                 monthlyRent: request.proposed_monthly_rent,
-                securityDeposit: 0,
                 status: 'active',
                 documentUrl: lease.documentUrl, // Carry forward from previous lease
                 isDocumentsVerified: true,

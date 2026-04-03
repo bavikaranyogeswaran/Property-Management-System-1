@@ -267,7 +267,6 @@ CREATE TABLE leases (
     monthly_rent BIGINT NOT NULL,
     status ENUM('draft', 'active', 'expired', 'ended', 'cancelled') DEFAULT 'active',
     notice_status ENUM('undecided', 'vacating', 'renewing') DEFAULT 'undecided', -- [ADDED] Tenant's intent
-    security_deposit BIGINT DEFAULT 0,
     deposit_status ENUM('pending', 'paid', 'awaiting_approval', 'awaiting_acknowledgment', 'disputed', 'partially_refunded', 'refunded') DEFAULT 'pending', -- [B7 FIX] Added awaiting_acknowledgment
     proposed_refund_amount BIGINT DEFAULT 0,
     refund_notes TEXT,

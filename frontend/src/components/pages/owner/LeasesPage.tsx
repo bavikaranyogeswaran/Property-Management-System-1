@@ -1007,16 +1007,33 @@ export function LeasesPage() {
 
                     {/* Deposit Info */}
                     <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                      <div>
+                      <div className="space-y-1">
                         <p className="text-sm text-gray-600">Deposit Status</p>
                         <p className="text-lg font-semibold flex items-center gap-2 capitalize">
                           {selectedLease.depositStatus?.replace('_', ' ')}
                         </p>
                       </div>
-                      {selectedLease.depositStatus === 'awaiting_approval' && (
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-orange-600 bg-orange-100 px-2 py-1 rounded">Action Required</span>
-                      )}
+                      <div className="text-right">
+                        <p className="text-[10px] text-gray-400 uppercase font-bold tracking-tighter">Current Balance</p>
+                        <p className="text-xl font-black text-blue-600">{formatLKR(selectedLease.currentDepositBalance || 0)}</p>
+                      </div>
                     </div>
+                  </div>
+
+                  {/* Deposit Breakdown */}
+                  <div className="p-4 bg-blue-50/50 border border-blue-100 rounded-lg flex justify-between items-center">
+                    <div className="flex items-center gap-3">
+                      <ShieldCheck className="size-5 text-blue-600" />
+                      <div>
+                        <p className="text-xs text-blue-700 font-bold uppercase">Contractual Requirement</p>
+                        <p className="text-sm font-medium text-blue-900">{formatLKR(selectedLease.targetDeposit || 0)}</p>
+                      </div>
+                    </div>
+                    {(selectedLease.targetDeposit ?? 0) > (selectedLease.currentDepositBalance ?? 0) && (
+                      <Badge variant="outline" className="bg-amber-100 text-amber-700 border-amber-200">
+                        Shortfall: {formatLKR((selectedLease.targetDeposit ?? 0) - (selectedLease.currentDepositBalance ?? 0))}
+                      </Badge>
+                    )}
                   </div>
 
                   {(selectedLease.depositStatus === 'awaiting_approval' || selectedLease.depositStatus === 'disputed') && (
@@ -1259,8 +1276,8 @@ export function LeasesPage() {
                     required
                   />
                   <p className="text-xs text-gray-500 mt-1">
-                    Enter the amount to be returned to the tenant. (Max:{' '}
-                    {leases.find((l) => l.id === refundLeaseId)?.securityDeposit || 0}
+                    Enter the amount to be returned to the tenant. (Available Ledger Balance:{' '}
+                    {formatLKR(leases.find((l) => l.id === refundLeaseId)?.currentDepositBalance || 0)}
                     )
                   </p>
                 </div>
