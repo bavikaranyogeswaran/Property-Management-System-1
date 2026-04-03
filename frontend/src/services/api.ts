@@ -108,6 +108,9 @@ export const payoutApi = {
   create: (data: { startDate: string; endDate: string }) =>
     apiClient.post('/payouts/create', data),
   getHistory: () => apiClient.get('/payouts/history'),
+  getDetails: (id: string) => apiClient.get(`/payouts/${id}/details`),
+  exportCSV: (id: string) =>
+    apiClient.get(`/payouts/${id}/export`, { responseType: 'blob' }),
 };
 
 export const auditApi = {

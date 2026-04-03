@@ -3,6 +3,9 @@ import { useAuth } from '../../app/context/AuthContext';
 import { payoutApi } from '../../services/api';
 import { OwnerPayout } from '../../types/models';
 import { formatLKR } from '../../utils/formatters';
+import { PayoutDetailModal } from './owner/PayoutDetailModal';
+import { FileText, Download, Eye, Table as TableIcon } from 'lucide-react';
+import { toast } from 'sonner';
 
 const OwnerPayoutsPage: React.FC = () => {
   const { user } = useAuth();
@@ -20,6 +23,7 @@ const OwnerPayoutsPage: React.FC = () => {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [selectedPayoutId, setSelectedPayoutId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchHistory();
@@ -75,6 +79,22 @@ const OwnerPayoutsPage: React.FC = () => {
     }
   };
 
+  const handleExport = async (payoutId: string) => {
+    try {
+      const res = await payoutApi.exportCSV(payoutId);
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `payout_reconciliation_${payoutId}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      toast.success('CSV Exported Successfully');
+    } catch (err) {
+      toast.error('Failed to export CSV');
+    }
+  };
+
   if (user?.role !== 'owner') {
     return (
       <div className="p-8 text-red-500">
@@ -84,8 +104,13 @@ const OwnerPayoutsPage: React.FC = () => {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold mb-6">Owner Payouts</h1>
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-2xl font-semibold text-gray-900">Owner Payouts</h2>
+          <p className="text-sm text-gray-500 mt-1">Manage and reconcile your payouts</p>
+        </div>
+      </div>
 
       {/* Payout Generator Card */}
       <div className="bg-white p-6 rounded-lg shadow-md mb-8">
@@ -93,14 +118,14 @@ const OwnerPayoutsPage: React.FC = () => {
         <p className="text-sm text-gray-600 mb-4">
           This will capture all verified payments and maintenance expenses that have not yet been paid out, up to the selected end date (<b>Cash-Basis Accounting</b>).
         </p>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Start Date
             </label>
             <input
               type="date"
-              className="w-full border p-2 rounded"
+              className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
               placeholder="Optional"
@@ -113,16 +138,20 @@ const OwnerPayoutsPage: React.FC = () => {
             </label>
             <input
               type="date"
-              className="w-full border p-2 rounded"
+              className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
             />
+            <div className="h-4"></div> {/* Alignment spacer to match Start Date subtext */}
           </div>
           <div>
+            <label className="block text-sm font-medium text-white mb-1">
+              Action
+            </label>
             <button
               onClick={handlePreview}
               disabled={previewLoading}
-              className="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700 disabled:opacity-50"
+              className="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700 disabled:opacity-50 transition-colors shadow-sm"
             >
               {previewLoading ? 'Calculating...' : 'Preview Payout'}
             </button>
@@ -209,6 +238,9 @@ const OwnerPayoutsPage: React.FC = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Generated Date
                 </th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -238,12 +270,35 @@ const OwnerPayoutsPage: React.FC = () => {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {new Date(p.generatedAt).toLocaleDateString()}
                   </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <div className="flex justify-end gap-2">
+                       <button
+                        onClick={() => setSelectedPayoutId(p.id)}
+                        className="p-1 text-blue-600 hover:bg-blue-50 rounded"
+                        title="View Breakdown"
+                      >
+                        <Eye className="size-4" />
+                      </button>
+                      <button
+                        onClick={() => handleExport(p.id)}
+                        className="p-1 text-gray-600 hover:bg-gray-100 rounded"
+                        title="Export CSV"
+                      >
+                        <Download className="size-4" />
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         )}
       </div>
+
+      <PayoutDetailModal 
+        payoutId={selectedPayoutId} 
+        onClose={() => setSelectedPayoutId(null)} 
+      />
     </div>
   );
 };

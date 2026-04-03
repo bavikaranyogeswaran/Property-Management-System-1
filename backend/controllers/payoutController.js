@@ -85,6 +85,43 @@ class PayoutController {
       res.status(500).json({ error: 'Failed to process payout' });
     }
   }
+
+  async getPayoutDetails(req, res) {
+    try {
+      const ownerId = req.user.id;
+      const { id } = req.params;
+
+      if (req.user.role !== 'owner') {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+
+      const details = await payoutService.getPayoutDetails(ownerId, id);
+      res.json(details);
+    } catch (error) {
+      console.error(error);
+      res.status(error.message.includes('denied') ? 403 : 500).json({ error: error.message });
+    }
+  }
+
+  async exportPayoutCSV(req, res) {
+    try {
+      const ownerId = req.user.id;
+      const { id } = req.params;
+
+      if (req.user.role !== 'owner') {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+
+      const csv = await payoutService.exportPayoutCSV(ownerId, id);
+      
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename=payout_reconciliation_${id}.csv`);
+      res.status(200).send(csv);
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: 'Failed to export CSV' });
+    }
+  }
 }
 
 export default new PayoutController();

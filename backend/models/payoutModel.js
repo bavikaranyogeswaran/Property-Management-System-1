@@ -130,6 +130,57 @@ class PayoutModel {
     }
     return true;
   }
+
+  async getPayoutDetails(payoutId, connection = null) {
+    const db = connection || pool;
+
+    // 1. Fetch Income Breakdown (Rent, Late Fees, etc.)
+    const [income] = await db.query(
+      `
+            SELECT 
+                p.payment_id,
+                p.amount,
+                p.payment_date,
+                ri.invoice_type,
+                ri.month,
+                ri.year,
+                ri.description as invoice_description,
+                u.unit_number,
+                prop.name as property_name
+            FROM payments p
+            JOIN rent_invoices ri ON p.invoice_id = ri.invoice_id
+            JOIN leases l ON ri.lease_id = l.lease_id
+            JOIN units u ON l.unit_id = u.unit_id
+            JOIN properties prop ON u.property_id = prop.property_id
+            WHERE p.payout_id = ?
+            ORDER BY prop.name, u.unit_number, p.payment_date
+        `,
+      [payoutId]
+    );
+
+    // 2. Fetch Expense Breakdown (Maintenance)
+    const [expenses] = await db.query(
+      `
+            SELECT 
+                mc.cost_id,
+                mc.amount,
+                mc.recorded_date,
+                mc.description,
+                u.unit_number,
+                prop.name as property_name,
+                mr.title as request_title
+            FROM maintenance_costs mc
+            JOIN maintenance_requests mr ON mc.request_id = mr.request_id
+            JOIN units u ON mr.unit_id = u.unit_id
+            JOIN properties prop ON u.property_id = prop.property_id
+            WHERE mc.payout_id = ?
+            ORDER BY prop.name, u.unit_number, mc.recorded_date
+        `,
+      [payoutId]
+    );
+
+    return { income, expenses };
+  }
 }
 
 export default new PayoutModel();

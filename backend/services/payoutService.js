@@ -73,6 +73,82 @@ class PayoutService {
     await payoutModel.markAsProcessed(payoutId);
     return true;
   }
+
+  async getPayoutDetails(ownerId, payoutId) {
+    // 1. Verify payout belongs to the requesting owner
+    const payouts = await payoutModel.findByOwnerId(ownerId);
+    const payout = payouts.find((p) => String(p.id) === String(payoutId));
+    
+    if (!payout) {
+      throw new Error('Payout not found or access denied');
+    }
+
+    const details = await payoutModel.getPayoutDetails(payoutId);
+    
+    // Add summary
+    const totalIncome = details.income.reduce((sum, r) => sum + Number(r.amount), 0);
+    const totalExpenses = details.expenses.reduce((sum, r) => sum + Number(r.amount), 0);
+    
+    return {
+      ...details,
+      summary: {
+        totalIncome,
+        totalExpenses,
+        netPayout: totalIncome - totalExpenses,
+        periodStart: payout.periodStart,
+        periodEnd: payout.periodEnd,
+        status: payout.status
+      }
+    };
+  }
+
+  async exportPayoutCSV(ownerId, payoutId) {
+    const details = await this.getPayoutDetails(ownerId, payoutId);
+    
+    const rows = [
+      ['Property', 'Unit', 'Type', 'Description', 'Date', 'Income (LKR)', 'Expense (LKR)'],
+    ];
+
+    // Income Rows
+    details.income.forEach(item => {
+      const type = item.invoice_type === 'rent' ? 'Rent' : 
+                   item.invoice_type === 'late_fee' ? 'Late Fee' : 
+                   item.invoice_type.charAt(0).toUpperCase() + item.invoice_type.slice(1);
+      
+      const description = item.invoice_description || `${type} for ${item.month}/${item.year}`;
+      
+      rows.push([
+        item.property_name,
+        item.unit_number,
+        type,
+        description,
+        item.payment_date,
+        (item.amount / 100).toFixed(2),
+        '0.00'
+      ]);
+    });
+
+    // Expense Rows
+    details.expenses.forEach(item => {
+      rows.push([
+        item.property_name,
+        item.unit_number,
+        'Maintenance',
+        item.description || item.request_title,
+        item.recorded_date,
+        '0.00',
+        (item.amount / 100).toFixed(2)
+      ]);
+    });
+
+    // Summary Row
+    rows.push([]);
+    rows.push(['TOTAL INCOME', '', '', '', '', (details.summary.totalIncome / 100).toFixed(2), '']);
+    rows.push(['TOTAL EXPENSES', '', '', '', '', '', (details.summary.totalExpenses / 100).toFixed(2)]);
+    rows.push(['NET PAYOUT', '', '', '', '', (details.summary.netPayout / 100).toFixed(2), '']);
+
+    return rows.map(r => r.join(',')).join('\n');
+  }
 }
 
 export default new PayoutService();

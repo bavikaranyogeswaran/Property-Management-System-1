@@ -16,4 +16,10 @@ router.get('/history', authenticateToken, payoutController.getHistory);
 // Mark Payout as Processed (Owner only)
 router.put('/:id/process', authenticateToken, payoutController.processPayout);
 
+// Get Payout Details (Owner only)
+router.get('/:id/details', authenticateToken, payoutController.getPayoutDetails);
+
+// Export Payout CSV (Owner only)
+router.get('/:id/export', authenticateToken, payoutController.exportPayoutCSV);
+
 export default router;
