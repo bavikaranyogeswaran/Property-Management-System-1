@@ -33,4 +33,18 @@ export const updateProfileSchema = Joi.object({
     .messages({
       'string.pattern.base': 'Please enter a valid Sri Lankan phone number (e.g., +94 77 123 4567 or 0771234567).',
     }),
+  // Optional Tenant Fields (E7)
+  emergencyContactName: Joi.string().optional().allow('', null),
+  emergencyContactPhone: Joi.string()
+    .pattern(sriLankanPhoneRegex)
+    .optional()
+    .allow('', null)
+    .messages({
+      'string.pattern.base': 'Please enter a valid Sri Lankan phone number for the emergency contact.',
+    }),
+  employmentStatus: Joi.string()
+    .valid('employed', 'self-employed', 'student', 'unemployed')
+    .optional()
+    .allow('', null),
+  permanentAddress: Joi.string().optional().allow('', null),
 });

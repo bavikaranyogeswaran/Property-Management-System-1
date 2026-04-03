@@ -96,7 +96,15 @@ class UserController {
     try {
       // Self-update only
       const id = req.user.id;
-      const { name, email, phone } = req.body;
+      const {
+        name,
+        email,
+        phone,
+        emergencyContactName,
+        emergencyContactPhone,
+        employmentStatus,
+        permanentAddress,
+      } = req.body;
 
       // Email validation if email is being updated
       if (email) {
@@ -110,10 +118,14 @@ class UserController {
         name,
         email,
         phone,
+        emergencyContactName,
+        emergencyContactPhone,
+        employmentStatus,
+        permanentAddress,
       });
       res.json(result);
     } catch (error) {
-      res.status(400).json(error);
+      res.status(400).json({ error: error.message || error });
     }
   }
 

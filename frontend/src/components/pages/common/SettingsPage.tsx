@@ -40,6 +40,11 @@ export function SettingsPage() {
     name: user?.name || '',
     email: user?.email || '',
     phone: user?.phone || '',
+    // Tenant Fields (E7)
+    permanentAddress: user?.permanentAddress || '',
+    emergencyContactName: user?.emergencyContactName || '',
+    emergencyContactPhone: user?.emergencyContactPhone || '',
+    employmentStatus: user?.employmentStatus || '',
   });
 
   // Fix: Update profileData when user loads/updates
@@ -49,6 +54,10 @@ export function SettingsPage() {
         name: user.name || '',
         email: user.email || '',
         phone: user.phone || '',
+        permanentAddress: user.permanentAddress || '',
+        emergencyContactName: user.emergencyContactName || '',
+        emergencyContactPhone: user.emergencyContactPhone || '',
+        employmentStatus: user.employmentStatus || '',
       });
     }
   }, [user]);
@@ -85,8 +94,23 @@ export function SettingsPage() {
     e.preventDefault();
     try {
       // Send only updatable fields
-      const { name, phone } = profileData;
-      await updateProfile({ name, phone });
+      const { 
+        name, 
+        phone, 
+        permanentAddress, 
+        emergencyContactName, 
+        emergencyContactPhone, 
+        employmentStatus 
+      } = profileData;
+      
+      await updateProfile({ 
+        name, 
+        phone,
+        permanentAddress,
+        emergencyContactName,
+        emergencyContactPhone,
+        employmentStatus
+      });
       toast.success('Profile updated successfully');
     } catch (error: any) {
       console.error(error);
@@ -182,6 +206,91 @@ export function SettingsPage() {
                     </Badge>
                   </div>
                 </div>
+
+                {user?.role === 'tenant' && (
+                  <div className="space-y-6 pt-6 border-t mt-6">
+                    <div className="space-y-4">
+                      <h3 className="text-sm font-medium text-gray-900 border-l-4 border-blue-500 pl-3">Residential Details</h3>
+                      <div className="space-y-2">
+                        <Label htmlFor="permanentAddress">Permanent Address</Label>
+                        <Input
+                          id="permanentAddress"
+                          placeholder="Line 1, Line 2, City"
+                          value={profileData.permanentAddress}
+                          onChange={(e) =>
+                            setProfileData({ ...profileData, permanentAddress: e.target.value })
+                          }
+                        />
+                        <p className="text-[10px] text-gray-500 italic">As mentioned in legal records/NIC.</p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <h3 className="text-sm font-medium text-gray-900 border-l-4 border-blue-500 pl-3">Emergency Contacts</h3>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="emergencyContactName">Contact Person</Label>
+                          <Input
+                            id="emergencyContactName"
+                            placeholder="Full Name"
+                            value={profileData.emergencyContactName}
+                            onChange={(e) =>
+                              setProfileData({ ...profileData, emergencyContactName: e.target.value })
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="emergencyContactPhone">Contact Number</Label>
+                          <Input
+                            id="emergencyContactPhone"
+                            placeholder="07XXXXXXXX"
+                            value={profileData.emergencyContactPhone}
+                            onChange={(e) =>
+                              setProfileData({ ...profileData, emergencyContactPhone: e.target.value })
+                            }
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <h3 className="text-sm font-medium text-gray-900 border-l-4 border-blue-500 pl-3">Identity & Employment</h3>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="nic">NIC Number (Read Only)</Label>
+                          <div className="relative">
+                             <Input
+                              id="nic"
+                              value={user?.nic || ''}
+                              readOnly
+                              disabled
+                              className="bg-gray-50 text-gray-500"
+                            />
+                            <Lock className="w-3.5 h-3.5 text-gray-400 absolute right-3 top-3" />
+                          </div>
+                          <p className="text-[10px] text-gray-500">Contact property management to update NIC.</p>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="employmentStatus">Employment Status</Label>
+                          <select
+                            id="employmentStatus"
+                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                            value={profileData.employmentStatus}
+                            onChange={(e) =>
+                              setProfileData({ ...profileData, employmentStatus: e.target.value })
+                            }
+                          >
+                            <option value="">Select Status</option>
+                            <option value="employed">Employed</option>
+                            <option value="self-employed">Self-Employed</option>
+                            <option value="student">Student</option>
+                            <option value="unemployed">Unemployed</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <div className="flex justify-end pt-4">
                   <Button type="submit">Save Changes</Button>
                 </div>

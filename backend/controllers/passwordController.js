@@ -1,9 +1,4 @@
-import jwt from 'jsonwebtoken';
-import bcrypt from 'bcryptjs';
-import userModel from '../models/userModel.js';
-import emailService from '../utils/emailService.js';
-
-const JWT_SECRET = process.env.JWT_SECRET || 'secret';
+import authService from '../services/authService.js';
 
 class PasswordController {
   async forgotPassword(req, res) {
@@ -13,26 +8,8 @@ class PasswordController {
         return res.status(400).json({ error: 'Email is required' });
       }
 
-      const user = await userModel.findByEmail(email);
-      if (!user) {
-        // Return success even if user not found to prevent enumeration
-        return res.json({
-          message: 'If an account exists, a reset link has been sent.',
-        });
-      }
-
-      // Create a short-lived token for password reset (1h expiry)
-      const resetToken = jwt.sign(
-        { id: user.user_id, type: 'reset' },
-        JWT_SECRET,
-        { expiresIn: '1h' }
-      );
-
-      await emailService.sendPasswordResetEmail(user.email, resetToken);
-
-      res.json({
-        message: 'If an account exists, a reset link has been sent.',
-      });
+      const result = await authService.requestPasswordReset(email);
+      res.json(result);
     } catch (error) {
       console.error('Forgot password error:', error);
       res.status(500).json({ error: 'Internal server error' });
@@ -49,45 +26,11 @@ class PasswordController {
           .json({ error: 'Token and new password are required' });
       }
 
-      // Verify token
-      let decoded;
-      try {
-        decoded = jwt.verify(token, JWT_SECRET);
-      } catch (err) {
-        return res.status(400).json({ error: 'Invalid or expired token' });
-      }
-
-      if (decoded.type !== 'reset') {
-        return res.status(400).json({ error: 'Invalid token type' });
-      }
-
-      // Find user
-      const user = await userModel.findById(decoded.id);
-      if (!user) {
-        return res.status(404).json({ error: 'User not found' });
-      }
-
-      // Hash new password
-      const salt = await bcrypt.genSalt(10);
-      const passwordHash = await bcrypt.hash(newPassword, salt);
-
-      // Update user directly via query since model.update might not have password support
-      // We need to extend model or run query here.
-      // Let's use userModel but we need to check if it supports password update.
-      // Looking at userModel.js earlier, `update` method takes `name, email, phone, status`.
-      // It does NOT update password.
-      // We should add a method to userModel for this.
-
-      // Allow me to update userModel first or I can do a direct query if I import pool.
-      // Better to add method to model.
-
-      // For now, I will assume I will add `updatePassword` to userModel.
-      await userModel.updatePassword(user.user_id, passwordHash);
-
-      res.json({ message: 'Password has been reset successfully' });
+      const result = await authService.resetPassword(token, newPassword);
+      res.json(result);
     } catch (error) {
       console.error('Reset password error:', error);
-      res.status(500).json({ error: 'Internal server error' });
+      res.status(400).json({ error: error.message });
     }
   }
 
@@ -108,21 +51,20 @@ class PasswordController {
           .json({ error: 'Password must be at least 8 characters' });
       }
 
-      // Verify current password
-      // We need to fetch the user with password hash. getUserById usually excludes hash.
-      // So we use userModel.findById directly (or a new method findByIdWithPassword)
-      // But looking at userModel.findById in userService, it excludes nothing by default.
-      // userService.getUserById explicitly deletes it.
-      // userModel.findById in db returns all columns.
-
-      const user = await userModel.findById(userId);
+      // We still need current password verification here or move it to a service
+      // For now, keep it here or create a service method
+      // Actually, since this is "authenticated" change, moving it to authService is cleaner too.
+      // But for simplicity of this specific task, let's just use the userModel.
+      
+      const user = await (await import('../models/userModel.js')).default.findById(userId);
       if (!user) {
         return res.status(404).json({ error: 'User not found' });
       }
 
+      const bcrypt = (await import('bcryptjs')).default;
       const validPassword = await bcrypt.compare(
         currentPassword,
-        user.password_hash
+        user.passwordHash || user.password_hash
       );
       if (!validPassword) {
         return res.status(401).json({ error: 'Incorrect current password' });
@@ -132,7 +74,7 @@ class PasswordController {
       const salt = await bcrypt.genSalt(10);
       const passwordHash = await bcrypt.hash(newPassword, salt);
 
-      await userModel.updatePassword(userId, passwordHash);
+      await (await import('../models/userModel.js')).default.updatePassword(userId, passwordHash);
 
       res.json({ message: 'Password updated successfully' });
     } catch (error) {

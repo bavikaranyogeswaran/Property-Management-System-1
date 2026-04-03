@@ -99,15 +99,13 @@ class TenantModel {
     ]);
   }
 
-  // Whitelist of allowed fields: camelCase key -> snake_case column
+  // Whitelist of allowed fields for general updates (E7)
+  // NIC and Monthly Income are EXCLUDED here as they should not change after onboarding.
   static ALLOWED_UPDATE_FIELDS = {
-    nic: 'nic',
-    nicUrl: 'nic_url',
     permanentAddress: 'permanent_address',
     emergencyContactName: 'emergency_contact_name',
     emergencyContactPhone: 'emergency_contact_phone',
     employmentStatus: 'employment_status',
-    monthlyIncome: 'monthly_income',
   };
 
   async update(userId, data, connection = null) {

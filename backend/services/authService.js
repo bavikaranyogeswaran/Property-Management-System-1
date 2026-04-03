@@ -74,6 +74,76 @@ class AuthService {
       throw new Error(error.message || 'Invalid or expired setup token');
     }
   }
+
+  async requestPasswordReset(email) {
+    // 1. Find user (don't throw error if not found - security parity)
+    const user = await userModel.findByEmail(email);
+    
+    // 2. If user exists, generate token and send email
+    if (user) {
+      const resetToken = jwt.sign(
+        { id: user.id, type: 'reset' },
+        JWT_SECRET,
+        { expiresIn: '1h' }
+      );
+      
+      await emailService.sendPasswordResetEmail(user.email, resetToken);
+      
+      // Log audit
+      try {
+        const auditLogger = (await import('../utils/auditLogger.js')).default;
+        await auditLogger.log({
+          userId: user.id,
+          actionType: 'PASSWORD_RESET_REQUESTED',
+          entityId: user.id,
+          details: { email }
+        });
+      } catch (e) {
+        console.error('Audit log failed for password reset request:', e);
+      }
+    }
+
+    // Always return generic success
+    return { message: 'If an account exists, a reset link has been sent.' };
+  }
+
+  async resetPassword(token, newPassword) {
+    try {
+      // 1. Verify token
+      const decoded = jwt.verify(token, JWT_SECRET);
+      if (decoded.type !== 'reset') {
+        throw new Error('Invalid token type');
+      }
+
+      // 2. Find user
+      const user = await userModel.findById(decoded.id);
+      if (!user) {
+        throw new Error('User not found');
+      }
+
+      // 3. Hash new password
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+      // 4. Update password
+      await userModel.updatePassword(decoded.id, hashedPassword);
+
+      // Log audit
+      try {
+        const auditLogger = (await import('../utils/auditLogger.js')).default;
+        await auditLogger.log({
+          userId: decoded.id,
+          actionType: 'PASSWORD_RESET_COMPLETED',
+          entityId: decoded.id
+        });
+      } catch (e) {
+        console.error('Audit log failed for password reset completion:', e);
+      }
+
+      return { message: 'Password has been reset successfully' };
+    } catch (error) {
+      throw new Error(error.message || 'Invalid or expired reset token');
+    }
+  }
 }
 
 export default new AuthService();

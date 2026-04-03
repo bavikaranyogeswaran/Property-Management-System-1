@@ -16,6 +16,13 @@ export interface User {
   name: string;
   phone?: string;
   role: UserRole;
+  // Tenant Specific Fields (E7)
+  permanentAddress?: string;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+  employmentStatus?: string;
+  nic?: string;
+  monthlyIncome?: number;
 }
 
 interface AuthContextType {

@@ -109,30 +109,79 @@ class UserService {
   }
 
   async updateUserProfile(id, data) {
-    const { name, phone } = data;
-
-    // Fetch current user to preserve email and status
-    const currentUser = await userModel.findById(id);
-    if (!currentUser) {
-      throw new Error('User not found');
-    }
-
-    // Email cannot be updated by user profile, use existing.
-    // Status should also be preserved.
-    const updated = await userModel.update(id, {
+    const {
       name,
       phone,
-      email: currentUser.email,
-      status: currentUser.status,
-    });
+      emergencyContactName,
+      emergencyContactPhone,
+      employmentStatus,
+      permanentAddress,
+    } = data;
 
-    if (!updated) {
-      throw new Error('Update failed');
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      // 1. Fetch current user from users table
+      const currentUser = await userModel.findById(id, connection);
+      if (!currentUser) {
+        throw new Error('User not found');
+      }
+
+      // 2. Update users table (common to all roles)
+      const usersUpdated = await userModel.update(id, {
+        name,
+        phone,
+        email: currentUser.email, // Preserve email
+        status: currentUser.status, // Preserve status
+      }, connection);
+
+      if (!usersUpdated) {
+        throw new Error('Update to users table failed');
+      }
+
+      // 3. Update tenants table if user is a tenant (E7)
+      if (currentUser.role === 'tenant') {
+        const tenantUpdateData = {
+          emergencyContactName,
+          emergencyContactPhone,
+          employmentStatus,
+          permanentAddress,
+        };
+
+        // tenantModel.update only updates provided fields based on its whitelist
+        await tenantModel.update(id, tenantUpdateData, connection);
+      }
+
+      // 4. Log the action (Audit)
+      try {
+        const auditLogger = (await import('../utils/auditLogger.js')).default;
+        await auditLogger.log({
+          userId: id,
+          actionType: 'PROFILE_UPDATED',
+          entityId: id,
+          details: { name, phone }
+        }, null, connection);
+      } catch (err) {
+        console.error('Audit log failed for profile update:', err);
+      }
+
+      await connection.commit();
+
+      // Return the updated basic user object
+      return {
+        id,
+        name,
+        email: currentUser.email,
+        phone,
+        role: currentUser.role
+      };
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
     }
-
-    // Return current email from user object (not passed data)
-    const user = await userModel.findById(id);
-    return { id, name, email: user.email, phone };
   }
 
   async deleteTreasurer(id) {
