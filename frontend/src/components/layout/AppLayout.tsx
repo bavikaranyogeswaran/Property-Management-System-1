@@ -46,7 +46,7 @@ interface AppLayoutProps {
 
 export function AppLayout({ children }: AppLayoutProps) {
   const { user, logout } = useAuth();
-  const { notifications, markNotificationAsRead } = useApp();
+  const { notifications, markNotificationAsRead, markAllAsRead } = useApp();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const location = useLocation();
 
@@ -151,7 +151,17 @@ export function AppLayout({ children }: AppLayoutProps) {
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-80 p-0" align="end">
-                <div className="p-4 border-b font-semibold">Notifications</div>
+                <div className="p-4 border-b flex items-center justify-between">
+                  <span className="font-semibold">Notifications</span>
+                  {unreadCount > 0 && (
+                    <button 
+                      onClick={markAllAsRead} 
+                      className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                    >
+                      Mark all read
+                    </button>
+                  )}
+                </div>
                 <ScrollArea className="h-[300px]">
                   {notifications.length === 0 ? (
                     <div className="p-4 text-center text-sm text-gray-500">
@@ -159,10 +169,19 @@ export function AppLayout({ children }: AppLayoutProps) {
                     </div>
                   ) : (
                     <div className="divide-y">
-                      {notifications.map((notification) => (
+                      {notifications.map((notification) => {
+                        const bgClass = notification.read 
+                          ? '' 
+                          : notification.severity === 'urgent' 
+                            ? 'bg-red-50/50 border-l-4 border-red-500' 
+                            : notification.severity === 'warning' 
+                              ? 'bg-yellow-50/50 border-l-4 border-yellow-500' 
+                              : 'bg-blue-50/50 border-l-4 border-blue-500';
+
+                        return (
                         <div
                           key={notification.id}
-                          className={`p-4 hover:bg-gray-50 cursor-pointer ${!notification.read ? 'bg-blue-50/50' : ''}`}
+                          className={`p-4 hover:bg-gray-50 cursor-pointer ${bgClass}`}
                           onClick={() =>
                             markNotificationAsRead(notification.id)
                           }
@@ -179,7 +198,8 @@ export function AppLayout({ children }: AppLayoutProps) {
                             ).toLocaleDateString()}
                           </div>
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </ScrollArea>

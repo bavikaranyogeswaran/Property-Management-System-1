@@ -24,6 +24,7 @@ export interface Notification {
 interface NotificationContextType {
   notifications: Notification[];
   markNotificationAsRead: (id: string) => Promise<void>;
+  markAllAsRead: () => Promise<void>;
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
@@ -125,8 +126,17 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const markAllAsRead = async () => {
+    try {
+      setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+      await notificationApi.markAllAsRead();
+    } catch (e) {
+      console.error('Failed to mark all notifications as read', e);
+    }
+  };
+
   return (
-    <NotificationContext.Provider value={{ notifications, markNotificationAsRead }}>
+    <NotificationContext.Provider value={{ notifications, markNotificationAsRead, markAllAsRead }}>
       {children}
     </NotificationContext.Provider>
   );

@@ -2,11 +2,11 @@ import pool from '../config/db.js';
 
 class NotificationModel {
   async create(data, connection = null) {
-    const { userId, message, type, isRead } = data;
+    const { userId, message, type, isRead, severity } = data;
     const db = connection || pool;
     const [result] = await db.query(
-      'INSERT INTO notifications (user_id, message, type, is_read) VALUES (?, ?, ?, ?)',
-      [userId, message, type, isRead || false]
+      'INSERT INTO notifications (user_id, message, type, severity, is_read) VALUES (?, ?, ?, ?, ?)',
+      [userId, message, type, severity || 'info', isRead || false]
     );
     return result.insertId;
   }
@@ -21,6 +21,7 @@ class NotificationModel {
       userId: row.user_id.toString(),
       message: row.message,
       type: row.type,
+      severity: row.severity,
       isRead: row.is_read,
       createdAt: row.created_at,
     }));

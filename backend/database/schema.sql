@@ -393,10 +393,10 @@ CREATE TABLE notifications (
     user_id INT,
     message TEXT NOT NULL,
     type ENUM('invoice','lease','maintenance','payment','visit','system') NOT NULL,
+    severity ENUM('info', 'warning', 'urgent') DEFAULT 'info',
     is_read BOOLEAN DEFAULT FALSE,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
-    UNIQUE KEY unique_unread_notif (user_id, message(255), type, is_read)
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 );
 
 -- =========================

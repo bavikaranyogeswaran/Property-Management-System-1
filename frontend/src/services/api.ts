@@ -103,6 +103,7 @@ export const paymentApi = {
 export const notificationApi = {
   getNotifications: () => apiClient.get('/notifications'),
   markAsRead: (id: string) => apiClient.put(`/notifications/${id}/read`),
+  markAllAsRead: () => apiClient.put('/notifications/read-all'),
 };
 
 // Invoice API
