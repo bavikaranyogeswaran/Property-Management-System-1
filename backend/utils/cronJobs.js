@@ -7,6 +7,7 @@ import emailService from './emailService.js';
 import tenantModel from '../models/tenantModel.js';
 import billingEngine from './billingEngine.js';
 import paymentService from '../services/paymentService.js';
+import leaseService from '../services/leaseService.js';
 import { getCurrentDateString, getLocalTime, today, now, parseLocalDate, addDays, formatToLocalDate } from './dateUtils.js';
 import { moneyMath, fromCents } from './moneyUtils.js';
 
@@ -66,7 +67,8 @@ export const generateRentInvoices = async () => {
 
     let createdCount = 0;
     for (const lease of activeLeases) {
-      const leaseRentInfo = billingEngine.calculateMonthlyRent(lease, currentYear, currentMonth);
+      const adjustments = await leaseModel.getAdjustments(lease.id);
+      const leaseRentInfo = billingEngine.calculateMonthlyRent(lease, currentYear, currentMonth, adjustments);
 
       if (!leaseRentInfo) continue;
       const dueDateStr = leaseRentInfo.dueDate;
@@ -849,6 +851,7 @@ export const runNightlyCron = async (targetDate = null) => {
     // 1. Warnings & Expiries
     await sendLeaseExpiryWarnings();
     await checkLeaseExpiration();
+    await leaseService.processAutomatedEscalations();
 
     // 2. Billing (Rent)
     await generateRentInvoices();

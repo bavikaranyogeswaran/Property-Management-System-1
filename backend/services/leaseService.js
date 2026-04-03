@@ -1186,6 +1186,72 @@ class LeaseService {
       conn.release();
     }
   }
+
+  /**
+   * E5: Automated Rent Escalation
+   * This is called by Cron daily to find and apply rent increases.
+   */
+  async processAutomatedEscalations() {
+    const targetDate = today();
+    console.log(`[Escalation] Processing escalations for ${targetDate}...`);
+    
+    const leases = await leaseModel.findLeasesNeedingEscalation(targetDate);
+    console.log(`[Escalation] Found ${leases.length} leases needing escalation.`);
+
+    const results = [];
+    for (const lease of leases) {
+      const conn = await pool.getConnection();
+      try {
+        await conn.beginTransaction();
+
+        const currentRent = Number(lease.monthly_rent);
+        const percentage = Number(lease.escalation_percentage);
+        
+        // Calculate new rent with compounding (rounding to nearest integer cent)
+        const multiplier = 1 + (percentage / 100);
+        const newRent = Math.round(currentRent * multiplier);
+
+        // 1. Record the adjustment history
+        await conn.query(
+          "INSERT INTO lease_rent_adjustments (lease_id, effective_date, new_monthly_rent, notes) VALUES (?, ?, ?, ?)",
+          [lease.lease_id, targetDate, newRent, `Automated ${percentage}% escalation applied.`]
+        );
+
+        // 2. Update the lease record
+        await leaseModel.update(lease.lease_id, {
+          monthlyRent: newRent,
+          lastEscalation_date: targetDate // This confirms the anniversary is handled
+        }, conn);
+
+        // 3. Notification Logic
+        const notificationModel = (await import('../models/notificationModel.js')).default;
+        await notificationModel.create({
+          userId: lease.tenant_id,
+          message: `Scheduled Rent Adjustment: Your monthly rent has been adjusted to LKR ${fromCents(newRent).toLocaleString()} effective today.`,
+          type: 'lease_update'
+        }, conn);
+
+        const auditLogger = (await import('../utils/auditLogger.js')).default;
+        await auditLogger.log({
+          userId: null, // System action
+          actionType: 'RENT_ESCALATED_AUTOMATED',
+          entityId: lease.lease_id,
+          details: { oldRent: currentRent, newRent, percentage }
+        }, null, conn);
+
+        await conn.commit();
+        console.log(`[Escalation] Successfully escalated Lease #${lease.lease_id} to ${newRent}`);
+        results.push({ leaseId: lease.lease_id, status: 'success', newRent });
+      } catch (err) {
+        await conn.rollback();
+        console.error(`[Escalation] Failed to escalate Lease #${lease.lease_id}:`, err);
+        results.push({ leaseId: lease.lease_id, status: 'failed', error: err.message });
+      } finally {
+        conn.release();
+      }
+    }
+    return results;
+  }
 }
 
 export default new LeaseService();

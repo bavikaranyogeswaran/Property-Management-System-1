@@ -278,6 +278,11 @@ CREATE TABLE leases (
     actual_checkout_at DATETIME, -- [ADDED] Actual checkout time
     signed_at DATETIME, -- [NEW] Time when lease moved to active
     reservation_expires_at DATETIME, -- [NEW] Hard deadline for draft stage
+    
+    escalation_percentage DECIMAL(5,2) DEFAULT NULL, -- [NEW] E5 Automated Rent Escalation % (e.g. 5.00)
+    escalation_period_months INT DEFAULT 12,        -- [NEW] E5 Frequency of escalation
+    last_escalation_date DATE DEFAULT NULL,         -- [NEW] E5 Tracking for recurrence
+    
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (tenant_id) REFERENCES users(user_id) ON DELETE RESTRICT,
     FOREIGN KEY (unit_id) REFERENCES units(unit_id) ON DELETE RESTRICT

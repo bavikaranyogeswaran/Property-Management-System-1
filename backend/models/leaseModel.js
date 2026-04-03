@@ -23,8 +23,8 @@ class LeaseModel {
     } = data;
     const dbConn = connection || db;
     const [result] = await dbConn.query(
-      `INSERT INTO leases (tenant_id, unit_id, start_date, end_date, monthly_rent, status, security_deposit, deposit_status, document_url, target_deposit, reservation_expires_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO leases (tenant_id, unit_id, start_date, end_date, monthly_rent, status, security_deposit, deposit_status, document_url, target_deposit, reservation_expires_at, escalation_percentage, escalation_period_months, last_escalation_date)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         tenantId,
         unitId,
@@ -37,6 +37,9 @@ class LeaseModel {
         data.documentUrl || null,
         data.targetDeposit || 0.0,
         data.reservationExpiresAt || null,
+        data.escalationPercentage || null,
+        data.escalationPeriodMonths || 12,
+        data.lastEscalationDate || null,
       ]
     );
     return result.insertId;
@@ -63,6 +66,9 @@ class LeaseModel {
     verificationStatus: 'verification_status',
     verificationRejectionReason: 'verification_rejection_reason',
     reservationExpiresAt: 'reservation_expires_at',
+    escalationPercentage: 'escalation_percentage',
+    escalationPeriodMonths: 'escalation_period_months',
+    lastEscalationDate: 'last_escalation_date',
   };
 
   async update(id, data, connection = null) {
@@ -354,6 +360,44 @@ class LeaseModel {
       notes: r.notes,
       createdAt: r.created_at
     }));
+  }
+  
+  /**
+   * E5: Automated Rent Escalation
+   * Finds active leases where (start_date + N months) <= targetDate 
+   * AND the escalation hasn't been applied for this cycle yet.
+   */
+  async findLeasesNeedingEscalation(targetDateString) {
+    const [rows] = await db.query(
+      `SELECT l.*, p.name as property_name, u.unit_number
+       FROM leases l
+       JOIN units u ON l.unit_id = u.unit_id
+       JOIN properties p ON u.property_id = p.property_id
+       WHERE l.status = 'active'
+         AND l.escalation_percentage IS NOT NULL
+         AND l.escalation_percentage > 0
+         AND (
+           -- Never escalated before: check if escalation_period_months has passed since start_date
+           (l.last_escalation_date IS NULL AND DATE_ADD(l.start_date, INTERVAL l.escalation_period_months MONTH) <= ?)
+           OR
+           -- Already escalated: check if escalation_period_months has passed since last_escalation_date
+           (l.last_escalation_date IS NOT NULL AND DATE_ADD(l.last_escalation_date, INTERVAL l.escalation_period_months MONTH) <= ?)
+         )`,
+      [targetDateString, targetDateString]
+    );
+    return rows;
+  }
+
+  /**
+   * E5: Fetch rent adjustments for a lease
+   */
+  async getAdjustments(leaseId, connection = null) {
+    const dbConn = connection || db;
+    const [rows] = await dbConn.query(
+      "SELECT * FROM lease_rent_adjustments WHERE lease_id = ? ORDER BY effective_date ASC",
+      [leaseId]
+    );
+    return rows;
   }
 }
 
