@@ -4,7 +4,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Send, User, Building2 } from 'lucide-react';
-import apiClient from '@/services/api';
+import { messageApi } from '@/services/api';
 import { toast } from 'sonner';
 import { useAuth } from '@/app/context/AuthContext';
 
@@ -20,14 +20,18 @@ interface Message {
 }
 
 interface ChatInterfaceProps {
-  leadId: string | number;
+  leadId?: string | number;
+  tenantId?: string | number;
+  mode?: 'lead' | 'tenant' | 'tenant-admin';
   title?: string;
   readOnly?: boolean;
-  className?: string; // Add className prop
+  className?: string;
 }
 
 export function ChatInterface({
   leadId,
+  tenantId,
+  mode = 'lead',
   title = 'Negotiation Chat',
   readOnly = false,
   className,
@@ -40,7 +44,16 @@ export function ChatInterface({
 
   const fetchMessages = async () => {
     try {
-      const response = await apiClient.get(`/leads/${leadId}/messages`);
+      let response;
+      if (mode === 'tenant') {
+        response = await messageApi.getMyThread();
+      } else if (mode === 'tenant-admin') {
+        if (!tenantId) return;
+        response = await messageApi.getTenantMessages(String(tenantId));
+      } else {
+        if (!leadId) return;
+        response = await messageApi.getLeadMessages(String(leadId));
+      }
       setMessages(response.data);
     } catch (error) {
       console.error('Failed to fetch messages', error);
@@ -54,7 +67,7 @@ export function ChatInterface({
       const interval = setInterval(fetchMessages, 5000);
       return () => clearInterval(interval);
     }
-  }, [leadId, readOnly]);
+  }, [leadId, tenantId, mode, readOnly]);
 
   // Scroll to bottom on new messages
   useEffect(() => {
@@ -69,19 +82,23 @@ export function ChatInterface({
 
     setIsLoading(true);
     try {
-      const response = await apiClient.post(`/leads/${leadId}/messages`, {
-        content: newMessage,
-      });
+      let response;
+      if (mode === 'tenant') {
+        response = await messageApi.sendToOwner(newMessage);
+      } else if (mode === 'tenant-admin') {
+        if (!tenantId) return;
+        response = await messageApi.sendTenantMessage(String(tenantId), newMessage);
+      } else {
+        if (!leadId) return;
+        response = await messageApi.sendLeadMessage(String(leadId), newMessage);
+      }
 
-      // Optimistic update or just append response
       setMessages([
         ...messages,
         { ...response.data, senderName: user?.name, senderRole: user?.role },
       ]);
       setNewMessage('');
-      setNewMessage('');
     } catch (error: any) {
-      console.error('Failed to send message', error);
       toast.error(error.response?.data?.error || 'Failed to send message');
     } finally {
       setIsLoading(false);

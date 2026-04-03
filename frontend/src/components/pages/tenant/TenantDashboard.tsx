@@ -148,16 +148,14 @@ export function TenantDashboard() {
           <p className="text-sm text-gray-500 mt-1">
             Welcome back, {user?.name}
           </p>
-          {leadHistory && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setIsHistoryOpen(true)}
-            >
-              <MessageSquare className="size-4 mr-2" />
-              Chat with Owner
-            </Button>
-          )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsHistoryOpen(true)}
+          >
+            <MessageSquare className="size-4 mr-2" />
+            Chat with Owner
+          </Button>
         </div>
       </div>
 
@@ -397,11 +395,9 @@ export function TenantDashboard() {
           <DialogHeader>
             <DialogTitle>Chat with Property Owner</DialogTitle>
           </DialogHeader>
-          {leadHistory && (
-            <ChatInterface
-              leadId={leadHistory.id}
-            />
-          )}
+          <ChatInterface
+            mode="tenant"
+          />
         </DialogContent>
       </Dialog>
       <Dialog open={isBehaviorOpen} onOpenChange={setIsBehaviorOpen}>

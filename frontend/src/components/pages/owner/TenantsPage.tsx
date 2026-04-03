@@ -21,12 +21,21 @@ import {
   UserX,
   UserCheck,
 } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { ChatInterface } from '@/components/common/ChatInterface';
 import { TenantDetailsDialog } from '@/components/tenants/TenantDetailsDialog';
+import { MessageSquare } from 'lucide-react';
 
 export function TenantsPage() {
   const { tenants, leases, units, properties } = useApp();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
+  const [chatTenantRow, setChatTenantRow] = useState<Tenant | null>(null);
   const [filterStatus, setFilterStatus] = useState<
     'all' | 'active' | 'inactive'
   >('all');
@@ -219,13 +228,23 @@ export function TenantsPage() {
                         </div>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => setSelectedTenant(tenant)}
-                        >
-                          View Details
-                        </Button>
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => setChatTenantRow(tenant)}
+                            title="Message Tenant"
+                          >
+                            <MessageSquare className="size-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setSelectedTenant(tenant)}
+                          >
+                            View Details
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   );
@@ -258,6 +277,22 @@ export function TenantsPage() {
         units={units}
         properties={properties}
       />
+
+      {/* Modern Tenant Chat Dialog */}
+      <Dialog
+        open={!!chatTenantRow}
+        onOpenChange={(open) => !open && setChatTenantRow(null)}
+      >
+        <DialogContent className="max-w-3xl h-[80vh] flex flex-col p-6">
+          <DialogHeader>
+            <DialogTitle>Chat with {chatTenantRow?.name}</DialogTitle>
+          </DialogHeader>
+          <ChatInterface
+            mode="tenant-admin"
+            tenantId={chatTenantRow?.id}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

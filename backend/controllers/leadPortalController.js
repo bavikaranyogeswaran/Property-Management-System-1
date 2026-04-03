@@ -159,13 +159,13 @@ class LeadPortalController {
       }
 
       // Use the lead's own ID as the sender (leads are guests, not users)
-      const messageId = await messageModel.create(
-        tokenRecord.leadId,
-        null,              // no user sender_id
-        content.trim(),
-        'lead',            // sender_type
-        lead.id            // sender_lead_id
-      );
+      const messageId = await messageModel.create({
+        leadId: tokenRecord.leadId,
+        senderId: null,
+        content: content.trim(),
+        senderType: 'lead',
+        senderLeadId: lead.id
+      });
 
       // Update last contacted
       await leadModel.update(tokenRecord.leadId, { lastContactedAt: new Date() });

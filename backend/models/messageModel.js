@@ -1,18 +1,20 @@
 import db from '../config/db.js';
 
 class MessageModel {
-  async create(leadId, senderId, content, senderType = 'user', senderLeadId = null) {
+  async create(data) {
+    const { leadId = null, tenantId = null, senderId, content, senderType = 'user', senderLeadId = null } = data;
+
     if (senderType === 'lead') {
       const [result] = await db.query(
-        'INSERT INTO messages (lead_id, sender_id, sender_lead_id, sender_type, content) VALUES (?, NULL, ?, ?, ?)',
-        [leadId, senderLeadId, senderType, content]
+        'INSERT INTO messages (lead_id, tenant_id, sender_id, sender_lead_id, sender_type, content) VALUES (?, ?, NULL, ?, ?, ?)',
+        [leadId, tenantId, senderLeadId, senderType, content]
       );
       return result.insertId;
     }
     
     const [result] = await db.query(
-      'INSERT INTO messages (lead_id, sender_id, sender_type, content) VALUES (?, ?, ?, ?)',
-      [leadId, senderId, senderType, content]
+      'INSERT INTO messages (lead_id, tenant_id, sender_id, sender_type, content) VALUES (?, ?, ?, ?, ?)',
+      [leadId, tenantId, senderId, senderType, content]
     );
     return result.insertId;
   }
@@ -23,6 +25,7 @@ class MessageModel {
             SELECT 
                 m.message_id as id,
                 m.lead_id as leadId,
+                m.tenant_id as tenantId,
                 m.sender_id as senderId,
                 m.sender_lead_id as senderLeadId,
                 m.sender_type as senderType,
@@ -42,6 +45,29 @@ class MessageModel {
     return rows;
   }
 
+  async findByTenantId(tenantId) {
+    const [rows] = await db.query(
+      `
+            SELECT 
+                m.message_id as id,
+                m.tenant_id as tenantId,
+                m.sender_id as senderId,
+                m.sender_type as senderType,
+                u.name as senderName,
+                u.role as senderRole,
+                m.content,
+                m.is_read as isRead,
+                m.created_at as createdAt
+            FROM messages m
+            LEFT JOIN users u ON m.sender_id = u.user_id
+            WHERE m.tenant_id = ?
+            ORDER BY m.created_at ASC
+        `,
+      [tenantId]
+    );
+    return rows;
+  }
+
   async markAsRead(messageId) {
     const [result] = await db.query(
       'UPDATE messages SET is_read = TRUE WHERE message_id = ?',
@@ -51,11 +77,17 @@ class MessageModel {
   }
 
   async markAllAsRead(leadId, readerId) {
-    // Mark all messages in this lead thread as read WHERE sender_id != readerId
-    // For lead-sent messages (sender_id IS NULL), they should also be marked read by the owner
     const [result] = await db.query(
       'UPDATE messages SET is_read = TRUE WHERE lead_id = ? AND (sender_id != ? OR sender_id IS NULL)',
       [leadId, readerId]
+    );
+    return result.affectedRows;
+  }
+
+  async markAllAsReadForTenant(tenantId, readerId) {
+    const [result] = await db.query(
+      'UPDATE messages SET is_read = TRUE WHERE tenant_id = ? AND sender_id != ?',
+      [tenantId, readerId]
     );
     return result.affectedRows;
   }

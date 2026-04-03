@@ -155,4 +155,20 @@ export const guestApi = {
   getActivationStatus: (token: string) => apiClient.get(`/public/invoice/${token}/status`),
 };
 
+export const messageApi = {
+  // Owner endpoints
+  getLeadMessages: (leadId: string) => apiClient.get(`/messages/${leadId}`),
+  sendLeadMessage: (leadId: string, content: string) => apiClient.post(`/messages/${leadId}`, { content }),
+  markLeadRead: (leadId: string) => apiClient.put(`/messages/${leadId}/read`),
+  
+  getTenantMessages: (tenantId: string) => apiClient.get(`/messages/owner/tenant/${tenantId}`),
+  sendTenantMessage: (tenantId: string, content: string) => apiClient.post(`/messages/owner/tenant/${tenantId}`, { content }),
+  markTenantRead: (tenantId: string) => apiClient.put(`/messages/owner/tenant/${tenantId}/read`),
+
+  // Tenant endpoints (The tenant views their own thread)
+  getMyThread: () => apiClient.get('/messages/tenant/thread'),
+  sendToOwner: (content: string) => apiClient.post('/messages/tenant/thread', { content }),
+  markMyThreadRead: () => apiClient.put('/messages/tenant/thread/read'),
+};
+
 export default apiClient;

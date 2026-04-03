@@ -216,7 +216,8 @@ CREATE TABLE lead_stage_history (
 
 CREATE TABLE messages (
     message_id INT AUTO_INCREMENT PRIMARY KEY,
-    lead_id INT NOT NULL,
+    lead_id INT NULL,
+    tenant_id INT NULL,
     sender_id INT NULL,                      -- Set when sender is a user (owner/tenant/treasurer)
     sender_lead_id INT NULL,                 -- Set when sender is a lead (guest)
     sender_type ENUM('user','lead') NOT NULL DEFAULT 'user',
@@ -224,6 +225,7 @@ CREATE TABLE messages (
     is_read BOOLEAN DEFAULT FALSE,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (lead_id) REFERENCES leads(lead_id) ON DELETE CASCADE,
+    FOREIGN KEY (tenant_id) REFERENCES users(user_id) ON DELETE CASCADE,
     FOREIGN KEY (sender_id) REFERENCES users(user_id) ON DELETE CASCADE,
     FOREIGN KEY (sender_lead_id) REFERENCES leads(lead_id) ON DELETE CASCADE
 );

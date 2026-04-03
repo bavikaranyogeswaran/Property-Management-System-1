@@ -271,7 +271,13 @@ class UserService {
       // 4a. Invalidate portal access tokens
       await leadTokenModel.invalidateForLead(leadId, connection);
 
-      // 4b. Record stage history (positional args: leadId, fromStatus, toStatus, notes, connection)
+      // 4b. Migrate past conversation thread to the active tenant ID
+      await connection.query(
+        'UPDATE messages SET tenant_id = ? WHERE lead_id = ?',
+        [userId, leadId]
+      );
+
+      // 4c. Record stage history (positional args: leadId, fromStatus, toStatus, notes, connection)
       const leadStageHistoryModel = (await import('../models/leadStageHistoryModel.js')).default;
       await leadStageHistoryModel.create(
           leadId,
