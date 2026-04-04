@@ -76,6 +76,7 @@ export function OwnerMaintenancePage() {
   const [costFormData, setCostFormData] = useState({
     amount: '',
     description: '',
+    billTo: 'owner' as 'owner' | 'tenant',
   });
   const [billFormData, setBillFormData] = useState({
     amount: '',
@@ -136,6 +137,7 @@ export function OwnerMaintenancePage() {
       requestId: selectedRequest.id,
       amount: parseFloat(costFormData.amount),
       description: costFormData.description,
+      billTo: costFormData.billTo,
     });
 
     toast.success('Maintenance cost recorded');
@@ -144,6 +146,7 @@ export function OwnerMaintenancePage() {
     setCostFormData({
       amount: '',
       description: '',
+      billTo: 'owner',
     });
   };
 
@@ -595,6 +598,9 @@ export function OwnerMaintenancePage() {
                           </span>
                         </div>
                         <div className="flex items-center gap-3">
+                          <Badge variant={cost.billTo === 'tenant' ? 'destructive' : 'secondary'} className="text-[10px] h-4 py-0 px-1">
+                            {cost.billTo === 'tenant' ? 'Tenant' : 'Owner'}
+                          </Badge>
                           <span className="font-semibold">
                             {formatLKR(cost.amount)}
                           </span>
@@ -650,6 +656,24 @@ export function OwnerMaintenancePage() {
                   required
                 />
               </div>
+              <div className="space-y-2">
+                <Label>Bill Responsibility To</Label>
+                <Select 
+                  value={costFormData.billTo} 
+                  onValueChange={(val: 'owner' | 'tenant') => setCostFormData({ ...costFormData, billTo: val })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select who to bill" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="owner">Owner (Deduct from Payout)</SelectItem>
+                    <SelectItem value="tenant">Tenant (Billed via Invoice/Deposit)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-[10px] text-gray-500 italic">
+                  * Items billed to tenants will NOT be deducted from your next payout.
+                </p>
+              </div>
               <div className="flex gap-2 justify-end">
                 <Button
                   type="button"
@@ -660,6 +684,7 @@ export function OwnerMaintenancePage() {
                     setCostFormData({
                       amount: '',
                       description: '',
+                      billTo: 'owner',
                     });
                   }}
                 >

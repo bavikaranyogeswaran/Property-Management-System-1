@@ -385,6 +385,7 @@ CREATE TABLE maintenance_costs (
     description VARCHAR(255),
     amount BIGINT NOT NULL,
     recorded_date DATE NOT NULL,
+    bill_to ENUM('owner', 'tenant') DEFAULT 'owner',
     payout_id INT,
     status ENUM('active', 'voided') DEFAULT 'active',
     FOREIGN KEY (request_id) REFERENCES maintenance_requests(request_id) ON DELETE CASCADE,

@@ -4,8 +4,9 @@ import { today } from '../utils/dateUtils.js';
 class MaintenanceCostController {
   async addCost(req, res) {
     try {
-      const { requestId, amount, description, recordedDate, billToTenant } =
+      const { requestId, amount, description, recordedDate, billTo, billToTenant } =
         req.body;
+      const isBillableToTenant = billTo === 'tenant' || billToTenant === true;
 
       // RBAC: Owner and Treasurer can add costs
       if (req.user.role !== 'owner' && req.user.role !== 'treasurer') {
@@ -17,14 +18,15 @@ class MaintenanceCostController {
         requestId,
         amount,
         description,
-        recordedDate
+        recordedDate,
+        billTo: billTo || (billToTenant ? 'tenant' : 'owner')
       }, req.user);
 
       // Logic Check: Billable Maintenance
       // If flagged, generate an Invoice for the tenant.
       let billingSuccess = null;
       let billingError = null;
-      if (billToTenant) {
+      if (isBillableToTenant) {
         try {
           // Get request details to find tenant/unit/lease?
           // maintenanceRequestModel has tenantId and unitId.
@@ -86,7 +88,7 @@ class MaintenanceCostController {
       }
 
       const response = { message: 'Cost recorded', costId };
-      if (billToTenant) {
+      if (isBillableToTenant) {
         response.billingSuccess = billingSuccess;
         if (billingError) response.billingError = billingError;
       }

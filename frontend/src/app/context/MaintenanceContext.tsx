@@ -25,7 +25,7 @@ export interface MaintenanceCost {
   amount: number;
   description: string;
   recordedDate: string;
-  billToTenant?: boolean;
+  billTo?: 'owner' | 'tenant';
 }
 
 interface MaintenanceContextType {
@@ -62,6 +62,7 @@ export function MaintenanceProvider({ children }: { children: ReactNode }) {
             ...c,
             amount: toLKRFromCents(c.amount),
             recordedDate: (c.recordedDate || '').split('T')[0],
+            billTo: c.billTo || 'owner',
           })));
         }
       }
@@ -102,7 +103,7 @@ export function MaintenanceProvider({ children }: { children: ReactNode }) {
         ...cost,
         amount: toCentsFromLKR(cost.amount)
       });
-      toast.success(cost.billToTenant ? 'Cost recorded & Invoice generated' : 'Cost recorded');
+      toast.success(cost.billTo === 'tenant' ? 'Cost recorded (Billed to Tenant)' : 'Cost recorded (Billed to Owner)');
       await fetchMaintenanceData();
     } catch (e) {
       toast.error('Failed to record cost');

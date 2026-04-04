@@ -223,7 +223,12 @@ export function PayoutDetailModal({ payoutId, onClose }: PayoutDetailModalProps)
                           </TableCell>
                           <TableCell>
                             <div className="text-sm font-semibold">{item.request_title}</div>
-                            <div className="text-[10px] text-muted-foreground italic line-clamp-1 max-w-[250px]">{item.description}</div>
+                            <div className="flex items-center gap-2 mt-1">
+                                <Badge variant="outline" className="text-[10px] h-4 py-0 px-1 font-mono uppercase">
+                                    {item.bill_to || 'owner'}
+                                </Badge>
+                                <div className="text-[10px] text-muted-foreground italic line-clamp-1 max-w-[250px]">{item.description}</div>
+                            </div>
                           </TableCell>
                           <TableCell className="text-sm whitespace-nowrap font-medium text-gray-500">
                             {new Date(item.recorded_date).toLocaleDateString()}

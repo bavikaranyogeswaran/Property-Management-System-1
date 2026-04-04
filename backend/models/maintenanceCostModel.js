@@ -15,6 +15,7 @@ class MaintenanceCostModel {
       recordedDate: row.recorded_date,
       invoiceId: row.invoice_id,
       isReimbursable: !!row.is_reimbursable,
+      billTo: row.bill_to,
       status: row.status
     }));
   }
@@ -38,16 +39,17 @@ class MaintenanceCostModel {
       recordedDate: row.recorded_date,
       invoiceId: row.invoice_id,
       isReimbursable: !!row.is_reimbursable,
+      billTo: row.bill_to,
       status: row.status
     }));
   }
 
   async create(data, connection = null) {
-    const { requestId, description, amount, recordedDate, invoiceId, isReimbursable } = data;
+    const { requestId, description, amount, recordedDate, invoiceId, isReimbursable, billTo } = data;
     const db = connection || pool;
     const [result] = await db.query(
-      'INSERT INTO maintenance_costs (request_id, description, amount, recorded_date, invoice_id, is_reimbursable) VALUES (?, ?, ?, ?, ?, ?)',
-      [requestId, description, amount, recordedDate || getLocalTime(), invoiceId || null, isReimbursable || false]
+      'INSERT INTO maintenance_costs (request_id, description, amount, recorded_date, invoice_id, is_reimbursable, bill_to) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [requestId, description, amount, recordedDate || getLocalTime(), invoiceId || null, isReimbursable || false, billTo || 'owner']
     );
     return result.insertId;
   }
@@ -64,6 +66,7 @@ class MaintenanceCostModel {
       recordedDate: row.recorded_date,
       invoiceId: row.invoice_id,
       isReimbursable: !!row.is_reimbursable,
+      billTo: row.bill_to,
       status: row.status
     }));
   }
@@ -105,6 +108,7 @@ class MaintenanceCostModel {
       recordedDate: row.recorded_date,
       invoiceId: row.invoice_id,
       isReimbursable: !!row.is_reimbursable,
+      billTo: row.bill_to,
       status: row.status,
       propertyName: row.property_name,
       propertyId: row.property_id
@@ -133,6 +137,7 @@ class MaintenanceCostModel {
       recordedDate: row.recorded_date,
       invoiceId: row.invoice_id,
       isReimbursable: !!row.is_reimbursable,
+      billTo: row.bill_to,
       status: row.status,
       propertyName: row.property_name,
       propertyId: row.property_id
@@ -160,6 +165,7 @@ class MaintenanceCostModel {
       recordedDate: row.recorded_date,
       invoiceId: row.invoice_id,
       isReimbursable: !!row.is_reimbursable,
+      billTo: row.bill_to,
       status: row.status,
       propertyId: row.property_id
     };
@@ -175,6 +181,7 @@ class MaintenanceCostModel {
       JOIN units u ON mr.unit_id = u.unit_id
       JOIN properties p ON u.property_id = p.property_id
       WHERE YEAR(mc.recorded_date) = ?
+      AND (mc.bill_to = 'owner' OR mc.bill_to IS NULL)
       GROUP BY p.property_id
       `,
       [year]

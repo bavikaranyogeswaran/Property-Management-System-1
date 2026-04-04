@@ -121,6 +121,7 @@ class PayoutModel {
             JOIN properties prop ON u.property_id = prop.property_id
             WHERE prop.owner_id = ?
             AND mc.status = 'active'
+            AND (mc.bill_to = 'owner' OR mc.bill_to IS NULL)
             AND mc.payout_id IS NULL
             AND mc.recorded_date <= ?
         `,
@@ -196,6 +197,7 @@ class PayoutModel {
                 mc.amount,
                 mc.recorded_date,
                 mc.description,
+                mc.bill_to,
                 u.unit_number,
                 prop.name as property_name,
                 mr.title as request_title

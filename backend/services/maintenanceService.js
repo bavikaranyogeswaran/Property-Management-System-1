@@ -278,7 +278,7 @@ class MaintenanceService {
             throw new Error('Access denied');
         }
 
-        const { requestId, amount, description, recordedDate } = data;
+        const { requestId, amount, description, recordedDate, billTo } = data;
         const request = await maintenanceRequestModel.findById(requestId);
         if (!request) throw new Error('Maintenance Request not found');
 
@@ -293,7 +293,8 @@ class MaintenanceService {
                 description,
                 recordedDate: recordedDate || getLocalTime(),
                 invoiceId: data.invoiceId || null,
-                isReimbursable: data.isReimbursable || false
+                isReimbursable: data.isReimbursable || false,
+                billTo: billTo || 'owner'
             }, connection);
 
             // 2. Identify lease to link ledger entry

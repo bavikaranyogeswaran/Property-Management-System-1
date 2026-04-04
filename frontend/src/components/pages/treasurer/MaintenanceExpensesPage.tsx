@@ -87,7 +87,7 @@ export function MaintenanceExpensesPage() {
       requestId: selectedRequest,
       amount: value,
       description,
-      billToTenant,
+      billTo: billToTenant ? 'tenant' : 'owner',
     });
 
     toast.success('Expense recorded successfully');
