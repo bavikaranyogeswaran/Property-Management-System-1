@@ -117,7 +117,9 @@ CREATE TABLE properties (
     street VARCHAR(255) NOT NULL,        -- [ADDED] Street Name
     city VARCHAR(100) NOT NULL,          -- [ADDED] City
     district VARCHAR(100) NOT NULL,      -- [ADDED] District
-    -- address_line_1/2/3 Removed
+    image_url VARCHAR(500),              -- [ADDED] For primary property image
+    description TEXT,                    -- [ADDED] Property details
+    features JSON,                       -- [ADDED] Stored list of features (Pool, AC, etc)
     status ENUM('active','inactive') DEFAULT 'active',
     is_archived BOOLEAN DEFAULT FALSE,
     archived_at DATETIME,
@@ -136,6 +138,7 @@ CREATE TABLE units (
     property_id INT NOT NULL,
     unit_number VARCHAR(50) NOT NULL,
     unit_type_id INT NOT NULL,               -- [MODIFIED] FK to unit_types
+    image_url VARCHAR(500),                  -- [ADDED] For primary unit image
     monthly_rent BIGINT NOT NULL,
     status ENUM('available', 'occupied', 'maintenance', 'reserved', 'inactive') DEFAULT 'available',
     is_archived BOOLEAN DEFAULT FALSE,
