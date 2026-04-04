@@ -94,6 +94,8 @@ export function PropertiesPage() {
       description: '',
       features: [],
       lateFeePercentage: 3,
+      lateFeeType: 'flat_percentage',
+      lateFeeAmount: 0,
       lateFeeGracePeriod: 5,
       tenantDeactivationDays: 30,
     },
@@ -325,6 +327,8 @@ export function PropertiesPage() {
       description: property.description || '',
       features: property.features || [],
       lateFeePercentage: property.lateFeePercentage ?? 3,
+      lateFeeType: property.lateFeeType ?? 'flat_percentage',
+      lateFeeAmount: property.lateFeeAmount ?? 0,
       lateFeeGracePeriod: property.lateFeeGracePeriod ?? 5,
       tenantDeactivationDays: property.tenantDeactivationDays ?? 30,
     });
@@ -376,6 +380,8 @@ export function PropertiesPage() {
       description: '',
       features: [],
       lateFeePercentage: 3,
+      lateFeeType: 'flat_percentage',
+      lateFeeAmount: 0,
       lateFeeGracePeriod: 5,
       tenantDeactivationDays: 30,
     });
@@ -722,27 +728,73 @@ export function PropertiesPage() {
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <FormField
                           control={propertyForm.control}
-                          name="lateFeePercentage"
+                          name="lateFeeType"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Late Fee (%)</FormLabel>
+                              <FormLabel>Late Fee Type</FormLabel>
                               <FormControl>
-                                <Input 
-                                  type="number" 
-                                  step="0.01" 
-                                  min="0"
-                                  {...field} 
-                                  onChange={e => {
-                                    const val = e.target.value === '' ? '' : parseFloat(e.target.value);
-                                    field.onChange(val);
-                                  }}
-                                />
+                                <select
+                                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                  {...field}
+                                >
+                                  <option value="flat_percentage">Flat Percentage (%)</option>
+                                  <option value="daily_fixed">Daily Fixed Amount (LKR)</option>
+                                </select>
                               </FormControl>
-                              <p className="text-[0.8rem] text-muted-foreground">Applied monthly on overdue balance</p>
                               <FormMessage />
                             </FormItem>
                           )}
                         />
+
+                        {propertyForm.watch('lateFeeType') === 'flat_percentage' ? (
+                          <FormField
+                            control={propertyForm.control}
+                            name="lateFeePercentage"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Standard Late Fee (%)</FormLabel>
+                                <FormControl>
+                                  <Input 
+                                    type="number" 
+                                    step="0.01" 
+                                    min="0"
+                                    {...field} 
+                                    onChange={e => {
+                                      const val = e.target.value === '' ? '' : parseFloat(e.target.value);
+                                      field.onChange(val);
+                                    }}
+                                  />
+                                </FormControl>
+                                <p className="text-[0.8rem] text-muted-foreground">Applied monthly on overdue balance</p>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        ) : (
+                          <FormField
+                            control={propertyForm.control}
+                            name="lateFeeAmount"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Daily Late Fee (LKR)</FormLabel>
+                                <FormControl>
+                                  <Input 
+                                    type="number" 
+                                    step="100"
+                                    min="0"
+                                    {...field} 
+                                    onChange={e => {
+                                      const val = e.target.value === '' ? '' : parseInt(e.target.value);
+                                      field.onChange(val);
+                                    }}
+                                  />
+                                </FormControl>
+                                <p className="text-[0.8rem] text-muted-foreground">Applied daily while overdue</p>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        )}
 
                         <FormField
                           control={propertyForm.control}

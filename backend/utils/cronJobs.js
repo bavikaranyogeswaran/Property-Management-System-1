@@ -305,100 +305,122 @@ export const sendLeaseExpiryWarnings = async () => {
 // Late Fee Automation (Daily at 2:00 AM)
 export const applyLateFees = async () => {
   console.log('Running late fee automation...');
+  const todayStr = formatToLocalDate(now());
+  
   try {
     const overdueInvoices = await invoiceModel.findOverdue();
     console.log(
-      `Found ${overdueInvoices.length} overdue invoices eligible for late fees.`
+      `Found ${overdueInvoices.length} overdue invoices eligible for late fee checks.`
     );
 
     let appliedCount = 0;
     for (const inv of overdueInvoices) {
-      // DUPLICATION GUARD: Ensure a late fee hasn't already been created for this invoice in the last 30 days
-      const [feeExists] = await db.query(
-        "SELECT 1 FROM rent_invoices WHERE lease_id = ? AND description LIKE ? AND invoice_type = 'late_fee' AND created_at > DATE_SUB(NOW(), INTERVAL 30 DAY) LIMIT 1",
-        [inv.lease_id, `%Late Fee for Invoice #${inv.invoice_id}%`]
-      );
-
-      if (feeExists.length > 0) {
-        console.log(`Late fee already exists for Invoice #${inv.invoice_id}. Skipping.`);
-        continue;
-      }
-
-      // Use property-specific fee if available, otherwise fallback to system default
-      const feePercentage = inv.lateFeePercentage !== null ? (inv.lateFeePercentage / 100) : LATE_FEE_PERCENTAGE;
-      const lateFeeAmount = moneyMath(inv.amount).mul(feePercentage).round().value();
-
-      // Create Late Fee Invoice
-      const lateFeeInvoiceId = await invoiceModel.createLateFeeInvoice({
-        leaseId: inv.lease_id,
-        amount: lateFeeAmount,
-        dueDate: formatToLocalDate(addDays(now(), 5)), // 5-day grace period
-        description: `Late Fee for Invoice #${inv.invoice_id} (${inv.year}-${inv.month})`,
-      });
-
-      // Auto-Apply Credits to Late Fee (consistent with rent invoice logic)
-      // Auto-Apply Credits to Late Fee (consistent with rent invoice logic)
-      try {
-        await paymentService.applyTenantCredit(lateFeeInvoiceId);
-      } catch (err) {
-        console.error(`[Cron] Failed to auto-apply credit to late fee invoice ${lateFeeInvoiceId}:`, err);
-      }
-
-      // Notify Tenant
-      await notificationModel.create({
-        userId: inv.tenant_id,
-        message: `A late fee of LKR ${fromCents(lateFeeAmount).toFixed(2)} has been applied to your account for overdue invoice #${inv.invoice_id}.`,
-        type: 'invoice',
-        isRead: false,
-      });
-
-      // Log Behavior (Negative)
-      try {
-        const behaviorLogModel = (await import('../models/behaviorLogModel.js')).default;
-        await behaviorLogModel.create({
-            tenantId: inv.tenant_id,
-            type: 'negative',
-            category: 'Payment',
-            scoreChange: -10,
-            description: `Late payment penalty for Invoice #${inv.invoice_id}`,
-            recordedBy: null
-        });
-        await tenantModel.incrementBehaviorScore(inv.tenant_id, -10);
-      } catch (scoreErr) {
-        console.error('Failed to log negative behavior for late fee:', scoreErr);
-      }
-
-      // Logic Check: Mark Original Invoice as 'Overdue'
-      // Previously, it remained 'pending'. Now explicitly set to 'overdue'.
-      await invoiceModel.updateStatus(inv.invoice_id, 'overdue');
-
-      // Send Email
-      try {
-        const [userRows] = await db.query(
-          'SELECT email FROM users WHERE user_id = ?',
-          [inv.tenant_id]
+      const isDaily = inv.lateFeeType === 'daily_fixed';
+      
+      if (isDaily) {
+        // DAILY ACCRUAL LOGIC
+        // Check if a late fee for "Today" already exists for this specific base invoice
+        const [todayFeeExists] = await db.query(
+          "SELECT 1 FROM rent_invoices WHERE lease_id = ? AND description LIKE ? AND invoice_type = 'late_fee' AND DATE(created_at) = CURDATE() LIMIT 1",
+          [inv.lease_id, `%Daily Late Fee for ${todayStr}%Invoice #${inv.invoice_id}%`]
         );
-        if (userRows.length > 0) {
-          // We reuse sendInvoiceNotification or create a generic one?
-          // sendInvoiceNotification expects { amount, dueDate, month, year, invoiceId }
-          await emailService.sendInvoiceNotification(userRows[0].email, {
-            amount: fromCents(lateFeeAmount),
-            dueDate: today(),
-            month: inv.month,
-            year: inv.year,
-            invoiceId: 'LATE-FEE',
-          });
+
+        if (todayFeeExists.length > 0) {
+          console.log(`Daily fee already applied for Invoice #${inv.invoice_id} on ${todayStr}. Skipping.`);
+          continue;
         }
-      } catch (emailErr) {
-        console.error('Failed to send late fee email:', emailErr);
+
+        const dailyAmount = inv.lateFeeAmount || 0;
+        if (dailyAmount <= 0) continue;
+
+        // Create Daily Late Fee Invoice
+        const lateFeeInvoiceId = await invoiceModel.createLateFeeInvoice({
+          leaseId: inv.lease_id,
+          amount: dailyAmount,
+          dueDate: formatToLocalDate(addDays(now(), 1)), // Due tomorrow
+          description: `Daily Late Fee for ${todayStr} (Invoice #${inv.invoice_id})`,
+        });
+
+        if (lateFeeInvoiceId) {
+          await paymentService.applyTenantCredit(lateFeeInvoiceId);
+          appliedCount++;
+        }
+
+      } else {
+        // FLAT PERCENTAGE LOGIC (Once every 30 days)
+        const [feeExists] = await db.query(
+          "SELECT 1 FROM rent_invoices WHERE lease_id = ? AND description LIKE ? AND invoice_type = 'late_fee' AND created_at > DATE_SUB(NOW(), INTERVAL 30 DAY) LIMIT 1",
+          [inv.lease_id, `%Late Fee for Invoice #${inv.invoice_id}%`]
+        );
+
+        if (feeExists.length > 0) {
+          console.log(`Flat late fee already exists for Invoice #${inv.invoice_id} in last 30 days. Skipping.`);
+          continue;
+        }
+
+        const feePercentage = inv.lateFeePercentage !== null ? (inv.lateFeePercentage / 100) : LATE_FEE_PERCENTAGE;
+        const flatFeeAmount = moneyMath(inv.amount).mul(feePercentage).round().value();
+
+        const lateFeeInvoiceId = await invoiceModel.createLateFeeInvoice({
+          leaseId: inv.lease_id,
+          amount: flatFeeAmount,
+          dueDate: formatToLocalDate(addDays(now(), 5)),
+          description: `Late Fee for Invoice #${inv.invoice_id} (${inv.year}-${inv.month})`,
+        });
+
+        if (lateFeeInvoiceId) {
+          await paymentService.applyTenantCredit(lateFeeInvoiceId);
+          appliedCount++;
+        }
       }
 
-      // [B4 FIX] Removed duplicate behavior score deduction block.
-      // The deduction at lines 393-406 (behaviorLogModel + tenantModel.incrementBehaviorScore) is the single source of truth.
+      // SHARED POST-APPLICATION LOGIC (Notifications & Score)
+      // Only runs if a fee was actually applied in this loop
+      const lastAppliedFee = await db.query(
+        "SELECT amount, invoice_id FROM rent_invoices WHERE lease_id = ? AND invoice_type = 'late_fee' ORDER BY created_at DESC LIMIT 1",
+        [inv.lease_id]
+      ).then(([rows]) => rows[0]);
 
-      appliedCount++;
+      if (lastAppliedFee) {
+        // Notify Tenant
+        await notificationModel.create({
+          userId: inv.tenant_id,
+          message: `A ${isDaily ? 'daily ' : ''}late fee of LKR ${fromCents(lastAppliedFee.amount).toFixed(2)} has been applied to your account for overdue invoice #${inv.invoice_id}.`,
+          type: 'invoice',
+          isRead: false,
+        });
+
+        // Log Behavior (Negative Score - only on the FIRST application to avoid crushing their score daily?)
+        // Decision: Only log score change on the very first late fee for an invoice.
+        const [firstFee] = await db.query(
+          "SELECT 1 FROM rent_invoices WHERE lease_id = ? AND description LIKE ? AND invoice_type = 'late_fee' LIMIT 2",
+          [inv.lease_id, `%Invoice #${inv.invoice_id}%`]
+        );
+
+        if (firstFee.length === 1) { // This is the first one
+          try {
+            const behaviorLogModel = (await import('../models/behaviorLogModel.js')).default;
+            await behaviorLogModel.create({
+                tenantId: inv.tenant_id,
+                type: 'negative',
+                category: 'Payment',
+                scoreChange: -10,
+                description: `Initial late payment penalty for Invoice #${inv.invoice_id}`,
+                recordedBy: null
+            });
+            await tenantModel.incrementBehaviorScore(inv.tenant_id, -10);
+          } catch (scoreErr) {
+            console.error('Failed to log negative behavior:', scoreErr);
+          }
+        }
+
+        // Logic Check: Mark Original Invoice as 'overdue' if it's still 'pending'
+        if (inv.status === 'pending') {
+          await invoiceModel.updateStatus(inv.invoice_id, 'overdue');
+        }
+      }
     }
-    console.log(`Applied late fees to ${appliedCount} invoices.`);
+    console.log(`Finished checking late fees. Applied ${appliedCount} new fees.`);
   } catch (error) {
     console.error('Error in late fee automation:', error);
   }

@@ -18,6 +18,8 @@ export interface Property {
   description?: string;
   features?: string[];
   lateFeePercentage: number;
+  lateFeeType: 'flat_percentage' | 'daily_fixed';
+  lateFeeAmount: number;
   lateFeeGracePeriod: number;
   tenantDeactivationDays: number;
 }

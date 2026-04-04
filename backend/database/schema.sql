@@ -124,7 +124,9 @@ CREATE TABLE properties (
     is_archived BOOLEAN DEFAULT FALSE,
     archived_at DATETIME,
 
-    late_fee_percentage DECIMAL(5,2) DEFAULT NULL, -- Property-specific late fee override
+    late_fee_percentage DECIMAL(5,2) DEFAULT 3.00,
+    late_fee_type ENUM('flat_percentage', 'daily_fixed') DEFAULT 'flat_percentage',
+    late_fee_amount BIGINT DEFAULT 0,
     late_fee_grace_period INT DEFAULT 5,       -- Days after due date before late fee applies
     tenant_deactivation_days INT DEFAULT 30,   -- [B6 FIX] Days after lease end to deactivate tenant account
     management_fee_percentage DECIMAL(5,2) DEFAULT 0.00, -- [NEW] Agency commission %

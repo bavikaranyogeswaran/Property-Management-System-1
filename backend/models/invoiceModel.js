@@ -266,7 +266,7 @@ class InvoiceModel {
   async findOverdue() {
     const [rows] = await pool.query(
       `
-            SELECT ri.*, l.tenant_id, p.late_fee_percentage, p.late_fee_grace_period,
+            SELECT ri.*, l.tenant_id, p.late_fee_percentage, p.late_fee_type, p.late_fee_amount, p.late_fee_grace_period,
                    COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id = ri.invoice_id AND status = 'verified'), 0) AS amount_paid
             FROM rent_invoices ri
             JOIN leases l ON ri.lease_id = l.lease_id
@@ -274,12 +274,6 @@ class InvoiceModel {
             JOIN properties p ON un.property_id = p.property_id
             WHERE ri.status IN ('pending', 'partially_paid')
             AND ri.due_date < DATE_SUB(CURDATE(), INTERVAL p.late_fee_grace_period DAY)
-            AND NOT EXISTS (
-                SELECT 1 FROM rent_invoices ri2 
-                WHERE ri2.lease_id = ri.lease_id 
-                AND ri2.description LIKE CONCAT('%Invoice #', ri.invoice_id, '%')
-                AND ri2.created_at > DATE_SUB(NOW(), INTERVAL 30 DAY)
-            )
         `
     );
     return rows.map(row => this.mapRow(row));

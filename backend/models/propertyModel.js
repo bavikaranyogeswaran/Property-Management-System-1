@@ -29,8 +29,8 @@ class PropertyModel {
   
       const [result] = await db.query(
         `INSERT INTO properties 
-              (owner_id, name, property_type_id, property_no, street, city, district, image_url, description, features, late_fee_percentage, late_fee_grace_period, tenant_deactivation_days, management_fee_percentage) 
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              (owner_id, name, property_type_id, property_no, street, city, district, image_url, description, features, late_fee_percentage, late_fee_type, late_fee_amount, late_fee_grace_period, tenant_deactivation_days, management_fee_percentage) 
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           ownerId,
           name,
@@ -42,8 +42,10 @@ class PropertyModel {
           imageUrl,
           description,
           featuresJson,
-          propertyData.lateFeePercentage || 3.00,
-          propertyData.lateFeeGracePeriod || 5,
+          propertyData.lateFeePercentage !== undefined ? propertyData.lateFeePercentage : 3.00,
+          propertyData.lateFeeType || 'flat_percentage',
+          propertyData.lateFeeAmount || 0,
+          propertyData.lateFeeGracePeriod !== undefined ? propertyData.lateFeeGracePeriod : 5,
           propertyData.tenantDeactivationDays || 30,
           managementFeePercentage || 0.00,
         ]
@@ -68,6 +70,8 @@ class PropertyModel {
                 p.created_at,
                 p.property_type_id,
                 p.late_fee_percentage,
+                p.late_fee_type,
+                p.late_fee_amount,
                 p.late_fee_grace_period,
                 p.tenant_deactivation_days,
                 p.management_fee_percentage,
@@ -102,6 +106,8 @@ class PropertyModel {
       status: row.status,
       createdAt: row.created_at,
       lateFeePercentage: parseFloat(row.late_fee_percentage),
+      lateFeeType: row.late_fee_type,
+      lateFeeAmount: Number(row.late_fee_amount),
       lateFeeGracePeriod: parseInt(row.late_fee_grace_period),
       tenantDeactivationDays: parseInt(row.tenant_deactivation_days),
       managementFeePercentage: parseFloat(row.management_fee_percentage),
@@ -126,6 +132,8 @@ class PropertyModel {
                 p.created_at,
                 p.property_type_id,
                 p.late_fee_percentage,
+                p.late_fee_type,
+                p.late_fee_amount,
                 p.late_fee_grace_period,
                 p.tenant_deactivation_days,
                 p.management_fee_percentage,
@@ -156,6 +164,8 @@ class PropertyModel {
       status: rows[0].status,
       createdAt: rows[0].created_at,
       lateFeePercentage: parseFloat(rows[0].late_fee_percentage),
+      lateFeeType: rows[0].late_fee_type,
+      lateFeeAmount: Number(rows[0].late_fee_amount),
       lateFeeGracePeriod: parseInt(rows[0].late_fee_grace_period),
       tenantDeactivationDays: parseInt(rows[0].tenant_deactivation_days),
       managementFeePercentage: parseFloat(rows[0].management_fee_percentage),
@@ -174,6 +184,8 @@ class PropertyModel {
     description: 'description',
     features: 'features',
     lateFeePercentage: 'late_fee_percentage',
+    lateFeeType: 'late_fee_type',
+    lateFeeAmount: 'late_fee_amount',
     lateFeeGracePeriod: 'late_fee_grace_period',
     tenantDeactivationDays: 'tenant_deactivation_days',
     managementFeePercentage: 'management_fee_percentage'

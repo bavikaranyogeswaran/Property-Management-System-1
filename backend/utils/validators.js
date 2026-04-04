@@ -178,6 +178,19 @@ export const validatePropertyConfig = (data) => {
     }
   }
 
+  if (data.lateFeeType !== undefined) {
+    if (!['flat_percentage', 'daily_fixed'].includes(data.lateFeeType)) {
+      errors.push('Late fee type must be "flat_percentage" or "daily_fixed"');
+    }
+  }
+
+  if (data.lateFeeAmount !== undefined) {
+    const val = parseInt(data.lateFeeAmount);
+    if (isNaN(val) || val < 0) {
+      errors.push('Late fee amount must be a non-negative number');
+    }
+  }
+
   if (data.tenantDeactivationDays !== undefined) {
     const val = parseInt(data.tenantDeactivationDays);
     if (isNaN(val) || val < 0) {
