@@ -178,6 +178,10 @@ class UnitModel {
       fields.push('image_url = ?');
       values.push(updates.imageUrl);
     }
+    if (updates.isTurnoverCleared !== undefined) {
+      fields.push('is_turnover_cleared = ?');
+      values.push(updates.isTurnoverCleared ? 1 : 0);
+    }
 
     if (fields.length === 0) return false;
 
@@ -234,6 +238,7 @@ class UnitModel {
         monthlyRent: Number(row.monthly_rent),
         status: status,
         imageUrl: row.image_url,
+        isTurnoverCleared: Boolean(row.is_turnover_cleared),
         createdAt: row.created_at,
         propertyName: row.property_name,
         pendingApplicationsCount: Number(row.pending_application_count || 0),

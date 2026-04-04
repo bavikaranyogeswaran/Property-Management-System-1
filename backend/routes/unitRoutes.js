@@ -40,4 +40,11 @@ router.patch(
   unitController.markAvailable
 );
 
+router.patch(
+  '/:id/clear-turnover',
+  authenticateToken,
+  authorizeRoles('owner', 'treasurer'),
+  unitController.clearTurnover
+);
+
 export default router;

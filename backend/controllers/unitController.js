@@ -166,6 +166,44 @@ class UnitController {
       res.status(500).json({ error: error.message });
     }
   }
+  // Clear a turnover lock after a lease expiration/inspection
+  async clearTurnover(req, res) {
+    try {
+      const unit = await unitModel.findById(req.params.id);
+      if (!unit) return res.status(404).json({ error: 'Unit not found' });
+
+      // Ownership/Staff check
+      if (req.user.role === 'owner') {
+        const property = await propertyModel.findById(unit.propertyId);
+        if (!property || String(property.ownerId) !== String(req.user.id)) {
+          return res.status(403).json({ error: 'You do not own the property associated with this unit.' });
+        }
+      } else if (req.user.role === 'treasurer') {
+         const staffModel = (await import('../models/staffModel.js')).default;
+         const isAssigned = await staffModel.isStaffAssignedToProperty(req.user.id, unit.propertyId);
+         if (!isAssigned) {
+             return res.status(403).json({ error: 'You are not assigned to manage this property.' });
+         }
+      }
+
+      // Check if it's actually locked
+      if (unit.isTurnoverCleared && unit.status !== 'maintenance') {
+        return res.status(400).json({ error: 'Unit does not have a pending turnover clearance.' });
+      }
+
+      await unitModel.update(req.params.id, { 
+        isTurnoverCleared: true,
+        status: (unit.futureLeaseCount > 0 || unit.pendingApplicationsCount > 0) ? 'reserved' : 'available'
+      });
+
+      res.json({ 
+        message: 'Turnover cleared successfully. Unit is now ready for the next occupancy.', 
+        unitId: req.params.id 
+      });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  }
 }
 
 export default new UnitController();

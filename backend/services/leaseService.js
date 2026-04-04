@@ -303,9 +303,11 @@ class LeaseService {
       if (lease.status !== 'draft') throw new Error('Only draft leases can be signed');
 
       const unit = await unitModel.findByIdForUpdate(lease.unitId, conn);
-      // [C2 FIX - Problem 3] Changed 'trashed' → 'inactive' (matches actual ENUM)
-      if (!unit || unit.status === 'maintenance' || unit.status === 'inactive') {
+      if (!unit || unit.status === 'inactive') {
          throw new Error('Unit is no longer available for occupancy.');
+      }
+      if (!unit.isTurnoverCleared) {
+         throw new Error('Unit is pending turnover clearance. Occupancy is blocked until inspection is complete.');
       }
 
       const hasOverlap = await leaseModel.checkOverlap(

@@ -180,9 +180,9 @@ export const checkLeaseExpiration = async () => {
             `Lease ${lease.lease_id} expired but Unit ${lease.unit_id} has active successor lease. Skipping maintenance.`
           );
         } else {
-          // No successor — unit goes to 'maintenance' (Turnover Buffer)
+          // No successor — unit goes to 'maintenance' (Turnover Buffer) and is locked for occupancy
           await connection.query(
-            "UPDATE units SET status = 'maintenance' WHERE unit_id = ?",
+            "UPDATE units SET status = 'maintenance', is_turnover_cleared = 0 WHERE unit_id = ?",
             [lease.unit_id]
           );
           console.log(
