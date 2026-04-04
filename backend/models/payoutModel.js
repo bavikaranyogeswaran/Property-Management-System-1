@@ -88,7 +88,7 @@ class PayoutModel {
     // 1. Snapshot Income IDs and Total (incl. per-property fees)
     const [incomeRows] = await db.query(
       `
-            SELECT p.payment_id as paymentId, p.amount, prop.management_fee_percentage as fee
+            SELECT p.payment_id as paymentId, p.amount, prop.management_fee_percentage as fee, ri.invoice_type as invoiceType
             FROM payments p
             JOIN rent_invoices ri ON p.invoice_id = ri.invoice_id
             JOIN leases l ON ri.lease_id = l.lease_id
@@ -106,9 +106,14 @@ class PayoutModel {
     const incomeIds = incomeRows.map(r => r.paymentId);
     const totalGross = incomeRows.reduce((sum, r) => sum + Number(r.amount), 0);
     const totalCommission = incomeRows.reduce((sum, r) => {
-        const fee = Number(r.fee || 0);
-        const comm = Math.round(Number(r.amount) * (fee / 100));
-        return sum + comm;
+        // [HARDENED] Only apply commission to Rent and Late Fees.
+        // Reimbursements (Maintenance) and Deposits should be 0% commission.
+        if (['rent', 'late_fee'].includes(r.invoiceType)) {
+            const fee = Number(r.fee || 0);
+            const comm = Math.round(Number(r.amount) * (fee / 100));
+            return sum + comm;
+        }
+        return sum;
     }, 0);
 
     // 2. Snapshot Expense IDs and Total
