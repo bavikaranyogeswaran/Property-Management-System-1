@@ -1,7 +1,8 @@
 import jwt from 'jsonwebtoken';
+import userModel from '../models/userModel.js';
 const { verify } = jwt;
 
-export const authenticateToken = (req, res, next) => {
+export const authenticateToken = async (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
@@ -9,14 +10,28 @@ export const authenticateToken = (req, res, next) => {
     return res.status(401).json({ error: 'Access token required' });
   }
 
-  verify(token, process.env.JWT_SECRET, (err, user) => {
-    if (err) {
-      console.log('[Auth] Token verification failed:', err.message);
-      return res.status(401).json({ error: 'Invalid or expired token' });
+  try {
+    const decoded = verify(token, process.env.JWT_SECRET);
+    
+    // Revocation Guard: Check server-side status
+    const user = await userModel.findById(decoded.id);
+    
+    if (!user || user.status !== 'active') {
+      console.warn(`[Auth] Revoked: User ${decoded.id} is no longer active.`);
+      return res.status(401).json({ error: 'Session revoked or account deactivated.' });
     }
-    req.user = user;
+
+    if (user.tokenVersion !== (decoded.tokenVersion || 0)) {
+      console.warn(`[Auth] Revoked: Token version mismatch for User ${decoded.id}.`);
+      return res.status(401).json({ error: 'Session expired by server. Please log in again.' });
+    }
+
+    req.user = decoded;
     next();
-  });
+  } catch (err) {
+    console.log('[Auth] Token verification failed:', err.message);
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
 };
 
 export const optionalAuthenticateToken = (req, res, next) => {

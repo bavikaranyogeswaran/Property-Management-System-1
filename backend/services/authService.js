@@ -23,7 +23,7 @@ class AuthService {
     }
 
     const token = sign(
-      { id: user.id, role: user.role, name: user.name, email: user.email },
+      { id: user.id, role: user.role, name: user.name, email: user.email, tokenVersion: user.tokenVersion || 0 },
       JWT_SECRET,
       { expiresIn: '24h' }
     );
@@ -62,6 +62,7 @@ class AuthService {
 
       const hashedPassword = await bcrypt.hash(password, 10);
       await userModel.setupPassword(decoded.id, hashedPassword);
+      await userModel.incrementTokenVersion(decoded.id);
 
       if (decoded.role === 'tenant' && tenantData) {
         // tenantModel.updateProfile will only update provided fields
@@ -126,6 +127,7 @@ class AuthService {
 
       // 4. Update password
       await userModel.updatePassword(decoded.id, hashedPassword);
+      await userModel.incrementTokenVersion(decoded.id);
 
       // Log audit
       try {

@@ -11,7 +11,7 @@ class UserModel {
   async findByEmail(email, connection = null) {
     const db = connection || pool;
     const [rows] = await db.query(
-      'SELECT user_id as id, name, email, phone, role, password_hash as passwordHash, is_email_verified as isEmailVerified, status, created_at as createdAt FROM users WHERE email = ? AND is_archived = FALSE',
+      'SELECT user_id as id, name, email, phone, role, password_hash as passwordHash, is_email_verified as isEmailVerified, status, token_version as tokenVersion, created_at as createdAt FROM users WHERE email = ? AND is_archived = FALSE',
       [email]
     );
     return rows[0];
@@ -121,7 +121,7 @@ class UserModel {
   async findById(id, connection = null) {
     const db = connection || pool;
     const query = `
-            SELECT u.user_id as id, u.name, u.email, u.phone, u.role, u.status, u.created_at as createdAt,
+            SELECT u.user_id as id, u.name, u.email, u.phone, u.role, u.status, u.token_version as tokenVersion, u.created_at as createdAt,
                    t.nic, t.nic_url as nicUrl, t.permanent_address as permanentAddress, 
                    t.employment_status as employmentStatus, t.monthly_income as monthlyIncome, 
                    t.behavior_score as behaviorScore, t.credit_balance as creditBalance,
@@ -182,8 +182,8 @@ class UserModel {
     // For simplicity now, we assume these specific fields are passed.
     // If password update is needed later, separate method is better.
     const [result] = await db.query(
-      'UPDATE users SET name = ?, email = ?, phone = ?, status = ? WHERE user_id = ? AND is_archived = FALSE',
-      [name, email, phone, status, id]
+      'UPDATE users SET name = ?, email = ?, phone = ?, status = ?, token_version = CASE WHEN status != ? THEN token_version + 1 ELSE token_version END WHERE user_id = ? AND is_archived = FALSE',
+      [name, email, phone, status, status, id]
     );
     return result.affectedRows > 0;
   }
@@ -216,7 +216,7 @@ class UserModel {
     const archivedEmail = `deleted_${id}_${Date.now()}_${user.email}`.substring(0, 100);
 
     const [result] = await db.query(
-      'UPDATE users SET archived_at = NOW(), is_archived = TRUE, email = ?, status = ?, name = CONCAT(name, " (Deleted)") WHERE user_id = ?',
+      'UPDATE users SET archived_at = NOW(), is_archived = TRUE, email = ?, status = ?, name = CONCAT(name, " (Deleted)"), token_version = token_version + 1 WHERE user_id = ?',
       [archivedEmail, 'inactive', id]
     );
     return result.affectedRows > 0;
@@ -235,6 +235,15 @@ class UserModel {
     const [result] = await db.query(
       'UPDATE users SET password_hash = ?, is_email_verified = TRUE, email_verified_at = NOW(), status = "active" WHERE user_id = ?',
       [passwordHash, id]
+    );
+    return result.affectedRows > 0;
+  }
+  
+  async incrementTokenVersion(id, connection = null) {
+    const db = connection || pool;
+    const [result] = await db.query(
+      'UPDATE users SET token_version = token_version + 1 WHERE user_id = ?',
+      [id]
     );
     return result.affectedRows > 0;
   }

@@ -20,6 +20,7 @@ CREATE TABLE users (
     role ENUM('owner','tenant','treasurer') NOT NULL,
     is_email_verified BOOLEAN DEFAULT FALSE,
     email_verified_at DATETIME,
+    token_version INT DEFAULT 0,
     status ENUM('active','inactive','banned') DEFAULT 'active',
     is_archived BOOLEAN DEFAULT FALSE,
     archived_at DATETIME,
