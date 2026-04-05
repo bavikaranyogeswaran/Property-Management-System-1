@@ -213,9 +213,9 @@ class LeaseModel {
             SELECT lease_id FROM leases 
             WHERE unit_id = ? 
             AND status IN ('active', 'pending', 'draft')
-           
             AND start_date <= ? 
-            AND (end_date IS NULL OR end_date >= ?)`;
+            AND (end_date IS NULL OR end_date >= ?)
+            FOR UPDATE`;
     const params = [unitId, endDate || '2099-12-31', startDate];
 
     if (excludeLeaseId) {
