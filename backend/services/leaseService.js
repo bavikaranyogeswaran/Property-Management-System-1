@@ -306,6 +306,11 @@ class LeaseService {
       if (!unit || unit.status === 'inactive') {
          throw new Error('Unit is no longer available for occupancy.');
       }
+      
+      if (unit.status === 'maintenance') {
+         throw new Error('Unit is currently under maintenance or repair and cannot be leased until cleared by staff.');
+      }
+
       if (!unit.isTurnoverCleared) {
          throw new Error('Unit is pending turnover clearance. Occupancy is blocked until inspection is complete.');
       }

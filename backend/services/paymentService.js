@@ -122,11 +122,20 @@ class PaymentService {
             // [HARDENED] Unit Availability & Lease Integrity Validation
             // We use FOR UPDATE to lock the lease row and ensure no status changes (like cancellation) happen mid-payment.
             const [leaseStatus] = await connection.query(
-                "SELECT status, unit_id, start_date, end_date FROM leases WHERE lease_id = ? FOR UPDATE",
+                `SELECT l.status as leaseStatus, l.unit_id, l.start_date, l.end_date, u.status as unitStatus 
+                 FROM leases l 
+                 JOIN units u ON l.unit_id = u.unit_id 
+                 WHERE l.lease_id = ? FOR UPDATE`,
                 [invoice.lease_id]
             );
             
-            if (!leaseStatus[0] || leaseStatus[0].status === 'cancelled') {
+            if (!leaseStatus[0]) throw new Error('Lease reference not found.');
+
+            if (leaseStatus[0].unitStatus === 'maintenance') {
+                 throw new Error('This unit is currently undergoing emergency maintenance or repair. Please contact the property manager before proceeding.');
+            }
+            
+            if (leaseStatus[0].leaseStatus === 'cancelled') {
                 throw new Error('This lease offer has expired or been cancelled. Please contact the property manager.');
             }
 
@@ -537,12 +546,38 @@ class PaymentService {
                 const lease = await leaseModel.findById(invoice.leaseId, connection);
                 if (lease && lease.status === 'draft') {
                     if (lease.isDocumentsVerified) {
-                        const leaseService = (await import('./leaseService.js')).default;
-                        await leaseService.signLease(lease.id, user, connection);
-                        
-                        // Trigger Onboarding (Set Password email)
-                        const userService = (await import('./userService.js')).default;
-                        await userService.triggerOnboarding(lease.tenantId, connection);
+                        try {
+                            const leaseService = (await import('./leaseService.js')).default;
+                            await leaseService.signLease(lease.id, user, connection);
+                            
+                            // Trigger Onboarding (Set Password email)
+                            const userService = (await import('./userService.js')).default;
+                            await userService.triggerOnboarding(lease.tenantId, connection);
+                        } catch (activationErr) {
+                            console.error(`[PaymentService] Auto-activation blocked for Lease #${lease.id}:`, activationErr.message);
+                            
+                            // Notify Staff that payment is received but activation is blocked by unit status
+                            const [propertyInfo] = await connection.query("SELECT owner_id FROM properties WHERE property_id = ?", [lease.propertyId]);
+                            const ownerId = propertyInfo[0]?.owner_id;
+                            
+                            const [assignedStaff] = await connection.query(
+                                "SELECT user_id FROM staff_property_assignments WHERE property_id = ?",
+                                [lease.propertyId]
+                            );
+
+                            const userIdsToNotify = new Set();
+                            if (ownerId) userIdsToNotify.add(ownerId);
+                            assignedStaff.forEach(s => userIdsToNotify.add(s.user_id));
+
+                            for (const userId of userIdsToNotify) {
+                                await notificationModel.create({
+                                    userId: userId,
+                                    message: `URGENT: Deposit Paid for Lease #${lease.id} (Unit ${lease.unitNumber}), but AUTO-ACTIVATION was BLOCKED by Unit Status (${activationErr.message}). Manual check required.`,
+                                    type: 'lease',
+                                    severity: 'urgent'
+                                }, connection);
+                            }
+                        }
                     } else {
                         // Notify Treasurers and Owners that payment is done but documents need review
                         const [propertyInfo] = await connection.query("SELECT owner_id FROM properties WHERE property_id = ?", [lease.propertyId]);
