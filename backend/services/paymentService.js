@@ -119,23 +119,22 @@ class PaymentService {
                 throw new Error('This invoice has already been paid.');
             }
 
-            // [HARDENED] Unit Availability & Lease Integrity Validation
-            // We use FOR UPDATE to lock the lease row and ensure no status changes (like cancellation) happen mid-payment.
-            const [leaseStatus] = await connection.query(
-                `SELECT l.status as leaseStatus, l.unit_id, l.start_date, l.end_date, u.status as unitStatus 
-                 FROM leases l 
-                 JOIN units u ON l.unit_id = u.unit_id 
-                 WHERE l.lease_id = ? FOR UPDATE`,
-                [invoice.lease_id]
-            );
+            // [HARDENED] Deterministic Locking Order (Unit -> Lease)
+            // Replaced the heavy JOIN ... FOR UPDATE which locked both tables simultaneously (high deadlock risk).
             
-            if (!leaseStatus[0]) throw new Error('Lease reference not found.');
+            // 1. Lock Unit first
+            const unit = await unitModel.findByIdForUpdate(invoice.unit_id, connection);
+            if (!unit) throw new Error('Unit not found.');
 
-            if (leaseStatus[0].unitStatus === 'maintenance') {
+            // 2. Lock Lease second
+            const lease = await leaseModel.findByIdForUpdate(invoice.lease_id, connection);
+            if (!lease) throw new Error('Lease reference not found.');
+
+            if (unit.status === 'maintenance') {
                  throw new Error('This unit is currently undergoing emergency maintenance or repair. Please contact the property manager before proceeding.');
             }
             
-            if (leaseStatus[0].leaseStatus === 'cancelled') {
+            if (lease.status === 'cancelled') {
                 throw new Error('This lease offer has expired or been cancelled. Please contact the property manager.');
             }
 

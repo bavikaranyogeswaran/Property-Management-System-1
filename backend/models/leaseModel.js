@@ -152,6 +152,20 @@ class LeaseModel {
     return this.mapRows(rows)[0];
   }
 
+  /**
+   * [NEW] Atomic Retrieval with Row Locking.
+   * Use this to prevent concurrent status changes during critical transactions.
+   */
+  async findByIdForUpdate(id, connection) {
+    if (!connection) throw new Error('findByIdForUpdate requires an active transaction connection.');
+    const [rows] = await connection.query(
+      "SELECT * FROM leases WHERE lease_id = ? FOR UPDATE",
+      [id]
+    );
+    if (rows.length === 0) return null;
+    return this.mapRows(rows)[0];
+  }
+
   async findByTenantId(tenantId) {
     const [rows] = await db.query(
       `

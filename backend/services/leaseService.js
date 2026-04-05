@@ -298,14 +298,21 @@ class LeaseService {
         await conn.beginTransaction();
       }
 
-      const lease = await leaseModel.findById(leaseId, conn);
-      if (!lease) throw new Error('Lease not found');
-      if (lease.status !== 'draft') throw new Error('Only draft leases can be signed');
+      // [HARDENED] Deterministic Locking Order (Unit -> Lease)
+      // 1. Initial look up to get Unit ID (no lock)
+      const baseLease = await leaseModel.findById(leaseId, conn);
+      if (!baseLease) throw new Error('Lease not found');
 
-      const unit = await unitModel.findByIdForUpdate(lease.unitId, conn);
+      // 2. Lock Parent (Unit) first
+      const unit = await unitModel.findByIdForUpdate(baseLease.unitId, conn);
       if (!unit || unit.status === 'inactive') {
          throw new Error('Unit is no longer available for occupancy.');
       }
+
+      // 3. Lock Child (Lease) second
+      const lease = await leaseModel.findByIdForUpdate(leaseId, conn);
+      if (!lease) throw new Error('Lease not found');
+      if (lease.status !== 'draft') throw new Error('Only draft leases can be signed');
       
       if (unit.status === 'maintenance') {
          throw new Error('Unit is currently under maintenance or repair and cannot be leased until cleared by staff.');
@@ -1103,9 +1110,21 @@ class LeaseService {
     try {
       await conn.beginTransaction();
 
-      const lease = await leaseModel.findById(leaseId, conn);
-      if (!lease) throw new Error('Lease not found');
-      if (['active', 'expired', 'ended'].includes(lease.status)) {
+      // [HARDENED] Deterministic Locking Order (Unit -> Lease)
+      
+      // 1. Initial look up (no lock) to get Unit ID
+      const baseLease = await leaseModel.findById(leaseId, conn);
+      if (!baseLease) throw new Error('Lease not found');
+
+      // 2. Lock Parent (Unit) first
+      const unitLock = await unitModel.findByIdForUpdate(baseLease.unitId, conn);
+      if (!unitLock) throw new Error('Unit reference not found.');
+
+      // 3. Lock Child (Lease) second
+      const lease = await leaseModel.findByIdForUpdate(leaseId, conn);
+      if (!lease) throw new Error('Lease reference not found.');
+
+      if (['active', 'expired', 'ended'].includes(baseLease.status)) {
           throw new Error('Only draft or pending leases can be cancelled manually. Use termination flow for active leases.');
       }
 
@@ -1142,8 +1161,19 @@ class LeaseService {
     try {
       await conn.beginTransaction();
 
-      const lease = await leaseModel.findById(leaseId, conn);
-      if (!lease) throw new Error('Lease not found');
+      // [HARDENED] Deterministic Locking Order (Unit -> Lease)
+      
+      // 1. Initial look up (no lock) to get Unit ID
+      const baseLease = await leaseModel.findById(leaseId, conn);
+      if (!baseLease) throw new Error('Lease not found');
+
+      // 2. Lock Parent (Unit) first
+      const unitLock = await unitModel.findByIdForUpdate(baseLease.unitId, conn);
+      if (!unitLock) throw new Error('Unit reference not found.');
+
+      // 3. Lock Child (Lease) second
+      const lease = await leaseModel.findByIdForUpdate(leaseId, conn);
+      if (!lease) throw new Error('Lease reference not found.');
       
       // Ownership check: must be the tenant
       if (String(lease.tenantId) !== String(user.id)) {

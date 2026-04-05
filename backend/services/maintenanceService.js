@@ -107,16 +107,19 @@ class MaintenanceService {
 
             const updated = await maintenanceRequestModel.updateStatus(id, status);
 
-            // [MAINTENANCE LOOP FIX] Automatically release unit status
+            // [HARDENED] Deterministic Locking Order
+            // Lock the Unit record first before synchronizing its availability status
             if (status === 'completed' || status === 'closed') {
+                const unitLock = await unitModel.findByIdForUpdate(request.unitId, connection);
+                if (!unitLock) throw new Error('Unit reference not found.');
+
                 const openCount = await maintenanceRequestModel.countOpenByUnitId(request.unitId, connection);
                 
                 // If this request was just completed, we must ensure NO other submitted/in-progress ones exist
                 if (openCount === 0) {
-                    const unit = await unitModel.findById(request.unitId, connection);
+                    const unit = unitLock; // Use the already locked record
                     
                     // Critical Guardrail: Only revert if the unit was specifically in 'maintenance' status
-                    // This prevents accidentally marking an 'occupied' or 'reserved' unit as 'available'
                     if (unit && unit.status === 'maintenance') {
                          // [CRITICAL FIX] Avoid "Ghost Availability"
                          // Check if there's a future lease commitment before marking as 'available'
