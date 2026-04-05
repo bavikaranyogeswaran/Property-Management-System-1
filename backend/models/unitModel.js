@@ -264,14 +264,20 @@ class UnitModel {
        AND (
          u.status = 'maintenance' OR
          u.status = 'reserved' OR
-         EXISTS (
-           SELECT 1 FROM leases l 
-           WHERE l.unit_id = u.unit_id 
-           AND l.status = 'active'
-           AND l.start_date <= CURRENT_DATE() 
-           AND (l.end_date IS NULL OR l.end_date >= CURRENT_DATE())
-         )
-       )`,
+          EXISTS (
+            SELECT 1 FROM leases l 
+            WHERE l.unit_id = u.unit_id 
+            AND l.status = 'active'
+            AND l.start_date <= CURRENT_DATE() 
+            AND (l.end_date IS NULL OR l.end_date >= CURRENT_DATE())
+          ) OR
+          EXISTS (
+            SELECT 1 FROM leases l 
+            WHERE l.unit_id = u.unit_id 
+            AND l.status IN ('active', 'pending', 'draft')
+            AND (l.start_date > CURRENT_DATE() OR (l.status = 'draft' AND (l.reservation_expires_at IS NULL OR l.reservation_expires_at >= CURRENT_DATE())))
+          )
+        )`,
       [propertyId]
     );
     return rows[0].count;
@@ -292,9 +298,10 @@ class UnitModel {
           WHEN EXISTS (
             SELECT 1 FROM leases l 
             WHERE l.unit_id = u.unit_id 
-            AND l.status = 'active'
-            AND l.start_date <= CURRENT_DATE() 
-            AND (l.end_date IS NULL OR l.end_date >= CURRENT_DATE())
+            AND (
+              (l.status = 'active' AND l.start_date <= CURRENT_DATE() AND (l.end_date IS NULL OR l.end_date >= CURRENT_DATE()))
+              OR (l.status IN ('active', 'pending', 'draft') AND (l.start_date > CURRENT_DATE() OR (l.status = 'draft' AND (l.reservation_expires_at IS NULL OR l.reservation_expires_at >= CURRENT_DATE()))))
+            )
           ) THEN 1 
           ELSE 0 
         END) AS occupied,
@@ -303,9 +310,10 @@ class UnitModel {
           WHEN EXISTS (
             SELECT 1 FROM leases l 
             WHERE l.unit_id = u.unit_id 
-            AND l.status = 'active'
-            AND l.start_date <= CURRENT_DATE() 
-            AND (l.end_date IS NULL OR l.end_date >= CURRENT_DATE())
+            AND (
+              (l.status = 'active' AND l.start_date <= CURRENT_DATE() AND (l.end_date IS NULL OR l.end_date >= CURRENT_DATE()))
+              OR (l.status IN ('active', 'pending', 'draft') AND (l.start_date > CURRENT_DATE() OR (l.status = 'draft' AND (l.reservation_expires_at IS NULL OR l.reservation_expires_at >= CURRENT_DATE()))))
+            )
           ) THEN NULL 
           ELSE u.unit_number 
         END) AS vacancies

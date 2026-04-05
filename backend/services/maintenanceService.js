@@ -118,8 +118,18 @@ class MaintenanceService {
                     // Critical Guardrail: Only revert if the unit was specifically in 'maintenance' status
                     // This prevents accidentally marking an 'occupied' or 'reserved' unit as 'available'
                     if (unit && unit.status === 'maintenance') {
-                         await unitModel.update(request.unitId, { status: 'available' }, connection);
-                         console.log(`[MaintenanceService] Auto-released Unit ${unit.unitNumber} back to 'available' after repairs.`);
+                         // [CRITICAL FIX] Avoid "Ghost Availability"
+                         // Check if there's a future lease commitment before marking as 'available'
+                         const [futureLeases] = await connection.query(
+                             `SELECT COUNT(*) as count FROM leases 
+                              WHERE unit_id = ? AND status IN ('active', 'pending', 'draft')
+                              AND (start_date > CURRENT_DATE() OR (status = 'draft' AND (reservation_expires_at IS NULL OR reservation_expires_at >= CURRENT_DATE())))`,
+                             [request.unitId]
+                         );
+
+                         const nextStatus = futureLeases[0].count > 0 ? 'reserved' : 'available';
+                         await unitModel.update(request.unitId, { status: nextStatus }, connection);
+                         console.log(`[MaintenanceService] Auto-released Unit ${unit.unitNumber} to '${nextStatus}' after repairs.`);
                     }
                 }
             }

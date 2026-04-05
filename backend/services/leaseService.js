@@ -817,7 +817,7 @@ class LeaseService {
       if (todayDate < start) {
         await leaseModel.update(leaseId, { status: 'cancelled', endDate: terminationDate }, connection);
         await invoiceModel.voidPendingByLeaseId(leaseId, connection);
-        await unitModel.update(lease.unitId, { status: 'available' }, connection);
+        await this._syncUnitStatus(lease.unitId, connection);
       } else {
         if (terminationFee > 0) {
           await invoiceModel.create({
@@ -907,8 +907,8 @@ class LeaseService {
       }
       await leaseModel.update(leaseId, updateData, connection);
 
-      // 2. Update unit status back to 'available' (from 'maintenance')
-      await unitModel.update(lease.unitId, { status: 'available' }, connection);
+      // 2. Resolve Unit Status Atomically
+      await this._syncUnitStatus(lease.unitId, connection);
 
       // 3. Audit Log
       const auditLogger = (await import('../utils/auditLogger.js')).default;
@@ -1041,16 +1041,8 @@ class LeaseService {
       await leaseModel.update(leaseId, { status: 'cancelled' }, conn);
 
       // [HARD RESERVATION FIX] Check if unit should go back to available
-      const [otherClaims] = await conn.query(
-        "SELECT lease_id FROM leases WHERE unit_id = ? AND status IN ('active', 'draft', 'pending') AND lease_id != ?",
-        [lease.unitId, leaseId]
-      );
-      if (otherClaims.length === 0) {
-        await conn.query(
-          "UPDATE units SET status = 'available' WHERE unit_id = ? AND status = 'reserved'", 
-          [lease.unitId]
-        );
-      }
+      // [FIXED] Now uses _syncUnitStatus to account for other future leases correctly
+      await this._syncUnitStatus(lease.unitId, conn);
 
       // [B4 FIX] Added missing auditLogger import
       const auditLogger = (await import('../utils/auditLogger.js')).default;
@@ -1094,16 +1086,8 @@ class LeaseService {
       await leaseModel.update(leaseId, { status: 'cancelled' }, conn);
 
       // [HARD RESERVATION FIX] Check if unit should go back to available
-      const [otherClaims] = await conn.query(
-        "SELECT lease_id FROM leases WHERE unit_id = ? AND status IN ('active', 'draft', 'pending') AND lease_id != ?",
-        [lease.unitId, leaseId]
-      );
-      if (otherClaims.length === 0) {
-        await conn.query(
-          "UPDATE units SET status = 'available' WHERE unit_id = ? AND status = 'reserved'", 
-          [lease.unitId]
-        );
-      }
+      // [FIXED] Now uses _syncUnitStatus to account for other future leases correctly
+      await this._syncUnitStatus(lease.unitId, conn);
 
       const auditLogger = (await import('../utils/auditLogger.js')).default;
       await auditLogger.log({
@@ -1252,6 +1236,63 @@ class LeaseService {
       }
     }
     return results;
+  }
+
+  /**
+   * Internal helper to synchronize the unit's physical status with its commitments.
+   * This ensures we don't mark a unit as 'available' if it has a future lease starting soon.
+   */
+  async _syncUnitStatus(unitId, connection) {
+      const dbConn = connection || pool;
+      
+      // Order of precedence for Unit Status:
+      // 1. Current Active Lease (Occupied)
+      // 2. Open Maintenance (Maintenance)
+      // 3. Future Reservation/Commitment (Reserved)
+      // 4. No commitments (Available)
+
+      // 1. Physical Occupancy: Check if any active lease exists TODAY
+      const [activeLeases] = await dbConn.query(
+        `SELECT COUNT(*) as count FROM leases 
+         WHERE unit_id = ? AND status = 'active'
+         AND start_date <= CURRENT_DATE() 
+         AND (end_date IS NULL OR end_date >= CURRENT_DATE())`,
+        [unitId]
+      );
+      if (activeLeases[0].count > 0) {
+          await unitModel.update(unitId, { status: 'occupied' }, dbConn);
+          return 'occupied';
+      }
+
+      // 2. Future Commitments: Reservations or future start dates
+      const [futureLeases] = await dbConn.query(
+        `SELECT COUNT(*) as count FROM leases 
+         WHERE unit_id = ? AND status IN ('active', 'pending', 'draft')
+         AND (start_date > CURRENT_DATE() OR (status = 'draft' AND (reservation_expires_at IS NULL OR reservation_expires_at >= CURRENT_DATE())))`,
+        [unitId]
+      );
+      if (futureLeases[0].count > 0) {
+          await unitModel.update(unitId, { status: 'reserved' }, dbConn);
+          return 'reserved';
+      }
+
+      // 3. Maintenance Logic: If unit is already in maintenance, keep it there unless manually released
+      // But we generally WANT to know if it's available. 
+      // If we're calling sync, it usually means something ended (lease or maintenance).
+      // If we are calling it from Maintenance completion, openCount will be 0.
+      
+      const [maintenance] = await dbConn.query(
+          "SELECT COUNT(*) as count FROM maintenance_requests WHERE unit_id = ? AND status NOT IN ('completed', 'closed')",
+          [unitId]
+      );
+      if (maintenance[0].count > 0) {
+          await unitModel.update(unitId, { status: 'maintenance' }, dbConn);
+          return 'maintenance';
+      }
+
+      // 4. Default Release
+      await unitModel.update(unitId, { status: 'available' }, dbConn);
+      return 'available';
   }
 }
 
