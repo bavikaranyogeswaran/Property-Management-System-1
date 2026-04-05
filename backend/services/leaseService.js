@@ -361,11 +361,18 @@ class LeaseService {
         try {
           const tenantUser = await (await import('../models/userModel.js')).default.findById(lease.tenantId, conn);
           if (tenantUser?.email) {
+            // [HARDENED] Fuzzy Matching for Lead Conversion
+            // Use LOWER() and TRIM() to ensure conversion works even with inconsistent user entry.
             const [matchingLeads] = await conn.query(
-              `SELECT lead_id, status FROM leads WHERE email = ? AND property_id = ? AND status = 'interested' LIMIT 1`,
-              [tenantUser.email, unit.propertyId]
+              `SELECT lead_id, status FROM leads 
+               WHERE (LOWER(TRIM(email)) = LOWER(TRIM(?)) OR (unit_id = ? AND status = 'interested')) 
+               AND property_id = ? 
+               AND status = 'interested' 
+               ORDER BY (LOWER(TRIM(email)) = LOWER(TRIM(?))) DESC LIMIT 1`,
+              [tenantUser.email, unit.unitId || unit.unit_id, unit.propertyId || unit.property_id, tenantUser.email]
             );
             if (matchingLeads.length > 0) {
+              const leadModel = (await import('../models/leadModel.js')).default;
               await leadModel.update(matchingLeads[0].lead_id, { status: 'converted' }, conn);
             }
           }

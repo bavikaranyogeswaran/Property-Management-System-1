@@ -161,6 +161,18 @@ class PaymentService {
             const invoiceId = invoice.id;
             const amount = invoice.amount; // Guests must pay the full amount for the deposit to "hold" the unit
 
+            // [NEW] Link Payment to Lead: Mark lead as 'Payment Pending' in notes
+            try {
+                const leadId = await leadModel.findIdByEmailAndProperty(invoice.tenant_email || invoice.email, unit.propertyId || unit.property_id);
+                if (leadId) {
+                    await leadModel.update(leadId, { 
+                        notes: `[SYSTEM: DEPOSIT PAYMENT SUBMITTED - ${new Date().toLocaleDateString()}]\n` + (invoice.notes || '')
+                    }, connection);
+                }
+            } catch (leadErr) {
+                console.error('[PaymentService] Failed to update lead status note:', leadErr);
+            }
+
             if (file) {
                 if (!file.path && !file.secure_url) {
                     throw new Error('Payment evidence file is corrupted or missing path.');
