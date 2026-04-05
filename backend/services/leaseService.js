@@ -138,14 +138,14 @@ class LeaseService {
       // 4. Generate Security Deposit Invoice immediately for the Draft Lease
       // This allows the tenant to pay their "Holding Deposit" before the official signing.
       let rawToken = null;
-      if (securityDeposit > 0) {
+      if (leaseParams.targetDeposit > 0) {
         rawToken = randomUUID();
         const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
         const expiresAt = formatToLocalDate(addDays(today(), 7)); // Increased to 7 days for verification phase
 
         await invoiceModel.create({
           leaseId,
-          amount: securityDeposit,
+          amount: leaseParams.targetDeposit,
           dueDate: formatToLocalDate(addDays(today(), 7)), // Due in 7 days to hold the unit
           description: 'Security Deposit',
           type: 'deposit',
@@ -165,7 +165,7 @@ class LeaseService {
           userId: user?.id || null,
           actionType: 'LEASE_CREATED_DRAFT',
           entityId: leaseId,
-          details: { tenantId, unitId, startDate, endDate, monthlyRent, targetDeposit: securityDeposit },
+          details: { tenantId, unitId, startDate, endDate, monthlyRent, targetDeposit: leaseParams.targetDeposit },
         },
         null,
         conn
