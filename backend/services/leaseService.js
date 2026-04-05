@@ -8,7 +8,7 @@ import visitModel from '../models/visitModel.js';
 import leadModel from '../models/leadModel.js';
 import { validateLeaseDuration } from '../utils/validators.js';
 import { getCurrentDateString, getLocalTime, today, parseLocalDate, addDays, formatToLocalDate, getDaysInMonth } from '../utils/dateUtils.js';
-import { toCentsFromMajor } from '../utils/moneyUtils.js';
+import { toCentsFromMajor, moneyMath, fromCents } from '../utils/moneyUtils.js';
 import renewalService from './renewalService.js';
 
 class LeaseService {
@@ -530,9 +530,9 @@ class LeaseService {
           const payments = paymentsMap.get(inv.invoice_id) || [];
           const paidAlready = payments
             .filter((p) => p.status === 'verified')
-            .reduce((sum, p) => sum + Number(p.amount), 0);
+            .reduce((sum, p) => moneyMath(sum).add(p.amount).value(), 0);
 
-          const outstanding = inv.amount - paidAlready;
+          const outstanding = moneyMath(inv.amount).sub(paidAlready).value();
           const toPay = Math.min(withheldAmount, outstanding);
 
           if (toPay > 0) {
@@ -1070,7 +1070,8 @@ class LeaseService {
     if (eff < start) throw new Error('Adjustment date cannot be before lease start');
     if (lease.endDate && eff > parseLocalDate(lease.endDate)) throw new Error('Adjustment date cannot be after lease end');
 
-    const newRentCents = toCentsFromMajor(newMonthlyRent);
+    // [HARDENED] Input is now sanitized to cents at the controller.
+    const newRentCents = newMonthlyRent;
 
     const adjustmentId = await leaseModel.createAdjustment({
       leaseId,
@@ -1262,9 +1263,9 @@ class LeaseService {
         const currentRent = Number(lease.monthly_rent);
         const percentage = Number(lease.escalation_percentage);
         
-        // Calculate new rent with compounding (rounding to nearest integer cent)
-        const multiplier = 1 + (percentage / 100);
-        const newRent = Math.round(currentRent * multiplier);
+        // [HARDENED] Precise Decimal Calculation (Compounding)
+        // Replaced: Math.round(currentRent * (1 + percentage/100))
+        const newRent = moneyMath(currentRent).mul(1 + (percentage / 100)).round().value();
 
         // 1. Record the adjustment history
         await conn.query(

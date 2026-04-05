@@ -7,6 +7,7 @@ import leaseModel from '../models/leaseModel.js';
 import leadModel from '../models/leadModel.js';
 import ledgerModel from '../models/ledgerModel.js';
 import { getLocalTime, parseLocalDate, addDays } from '../utils/dateUtils.js';
+import { moneyMath } from '../utils/moneyUtils.js';
 
 class ReportService {
 
@@ -62,7 +63,7 @@ class ReportService {
             costs.forEach((cost) => {
                 const name = cost.property_name || 'Unknown Property';
                 if (!propertyStats[name]) propertyStats[name] = { income: 0, depositsHeld: 0, expense: 0 };
-                propertyStats[name].expense += Number(cost.amount);
+                propertyStats[name].expense = moneyMath(propertyStats[name].expense).add(cost.amount).value();
             });
 
             return propertyStats;
@@ -78,13 +79,13 @@ class ReportService {
         invoiceStats.filter(s => propertyIds.includes(Number(s.property_id))).forEach(s => {
              const name = s.property_name || 'Unknown Property';
              if (!propertyStats[name]) propertyStats[name] = { income: 0, expense: 0, depositsHeld: 0 };
-             propertyStats[name].income += Number(s.total_income);
+             propertyStats[name].income = moneyMath(propertyStats[name].income).add(s.total_income).value();
         });
 
         costStats.filter(s => propertyIds.includes(Number(s.property_id))).forEach(s => {
              const name = s.property_name || 'Unknown Property';
              if (!propertyStats[name]) propertyStats[name] = { income: 0, expense: 0, depositsHeld: 0 };
-             propertyStats[name].expense += Number(s.total_expense);
+             propertyStats[name].expense = moneyMath(propertyStats[name].expense).add(s.total_expense).value();
         });
 
         return propertyStats;
@@ -177,8 +178,8 @@ class ReportService {
             else if (text.includes('door') || text.includes('lock') || text.includes('key')) category = 'Security';
 
             if (!categories[category]) categories[category] = 0;
-            categories[category] += Number(cost.amount);
-            totalCost += Number(cost.amount);
+            categories[category] = moneyMath(categories[category]).add(cost.amount).value();
+            totalCost = moneyMath(totalCost).add(cost.amount).value();
         });
 
         return { categories, totalCost };

@@ -1,6 +1,7 @@
 
 import leaseService from '../services/leaseService.js';
 import renewalService from '../services/renewalService.js';
+import { toCentsFromMajor } from '../utils/moneyUtils.js';
 
 
 class LeaseController {
@@ -140,7 +141,7 @@ class LeaseController {
       const { id } = req.params;
       const { newEndDate, newMonthlyRent } = req.body;
 
-      const result = await renewalService.instantRenew(id, newEndDate, newMonthlyRent, req.user);
+      const result = await renewalService.instantRenew(id, newEndDate, toCentsFromMajor(newMonthlyRent), req.user);
       res.json({ message: 'Lease instantly renewed successfully', ...result });
     } catch (error) {
       if (error.message.includes('not found')) return res.status(404).json({ error: error.message });
@@ -158,7 +159,7 @@ class LeaseController {
       const { id } = req.params;
       const { amount, notes } = req.body; 
 
-      const result = await leaseService.refundDeposit(id, amount, notes, req.user);
+      const result = await leaseService.requestRefund(id, toCentsFromMajor(amount), notes, req.user);
       res.json({ message: 'Deposit refund requested successfully', ...result });
     } catch (error) {
        if (error.message.includes('not found')) return res.status(404).json({ error: error.message });
@@ -204,7 +205,7 @@ class LeaseController {
       const { id } = req.params;
       const { terminationDate, terminationFee } = req.body; // Fee optional
 
-      const result = await leaseService.terminateLease(id, terminationDate, terminationFee, req.user);
+      const result = await leaseService.terminateLease(id, terminationDate, toCentsFromMajor(terminationFee), req.user);
       res.json({ message: 'Lease terminated successfully', ...result });
     } catch (error) {
        if (error.message.includes('not found')) return res.status(404).json({ error: error.message });
@@ -257,7 +258,7 @@ class LeaseController {
 
       const adjustmentId = await leaseService.addRentAdjustment(id, {
         effectiveDate,
-        newMonthlyRent,
+        newMonthlyRent: toCentsFromMajor(newMonthlyRent),
         notes
       }, req.user);
 
@@ -306,7 +307,7 @@ class LeaseController {
       if (adjustedAmount === undefined || adjustedAmount < 0) {
          return res.status(400).json({ error: 'Valid adjustedAmount is required' });
       }
-      const result = await leaseService.resolveRefundDispute(id, req.user, adjustedAmount);
+      const result = await leaseService.resolveRefundDispute(id, req.user, toCentsFromMajor(adjustedAmount));
       res.json(result);
     } catch (error) {
       console.error(error);
