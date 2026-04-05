@@ -233,13 +233,23 @@ class LedgerModel {
    * Internal Audit Tool: Finds verified payments that don't have a corresponding ledger entry.
    */
   async findMismatches() {
-    const [rows] = await db.query(`
-        SELECT p.payment_id, p.amount, p.invoice_id, p.status
+    // 1. Find verified payments without ledger entries (Credits)
+    const [payments] = await pool.query(`
+        SELECT p.payment_id, p.amount, p.invoice_id, p.status, 'payment' as record_type
         FROM payments p
-        LEFT JOIN ledger l ON p.payment_id = l.payment_id
-        WHERE p.status = 'verified' AND l.ledger_id IS NULL
+        LEFT JOIN accounting_ledger al ON p.payment_id = al.payment_id
+        WHERE p.status = 'verified' AND al.entry_id IS NULL
     `);
-    return rows;
+
+    // 2. Find invoices without ledger entries (Debits)
+    const [invoices] = await pool.query(`
+        SELECT ri.invoice_id, ri.amount, ri.lease_id, ri.status, 'invoice' as record_type
+        FROM rent_invoices ri
+        LEFT JOIN accounting_ledger al ON ri.invoice_id = al.invoice_id
+        WHERE ri.status NOT IN ('void') AND al.entry_id IS NULL
+    `);
+
+    return [...payments, ...invoices];
   }
 }
 
