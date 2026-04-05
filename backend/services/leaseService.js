@@ -645,33 +645,98 @@ class LeaseService {
       }
 
       await leaseModel.update(leaseId, {
-        refundedAmount: Number(lease.refundedAmount || 0) + Number(amount),
         depositStatus: status,
-        proposedRefundAmount: 0
       }, connection);
 
       const auditLogger = (await import('../utils/auditLogger.js')).default;
-      await auditLogger.log({
-        userId: user.id,
-        actionType: 'DEPOSIT_REFUND_APPROVED',
-        entityId: leaseId,
-        details: { refundedAmount: amount, status },
-      }, null, connection);
+      await auditLogger.log(
+        {
+          userId: user.id,
+          actionType: 'DEPOSIT_REFUND_APPROVED',
+          entityId: leaseId,
+          details: { status },
+        },
+        null,
+        connection
+      );
 
-      if (amount > 0) {
-        const ledgerModel = (await import('../models/ledgerModel.js')).default;
-        await ledgerModel.create({
+      await connection.commit();
+      return { status };
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+
+  async confirmDisbursement(leaseId, data, user) {
+    if (user.role !== 'owner' && user.role !== 'treasurer') {
+      throw new Error(
+        'Access denied. Only owners and treasurers can record disbursements.'
+      );
+    }
+
+    const { bankReferenceId, disbursementDate } = data;
+    if (!bankReferenceId)
+      throw new Error('Bank Reference ID is required for disbursement.');
+
+    const lease = await leaseModel.findById(leaseId);
+    if (!lease) throw new Error('Lease not found');
+
+    if (lease.depositStatus !== 'awaiting_acknowledgment') {
+      throw new Error(
+        'This refund is not in the correct state (Approved, Pending Disbursement).'
+      );
+    }
+
+    const amount = lease.proposedRefundAmount;
+    const connection = await pool.getConnection();
+
+    try {
+      await connection.beginTransaction();
+
+      // 1. Finalize Lease State
+      await leaseModel.update(
+        leaseId,
+        {
+          refundedAmount: Number(lease.refundedAmount || 0) + Number(amount),
+          depositStatus: 'refunded',
+          proposedRefundAmount: 0,
+          bankReferenceId: bankReferenceId,
+          disbursementDate: disbursementDate || today(),
+        },
+        connection
+      );
+
+      // 2. Create the final "Cash Outflow" Ledger Entry
+      const ledgerModel = (await import('../models/ledgerModel.js')).default;
+      await ledgerModel.create(
+        {
           leaseId: Number(leaseId),
           accountType: 'liability',
           category: 'deposit_refund',
           debit: Number(amount),
-          description: `Deposit refund approved by owner: ${amount}`,
-          entryDate: today(),
-        }, connection);
-      }
+          description: `Security deposit refund disbursed via bank. Ref: ${bankReferenceId}`,
+          entryDate: disbursementDate || today(),
+        },
+        connection
+      );
+
+      const auditLogger = (await import('../utils/auditLogger.js')).default;
+      await auditLogger.log(
+        {
+          userId: user.id,
+          actionType: 'DEPOSIT_DISBURSED',
+          entityId: leaseId,
+          details: { amount, bankReferenceId },
+        },
+        null,
+        connection
+      );
 
       await connection.commit();
-      return { status, refundedAmount: amount };
+      return { status: 'refunded', refundedAmount: amount, bankReferenceId };
     } catch (error) {
       await connection.rollback();
       throw error;

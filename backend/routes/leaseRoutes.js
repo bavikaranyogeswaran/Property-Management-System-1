@@ -14,6 +14,7 @@ router.post('/:id/instant-renew', authenticateToken, authorizeResource('lease'),
 router.post('/:id/refund', authenticateToken, authorizeResource('lease'), leaseController.refundDeposit);
 router.post('/:id/refund/approve', authenticateToken, authorizeResource('lease'), leaseController.approveRefund);
 router.post('/:id/refund/dispute', authenticateToken, authorizeResource('lease'), leaseController.disputeRefund);
+router.post('/:id/refund/disburse', authenticateToken, authorizeResource('lease'), leaseController.recordDisbursement);
 router.post('/:id/refund/resolve', authenticateToken, authorizeResource('lease'), leaseController.resolveRefundDispute);
 router.patch('/:id/document', authenticateToken, authorizeResource('lease'), leaseController.updateLeaseDocument);
 router.post(

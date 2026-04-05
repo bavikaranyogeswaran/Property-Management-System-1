@@ -81,6 +81,7 @@ interface LeaseContextType {
   rejectLeaseDocuments: (id: string, reason: string) => Promise<void>;
   withdrawApplication: (id: string) => Promise<void>;
   cancelLease: (id: string) => Promise<void>;
+  recordDisbursement: (id: string, data: { bankReferenceId: string; disbursementDate?: string }) => Promise<void>;
 
   // Renewal operations
   renewalRequests: RenewalRequest[];
@@ -204,7 +205,7 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
     try {
       await apiClient.post(`/leases/${id}/refund/approve`);
       await fetchLeases();
-      toast.success('Refund approved. Awaiting tenant acknowledgment.');
+      toast.success('Refund approved. Awaiting physical bank transfer confirmation.');
     } catch (e: any) {
       const msg = e.response?.data?.error || 'Failed to approve refund';
       toast.error(msg);
@@ -365,6 +366,18 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const recordDisbursement = async (id: string, data: { bankReferenceId: string; disbursementDate?: string }) => {
+    try {
+      await apiClient.post(`/leases/${id}/refund/disburse`, data);
+      await fetchLeases();
+      toast.success('Disbursement recorded. Refund finalized.');
+    } catch (e: any) {
+      const msg = e.response?.data?.error || 'Failed to record disbursement';
+      toast.error(msg);
+      throw new Error(msg);
+    }
+  };
+
   const fetchRenewalRequests = async () => {
     try {
       const response = await apiClient.get('/renewal-requests');
@@ -441,7 +454,8 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
       proposeRenewalTerms,
       approveRenewal,
       rejectRenewal,
-      cancelLease
+      cancelLease,
+      recordDisbursement
     }}>
       {children}
     </LeaseContext.Provider>

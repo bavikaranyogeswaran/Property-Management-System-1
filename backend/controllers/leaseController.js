@@ -325,6 +325,19 @@ class LeaseController {
     }
   }
 
+  async recordDisbursement(req, res) {
+    try {
+      const { id } = req.params;
+      const result = await leaseService.confirmDisbursement(id, req.body, req.user);
+      res.json({ message: 'Disbursement recorded and refund finalized.', ...result });
+    } catch (error) {
+      console.error('Record Disbursement Error:', error);
+      if (error.message.includes('Access denied')) return res.status(403).json({ error: error.message });
+      if (error.message.includes('not found')) return res.status(404).json({ error: error.message });
+      res.status(400).json({ error: error.message });
+    }
+  }
+
   async cancelLease(req, res) {
     try {
       if (req.user.role !== 'owner' && req.user.role !== 'treasurer') {
