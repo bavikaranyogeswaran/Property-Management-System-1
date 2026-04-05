@@ -115,14 +115,7 @@ class PayHereService {
                 throw new Error('Payment amount mismatch');
             }
 
-            // 3. Check for Duplicate Payment ID (Idempotency)
-            const [existing] = await pool.query('SELECT 1 FROM payments WHERE reference_number = ?', [payment_id]);
-            if (existing.length > 0) {
-                console.warn(`[PayHereService] Duplicate notification for payment ID: ${payment_id}`);
-                return { success: true, message: 'Already processed' };
-            }
-
-            // 4. Record the payment
+            // 3. Record the payment (Hardened with Atomic Idempotency and Locking)
             await paymentService.recordAutomatedPayment({
                 invoiceId: invoiceId,
                 amount: receivedCents,

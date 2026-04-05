@@ -112,6 +112,24 @@ class InvoiceModel {
     };
   }
 
+  /**
+   * [NEW] Atomic Retrieval with Row Locking.
+   * Use this to serialize concurrent payment gateway notifications.
+   */
+  async findByIdForUpdate(id, connection) {
+    if (!connection) throw new Error('findByIdForUpdate requires an active transaction connection.');
+    const [rows] = await connection.query(
+      `SELECT ri.*, u.property_id, l.unit_id 
+       FROM rent_invoices ri 
+       JOIN leases l ON ri.lease_id = l.lease_id
+       JOIN units u ON l.unit_id = u.unit_id
+       WHERE ri.invoice_id = ? FOR UPDATE`,
+      [id]
+    );
+    if (rows.length === 0) return null;
+    return this.mapRow(rows[0]);
+  }
+
   async findById(id, connection = null) {
     const db = connection || pool;
     const [rows] = await db.query(

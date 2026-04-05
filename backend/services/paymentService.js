@@ -261,20 +261,11 @@ class PaymentService {
                 await conn.query('SAVEPOINT record_automated_payment');
             }
 
-            const invoice = await invoiceModel.findById(invoiceId, conn);
+            // [HARDENED] 1. Atomic Row Locking: Serialize concurrent requests for this invoice
+            const invoice = await invoiceModel.findByIdForUpdate(invoiceId, conn);
             if (!invoice) throw new Error(`Invoice #${invoiceId} not found`);
 
-            // [SECURITY FIX] 100x Revenue Bleed and Tampering Guard
-            // Compare the PAID amount (in cents) with the INVOICE amount (translated to cents).
-            const expectedCents = Number(invoice.amount);
-            if (Number(amount) < expectedCents) {
-                console.error(`[Security Alert] Underpayment detected for automated invoice #${invoiceId}. Expected ${expectedCents} cents, but received ${amount} cents.`);
-                // We record it as a rejected or partial payment?
-                // For PayHere integration, we expect a 1:1 match for activation.
-                throw new Error('Payment amount mismatch. Security verification failed.');
-            }
-
-            // 1. [IDEMPOTENCY CHECK] Prevent double-processing of the same gateway transaction
+            // [HARDENED] 2. Atomic Idempotency Check (Within protected row lock)
             const existingPayment = await paymentModel.findByReferenceNumber(referenceNumber, conn);
             let paymentId;
             
@@ -290,17 +281,36 @@ class PaymentService {
                 console.log(`[PaymentService] Recovery trigger: Updating existing ${existingPayment.status} payment (Ref: ${referenceNumber}) to verified.`);
                 await paymentModel.updateStatus(existingPayment.id, 'verified', null, conn);
                 paymentId = Number(existingPayment.id);
-            } else {
-                // 2. Create New Verified Payment
-                paymentId = await paymentModel.create({
-                    invoiceId,
-                    amount,
-                    paymentDate: today(),
-                    paymentMethod: paymentMethod || 'online',
-                    referenceNumber,
-                    evidenceUrl: null,
-                    status: 'verified'
-                }, conn);
+            }
+
+            // [SECURITY FIX] 100x Revenue Bleed and Tampering Guard
+            const expectedCents = Number(invoice.amount);
+            if (Number(amount) < expectedCents) {
+                console.error(`[Security Alert] Underpayment detected for automated invoice #${invoiceId}. Expected ${expectedCents} cents, but received ${amount} cents.`);
+                throw new Error('Payment amount mismatch. Security verification failed.');
+            }
+
+            if (!paymentId) {
+                // 3. Create New Verified Payment
+                try {
+                    paymentId = await paymentModel.create({
+                        invoiceId,
+                        amount,
+                        paymentDate: today(),
+                        paymentMethod: paymentMethod || 'online',
+                        referenceNumber,
+                        evidenceUrl: null,
+                        status: 'verified'
+                    }, conn);
+                } catch (dupErr) {
+                    if (dupErr.code === 'ER_DUP_ENTRY') {
+                        // Concurrent request beat us to it right after the SELECT but before our lock? 
+                        // Or just finished its transaction.
+                        const fallback = await paymentModel.findByReferenceNumber(referenceNumber, conn);
+                        if (fallback) return Number(fallback.id);
+                    }
+                    throw dupErr;
+                }
             }
 
             const payment = await paymentModel.findById(paymentId, conn);
