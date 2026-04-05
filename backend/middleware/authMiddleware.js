@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import userModel from '../models/userModel.js';
+import authorizationService from '../services/authorizationService.js';
 const { verify } = jwt;
 
 export const authenticateToken = async (req, res, next) => {
@@ -65,6 +66,60 @@ export const authorizeRoles = (...roles) => {
       return res.status(403).json({ error: `Access denied. Required role: ${roles.join(' or ')}` });
     }
     next();
+  };
+};
+
+/**
+ * Centrally enforces resource-level authorization.
+ * Wraps AuthorizationService into a reusable middleware.
+ * Expects resource ID in req.params.id or req.params[paramName].
+ */
+export const authorizeResource = (resourceType, paramName = 'id') => {
+  return async (req, res, next) => {
+    const userId = req.user.id;
+    const role = req.user.role;
+    const resourceId = req.params[paramName];
+
+    if (!resourceId) {
+      console.error(`[Auth] Missing ${paramName} for ${resourceType} authorization.`);
+      return res.status(400).json({ error: 'System error: Identity check failed (Missing ID).' });
+    }
+
+    let authorized = false;
+    try {
+      switch (resourceType) {
+        case 'property':
+          authorized = await authorizationService.canAccessProperty(userId, role, resourceId);
+          break;
+        case 'unit':
+          authorized = await authorizationService.canAccessUnit(userId, role, resourceId);
+          break;
+        case 'lease':
+          authorized = await authorizationService.canAccessLease(userId, role, resourceId);
+          break;
+        case 'invoice':
+          authorized = await authorizationService.canAccessInvoice(userId, role, resourceId);
+          break;
+        case 'payment':
+          authorized = await authorizationService.canAccessPayment(userId, role, resourceId);
+          break;
+        case 'maintenanceRequest':
+          authorized = await authorizationService.canAccessMaintenanceRequest(userId, role, resourceId);
+          break;
+        default:
+          throw new Error(`Unsupported resource type for authorization: ${resourceType}`);
+      }
+
+      if (!authorized) {
+        console.warn(`[Auth] Forbidden: User ${userId} (${role}) denied access to ${resourceType} #${resourceId}.`);
+        return res.status(403).json({ error: 'Access denied. You do not have permission to access this resource.' });
+      }
+
+      next();
+    } catch (err) {
+      console.error(`[Auth] Exception during ${resourceType} authorization:`, err.message);
+      return res.status(500).json({ error: 'Internal system error during authorization.' });
+    }
   };
 };
 
