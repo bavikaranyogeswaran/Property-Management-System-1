@@ -28,6 +28,11 @@ class LeadPortalController {
         return res.status(404).json({ error: 'Lead not found' });
       }
 
+      // [FIX] SECURITY: Block access for 'dropped' inquiries
+      if (lead.status === 'dropped') {
+        return res.status(403).json({ error: 'This inquiry has been closed. Please contact the property owner for more information.' });
+      }
+
       // Fetch property details
       let property = null;
       if (lead.propertyId) {
@@ -57,11 +62,25 @@ class LeadPortalController {
               [lead.email]
           );
           if (leases.length > 0) {
-              activeLease = leaseModel.mapRows(leases)[0];
+              const rawLease = leaseModel.mapRows(leases)[0];
               
               // Enrich with deposit status
-              const depositStats = await leaseModel.getDepositStatus(activeLease.id);
-              activeLease.depositStatus = depositStats;
+              const depositStats = await leaseModel.getDepositStatus(rawLease.id);
+              
+              // [FIX] SECURITY: PII Sanitization (DTO mapping)
+              // Only expose fields relevant to the prospective tenant's onboarding.
+              activeLease = {
+                  id: rawLease.id,
+                  startDate: rawLease.startDate,
+                  endDate: rawLease.endDate,
+                  monthlyRent: rawLease.monthlyRent,
+                  status: rawLease.status,
+                  currentDepositBalance: rawLease.currentDepositBalance,
+                  depositStatus: rawLease.depositStatus,
+                  targetDeposit: rawLease.targetDeposit,
+                  documentUrl: rawLease.documentUrl,
+                  depositStats: depositStats
+              };
           }
       }
       
