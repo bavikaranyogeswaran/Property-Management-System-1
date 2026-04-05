@@ -1,8 +1,16 @@
-import db from '../config/db.js';
+
+import propertyModel from '../models/propertyModel.js';
+import unitModel from '../models/unitModel.js';
+import leaseModel from '../models/leaseModel.js';
+import invoiceModel from '../models/invoiceModel.js';
+import paymentModel from '../models/paymentModel.js';
+import maintenanceRequestModel from '../models/maintenanceRequestModel.js';
+import staffModel from '../models/staffModel.js';
 
 /**
  * AuthorizationService
  * Centralizes ownership and permission checks for all resources.
+ * [REFACTORED]: Now uses Models instead of direct DB queries to ensure architectural integrity.
  */
 class AuthorizationService {
   /**
@@ -10,18 +18,12 @@ class AuthorizationService {
    */
   async canAccessProperty(userId, role, propertyId) {
     if (role === 'owner') {
-      const [rows] = await db.query(
-        'SELECT 1 FROM properties WHERE property_id = ? AND owner_id = ?',
-        [propertyId, userId]
-      );
-      return rows.length > 0;
+      const property = await propertyModel.findById(propertyId);
+      return property && property.ownerId === userId;
     }
     if (role === 'treasurer') {
-      const [rows] = await db.query(
-        'SELECT 1 FROM staff_property_assignments WHERE user_id = ? AND property_id = ?',
-        [userId, propertyId]
-      );
-      return rows.length > 0;
+      const assigned = await staffModel.getAssignedProperties(userId);
+      return assigned.some(p => p.id === propertyId.toString());
     }
     return false;
   }
@@ -30,170 +32,60 @@ class AuthorizationService {
    * Checks if a user can access a specific unit.
    */
   async canAccessUnit(userId, role, unitId) {
-    if (role === 'owner') {
-      const [rows] = await db.query(
-        `SELECT 1 FROM units u 
-         JOIN properties p ON u.property_id = p.property_id 
-         WHERE u.unit_id = ? AND p.owner_id = ?`,
-        [unitId, userId]
-      );
-      return rows.length > 0;
-    }
-    if (role === 'treasurer') {
-      const [rows] = await db.query(
-        `SELECT 1 FROM units u 
-         JOIN staff_property_assignments spa ON u.property_id = spa.property_id 
-         WHERE u.unit_id = ? AND spa.user_id = ?`,
-        [unitId, userId]
-      );
-      return rows.length > 0;
-    }
-    return false;
+    const unit = await unitModel.findById(unitId);
+    if (!unit) return false;
+
+    return await this.canAccessProperty(userId, role, unit.propertyId);
   }
 
   /**
    * Checks if a user can access a lease.
    */
   async canAccessLease(userId, role, leaseId) {
-    if (role === 'owner') {
-      const [rows] = await db.query(
-        `SELECT 1 FROM leases l 
-         JOIN units u ON l.unit_id = u.unit_id 
-         JOIN properties p ON u.property_id = p.property_id 
-         WHERE l.lease_id = ? AND p.owner_id = ?`,
-        [leaseId, userId]
-      );
-      return rows.length > 0;
-    }
-    if (role === 'treasurer') {
-      const [rows] = await db.query(
-        `SELECT 1 FROM leases l 
-         JOIN units u ON l.unit_id = u.unit_id 
-         JOIN staff_property_assignments spa ON u.property_id = spa.property_id 
-         WHERE l.lease_id = ? AND spa.user_id = ?`,
-        [leaseId, userId]
-      );
-      return rows.length > 0;
-    }
+    const lease = await leaseModel.findById(leaseId);
+    if (!lease) return false;
+
     if (role === 'tenant') {
-      const [rows] = await db.query(
-        'SELECT 1 FROM leases WHERE lease_id = ? AND tenant_id = ?',
-        [leaseId, userId]
-      );
-      return rows.length > 0;
+      return lease.tenantId === userId.toString();
     }
-    return false;
+
+    return await this.canAccessUnit(userId, role, lease.unitId);
   }
 
   /**
    * Checks if a user can access an invoice.
    */
   async canAccessInvoice(userId, role, invoiceId) {
-    if (role === 'owner') {
-      const [rows] = await db.query(
-        `SELECT 1 FROM rent_invoices ri 
-         JOIN leases l ON ri.lease_id = l.lease_id 
-         JOIN units u ON l.unit_id = u.unit_id 
-         JOIN properties p ON u.property_id = p.property_id 
-         WHERE ri.invoice_id = ? AND p.owner_id = ?`,
-        [invoiceId, userId]
-      );
-      return rows.length > 0;
-    }
-    if (role === 'treasurer') {
-      const [rows] = await db.query(
-        `SELECT 1 FROM rent_invoices ri 
-         JOIN leases l ON ri.lease_id = l.lease_id 
-         JOIN units u ON l.unit_id = u.unit_id 
-         JOIN staff_property_assignments spa ON u.property_id = spa.property_id 
-         WHERE ri.invoice_id = ? AND spa.user_id = ?`,
-        [invoiceId, userId]
-      );
-      return rows.length > 0;
-    }
-    if (role === 'tenant') {
-      const [rows] = await db.query(
-        'SELECT 1 FROM rent_invoices ri JOIN leases l ON ri.lease_id = l.lease_id WHERE ri.invoice_id = ? AND l.tenant_id = ?',
-        [invoiceId, userId]
-      );
-      return rows.length > 0;
-    }
-    return false;
+    const invoice = await invoiceModel.findById(invoiceId);
+    if (!invoice) return false;
+
+    // Use lease access check for consistency
+    return await this.canAccessLease(userId, role, invoice.leaseId);
   }
 
   /**
    * Checks if a user can access a payment.
    */
   async canAccessPayment(userId, role, paymentId) {
-    if (role === 'owner') {
-      const [rows] = await db.query(
-        `SELECT 1 FROM payments p 
-         JOIN rent_invoices ri ON p.invoice_id = ri.invoice_id 
-         JOIN leases l ON ri.lease_id = l.lease_id 
-         JOIN units u ON l.unit_id = u.unit_id 
-         JOIN properties p_prop ON u.property_id = p_prop.property_id 
-         WHERE p.payment_id = ? AND p_prop.owner_id = ?`,
-        [paymentId, userId]
-      );
-      return rows.length > 0;
-    }
-    if (role === 'treasurer') {
-      const [rows] = await db.query(
-        `SELECT 1 FROM payments p 
-         JOIN rent_invoices ri ON p.invoice_id = ri.invoice_id 
-         JOIN leases l ON ri.lease_id = l.lease_id 
-         JOIN units u ON l.unit_id = u.unit_id 
-         JOIN staff_property_assignments spa ON u.property_id = spa.property_id 
-         WHERE p.payment_id = ? AND spa.user_id = ?`,
-        [paymentId, userId]
-      );
-      return rows.length > 0;
-    }
-    if (role === 'tenant') {
-      const [rows] = await db.query(
-        `SELECT 1 FROM payments p 
-         JOIN rent_invoices ri ON p.invoice_id = ri.invoice_id 
-         JOIN leases l ON ri.lease_id = l.lease_id 
-         WHERE p.payment_id = ? AND l.tenant_id = ?`,
-        [paymentId, userId]
-      );
-      return rows.length > 0;
-    }
-    return false;
+    const payment = await paymentModel.findById(paymentId);
+    if (!payment) return false;
+
+    // A payment is linked to an invoice, which is linked to a lease
+    return await this.canAccessInvoice(userId, role, payment.invoiceId);
   }
 
   /**
    * Checks if a user can access a maintenance request.
    */
   async canAccessMaintenanceRequest(userId, role, requestId) {
-    if (role === 'owner') {
-      const [rows] = await db.query(
-        `SELECT 1 FROM maintenance_requests mr 
-         JOIN units u ON mr.unit_id = u.unit_id 
-         JOIN properties p ON u.property_id = p.property_id 
-         WHERE mr.request_id = ? AND p.owner_id = ?`,
-        [requestId, userId]
-      );
-      return rows.length > 0;
-    }
-    if (role === 'treasurer') {
-      const [rows] = await db.query(
-        `SELECT 1 FROM maintenance_requests mr 
-         JOIN units u ON mr.unit_id = u.unit_id 
-         JOIN staff_property_assignments spa ON u.property_id = spa.property_id 
-         WHERE mr.request_id = ? AND spa.user_id = ?`,
-        [requestId, userId]
-      );
-      return rows.length > 0;
-    }
+    const request = await maintenanceRequestModel.findById(requestId);
+    if (!request) return false;
+
     if (role === 'tenant') {
-      const [rows] = await db.query(
-        'SELECT 1 FROM maintenance_requests WHERE request_id = ? AND tenant_id = ?',
-        [requestId, userId]
-      );
-      return rows.length > 0;
+      return request.tenantId === userId.toString();
     }
-    return false;
+
+    return await this.canAccessUnit(userId, role, request.unitId);
   }
 }
 
