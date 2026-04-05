@@ -50,6 +50,15 @@ class InvoiceController {
       });
     } catch (error) {
       console.error('Error generating invoices:', error);
+      
+      if (error.message.includes('already in progress')) {
+        return res.status(409).json({ error: error.message });
+      }
+      
+      if (error.message.includes('recently completed')) {
+        return res.status(429).json({ error: error.message });
+      }
+
       if (error.message.includes('Access denied')) {
            return res.status(403).json({ error: error.message });
       }

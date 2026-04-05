@@ -61,7 +61,32 @@ export const generateRentInvoices = async () => {
   const currentYear = currentToday.getFullYear();
   const currentMonth = currentToday.getMonth() + 1; // 1-12
 
+  // 1. CONCURRENCY LOCK CHECK: Respect manual generation locks
+  const lockName = `generate_invoices_${currentYear}_${currentMonth}`;
   try {
+    const [existingLock] = await db.query(
+        "SELECT status, updated_at FROM cron_checkpoints WHERE job_name = ? LIMIT 1",
+        [lockName]
+    );
+
+    if (existingLock.length > 0) {
+        const lastUpdate = new Date(existingLock[0].updated_at);
+        const diffMinutes = (new Date().getTime() - lastUpdate.getTime()) / (1000 * 60);
+
+        if (existingLock[0].status === 'running' && diffMinutes < 15) {
+            console.log(`[Cron] Skipping Rent Invoicing: Manual process "${lockName}" is currently running.`);
+            return;
+        }
+    }
+
+    // Set/Update lock for automation
+    await db.query(
+        `INSERT INTO cron_checkpoints (job_name, last_success_date, status, message) 
+         VALUES (?, ?, 'running', 'Automated generation started')
+         ON DUPLICATE KEY UPDATE status = 'running', updated_at = NOW(), message = 'Automated generation refreshed'`,
+        [lockName, `${currentYear}-${String(currentMonth).padStart(2, '0')}-01`]
+    );
+
     const activeLeases = await leaseModel.findActive();
     console.log(`Found ${activeLeases.length} active leases.`);
 
@@ -133,8 +158,19 @@ export const generateRentInvoices = async () => {
       }
     }
     console.log(`Automated Invoicing: Created ${createdCount} new invoices.`);
+
+    // RELEASE LOCK
+    await db.query(
+        "UPDATE cron_checkpoints SET status = 'success', message = ?, updated_at = NOW() WHERE job_name = ?",
+        [`Automated generation complete: ${createdCount} created`, lockName]
+    );
   } catch (error) {
     console.error('Error in automated invoicing:', error);
+    // Release with failure
+    await db.query(
+        "UPDATE cron_checkpoints SET status = 'failed', message = ?, updated_at = NOW() WHERE job_name = ?",
+        [error.message, lockName]
+    );
   }
 };
 

@@ -1,4 +1,5 @@
 
+import db from '../config/db.js';
 import invoiceModel from '../models/invoiceModel.js';
 import leaseModel from '../models/leaseModel.js';
 import staffModel from '../models/staffModel.js';
@@ -78,80 +79,124 @@ class InvoiceService {
             throw new Error('Access denied. Only Treasurers can generate invoices.');
         }
 
-        const now = getLocalTime();
-        const y = year || now.getFullYear();
-        const m = month || now.getMonth() + 1;
+        const nowTime = getLocalTime();
+        const y = year || nowTime.getFullYear();
+        const m = month || nowTime.getMonth() + 1;
 
-        const activeLeases = await leaseModel.findActive();
-
-        // RBAC: Treasurer assignments
-        const assigned = await staffModel.getAssignedProperties(user.id);
-        const assignedPropertyIds = assigned.map((p) => p.property_id.toString());
-        const targetLeases = activeLeases.filter((l) =>
-            assignedPropertyIds.includes(l.propertyId.toString())
+        // 1. CONCURRENCY LOCK: Prevent multiple simultaneous bulk generations
+        const lockName = `generate_invoices_${y}_${m}`;
+        const [existingLock] = await db.query(
+            "SELECT status, updated_at FROM cron_checkpoints WHERE job_name = ? LIMIT 1",
+            [lockName]
         );
 
-        let generatedCount = 0;
-        let skippedCount = 0;
+        if (existingLock.length > 0) {
+            const lastUpdate = new Date(existingLock[0].updated_at);
+            const diffMinutes = (new Date().getTime() - lastUpdate.getTime()) / (1000 * 60);
 
-        for (const lease of targetLeases) {
-            const leaseStart = parseLocalDate(lease.startDate);
-            leaseStart.setHours(0, 0, 0, 0);
-
-            const targetMonthStart = parseLocalDate(`${y}-${String(m).padStart(2, '0')}-01`);
-            targetMonthStart.setHours(0, 0, 0, 0);
-
-            if (leaseStart > targetMonthStart) {
-                skippedCount++;
-                continue;
+            if (existingLock[0].status === 'running' && diffMinutes < 15) {
+                throw new Error('Invoice generation for this period is already in progress. Please wait.');
             }
-
-            const exists = await invoiceModel.exists(lease.id, y, m);
-            if (exists) {
-                skippedCount++;
-                continue;
+            
+            // Rate Limit: Prevent regeneration if successful within last 5 minutes
+            if (existingLock[0].status === 'success' && diffMinutes < 5) {
+                throw new Error('Invoice generation was recently completed. Please wait 5 minutes before re-running.');
             }
-
-            const billingInfo = billingEngine.calculateMonthlyRent(lease, y, m);
-            if (!billingInfo) {
-                skippedCount++;
-                continue;
-            }
-
-            const invoiceId = await invoiceModel.create({
-                leaseId: lease.id,
-                amount: billingInfo.amount,
-                dueDate: billingInfo.dueDate,
-                description: billingInfo.description,
-            });
-
-            // Auto-apply credit if exists
-            try {
-                await paymentService.applyTenantCredit(invoiceId);
-            } catch (err) {
-                console.error(`[InvoiceService] Failed to auto-apply credit to generated invoice ${invoiceId}:`, err);
-            }
-
-            // Notify Tenant via Email
-            try {
-                const tenant = await userModel.findById(lease.tenantId);
-                if (tenant && tenant.email) {
-                    await emailService.sendInvoiceNotification(tenant.email, {
-                        amount: billingInfo.amount,
-                        dueDate: billingInfo.dueDate,
-                        month: m,
-                        year: y,
-                        invoiceId: invoiceId,
-                    });
-                }
-            } catch (err) {
-                console.error(`Failed to send email for invoice ${invoiceId}:`, err);
-            }
-
-            generatedCount++;
         }
 
-        return { generated: generatedCount, skipped: skippedCount };
+        // Set/Reset Lock to Running
+        await db.query(
+            `INSERT INTO cron_checkpoints (job_name, last_success_date, status, message) 
+             VALUES (?, ?, 'running', 'Manual generation started')
+             ON DUPLICATE KEY UPDATE status = 'running', updated_at = NOW(), message = 'Manual generation re-started'`,
+            [lockName, `${y}-${String(m).padStart(2, '0')}-01`]
+        );
+
+        try {
+            const activeLeases = await leaseModel.findActive();
+
+            // RBAC: Treasurer assignments
+            const assigned = await staffModel.getAssignedProperties(user.id);
+            const assignedPropertyIds = assigned.map((p) => p.property_id.toString());
+            const targetLeases = activeLeases.filter((l) =>
+                assignedPropertyIds.includes(l.propertyId.toString())
+            );
+
+            let generatedCount = 0;
+            let skippedCount = 0;
+
+            for (const lease of targetLeases) {
+                const leaseStart = parseLocalDate(lease.startDate);
+                leaseStart.setHours(0, 0, 0, 0);
+
+                const targetMonthStart = parseLocalDate(`${y}-${String(m).padStart(2, '0')}-01`);
+                targetMonthStart.setHours(0, 0, 0, 0);
+
+                if (leaseStart > targetMonthStart) {
+                    skippedCount++;
+                    continue;
+                }
+
+                const exists = await invoiceModel.exists(lease.id, y, m);
+                if (exists) {
+                    skippedCount++;
+                    continue;
+                }
+
+                const billingInfo = billingEngine.calculateMonthlyRent(lease, y, m);
+                if (!billingInfo) {
+                    skippedCount++;
+                    continue;
+                }
+
+                const invoiceId = await invoiceModel.create({
+                    leaseId: lease.id,
+                    amount: billingInfo.amount,
+                    dueDate: billingInfo.dueDate,
+                    description: billingInfo.description,
+                });
+
+                // Auto-apply credit if exists
+                try {
+                    await paymentService.applyTenantCredit(invoiceId);
+                } catch (err) {
+                    console.error(`[InvoiceService] Failed to auto-apply credit to generated invoice ${invoiceId}:`, err);
+                }
+
+                // Notify Tenant via Email
+                try {
+                    const tenant = await userModel.findById(lease.tenantId);
+                    if (tenant && tenant.email) {
+                        await emailService.sendInvoiceNotification(tenant.email, {
+                            amount: billingInfo.amount,
+                            dueDate: billingInfo.dueDate,
+                            month: m,
+                            year: y,
+                            invoiceId: invoiceId,
+                        });
+                    }
+                } catch (err) {
+                    console.error(`Failed to send email for invoice ${invoiceId}:`, err);
+                }
+
+                generatedCount++;
+            }
+
+            // 3. RELEASE LOCK: Mark as successful
+            await db.query(
+                "UPDATE cron_checkpoints SET status = 'success', message = ?, updated_at = NOW() WHERE job_name = ?",
+                [`Generated ${generatedCount} invoices manually`, lockName]
+            );
+
+            return { generated: generatedCount, skipped: skippedCount };
+        } catch (err) {
+            // Handle Error Release
+            await db.query(
+                "UPDATE cron_checkpoints SET status = 'failed', message = ?, updated_at = NOW() WHERE job_name = ?",
+                [err.message, lockName]
+            );
+            throw err;
+        }
     }
 
     async updateStatus(id, status, user) {
