@@ -31,47 +31,63 @@ class InvoiceService {
             throw new Error('Denied. Only Treasurers can create invoices.');
         }
 
-        // RBAC Check: Ensure treasurer is assigned to this property
-        const lease = await leaseModel.findById(data.leaseId);
-        if (!lease) throw new Error('Lease not found');
-        
-        const assigned = await staffModel.getAssignedProperties(user.id);
-        const assignedPropertyIds = assigned.map((p) => p.id.toString());
-        if (!assignedPropertyIds.includes(lease.propertyId.toString())) {
-            throw new Error('Access denied. You are not assigned to this property.');
-        }
+        const connection = await pool.getConnection();
 
-        const invoiceId = await invoiceModel.create(data);
-        
-        // Auto-apply credit if exists
         try {
-            await paymentService.applyTenantCredit(invoiceId);
-        } catch (err) {
-            console.error(`[InvoiceService] Failed to auto-apply credit to new invoice ${invoiceId}:`, err);
-        }
-        
-        // Notify Tenant via Email
-        try {
-            const lease = await leaseModel.findById(data.leaseId);
-            if (lease) {
-                const tenant = await userModel.findById(lease.tenantId);
-                if (tenant && tenant.email) {
-                    const dueDate = parseLocalDate(data.dueDate);
+            await connection.beginTransaction();
+
+            // RBAC Check: Ensure treasurer is assigned to this property
+            const lease = await leaseModel.findById(data.leaseId, connection);
+            if (!lease) throw new Error('Lease not found');
+            
+            const staffModel = (await import('../models/staffModel.js')).default;
+            const assigned = await staffModel.getAssignedProperties(user.id);
+            const assignedPropertyIds = assigned.map((p) => p.id.toString());
+            
+            if (!assignedPropertyIds.includes(lease.propertyId.toString())) {
+                throw new Error('Access denied. You are not assigned to this property.');
+            }
+
+            const invoiceId = await invoiceModel.create(data, connection);
+            
+            // 2. Auto-apply credit if exists (Participates in existing transaction)
+            if (invoiceId) {
+                await paymentService.applyTenantCredit(invoiceId, connection);
+            }
+
+            await connection.commit();
+
+            // 3. Post-Commit Actions (Notifications)
+            // Re-fetch to ensure we have the most accurate state for the email (e.g. if it's now 'paid')
+            const finalInvoice = await invoiceModel.findById(invoiceId);
+            const tenant = await userModel.findById(lease.tenantId);
+            
+            if (tenant && tenant.email) {
+                const dueDate = parseLocalDate(data.dueDate);
+                try {
                     await emailService.sendInvoiceNotification(tenant.email, {
                         amount: data.amount,
                         dueDate: data.dueDate,
                         month: dueDate.getMonth() + 1,
                         year: dueDate.getFullYear(),
                         invoiceId: invoiceId,
-                        description: data.description
+                        description: data.description,
+                        isPaid: finalInvoice.status === 'paid'
                     });
+                } catch (emailErr) {
+                    console.error('[InvoiceService] Failed to send invoice notification email:', emailErr);
                 }
             }
-        } catch (err) {
-            console.error('Failed to send manual invoice email:', err);
-        }
 
-        return invoiceId;
+            return invoiceId;
+
+        } catch (error) {
+            await connection.rollback();
+            console.error('[InvoiceService] Create Invoice Transaction Failed:', error);
+            throw error;
+        } finally {
+            connection.release();
+        }
     }
 
     async generateMonthlyInvoices(year, month, user) {

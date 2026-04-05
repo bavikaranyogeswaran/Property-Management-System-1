@@ -197,101 +197,121 @@ class MaintenanceService {
             throw new Error('Access denied');
         }
 
-        const { requestId, amount, dueDate, description } = data;
-        const request = await maintenanceRequestModel.findById(requestId);
-        if (!request) throw new Error('Maintenance Request not found');
+        const connection = await pool.getConnection();
 
-        const leases = await leaseModel.findByTenantId(request.tenantId);
-        
-        // Find most relevant lease (Active first, then recently ended/expired)
-        let targetLease = leases.find(
-            (l) => l.unitId === request.unitId.toString() && l.status === 'active'
-        );
-
-        if (!targetLease) {
-            // Check for recently ended/expired leases (30-day grace period)
-            const gracePeriodDays = 30;
-            const graceDate = new Date();
-            graceDate.setDate(graceDate.getDate() - gracePeriodDays);
-            
-            const recentLeases = leases
-                .filter(l => l.unitId === request.unitId.toString() && (l.status === 'expired' || l.status === 'ended'))
-                .filter(l => l.endDate && new Date(l.endDate) >= graceDate)
-                .sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime());
-            
-            if (recentLeases.length > 0) {
-                targetLease = recentLeases[0];
-            }
-        }
-
-        if (!targetLease) {
-             throw new Error('No active or recently ended lease (within 30 days) found for this tenant/unit. Cannot invoice.');
-        }
-
-        const [unbilledCosts] = await pool.query(
-            'SELECT cost_id, amount FROM maintenance_costs WHERE request_id = ? AND invoice_id IS NULL',
-            [requestId]
-        );
-
-        if (unbilledCosts.length === 0) {
-             throw new Error('No unbilled costs found for this maintenance request to invoice.');
-        }
-
-        const aggregatedTotalCents = unbilledCosts.reduce((sum, cost) => sum + Number(cost.amount), 0);
-        const costIds = unbilledCosts.map(c => c.cost_id);
-
-        let proposedDescription = description || `Maintenance Bill: ${request.title}`;
-        const existingInvoices = await invoiceModel.findByLeaseAndDescription(
-            targetLease.id,
-            proposedDescription
-        );
-
-        if (existingInvoices.length > 0) {
-            proposedDescription = `${proposedDescription} (${new Date().getTime()})`;
-        }
-
-        const invoiceId = await invoiceModel.create({
-            leaseId: targetLease.id,
-            amount: aggregatedTotalCents, // Native cents summation
-            dueDate: dueDate || today(),
-            description: proposedDescription,
-            type: 'maintenance',
-        });
-
-        // Link all aggregated costs to this new invoice
-        if (costIds.length > 0) {
-            await pool.query('UPDATE maintenance_costs SET invoice_id = ?, is_reimbursable = TRUE WHERE cost_id IN (?)', [invoiceId, costIds]);
-        }
-
-        const displayAmountMajor = aggregatedTotalCents / 100;
-
-        await notificationModel.create({
-            userId: request.tenantId,
-            message: `You have been billed ${displayAmountMajor} for maintenance: ${request.title}`,
-            type: 'invoice',
-        });
-
-        // Notify Tenant via Email
         try {
-            const tenant = await userModel.findById(request.tenantId);
-            if (tenant && tenant.email) {
-                const currentNow = now();
-                await emailService.sendInvoiceNotification(tenant.email, {
-                    amount: displayAmountMajor,
-                    dueDate: dueDate || today(),
-                    month: currentNow.getMonth() + 1,
-                    year: currentNow.getFullYear(),
-                    invoiceId: invoiceId,
-                    description: proposedDescription
-                });
-            }
-        } catch (err) {
-            console.error('Failed to send maintenance invoice email:', err);
-        }
+            await connection.beginTransaction();
 
-        return invoiceId;
+            const { requestId, amount, dueDate, description } = data;
+            const request = await maintenanceRequestModel.findById(requestId, connection);
+            if (!request) throw new Error('Maintenance Request not found');
+
+            const leases = await leaseModel.findByTenantId(request.tenantId, connection);
+            
+            // Find most relevant lease
+            let targetLease = leases.find(
+                (l) => l.unitId === request.unitId.toString() && l.status === 'active'
+            );
+
+            if (!targetLease) {
+                const gracePeriodDays = 30;
+                const graceDate = new Date();
+                graceDate.setDate(graceDate.getDate() - gracePeriodDays);
+                
+                const recentLeases = leases
+                    .filter(l => l.unitId === request.unitId.toString() && (l.status === 'expired' || l.status === 'ended'))
+                    .filter(l => l.endDate && new Date(l.endDate) >= graceDate)
+                    .sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime());
+                
+                if (recentLeases.length > 0) {
+                    targetLease = recentLeases[0];
+                }
+            }
+
+            if (!targetLease) {
+                 throw new Error('No active or recently ended lease (within 30 days) found for this tenant/unit. Cannot invoice.');
+            }
+
+            const [unbilledCosts] = await connection.query(
+                'SELECT cost_id, amount FROM maintenance_costs WHERE request_id = ? AND invoice_id IS NULL',
+                [requestId]
+            );
+
+            if (unbilledCosts.length === 0) {
+                 throw new Error('No unbilled costs found for this maintenance request to invoice.');
+            }
+
+            const aggregatedTotalCents = unbilledCosts.reduce((sum, cost) => sum + Number(cost.amount), 0);
+            const costIds = unbilledCosts.map(c => c.cost_id);
+
+            let proposedDescription = description || `Maintenance Bill: ${request.title}`;
+            const existingInvoices = await invoiceModel.findByLeaseAndDescription(
+                targetLease.id,
+                proposedDescription,
+                connection
+            );
+
+            if (existingInvoices.length > 0) {
+                proposedDescription = `${proposedDescription} (${new Date().getTime()})`;
+            }
+
+            const invoiceId = await invoiceModel.create({
+                leaseId: targetLease.id,
+                amount: aggregatedTotalCents,
+                dueDate: dueDate || today(),
+                description: proposedDescription,
+                type: 'maintenance',
+            }, connection);
+
+            // Link all aggregated costs to this new invoice
+            if (costIds.length > 0) {
+                await connection.query('UPDATE maintenance_costs SET invoice_id = ?, is_reimbursable = TRUE WHERE cost_id IN (?)', [invoiceId, costIds]);
+            }
+
+            // [NEW] Attempt to auto-apply any credits
+            await paymentService.applyTenantCredit(invoiceId, connection);
+
+            await connection.commit();
+
+            const displayAmountMajor = aggregatedTotalCents / 100;
+            const finalInvoice = await invoiceModel.findById(invoiceId);
+
+            await notificationModel.create({
+                userId: request.tenantId,
+                message: `You have been billed ${displayAmountMajor} for maintenance: ${request.title}${finalInvoice.status === 'paid' ? ' (Paid via Credit)' : ''}`,
+                type: 'invoice',
+            });
+
+            // Notify Tenant via Email
+            try {
+                const tenant = await userModel.findById(request.tenantId);
+                if (tenant && tenant.email) {
+                    const currentNow = now();
+                    await emailService.sendInvoiceNotification(tenant.email, {
+                        amount: displayAmountMajor,
+                        dueDate: dueDate || today(),
+                        month: currentNow.getMonth() + 1,
+                        year: currentNow.getFullYear(),
+                        invoiceId: invoiceId,
+                        description: proposedDescription,
+                        isPaid: finalInvoice.status === 'paid'
+                    });
+                }
+            } catch (err) {
+                console.error('Failed to send maintenance invoice email:', err);
+            }
+
+            return invoiceId;
+
+        } catch (error) {
+            await connection.rollback();
+            console.error('[MaintenanceService] Create Maintenance Invoice Transaction Failed:', error);
+            throw error;
+        } finally {
+            connection.release();
+        }
     }
-    
+
     async recordCost(data, user) {
         if (user.role !== 'owner' && user.role !== 'treasurer') {
             throw new Error('Access denied');
