@@ -1,6 +1,6 @@
 import express from 'express';
 import payhereController from '../controllers/payhereController.js';
-import { authenticateToken } from '../middleware/authMiddleware.js';
+import { authenticateToken, optionalAuthenticateToken } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
@@ -26,10 +26,10 @@ router.post('/notify', payhereController.handleNotification);
 
 /**
  * @route   POST /api/payhere/simulate-webhook
- * @desc    Simulate a PayHere webhook (Development Only)
- * @access  Public (Should be restricted in production)
+ * @desc    Simulate a PayHere webhook (Authorized via Session or Magic Token)
+ * @access  Private/MagicToken
  */
-router.post('/simulate-webhook', payhereController.simulateWebhook);
+router.post('/simulate-webhook', optionalAuthenticateToken, payhereController.simulateWebhook);
 
 export default router;
 

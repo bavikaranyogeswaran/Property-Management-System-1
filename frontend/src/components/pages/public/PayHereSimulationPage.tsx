@@ -39,6 +39,7 @@ export default function PayHereSimulationPage() {
   const last_name = searchParams.get('last_name');
   const email = searchParams.get('email');
   const item = searchParams.get('items');
+  const custom_1 = searchParams.get('custom_1'); // Magic Token for leads
 
   // Safety check: go back if required data is missing
   useEffect(() => {
@@ -60,7 +61,8 @@ export default function PayHereSimulationPage() {
         order_id,
         amount,
         status_code: '2', // Success
-        payment_id: `SIM-${Date.now()}`
+        payment_id: `SIM-${Date.now()}`,
+        magic_token: custom_1 // Pass authorization token
       });
 
       setStatus('success');

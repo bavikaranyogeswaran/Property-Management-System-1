@@ -31,10 +31,10 @@ export const validateNotificationHash = (payload) => {
         is_simulation
     } = payload;
 
-    // Simulation bypass for local development
-    if (is_simulation === 'true' || is_simulation === true) {
-        console.log(`[PayHereUtils] Simulation bypass detected for Order ID: ${order_id}`);
-        return true;
+    // Verify Merchant ID matches our configuration
+    if (merchant_id !== MERCHANT_ID) {
+        console.error(`[PayHereUtils] Merchant ID mismatch. Received: ${merchant_id}, Expected: ${MERCHANT_ID}`);
+        return false;
     }
 
     const secretHash = crypto.createHash('md5').update(MERCHANT_SECRET || '').digest('hex').toUpperCase();

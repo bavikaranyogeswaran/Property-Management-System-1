@@ -70,14 +70,16 @@ class PayHereService {
      * Processes the notification sent by PayHere.
      * @param {Object} payload 
      */
-    async processNotification(payload) {
+    async processNotification(payload, skipHash = false) {
         console.log('[PayHereService] Received Notification:', payload);
 
-        // 1. Validate Hash
-        const isValid = validateNotificationHash(payload);
-        if (!isValid) {
-            console.error('[PayHereService] Invalid Hash Signature Received');
-            throw new Error('Invalid signature');
+        // 1. Validate Hash (unless skipped by internal authorized simulation)
+        if (!skipHash) {
+            const isValid = validateNotificationHash(payload);
+            if (!isValid) {
+                console.error('[PayHereService] Invalid Hash Signature Received');
+                throw new Error('Invalid signature');
+            }
         }
 
         const { order_id, status_code, payhere_amount, payment_id } = payload;
@@ -100,15 +102,30 @@ class PayHereService {
         // 2. Handle Status Code
         // 2 = Success, 0 = Pending, -1 = Cancelled, -2 = Failed, -3 = Chargedback
         if (status_code === '2') {
-            console.log(`[PayHereService] Payment Successful for Invoice #${invoiceId}`);
+            // 2. Load Invoice and verify amount
+            const invoice = await invoiceModel.findById(invoiceId);
+            if (!invoice) throw new Error('Invoice not found');
+            
+            const expectedCents = Number(invoice.amount);
+            const receivedCents = toCents(payhere_amount);
+            
+            // Variance check (allows 1.00 LKR difference)
+            if (Math.abs(expectedCents - receivedCents) > 100) {
+                console.error(`[PayHereService] Amount mismatch for Invoice #${invoiceId}. Expected: ${expectedCents}, Received: ${receivedCents}`);
+                throw new Error('Payment amount mismatch');
+            }
 
-            // 3. Record the payment in our system
-            // [HARDENED] Ensure the recorded amount is converted to integer cents for the ledger.
-            const paidCents = toCents(payhere_amount);
+            // 3. Check for Duplicate Payment ID (Idempotency)
+            const [existing] = await pool.query('SELECT 1 FROM payments WHERE reference_number = ?', [payment_id]);
+            if (existing.length > 0) {
+                console.warn(`[PayHereService] Duplicate notification for payment ID: ${payment_id}`);
+                return { success: true, message: 'Already processed' };
+            }
 
+            // 4. Record the payment
             await paymentService.recordAutomatedPayment({
                 invoiceId: invoiceId,
-                amount: paidCents,
+                amount: receivedCents,
                 paymentMethod: 'payhere',
                 referenceNumber: payment_id
             });
