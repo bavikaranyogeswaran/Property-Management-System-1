@@ -206,30 +206,12 @@ class MaintenanceService {
             const request = await maintenanceRequestModel.findById(requestId, connection);
             if (!request) throw new Error('Maintenance Request not found');
 
-            const leases = await leaseModel.findByTenantId(request.tenantId, connection);
-            
-            // Find most relevant lease
-            let targetLease = leases.find(
-                (l) => l.unitId === request.unitId.toString() && l.status === 'active'
-            );
+            // [HARDENED] Historical Context Discovery:
+            // Find the lease that was active when the request was created, regardless of time elapsed.
+            const targetLease = await this._getLeaseForRequest(requestId, connection);
 
             if (!targetLease) {
-                const gracePeriodDays = 30;
-                const graceDate = new Date();
-                graceDate.setDate(graceDate.getDate() - gracePeriodDays);
-                
-                const recentLeases = leases
-                    .filter(l => l.unitId === request.unitId.toString() && (l.status === 'expired' || l.status === 'ended'))
-                    .filter(l => l.endDate && new Date(l.endDate) >= graceDate)
-                    .sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime());
-                
-                if (recentLeases.length > 0) {
-                    targetLease = recentLeases[0];
-                }
-            }
-
-            if (!targetLease) {
-                 throw new Error('No active or recently ended lease (within 30 days) found for this tenant/unit. Cannot invoice.');
+                 throw new Error(`Critical Integrity Error: No historical or active lease found for Tenant ID ${request.tenantId} at Unit ${request.unitId}. Maintenance cannot be billed without a ledger recipient.`);
             }
 
             const [unbilledCosts] = await connection.query(
@@ -337,24 +319,8 @@ class MaintenanceService {
             }, connection);
 
             // 2. Identify lease to link ledger entry
-            // [BILLING FIX] Same grace logic for recording costs
-            const leases = await leaseModel.findByTenantId(request.tenantId);
-            let targetLease = leases.find(
-                (l) => l.unitId === request.unitId && l.status === 'active'
-            );
-
-            if (!targetLease) {
-                const graceDate = new Date();
-                graceDate.setDate(graceDate.getDate() - 30);
-                const recentLeases = leases
-                    .filter(l => l.unitId === request.unitId && (l.status === 'expired' || l.status === 'ended'))
-                    .filter(l => l.endDate && new Date(l.endDate) >= graceDate)
-                    .sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime());
-                
-                if (recentLeases.length > 0) {
-                    targetLease = recentLeases[0];
-                }
-            }
+            // [BILLING FIX] Same context-aware logic for recording costs
+            const targetLease = await this._getLeaseForRequest(requestId, connection);
 
             if (targetLease) {
                 // 3. Post to Ledger as an Expense
@@ -366,6 +332,8 @@ class MaintenanceService {
                     description: `Maintenance Cost: ${description || request.title} (Req #${requestId})`,
                     entryDate: recordedDate || getCurrentDateString(),
                 }, connection);
+            } else {
+                console.error(`[MaintenanceService] WARNING: Maintenance cost recorded for Req #${requestId} but NO LEASE was found. Ledger entry skipped. Owner payout will be inaccurate.`);
             }
 
             const auditLogger = (await import('../utils/auditLogger.js')).default;
@@ -384,6 +352,42 @@ class MaintenanceService {
         } finally {
             connection.release();
         }
+    }
+
+    /**
+     * [NEW] Private Helper: Identify the correct lease for a maintenance request.
+     * Prioritizes the lease that was active on the date the request was created.
+     */
+    async _getLeaseForRequest(requestId, connection = null) {
+        const request = await maintenanceRequestModel.findById(requestId);
+        if (!request) return null;
+
+        const leases = await leaseModel.findByTenantId(request.tenantId, connection);
+        const requestDateString = request.createdAt instanceof Date 
+            ? request.createdAt.toISOString().split('T')[0] 
+            : new Date(request.createdAt).toISOString().split('T')[0];
+        
+        // 1. Best Match: Lease active at the time of request
+        let targetLease = leases.find(l => {
+            return l.unitId === request.unitId.toString() && 
+                   requestDateString >= l.startDate && 
+                   (!l.endDate || requestDateString <= l.endDate);
+        });
+
+        // 2. Fallback: Current active lease for the same unit
+        if (!targetLease) {
+            targetLease = leases.find(l => l.unitId === request.unitId.toString() && l.status === 'active');
+        }
+
+        // 3. Fallback: Most recent lease for that unit
+        if (!targetLease) {
+            const unitLeases = leases
+                .filter(l => l.unitId === request.unitId.toString())
+                .sort((a, b) => new Date(b.endDate || '2099-12-31').getTime() - new Date(a.endDate || '2099-12-31').getTime());
+            if (unitLeases.length > 0) targetLease = unitLeases[0];
+        }
+
+        return targetLease;
     }
 
     async getRequests(user) {
