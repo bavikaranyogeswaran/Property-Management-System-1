@@ -256,27 +256,32 @@ class PaymentService {
 
             // 1. [IDEMPOTENCY CHECK] Prevent double-processing of the same gateway transaction
             const existingPayment = await paymentModel.findByReferenceNumber(referenceNumber, conn);
+            let paymentId;
+            
             if (existingPayment) {
                 if (existingPayment.status === 'verified') {
                     console.log(`[PaymentService] Idempotent trigger: Payment for ref ${referenceNumber} already verified. Skipping duplicate.`);
                     if (!isExternalConn) await conn.rollback();
                     return Number(existingPayment.id);
                 }
-                // If it exists but is pending, we might want to update it to verified, 
-                // but the current logic is based on 'record' being the entry point.
-                // For now, we skip if already verified as that's the "Happy path duplicate".
+                
+                // [FIX] RECOVERY LOGIC: If a previously REJECTED or PENDING payment is confirmed by the gateway, 
+                // we update the existing record to 'verified' instead of trying to create a new one (which fails unique constraint).
+                console.log(`[PaymentService] Recovery trigger: Updating existing ${existingPayment.status} payment (Ref: ${referenceNumber}) to verified.`);
+                await paymentModel.updateStatus(existingPayment.id, 'verified', null, conn);
+                paymentId = Number(existingPayment.id);
+            } else {
+                // 2. Create New Verified Payment
+                paymentId = await paymentModel.create({
+                    invoiceId,
+                    amount,
+                    paymentDate: today(),
+                    paymentMethod: paymentMethod || 'online',
+                    referenceNumber,
+                    evidenceUrl: null,
+                    status: 'verified'
+                }, conn);
             }
-
-            // 2. Create Verified Payment
-            const paymentId = await paymentModel.create({
-                invoiceId,
-                amount,
-                paymentDate: today(),
-                paymentMethod: paymentMethod || 'online',
-                referenceNumber,
-                evidenceUrl: null,
-                status: 'verified'
-            }, conn);
 
             const payment = await paymentModel.findById(paymentId, conn);
 
