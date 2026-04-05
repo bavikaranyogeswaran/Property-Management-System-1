@@ -151,7 +151,7 @@ class PaymentService {
                  AND l.status IN ('active', 'draft')
                  AND l.start_date <= ? 
                  AND (l.end_date IS NULL OR l.end_date >= ?)`,
-                [leaseStatus[0].unit_id, invoice.lease_id, leaseStatus[0].end_date, leaseStatus[0].start_date]
+                [lease.unitId, invoice.lease_id, lease.endDate || '2099-12-31', lease.startDate]
             );
 
             if (overlappingPayments.length > 0) {
