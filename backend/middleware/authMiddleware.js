@@ -16,9 +16,9 @@ export const authenticateToken = async (req, res, next) => {
     // Revocation Guard: Check server-side status
     const user = await userModel.findById(decoded.id);
     
-    if (!user || user.status !== 'active') {
-      console.warn(`[Auth] Revoked: User ${decoded.id} is blocked or archived.`);
-      return res.status(401).json({ error: 'Account disabled or deleted. Please contact support.' });
+    if (!user || user.status !== 'active' || user.is_archived) {
+      console.warn(`[Auth] Revoked: User ${decoded.id} is blocked, archived, or inactive (Status: ${user?.status}, Archived: ${user?.is_archived}).`);
+      return res.status(401).json({ error: 'Account disabled, archived, or deleted. Please contact support.' });
     }
     
     // [HARDENED] Strict Session Revocation Check

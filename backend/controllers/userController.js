@@ -299,6 +299,33 @@ class UserController {
       res.status(500).json({ error: error.message });
     }
   }
+
+  async forceLogout(req, res) {
+    try {
+      if (req.user.role !== 'owner') {
+        return res.status(403).json({ error: 'Access denied. Only Owners can force logout users.' });
+      }
+
+      const { id } = req.params;
+      const success = await userService.incrementTokenVersion(id);
+      
+      if (!success) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      const auditLogger = (await import('../utils/auditLogger.js')).default;
+      await auditLogger.log({
+        userId: req.user.id,
+        actionType: 'SECURITY_FORCE_LOGOUT',
+        entityId: id,
+        details: { targetUserId: id, reason: req.body.reason || 'Administrative action' }
+      }, req);
+
+      res.json({ message: 'User sessions invalidated successfully.' });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  }
 }
 
 export default new UserController();

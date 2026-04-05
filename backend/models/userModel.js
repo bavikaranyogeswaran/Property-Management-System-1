@@ -132,7 +132,7 @@ class UserModel {
             LEFT JOIN tenants t ON u.user_id = t.user_id
             LEFT JOIN owners o ON u.user_id = o.user_id
             LEFT JOIN staff s ON u.user_id = s.user_id
-            WHERE u.user_id = ? AND u.is_archived = FALSE
+            WHERE u.user_id = ?
         `;
     const [rows] = await db.query(query, [id]);
     return rows[0];

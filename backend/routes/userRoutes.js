@@ -79,4 +79,12 @@ router.get(
   userController.getAssignedProperties
 );
 
+// Security: Force Logout / Session Revocation
+router.post(
+  '/:id/force-logout',
+  authenticateToken,
+  authorizeRoles('owner'),
+  userController.forceLogout
+);
+
 export default router;
