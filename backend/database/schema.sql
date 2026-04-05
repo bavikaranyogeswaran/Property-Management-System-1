@@ -323,7 +323,7 @@ CREATE TABLE rent_invoices (
     description VARCHAR(255),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (lease_id) REFERENCES leases(lease_id) ON DELETE RESTRICT,
-    UNIQUE KEY unique_periodic_invoice (lease_id, year, month, invoice_type, description)
+    UNIQUE KEY unique_periodic_invoice (lease_id, year, month, invoice_type)
 );
 
 -- =========================
