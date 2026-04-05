@@ -239,7 +239,12 @@ class PaymentService {
         const isExternalConn = !!connection;
 
         try {
-            if (!isExternalConn) await conn.beginTransaction();
+            if (!isExternalConn) {
+                await conn.beginTransaction();
+            } else {
+                // [NEW] Use Savepoint to allow partial rollback within an outer transaction
+                await conn.query('SAVEPOINT record_automated_payment');
+            }
 
             const invoice = await invoiceModel.findById(invoiceId, conn);
             if (!invoice) throw new Error(`Invoice #${invoiceId} not found`);
@@ -290,7 +295,11 @@ class PaymentService {
             const systemUser = { id: null, role: 'system' };
             await this._finalizeVerifiedPayment(paymentId, invoice, payment, systemUser, conn);
 
-            if (!isExternalConn) await conn.commit();
+            if (!isExternalConn) {
+                await conn.commit();
+            } else {
+                await conn.query('RELEASE SAVEPOINT record_automated_payment');
+            }
 
             // 3. Fire-and-forget emails
             try {
@@ -310,7 +319,11 @@ class PaymentService {
             return paymentId;
 
         } catch (error) {
-            if (!isExternalConn) await conn.rollback();
+            if (!isExternalConn) {
+                await conn.rollback();
+            } else {
+                await conn.query('ROLLBACK TO SAVEPOINT record_automated_payment');
+            }
             console.error('[PaymentService] Automated Payment Failed:', error);
             throw error;
         } finally {
@@ -318,19 +331,20 @@ class PaymentService {
         }
     }
 
-    async verifyPayment(paymentId, status, user, reason = null) {
-        if (user.role !== 'treasurer') {
+    async verifyPayment(paymentId, status, user, reason = null, connection = null) {
+        if (user.role !== 'treasurer' && user.role !== 'system') {
             throw new Error('Access denied. Only Treasurers can verify payments.');
         }
 
-        const connection = await pool.getConnection();
+        const conn = connection || await pool.getConnection();
+        const isOwnTransaction = !connection;
         try {
-            await connection.beginTransaction();
+            if (isOwnTransaction) await conn.beginTransaction();
 
-            const payment = await paymentModel.findById(paymentId, connection);
+            const payment = await paymentModel.findById(paymentId, conn);
             if (!payment) throw new Error('Payment not found');
 
-            const invoice = await invoiceModel.findById(payment.invoiceId || payment.invoice_id, connection);
+            const invoice = await invoiceModel.findById(payment.invoiceId || payment.invoice_id, conn);
             if (!invoice) throw new Error('Invoice not found');
 
             // [C3 FIX - Problem 3] Block verification for voided/cancelled invoices
@@ -339,11 +353,11 @@ class PaymentService {
             }
 
             // [C3 FIX - Problem 2] Strict Treasurer Assignment RBAC
-            const lease = await leaseModel.findById(invoice.leaseId || invoice.lease_id, connection);
+            const lease = await leaseModel.findById(invoice.leaseId || invoice.lease_id, conn);
             if (!lease) throw new Error('Lease not found');
             
             const unitModel = (await import('../models/unitModel.js')).default;
-            const unit = await unitModel.findById(lease.unitId || lease.unit_id, connection);
+            const unit = await unitModel.findById(lease.unitId || lease.unit_id, conn);
             
             const staffModel = (await import('../models/staffModel.js')).default;
             const assignedProperties = await staffModel.getAssignedProperties(user.id);
@@ -351,23 +365,23 @@ class PaymentService {
                 throw new Error('Access denied. You are not assigned to this property.');
             }
 
-            const { payment: updatedPayment, changed } = await paymentModel.updateStatus(paymentId, status, null, connection);
+            const { payment: updatedPayment, changed } = await paymentModel.updateStatus(paymentId, status, null, conn);
 
             // [C3 FIX - Problem 4] Concurrency Lock: Throw explicit error on Idempotency catch
             if (!changed) {
-                 await connection.rollback();
+                 if (isOwnTransaction) await conn.rollback();
                  throw new Error('This payment was already verified or rejected by another user.');
             }
 
             if (status === 'verified') {
                 const payment = updatedPayment;
                 if (payment) {
-                    await this._finalizeVerifiedPayment(paymentId, invoice, payment, user, connection);
+                    await this._finalizeVerifiedPayment(paymentId, invoice, payment, user, conn);
                 }
             } else if (status === 'rejected') {
                  const payment = updatedPayment;
                  if (payment) {
-                         const allPayments = await paymentModel.findByInvoiceId(payment.invoiceId, connection);
+                         const allPayments = await paymentModel.findByInvoiceId(payment.invoiceId, conn);
                          const totalVerified = allPayments
                             .filter((p) => p.status === 'verified')
                             .reduce((sum, p) => sum + Number(p.amount), 0);
@@ -380,13 +394,13 @@ class PaymentService {
                                  const isOverdue = now() > parseLocalDate(invoice.due_date);
                                  newStatus = isOverdue ? 'overdue' : 'pending';
                              }
-                             await invoiceModel.updateStatus(invoice.invoice_id, newStatus, connection);
+                             await invoiceModel.updateStatus(invoice.invoice_id, newStatus, conn);
                          }
 
                          if (invoice.invoice_type === 'deposit') {
                               await leaseModel.update(invoice.lease_id, {
                                   deposit_status: 'pending',
-                              }, connection);
+                              }, conn);
                          }
                          
                          const rejectMessage = reason 
@@ -398,18 +412,18 @@ class PaymentService {
                              message: rejectMessage,
                              type: 'payment',
                              severity: 'urgent',
-                          }, connection);
+                          }, conn);
 
                           await auditLogger.log({
                              userId: user.id,
                              actionType: 'PAYMENT_REJECTED',
                              entityId: paymentId,
                              details: { invoiceId: payment.invoiceId, amount: payment.amount, reason },
-                         }, { user: user }, connection);
+                         }, { user: user }, conn);
                      }
                  }
 
-            await connection.commit();
+            if (isOwnTransaction) await conn.commit();
 
             // Fire-and-forget emails outside transaction
             if (status === 'verified') {
@@ -446,11 +460,11 @@ class PaymentService {
             return updatedPayment;
 
         } catch (error) {
-            await connection.rollback();
+            if (isOwnTransaction) await conn.rollback();
             console.error('Verify Payment Transaction Failed:', error);
             throw error;
         } finally {
-            connection.release();
+            if (isOwnTransaction) conn.release();
         }
     }
 
