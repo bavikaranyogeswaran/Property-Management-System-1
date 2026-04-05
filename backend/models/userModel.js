@@ -190,8 +190,9 @@ class UserModel {
 
   async updatePassword(id, passwordHash, connection = null) {
     const db = connection || pool;
+    // [HARDENED] Increment token_version on password change to invalidate other sessions
     const [result] = await db.query(
-      'UPDATE users SET password_hash = ? WHERE user_id = ?',
+      'UPDATE users SET password_hash = ?, token_version = token_version + 1 WHERE user_id = ?',
       [passwordHash, id]
     );
     return result.affectedRows > 0;
@@ -232,8 +233,9 @@ class UserModel {
 
   async setupPassword(id, passwordHash, connection = null) {
     const db = connection || pool;
+    // [HARDENED] Reset token_version on setup to ensure a clean state
     const [result] = await db.query(
-      'UPDATE users SET password_hash = ?, is_email_verified = TRUE, email_verified_at = NOW(), status = "active" WHERE user_id = ?',
+      'UPDATE users SET password_hash = ?, is_email_verified = TRUE, email_verified_at = NOW(), status = "active", token_version = 1 WHERE user_id = ?',
       [passwordHash, id]
     );
     return result.affectedRows > 0;

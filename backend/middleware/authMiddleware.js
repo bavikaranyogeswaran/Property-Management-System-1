@@ -17,13 +17,15 @@ export const authenticateToken = async (req, res, next) => {
     const user = await userModel.findById(decoded.id);
     
     if (!user || user.status !== 'active') {
-      console.warn(`[Auth] Revoked: User ${decoded.id} is no longer active.`);
-      return res.status(401).json({ error: 'Session revoked or account deactivated.' });
+      console.warn(`[Auth] Revoked: User ${decoded.id} is blocked or archived.`);
+      return res.status(401).json({ error: 'Account disabled or deleted. Please contact support.' });
     }
-
-    if (user.tokenVersion !== (decoded.tokenVersion || 0)) {
-      console.warn(`[Auth] Revoked: Token version mismatch for User ${decoded.id}.`);
-      return res.status(401).json({ error: 'Session expired by server. Please log in again.' });
+    
+    // [HARDENED] Strict Session Revocation Check
+    const currentTokenVersion = decoded.tokenVersion || 0;
+    if (user.tokenVersion !== currentTokenVersion) {
+      console.warn(`[Auth] Revoked: Session version mismatch for User ${decoded.id} (${user.tokenVersion} vs ${currentTokenVersion}).`);
+      return res.status(401).json({ error: 'Your session has been logged out by another security event (e.g., password change). Please log in again.' });
     }
 
     req.user = decoded;
