@@ -28,6 +28,12 @@ class MaintenanceService {
             throw new Error('Access denied. You do not have an active lease for this unit.');
         }
 
+        // [HARDENED ANTI-SPAM] Content-Aware Deduplication
+        const isDuplicate = await maintenanceRequestModel.findRecentDuplicate(unitId, tenantId, title, description);
+        if (isDuplicate) {
+             throw new Error('A maintenance request with this exact content was already submitted recently. Please wait a few minutes before trying again.');
+        }
+
         // Flood Protection: Max 5 open requests per unit
         const openCount = await maintenanceRequestModel.countOpenByUnitId(unitId);
         if (openCount >= 5) {

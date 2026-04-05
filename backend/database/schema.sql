@@ -372,8 +372,7 @@ CREATE TABLE maintenance_requests (
     status ENUM('submitted','in_progress','completed') DEFAULT 'submitted',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (unit_id) REFERENCES units(unit_id) ON DELETE CASCADE,
-    FOREIGN KEY (tenant_id) REFERENCES users(user_id) ON DELETE CASCADE,
-    UNIQUE KEY unique_request_spam (unit_id, tenant_id, title, status)
+    FOREIGN KEY (tenant_id) REFERENCES users(user_id) ON DELETE CASCADE
 );
 
 CREATE TABLE maintenance_images (

@@ -196,26 +196,18 @@ class MaintenanceRequestModel {
     try {
       await connection.beginTransaction();
 
-      let result;
-      try {
-        [result] = await connection.query(
-          'INSERT INTO maintenance_requests (unit_id, tenant_id, title, description, priority, category, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
-          [
-            unitId,
-            tenantId,
-            title,
-            description,
-            priority || 'medium',
-            category || 'general',
-            'submitted',
-          ]
-        );
-      } catch (insertErr) {
-        if (insertErr.code === 'ER_DUP_ENTRY') {
-           throw new Error('A maintenance request with this title is already active for this unit.');
-        }
-        throw insertErr;
-      }
+      const [result] = await connection.query(
+        'INSERT INTO maintenance_requests (unit_id, tenant_id, title, description, priority, category, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [
+          unitId,
+          tenantId,
+          title,
+          description,
+          priority || 'medium',
+          category || 'general',
+          'submitted',
+        ]
+      );
       const requestId = result.insertId;
 
       if (images && images.length > 0) {
@@ -264,6 +256,20 @@ class MaintenanceRequestModel {
       [unitId]
     );
     return rows[0].count;
+  }
+
+  async findRecentDuplicate(unitId, tenantId, title, description) {
+    // [HARDENED ANTI-SPAM] Check for EXACT Title + Description match within last 5 minutes
+    // This allows different issues (different descriptions) with the same title, 
+    // but prevents accidental double-clicks or identical spam.
+    const [rows] = await pool.query(
+      `SELECT request_id FROM maintenance_requests 
+       WHERE unit_id = ? AND tenant_id = ? AND title = ? AND description = ? 
+       AND created_at >= DATE_SUB(NOW(), INTERVAL 5 MINUTE)
+       LIMIT 1`,
+      [unitId, tenantId, title, description]
+    );
+    return rows.length > 0;
   }
 }
 
