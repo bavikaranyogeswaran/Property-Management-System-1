@@ -12,6 +12,9 @@ import ledgerModel from '../models/ledgerModel.js';
 import pool from '../config/db.js';
 import { getCurrentDateString, getLocalTime, today, now } from '../utils/dateUtils.js';
 import { toCentsFromMajor } from '../utils/moneyUtils.js';
+import authorizationService from './authorizationService.js';
+import paymentService from './paymentService.js';
+import { ROLES } from '../utils/roleUtils.js';
 
 class MaintenanceService {
 
@@ -72,8 +75,8 @@ class MaintenanceService {
     }
 
     async updateStatus(id, status, user) {
-        if (user.role !== 'owner' && user.role !== 'treasurer') {
-             throw new Error('Only owners and treasurers can update status');
+        if (!authorizationService.isAtLeast(user.role, ROLES.TREASURER)) {
+             throw new Error('Only Treasurers (or Owners) can update maintenance status');
         }
 
         const connection = await pool.getConnection();
@@ -193,8 +196,8 @@ class MaintenanceService {
     }
 
     async createInvoice(data, user) {
-        if (user.role !== 'owner' && user.role !== 'treasurer') {
-            throw new Error('Access denied');
+        if (!authorizationService.isAtLeast(user.role, ROLES.TREASURER)) {
+            throw new Error('Access denied. Only Treasurers (or Owners) can create maintenance invoices.');
         }
 
         const connection = await pool.getConnection();
@@ -295,8 +298,8 @@ class MaintenanceService {
     }
 
     async recordCost(data, user) {
-        if (user.role !== 'owner' && user.role !== 'treasurer') {
-            throw new Error('Access denied');
+        if (!authorizationService.isAtLeast(user.role, ROLES.TREASURER)) {
+            throw new Error('Access denied. Only Treasurers (or Owners) can record maintenance costs.');
         }
 
         const { requestId, amount, description, recordedDate, billTo } = data;

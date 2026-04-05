@@ -6,26 +6,41 @@ import invoiceModel from '../models/invoiceModel.js';
 import paymentModel from '../models/paymentModel.js';
 import maintenanceRequestModel from '../models/maintenanceRequestModel.js';
 import staffModel from '../models/staffModel.js';
+import { ROLES, ROLE_LEVELS, isAtLeast } from '../utils/roleUtils.js';
 
 /**
  * AuthorizationService
  * Centralizes ownership and permission checks for all resources.
- * [REFACTORED]: Now uses Models instead of direct DB queries to ensure architectural integrity.
  */
 class AuthorizationService {
   /**
    * Checks if a user has OWNERSHIP or STAFF access to a property.
+   * [HIERARCHY AWARE]: Owners can access property records even if checking for treasurer-level staff access.
    */
   async canAccessProperty(userId, role, propertyId) {
-    if (role === 'owner') {
-      const property = await propertyModel.findById(propertyId);
-      return property && property.ownerId === userId;
-    }
-    if (role === 'treasurer') {
+    const property = await propertyModel.findById(propertyId);
+    if (!property) return false;
+
+    // 1. Ownership check: If you own it, you can access it (regardless of role level)
+    if (property.ownerId === userId) return true;
+
+    // 2. System access
+    if (role === ROLES.SYSTEM) return true;
+
+    // 3. Staff check: Only treasurers assigned to THIS property have access
+    if (isAtLeast(role, ROLES.TREASURER)) {
       const assigned = await staffModel.getAssignedProperties(userId);
-      return assigned.some(p => p.id === propertyId.toString());
+      return assigned.some(p => p.property_id.toString() === propertyId.toString());
     }
+
     return false;
+  }
+
+  /**
+   * Checks if a role has at least the required permission level.
+   */
+  isAtLeast(currentRole, targetRole) {
+    return isAtLeast(currentRole, targetRole);
   }
 
   /**

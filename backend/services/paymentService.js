@@ -11,7 +11,9 @@ import leaseModel from '../models/leaseModel.js';
 import auditLogger from '../utils/auditLogger.js';
 import ledgerModel from '../models/ledgerModel.js';
 import emailService from '../utils/emailService.js';
-import { getCurrentDateString, getLocalTime, today, now, parseLocalDate, addDays, formatToLocalDate } from '../utils/dateUtils.js';
+import { today, now, parseLocalDate } from '../utils/dateUtils.js';
+import authorizationService from './authorizationService.js';
+import { ROLES } from '../utils/roleUtils.js';
 import { fromCents, toCentsFromMajor } from '../utils/moneyUtils.js';
 
 /**
@@ -73,9 +75,10 @@ class PaymentService {
                 throw new Error('You already have a pending payment for this invoice. Please wait for verification.');
             }
 
+            const centsAmount = toCentsFromMajor(amount);
             const paymentId = await paymentModel.create({
                 invoiceId,
-                amount: toCentsFromMajor(amount),
+                amount: centsAmount,
                 paymentDate,
                 paymentMethod,
                 referenceNumber,
@@ -87,7 +90,7 @@ class PaymentService {
             for (const t of treasurers) {
                 await notificationModel.create({
                     userId: t.user_id,
-                    message: `New Payment submitted for Invoice #${invoiceId} (Amount: ${fromCents(amount).toFixed(2)}).`,
+                    message: `New Payment submitted for Invoice #${invoiceId} (Amount: ${fromCents(centsAmount).toFixed(2)}).`,
                     type: 'payment',
                 }, connection);
             }
@@ -344,8 +347,8 @@ class PaymentService {
     }
 
     async verifyPayment(paymentId, status, user, reason = null, connection = null) {
-        if (user.role !== 'treasurer' && user.role !== 'system') {
-            throw new Error('Access denied. Only Treasurers can verify payments.');
+        if (!authorizationService.isAtLeast(user.role, ROLES.TREASURER)) {
+            throw new Error('Access denied. Only Treasurers (or Owners) can verify payments.');
         }
 
         const conn = connection || await pool.getConnection();
