@@ -401,31 +401,37 @@ class LeaseService {
       }
       
       // [IMPROVEMENT] Backfill Missing Rent Invoices if activated late
-      const start = parseLocalDate(lease.startDate);
-      const now = getLocalTime();
-      const billingEngine = (await import('../utils/billingEngine.js')).default;
-      
-      let cursorDate = new Date(start.getFullYear(), start.getMonth(), 1);
-      const targetDate = new Date(now.getFullYear(), now.getMonth(), 1);
+      // [RESILIENCE] Wrapped in try/catch to ensure activation isn't blocked by non-critical backfill errors.
+      try {
+        const start = parseLocalDate(lease.startDate);
+        const now = getLocalTime();
+        const billingEngine = (await import('../utils/billingEngine.js')).default;
+        
+        let cursorDate = new Date(start.getFullYear(), start.getMonth(), 1);
+        const targetDate = new Date(now.getFullYear(), now.getMonth(), 1);
 
-      while (cursorDate <= targetDate) {
-          const y = cursorDate.getFullYear();
-          const m = cursorDate.getMonth() + 1;
-          
-          const billingInfo = billingEngine.calculateMonthlyRent(lease, y, m);
-          if (billingInfo) {
-              const exists = await invoiceModel.exists(lease.id, y, m, 'rent', conn);
-              if (!exists) {
-                  await invoiceModel.create({
-                      leaseId: lease.id,
-                      amount: billingInfo.amount,
-                      dueDate: billingInfo.dueDate,
-                      description: billingInfo.description,
-                      type: 'rent'
-                  }, conn);
-              }
-          }
-          cursorDate.setMonth(cursorDate.getMonth() + 1);
+        while (cursorDate <= targetDate) {
+            const y = cursorDate.getFullYear();
+            const m = cursorDate.getMonth() + 1;
+            
+            const billingInfo = billingEngine.calculateMonthlyRent(lease, y, m);
+            if (billingInfo) {
+                const exists = await invoiceModel.exists(lease.id, y, m, 'rent', conn);
+                if (!exists) {
+                    await invoiceModel.create({
+                        leaseId: lease.id,
+                        amount: billingInfo.amount,
+                        dueDate: billingInfo.dueDate,
+                        description: billingInfo.description,
+                        type: 'rent'
+                    }, conn);
+                }
+            }
+            cursorDate.setMonth(cursorDate.getMonth() + 1);
+        }
+      } catch (backfillErr) {
+        console.error(`[LeaseService] Automated Rent Backfill failed for Lease #${leaseId}:`, backfillErr);
+        // We do NOT throw here. The lease activation is the priority.
       }
 
       const auditLogger = (await import('../utils/auditLogger.js')).default;

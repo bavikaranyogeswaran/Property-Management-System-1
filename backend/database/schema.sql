@@ -143,6 +143,7 @@ CREATE TABLE units (
     image_url VARCHAR(500),                  -- [ADDED] For primary unit image
     monthly_rent BIGINT NOT NULL,
     status ENUM('available', 'occupied', 'maintenance', 'reserved', 'inactive') DEFAULT 'available',
+    is_turnover_cleared BOOLEAN DEFAULT TRUE, -- [NEW] Manual safety check for move-ins
     is_archived BOOLEAN DEFAULT FALSE,
     archived_at DATETIME,
 
