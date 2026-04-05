@@ -63,7 +63,7 @@ export interface LeaseTerm {
 interface LeaseContextType {
   leases: Lease[];
   addLease: (lease: Omit<Lease, 'id' | 'createdAt'>) => Promise<void>;
-  endLease: (id: string) => Promise<void>;
+  endLease: (id: string, terminationDate: string, terminationFee: number) => Promise<void>;
   renewLease: (id: string, newEndDate: string, newMonthlyRent?: number) => Promise<void>;
   refundDeposit: (id: string, amount: number, notes?: string) => Promise<void>;
   approveRefund: (id: string) => Promise<void>;
@@ -141,8 +141,8 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
     try {
       const response = await apiClient.post('/leases', {
         ...lease,
-        monthlyRent: toCentsFromLKR(lease.monthlyRent),
-        targetDeposit: toCentsFromLKR(lease.targetDeposit || 0),
+        monthlyRent: lease.monthlyRent,
+        targetDeposit: lease.targetDeposit || 0,
       });
       const constructedLease: Lease = {
         ...lease,
@@ -157,9 +157,9 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const endLease = async (id: string) => {
+  const endLease = async (id: string, terminationDate: string, terminationFee: number) => {
     try {
-      await apiClient.post(`/leases/${id}/terminate`);
+      await apiClient.post(`/leases/${id}/terminate`, { terminationDate, terminationFee });
       setLeases(prev => prev.map(l => (l.id === id ? { ...l, status: 'ended' } : l)));
       const lease = leases.find(l => l.id === id);
       if (lease) await updateUnit(lease.unitId, { status: 'available' });
@@ -175,7 +175,7 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
     try {
       await apiClient.post(`/leases/${id}/instant-renew`, { 
         newEndDate, 
-        newMonthlyRent: newMonthlyRent ? toCentsFromLKR(newMonthlyRent) : undefined 
+        newMonthlyRent: newMonthlyRent ? newMonthlyRent : undefined 
       });
       await fetchLeases();
       toast.success('Renewal approved. A new draft lease is ready.');
@@ -189,7 +189,7 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
   const refundDeposit = async (id: string, amount: number, notes?: string) => {
     try {
       await apiClient.post(`/leases/${id}/refund`, { 
-        amount: toCentsFromLKR(amount), 
+        amount: amount, 
         notes 
       });
       await fetchLeases(); // Easier to refetch instead of manual mapping
@@ -395,7 +395,7 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
     try {
       await apiClient.post(`/renewal-requests/${id}/propose`, {
         ...data,
-        proposedMonthlyRent: toCentsFromLKR(data.proposedMonthlyRent)
+        proposedMonthlyRent: data.proposedMonthlyRent
       });
       toast.success('Renewal terms proposed successfully');
       fetchRenewalRequests();

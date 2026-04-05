@@ -20,3 +20,13 @@ export const toLKRFromCents = (cents: number): number => {
 export const toCentsFromLKR = (lkr: number): number => {
   return Math.round(lkr * 100);
 };
+
+export const formatToLocalDate = (dateString: string): string => {
+  if (!dateString) return 'N/A';
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-LK', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+};
