@@ -20,11 +20,22 @@ class LeaseModel {
       status,
       securityDeposit,
       depositStatus,
+      reservationExpiresInDays // [NEW] Pass days to use DB-native math
     } = data;
     const dbConn = connection || db;
+    
+    // [HARDENED] Use SQL-native timestamp math if reservationExpiresInDays is provided
+    let expiryExpr = '?';
+    let expiryValue = data.reservationExpiresAt || null;
+    
+    if (reservationExpiresInDays) {
+        expiryExpr = `DATE_ADD(UTC_TIMESTAMP(), INTERVAL ? DAY)`;
+        expiryValue = reservationExpiresInDays;
+    }
+
     const [result] = await dbConn.query(
       `INSERT INTO leases (tenant_id, unit_id, start_date, end_date, monthly_rent, status, deposit_status, document_url, target_deposit, reservation_expires_at, escalation_percentage, escalation_period_months, last_escalation_date)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ${expiryExpr}, ?, ?, ?)`,
       [
         tenantId,
         unitId,
@@ -35,7 +46,7 @@ class LeaseModel {
         depositStatus || 'pending',
         data.documentUrl || null,
         data.targetDeposit || 0.0,
-        data.reservationExpiresAt || null,
+        expiryValue,
         data.escalationPercentage || null,
         data.escalationPeriodMonths || 12,
         data.lastEscalationDate || null,
@@ -77,8 +88,14 @@ class LeaseModel {
     Object.keys(data).forEach((key) => {
       const column = LeaseModel.UPDATE_KEY_MAP[key];
       if (column && data[key] !== undefined) {
-        fields.push(`${column} = ?`);
-        values.push(data[key]);
+        // [HARDENED] Support for SQL-native timestamp updates if needed
+        if (key === 'reservationExpiresAt' && typeof data[key] === 'object' && data[key].sql) {
+            fields.push(`${column} = ${data[key].sql}`);
+            // No value to push for raw SQL fragments
+        } else {
+            fields.push(`${column} = ?`);
+            values.push(data[key]);
+        }
       }
     });
     values.push(id);

@@ -126,7 +126,7 @@ class LeaseService {
         targetDeposit: toCentsFromMajor(targetDeposit || 0.0),
         documentUrl: documentUrl || null,
         leaseTermId: data.leaseTermId || null,
-        reservationExpiresAt: formatToLocalDate(addDays(today(), 2)), 
+        reservationExpiresInDays: 2, // [HARDENED] Use DB-native math
       };
 
       // 3. Create Lease
@@ -350,7 +350,7 @@ class LeaseService {
       await leaseModel.update(leaseId, { 
         status: 'active', 
         signedAt: getLocalTime(),
-        reservationExpiresAt: null // [NEW] Clear deadline upon activation
+        reservationExpiresAt: { sql: 'NULL' } // [HARDENED] Clear expiry using DB logic
       }, conn);
 
       await visitModel.cancelVisitsForUnit(lease.unitId, todayDate, conn);
