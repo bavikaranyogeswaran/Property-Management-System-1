@@ -455,15 +455,17 @@ export function LeasesPage() {
                 >
                   <AlertTriangle className="size-4" />
                 </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setActivateLeaseId(lease.id)}
-                  className="text-green-600 hover:text-green-700 hover:bg-green-50"
-                  title="Sign & Activate Lease"
-                >
-                  <PlayCircle className="size-4" />
-                </Button>
+                {lease.verificationStatus === 'verified' && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setActivateLeaseId(lease.id)}
+                    className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                    title="Sign & Activate Lease"
+                  >
+                    <PlayCircle className="size-4" />
+                  </Button>
+                )}
                 <Button
                   size="sm"
                   variant="ghost"

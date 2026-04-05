@@ -88,7 +88,13 @@ class LeaseController {
       if (error.message.includes('not found')) return res.status(404).json({ error: error.message });
       if (error.message.includes('draft')) return res.status(400).json({ error: error.message });
       if (error.message.includes('available') || error.message.includes('already leased')) return res.status(409).json({ error: error.message });
-      if (error.message.includes('not fully paid') || error.message.includes('not been verified')) return res.status(400).json({ error: error.message });
+      if (
+        error.message.includes('not fully paid') || 
+        error.message.includes('not been verified') ||
+        error.message.includes('turnover') ||
+        error.message.includes('inspection') ||
+        error.message.includes('occupancy')
+      ) return res.status(400).json({ error: error.message });
       res.status(500).json({ error: error.message });
     }
   }
