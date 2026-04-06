@@ -1,0 +1,20 @@
+{
+  "name": "pms-workspace",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Root workspace for Property Management System",
+  "scripts": {
+    "prepare": "husky",
+    "lint-staged": "lint-staged"
+  },
+  "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^15.4.3",
+    "prettier": "^3.5.2"
+  },
+  "lint-staged": {
+    "**/*.{js,jsx,ts,tsx,json,css,md}": [
+      "prettier --write"
+    ]
+  }
+}
