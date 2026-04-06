@@ -1,13 +1,32 @@
 import winston from 'winston';
 import 'winston-daily-rotate-file';
+import CloudWatchTransport from 'winston-cloudwatch';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { getRequestId } from './correlation.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
-// Define log directory (relative to backend root)
 const logDirectory = path.join(__dirname, '..', 'logs');
+
+/**
+ * PII Redaction Format
+ * Scrubs sensitive keys from metadata before logging.
+ */
+const redact = winston.format((info) => {
+  const sensitiveKeys = ['password', 'token', 'secret', 'cvv', 'creditCard'];
+  const redactObject = (obj) => {
+    for (const key in obj) {
+      if (sensitiveKeys.includes(key.toLowerCase())) {
+        obj[key] = '[REDACTED]';
+      } else if (typeof obj[key] === 'object' && obj[key] !== null) {
+        redactObject(obj[key]);
+      }
+    }
+  };
+  redactObject(info);
+  return info;
+});
 
 /**
  * Custom Log Format: JSON for Production, Colorized for Development
@@ -15,7 +34,14 @@ const logDirectory = path.join(__dirname, '..', 'logs');
 const logFormat = winston.format.combine(
   winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
   winston.format.errors({ stack: true }),
+  redact(),
   winston.format.splat(),
+  // Add Request ID dynamically if available in Async Context
+  winston.format((info) => {
+    const requestId = getRequestId();
+    if (requestId) info.requestId = requestId;
+    return info;
+  })(),
   winston.format.json()
 );
 
@@ -42,9 +68,26 @@ const transports = [
   }),
 ];
 
-// 2. File Transports (Only for non-test environments or specific conditions)
+/**
+ * CloudWatch Transport (Production Only)
+ * Only enabled if AWS_CLOUDWATCH_GROUP is provided in environment.
+ */
+if (process.env.AWS_CLOUDWATCH_GROUP) {
+  transports.push(
+    new CloudWatchTransport({
+      logGroupName: process.env.AWS_CLOUDWATCH_GROUP,
+      logStreamName: `${process.env.NODE_ENV || 'production'}-${new Date().toISOString().split('T')[0]}`,
+      awsAccessKeyId: process.env.AWS_ACCESS_KEY_ID,
+      awsSecretKey: process.env.AWS_SECRET_ACCESS_KEY,
+      awsRegion: process.env.AWS_REGION || 'us-east-1',
+      jsonMessage: true,
+      retentionInDays: 30,
+    })
+  );
+}
+
+// 2. File Transports (Only for non-test environments)
 if (process.env.NODE_ENV !== 'test') {
-  // ERROR rotation
   transports.push(
     new winston.transports.DailyRotateFile({
       filename: path.join(logDirectory, 'error-%DATE%.log'),
@@ -56,7 +99,6 @@ if (process.env.NODE_ENV !== 'test') {
     })
   );
 
-  // COMBINED rotation
   transports.push(
     new winston.transports.DailyRotateFile({
       filename: path.join(logDirectory, 'combined-%DATE%.log'),
@@ -80,5 +122,4 @@ const logger = winston.createLogger({
   exitOnError: false,
 });
 
-// Simple wrapper for better dev experience (optional)
 export default logger;

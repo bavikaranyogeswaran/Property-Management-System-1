@@ -11,6 +11,7 @@ import cors from 'cors';
 import logger from './utils/logger.js';
 import helmet from 'helmet';
 import { apiLimiter, publicPortalLimiter } from './utils/rateLimiters.js';
+import { correlationIdMiddleware } from './utils/correlation.js';
 import { config, validateConfig } from './config/config.js';
 import globalErrorHandler from './controllers/errorController.js';
 import path from 'path';
@@ -115,6 +116,9 @@ app.use((req, res, next) => {
 
 app.use(json());
 app.use(express.urlencoded({ extended: true })); // Added for PayHere form data
+// Apply Correlation ID Middleware (First)
+app.use(correlationIdMiddleware);
+
 // Apply Global API Limiter
 app.use('/api', apiLimiter);
 
