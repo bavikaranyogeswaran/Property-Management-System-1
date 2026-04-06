@@ -6,7 +6,7 @@ import authController from '../controllers/authController.js';
 import passwordController from '../controllers/passwordController.js';
 import { authenticateToken } from '../middleware/authMiddleware.js';
 import validateRequest from '../middleware/validateRequest.js';
-import forgotPasswordLimiter from '../middleware/forgotPasswordLimiter.js';
+import { loginLimiter, sensitiveActionLimiter } from '../utils/rateLimiters.js';
 import {
   loginSchema,
   verifyEmailSchema,
@@ -16,15 +16,7 @@ import {
   changePasswordSchema,
 } from '../schemas/authSchemas.js';
 
-const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 mins
-  max: 10, // 10 attempts
-  message: {
-    error: 'Too many login attempts. Please try again after 15 minutes.',
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
+// Note: local loginLimiter removed, replaced by import
 
 import upload from '../middleware/upload.js';
 
@@ -36,6 +28,7 @@ router.post(
 );
 router.post(
   '/verify-email',
+  sensitiveActionLimiter,
   validateRequest(verifyEmailSchema),
   authController.verifyEmail
 );
@@ -58,12 +51,13 @@ router.post(
 );
 router.post(
   '/forgot-password',
-  forgotPasswordLimiter,
+  sensitiveActionLimiter,
   validateRequest(forgotPasswordSchema),
   passwordController.forgotPassword
 );
 router.post(
   '/reset-password',
+  sensitiveActionLimiter,
   validateRequest(resetPasswordSchema),
   passwordController.resetPassword
 );

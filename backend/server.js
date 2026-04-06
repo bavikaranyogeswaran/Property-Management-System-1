@@ -10,7 +10,7 @@ import express, { json } from 'express';
 import cors from 'cors';
 import logger from './utils/logger.js';
 import helmet from 'helmet';
-import rateLimit from 'express-rate-limit'; // Controls how many requests someone can make (Security)
+import { apiLimiter, publicPortalLimiter } from './utils/rateLimiters.js'; 
 import { config, validateConfig } from './config/config.js';
 import initCronJobs from './utils/cronJobs.js';
 import path from 'path';
@@ -68,23 +68,7 @@ app.use(
 );
 app.use(json());
 app.use(express.urlencoded({ extended: true })); // Added for PayHere form data
-//  Rate Limiting: Prevents hackers from guessing passwords by trying too fast.
-//  If someone fails login 100 times in 15 minutes, we block them.
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
-  message:
-    'Too many login attempts from this IP, please try again after 15 minutes',
-});
-app.use('/api/auth', authLimiter);
-
-// General Rate Limiter: Prevent abuse of all other endpoints
-// Increased to 1000 to accommodate multiple dashboard requests
-const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 1000,
-  message: 'Too many requests from this IP, please try again after 15 minutes',
-});
+// Apply Global API Limiter
 app.use('/api', apiLimiter);
 
 //  File Server: Allows the frontend to see uploaded images (like receipt photos).
@@ -127,7 +111,7 @@ import auditRoutes from './routes/auditRoutes.js';
 import guestPaymentRoutes from './routes/guestPaymentRoutes.js';
 
 // ... (rest of imports)
-app.use('/api/lead-portal', leadPortalRoutes);
+app.use('/api/lead-portal', publicPortalLimiter, leadPortalRoutes);
 
 app.get('/api/health', async (req, res) => {
   try {
@@ -150,7 +134,7 @@ app.get('/api/health', async (req, res) => {
   }
 });
 
-app.use('/api/public/invoice', guestPaymentRoutes);
+app.use('/api/public/invoice', publicPortalLimiter, guestPaymentRoutes);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
