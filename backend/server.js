@@ -82,8 +82,8 @@ app.use(express.urlencoded({ extended: true })); // Added for PayHere form data
 // Apply Global API Limiter
 app.use('/api', apiLimiter);
 
-//  File Server: Allows the frontend to see uploaded images (like receipt photos).
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// NOTE: Local /uploads serving is DEPRECATED in favor of 100% Stateless Cloudinary storage.
+// This ensures the application can scale horizontally without file synchronization issues.
 
 // ============================================================================
 //  ROUTES (The Department Directory)
@@ -126,21 +126,26 @@ app.use('/api/lead-portal', publicPortalLimiter, leadPortalRoutes);
 
 app.get('/api/health', async (req, res) => {
   try {
-    // Attempt to query the database to verify connectivity
+    // 1. Verify Database Connectivity
     await db.query('SELECT 1');
+
     res.json({
       status: 'ok',
       app: 'up',
       database: 'connected',
+      environment: config.env,
+      uptime: process.uptime(),
+      memory: process.memoryUsage().rss,
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    logger.error('[Health Check] Database connection failed:', error.message);
+    logger.error('[Health Check] System health check failed:', error.message);
     res.status(503).json({
       status: 'error',
       app: 'up',
       database: 'disconnected',
       error: error.message,
+      timestamp: new Date().toISOString(),
     });
   }
 });
@@ -211,6 +216,31 @@ if (config.env !== 'test') {
       process.exit(1);
     });
   });
+
+  // 3. Handle Graceful Shutdown (SIGTERM/SIGINT) - Crucial for Docker/K8s logic
+  const shutdown = (signal) => {
+    logger.info(`${signal} received. Starting graceful shutdown...`);
+    server.close(async () => {
+      logger.info('HTTP server closed.');
+      try {
+        await db.destroy();
+        logger.info('Database connections closed.');
+        process.exit(0);
+      } catch (err) {
+        logger.error('Error during database shutdown:', err.message);
+        process.exit(1);
+      }
+    });
+
+    // Force shutdown after 10 seconds if graceful shutdown fails
+    setTimeout(() => {
+      logger.error('Could not close connections in time, forcefully shutting down');
+      process.exit(1);
+    }, 10000);
+  };
+
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
 }
 
 export default app;

@@ -4,11 +4,14 @@ import unitModel from '../models/unitModel.js';
 import unitImageModel from '../models/unitImageModel.js';
 import { v2 as cloudinary } from 'cloudinary';
 
+import { config } from '../config/config.js';
+import logger from '../utils/logger.js';
+
 // Configure Cloudinary for deletion (pattern matching upload.js)
 cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
+  cloud_name: config.cloudinary.cloudName,
+  api_key: config.cloudinary.apiKey,
+  api_secret: config.cloudinary.apiSecret,
 });
 
 // Helper to extract Cloudinary public_id from URL
@@ -149,9 +152,9 @@ class ImageController {
       if (publicId) {
         try {
           await cloudinary.uploader.destroy(publicId);
-          console.log(`Cloudinary asset deleted: ${publicId}`);
+          logger.info(`Cloudinary asset deleted: ${publicId}`);
         } catch (cloudinaryErr) {
-          console.error(
+          logger.error(
             `Failed to delete Cloudinary asset ${publicId}:`,
             cloudinaryErr
           );
