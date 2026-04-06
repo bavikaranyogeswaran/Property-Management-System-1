@@ -5,7 +5,7 @@
   "main": "server.js",
   "type": "module",
   "scripts": {
-    "start": "node server.js",
+    "start": "npx knex migrate:latest && node server.js",
     "dev": "nodemon server.js",
     "format": "prettier --write .",
     "migrate:make": "knex migrate:make",
