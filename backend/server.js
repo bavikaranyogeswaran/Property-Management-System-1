@@ -146,7 +146,6 @@ app.get('/api/health', async (req, res) => {
   }
 });
 
-
 app.use('/api/public/invoice', guestPaymentRoutes);
 
 app.use('/api/auth', authRoutes);
@@ -219,7 +218,10 @@ app.use((err, req, res, next) => {
 // Only start the server if not running in a test environment
 if (process.env.NODE_ENV !== 'test') {
   app.listen(PORT, () => {
-    logger.info(`Server is running on port ${PORT}`, { port: PORT, env: process.env.NODE_ENV || 'development' });
+    logger.info(`Server is running on port ${PORT}`, {
+      port: PORT,
+      env: process.env.NODE_ENV || 'development',
+    });
   });
 }
 
