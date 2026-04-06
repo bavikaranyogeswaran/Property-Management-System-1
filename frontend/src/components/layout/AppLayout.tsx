@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 
 import { Link, useLocation } from 'react-router-dom';
+import { LeaseSwitcher } from './LeaseSwitcher';
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -230,6 +231,9 @@ export function AppLayout({ children }: AppLayoutProps) {
       <div className="flex">
         {/* Sidebar Navigation - Desktop */}
         <aside className="hidden lg:block w-64 bg-white border-r border-gray-200 min-h-[calc(100vh-57px)] sticky top-[57px]">
+          <div className="p-4 border-b">
+            <LeaseSwitcher />
+          </div>
           <nav className="p-4 space-y-1">
             {menuItems.map((item) => {
               const Icon = item.icon;
@@ -255,6 +259,9 @@ export function AppLayout({ children }: AppLayoutProps) {
         {/* Mobile Menu */}
         {isMobileMenuOpen && (
           <div className="lg:hidden fixed inset-0 top-[57px] bg-white z-20 overflow-y-auto">
+            <div className="p-4 border-b">
+              <LeaseSwitcher />
+            </div>
             <nav className="p-4 space-y-1">
               {menuItems.map((item) => {
                 const Icon = item.icon;

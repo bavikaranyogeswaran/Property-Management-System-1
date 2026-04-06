@@ -29,7 +29,7 @@ import { Trophy } from 'lucide-react';
 import { formatLKR } from '@/utils/formatters';
 
 export function TenantDashboard() {
-  const { user } = useAuth();
+  const { user, activeLeaseId, tenantLeases: leasesFromAuth } = useAuth();
   const {
     units,
     leases,
@@ -67,21 +67,26 @@ export function TenantDashboard() {
       });
   }, []);
 
-  // Find tenant's data - in real app, user.id would match tenant.id
-  const tenantLeases = leases.filter((l) => l.status === 'active');
-  const currentLease = tenantLeases[0]; // Simplified: assuming one active lease
+  // Multi-Unit Logic (E19): Use active lease from context
+  const currentLease = leasesFromAuth.find((l) => l.id === activeLeaseId);
 
-  const tenantInvoices = invoices;
+  const tenantInvoices = currentLease 
+    ? invoices.filter(i => i.leaseId === currentLease.id)
+    : [];
   const pendingInvoices = tenantInvoices.filter((i) => i.status === 'pending');
   const paidInvoices = tenantInvoices.filter((i) => i.status === 'paid');
 
-  const tenantPayments = payments;
+  const tenantPayments = currentLease
+    ? payments.filter(p => p.tenantId === user?.id) // Keep all payments for visibility, or filter by invoice's lease if possible
+    : [];
   const pendingPayments = tenantPayments.filter((p) => p.status === 'pending');
   const verifiedPayments = tenantPayments.filter(
     (p) => p.status === 'verified'
   );
 
-  const tenantMaintenanceRequests = maintenanceRequests;
+  const tenantMaintenanceRequests = currentLease
+    ? maintenanceRequests.filter(r => r.unitId === currentLease.unitId)
+    : [];
   const openRequests = tenantMaintenanceRequests.filter(
     (r) => r.status === 'submitted' || r.status === 'in_progress'
   );
@@ -263,7 +268,7 @@ export function TenantDashboard() {
       <NotificationBanner
         notifications={notifications}
         userRole="tenant"
-        tenantId={tenantLeases[0]?.tenantId}
+        tenantId={user?.id}
       />
 
       {/* Alerts */}

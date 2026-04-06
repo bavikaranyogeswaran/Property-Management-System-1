@@ -35,7 +35,7 @@ import { ReceiptViewer } from '@/components/common/ReceiptViewer';
 import { formatLKR } from '@/utils/formatters';
 
 export function TenantPaymentsPage() {
-  const { user } = useAuth();
+  const { user, activeLeaseId, tenantLeases: leasesFromAuth } = useAuth();
   const { payments, receipts, invoices, units, properties, tenants } = useApp();
   const [selectedReceipt, setSelectedReceipt] = useState<{
     receipt: ReceiptType;
@@ -49,8 +49,16 @@ export function TenantPaymentsPage() {
   } | null>(null);
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
 
-  // In a real app, filter by actual tenant ID
-  const tenantPayments = payments;
+  // Multi-Unit Logic (E19): Use active lease from context
+  const currentLease = leasesFromAuth.find((l) => l.id === activeLeaseId);
+
+  const tenantPayments = currentLease
+    ? payments.filter((p) => {
+        const inv = invoices.find(i => i.id === p.invoiceId);
+        return inv?.leaseId === currentLease.id;
+      })
+    : [];
+
   const verifiedPayments = tenantPayments.filter(
     (p) => p.status === 'verified'
   );

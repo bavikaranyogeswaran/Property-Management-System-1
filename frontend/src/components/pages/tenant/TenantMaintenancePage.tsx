@@ -25,7 +25,7 @@ import { Wrench, Plus, Clock, CheckCircle, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
 export function TenantMaintenancePage() {
-  const { user } = useAuth();
+  const { user, activeLeaseId, tenantLeases: leasesFromAuth } = useAuth();
   const {
     maintenanceRequests,
     leases,
@@ -42,14 +42,16 @@ export function TenantMaintenancePage() {
   });
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
 
-  // In real app, filter by actual tenant ID
-  const tenantLeases = leases.filter((l) => l.status === 'active');
-  const tenantUnit = tenantLeases[0]
-    ? units.find((u) => u.id === tenantLeases[0].unitId)
+  // Multi-Unit Logic (E19): Use active lease from context instead of hardcoded [0]
+  const tenantLease = leasesFromAuth.find((l) => l.id === activeLeaseId);
+  const tenantUnit = tenantLease
+    ? units.find((u) => u.id === tenantLease.unitId)
     : null;
 
-  // Filter maintenance requests for this tenant
-  const tenantRequests = maintenanceRequests;
+  // Filter maintenance requests for the specific active unit
+  const tenantRequests = maintenanceRequests.filter(
+    (r) => r.unitId === tenantLease?.unitId
+  );
   const openRequests = tenantRequests.filter(
     (r) => r.status === 'submitted' || r.status === 'in_progress'
   );

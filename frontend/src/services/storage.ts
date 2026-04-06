@@ -28,6 +28,15 @@ export const storage = {
     localStorage.removeItem('user');
   },
 
+  // Lease management
+  getActiveLeaseId: (): string | null => {
+    return localStorage.getItem('activeLeaseId');
+  },
+
+  setActiveLeaseId: (id: string): void => {
+    localStorage.setItem('activeLeaseId', id);
+  },
+
   // Clear all storage
   clear: (): void => {
     localStorage.clear();

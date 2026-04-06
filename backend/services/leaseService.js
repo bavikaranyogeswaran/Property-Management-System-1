@@ -87,22 +87,10 @@ class LeaseService {
         throw new Error('Unit is no longer available (inactive).');
       }
 
-      // 2a. Check for Same-tenant overlap
-      const activeLeases = await leaseModel.findByTenantId(tenantId);
-      const hasOverlappingActiveLease = activeLeases.some(l => {
-        if (l.status !== 'active' && l.status !== 'draft') return false;
-        
-        const lStart = parseLocalDate(l.startDate);
-        const lEnd = l.endDate ? parseLocalDate(l.endDate) : parseLocalDate('2099-12-31');
-        const reqStart = parseLocalDate(startDate);
-        const reqEnd = endDate ? parseLocalDate(endDate) : parseLocalDate('2099-12-31');
-        
-        return reqStart <= lEnd && reqEnd >= lStart;
-      });
-
-      if (hasOverlappingActiveLease) {
-        throw new Error('Tenant already holds an overlapping active or draft lease.');
-      }
+      // 2a. [REMOVED] Same-tenant overlap check (Supporting Multi-Unit Leases)
+      // We no longer block a single tenant from holding multiple active leases 
+      // across different units or properties. Unit-level availability is still 
+      // strictly enforced by the check below.
 
       // 2. Check for Date Overlaps
       const hasOverlap = await leaseModel.checkOverlap(

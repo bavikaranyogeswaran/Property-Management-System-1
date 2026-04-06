@@ -7,6 +7,8 @@ import React, {
   ReactNode,
 } from 'react';
 import authService from '../../services/auth';
+import { leaseApi } from '../../services/api';
+import storage from '../../services/storage';
 
 export type UserRole = 'owner' | 'tenant' | 'treasurer' | 'lead';
 
@@ -34,6 +36,12 @@ interface AuthContextType {
   updateProfile: (data: Partial<User>) => Promise<void>;
   changePassword: (data: any) => Promise<void>;
   refreshUser: () => Promise<void>;
+  
+  // Multi-Unit (E19)
+  tenantLeases: any[];
+  activeLeaseId: string | null;
+  setActiveLeaseId: (id: string) => void;
+  isLoadingLeases: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -41,7 +49,36 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [tenantLeases, setTenantLeases] = useState<any[]>([]);
+  const [activeLeaseId, setActiveLeaseIdState] = useState<string | null>(null);
+  const [isLoadingLeases, setIsLoadingLeases] = useState(false);
   const logoutTimerRef = useRef<number | null>(null);
+
+  const setActiveLeaseId = (id: string) => {
+    setActiveLeaseIdState(id);
+    storage.setActiveLeaseId(id);
+  };
+
+  const fetchLeases = async (userId: string) => {
+    try {
+      setIsLoadingLeases(true);
+      const res = await leaseApi.getLeases();
+      const activeOnly = res.data.filter((l: any) => l.status === 'active' || l.status === 'draft');
+      setTenantLeases(activeOnly);
+      
+      // Select active lease: Persisted > First Active > First found
+      const storedId = storage.getActiveLeaseId();
+      if (storedId && activeOnly.some((l: any) => l.id === storedId)) {
+        setActiveLeaseIdState(storedId);
+      } else if (activeOnly.length > 0) {
+        setActiveLeaseId(activeOnly[0].id);
+      }
+    } catch (err) {
+      console.error('[AuthContext] Failed to fetch tenant leases:', err);
+    } finally {
+      setIsLoadingLeases(false);
+    }
+  };
 
   const clearLogoutTimer = () => {
     if (logoutTimerRef.current) {
@@ -76,9 +113,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const remainingTime = authService.getTokenRemainingTime();
         scheduleLogout(remainingTime);
         
+        if (storedUser.role === 'tenant') {
+            fetchLeases(storedUser.id);
+        }
+
         // Sync with backend to ensure the local user data is not stale
         authService.getProfile().then(user => {
-          if (user) setUser(user);
+          if (user) {
+              setUser(user);
+              if (user.role === 'tenant' && tenantLeases.length === 0) fetchLeases(user.id);
+          }
         }).catch(err => {
           console.error('[AuthContext] Initial sync failed:', err);
           // If 401, the interceptor will handle it, otherwise keep local for now
@@ -101,6 +145,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const { user } = await authService.login({ email, password });
       setUser(user);
+      if (user.role === 'tenant') {
+          await fetchLeases(user.id);
+      }
       const remainingTime = authService.getTokenRemainingTime();
       scheduleLogout(remainingTime);
       return true;
@@ -152,6 +199,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         updateProfile,
         changePassword,
         refreshUser,
+        tenantLeases,
+        activeLeaseId,
+        setActiveLeaseId,
+        isLoadingLeases,
       }}
     >
       {children}

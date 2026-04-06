@@ -139,6 +139,13 @@ export const userApi = {
   getUserById: (id: string) => apiClient.get(`/users/${id}`),
 };
 
+// Lease API
+export const leaseApi = {
+  getLeases: () => apiClient.get('/leases'),
+  getById: (id: string) => apiClient.get(`/leases/${id}`),
+  updateNotice: (id: string, status: string) => apiClient.put(`/leases/${id}/notice`, { status }),
+};
+
 // Receipts
 export const receiptApi = {
   getReceipts: () => apiClient.get('/receipts'),

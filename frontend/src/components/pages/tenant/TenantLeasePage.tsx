@@ -19,13 +19,18 @@ import { Button } from '@/components/ui/button';
 import { formatLKR } from '@/utils/formatters';
 
 export function TenantLeasePage() {
-  const { user } = useAuth();
+  const { user, activeLeaseId, tenantLeases: leasesFromAuth } = useAuth();
   const { leases, units, properties, updateNoticeStatus, renewalRequests, acknowledgeRefund, disputeRefund } = useApp();
 
+  // Multi-Unit Logic (E19): Use active lease from context
+  const tenantLease = leasesFromAuth.find((l) => l.id === activeLeaseId);
+  const tenantUnit = tenantLease
+    ? units.find((u) => u.id === tenantLease.unitId)
+    : null;
+
   // Separate active and past leases
-  const activeLeases = leases.filter((l) => l.status === 'active');
-  const pastLeases = leases.filter((l) => l.status !== 'active');
-  const currentLease = activeLeases[0];
+  const activeLeases = leases.filter((l) => l.status === 'active' && l.id === activeLeaseId);
+  const pastLeases = leases.filter((l) => l.status !== 'active' && leasesFromAuth.some(tl => tl.id === l.id));
 
   // Helper: get unit and property info for a lease
   const getLeaseDetails = (lease: Lease) => {

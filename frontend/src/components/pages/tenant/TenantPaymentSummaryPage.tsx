@@ -16,13 +16,27 @@ import {
 import { formatLKR } from '@/utils/formatters';
 
 export function TenantPaymentSummaryPage() {
-  const { user } = useAuth();
+  const { user, activeLeaseId, tenantLeases: leasesFromAuth } = useAuth();
   const { payments, invoices, receipts } = useApp();
 
+  // Multi-Unit Logic (E19): Use active lease from context
+  const currentLease = leasesFromAuth.find((l) => l.id === activeLeaseId);
+
+  const tenantInvoices = currentLease
+    ? invoices.filter((i) => i.leaseId === currentLease.id)
+    : [];
+
+  const tenantPayments = currentLease
+    ? payments.filter((p) => {
+        const inv = invoices.find(i => i.id === p.invoiceId);
+        return inv?.leaseId === currentLease.id;
+      })
+    : [];
+
   // Payment stats
-  const verifiedPayments = payments.filter((p) => p.status === 'verified');
-  const pendingPayments = payments.filter((p) => p.status === 'pending');
-  const rejectedPayments = payments.filter((p) => p.status === 'rejected');
+  const verifiedPayments = tenantPayments.filter((p) => p.status === 'verified');
+  const pendingPayments = tenantPayments.filter((p) => p.status === 'pending');
+  const rejectedPayments = tenantPayments.filter((p) => p.status === 'rejected');
 
   const totalPaid = verifiedPayments.reduce((sum, p) => sum + p.amount, 0);
   const totalPending = pendingPayments.reduce((sum, p) => sum + p.amount, 0);
@@ -152,7 +166,7 @@ export function TenantPaymentSummaryPage() {
     },
   ];
 
-  const totalPaymentCount = payments.length || 1;
+  const totalPaymentCount = tenantPayments.length || 1;
 
   const statusColors: Record<string, string> = {
     verified: 'bg-green-100 text-green-800',
@@ -214,7 +228,7 @@ export function TenantPaymentSummaryPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {payments.length === 0 ? (
+            {tenantPayments.length === 0 ? (
               <p className="text-sm text-gray-500 text-center py-8">
                 No payment data available yet
               </p>
@@ -255,7 +269,7 @@ export function TenantPaymentSummaryPage() {
             <CardTitle>Payment Status</CardTitle>
           </CardHeader>
           <CardContent>
-            {payments.length === 0 ? (
+            {tenantPayments.length === 0 ? (
               <p className="text-sm text-gray-500 text-center py-8">
                 No payments yet
               </p>
@@ -344,7 +358,7 @@ export function TenantPaymentSummaryPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {payments.length === 0 ? (
+          {tenantPayments.length === 0 ? (
             <p className="text-sm text-gray-500 text-center py-8">
               No payments made yet. Submit your first payment from the Payments
               page.
@@ -364,7 +378,7 @@ export function TenantPaymentSummaryPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {[...payments]
+                  {[...tenantPayments]
                     .sort(
                       (a, b) =>
                         new Date(b.submittedAt).getTime() -

@@ -35,7 +35,7 @@ import apiClient from '@/services/api';
 import { formatLKR } from '@/utils/formatters';
 
 export function TenantInvoicesPage() {
-  const { user } = useAuth();
+  const { user, activeLeaseId, tenantLeases: leasesFromAuth } = useAuth();
   const {
     invoices,
     payments,
@@ -68,9 +68,13 @@ export function TenantInvoicesPage() {
   const [preparingPayHere, setPreparingPayHere] = useState(false);
   const [payHereData, setPayHereData] = useState<any>(null);
 
-  // In a real app, filter by actual tenant ID
-  const tenantInvoices = invoices;
-  const pendingInvoices = tenantInvoices.filter((i) => i.status === 'pending');
+  // Multi-Unit Logic (E19): Use active lease from context
+  const currentLease = leasesFromAuth.find((l) => l.id === activeLeaseId);
+
+  const tenantInvoices = currentLease
+    ? invoices.filter((i) => i.leaseId === currentLease.id)
+    : [];
+  const pendingInvoices = tenantInvoices.filter((i) => i.status === 'pending' || i.status === 'partially_paid');
   const paidInvoices = tenantInvoices.filter((i) => i.status === 'paid');
   // Fix: Compare dates strictly (YYYY-MM-DD string comparison works if format is ISO)
   // Fix: Compare dates strictly (YYYY-MM-DD string comparison works if format is ISO)
