@@ -50,7 +50,7 @@ export const authenticateToken = async (req, res, next) => {
   }
 };
 
-export const optionalAuthenticateToken = (req, res, next) => {
+export const optionalAuthenticateToken = async (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
@@ -59,25 +59,39 @@ export const optionalAuthenticateToken = (req, res, next) => {
     return next();
   }
 
-  verify(token, process.env.JWT_SECRET, (err, user) => {
-    if (err) {
-      // If a token was provided but is invalid/expired, return 401
-      // instead of silently failing and treating as guest.
-      console.warn('[Auth] Optional Auth: Invalid token provided. Rejecting.');
-      return res.status(401).json({
-        error: 'Session expired or invalid token. Please log in again.',
-      });
+  try {
+    const decoded = verify(token, process.env.JWT_SECRET);
+
+    // [HARDENED] Even in optional auth, we verify against the DB if a token is present.
+    // This prevents "Ghost Access" where a blocked user appears authenticated on public pages.
+    const user = await userModel.findById(decoded.id);
+
+    if (!user || user.status !== 'active' || user.is_archived) {
+      req.user = null; // Treat as guest if blocked/deleted
+      return next();
     }
-    req.user = user;
+
+    if (user.tokenVersion !== (decoded.tokenVersion || 0)) {
+      req.user = null; // Treat as guest if session revoked
+      return next();
+    }
+
+    // [HARDENED] Real-time Role Synchronization
+    req.user = { ...decoded, role: user.role };
     next();
-  });
+  } catch (err) {
+    // If token is malformed/expired, the user experience choice is to either reject (consistency)
+    // or ignore (lax). Given the sensitive nature of roles, we reject to force a re-login.
+    console.warn('[Auth] Optional Auth: Invalid token provided. Rejecting.');
+    return res.status(401).json({
+      error: 'Session expired or invalid token. Please log in again.',
+    });
+  }
 };
 
 export const authorizeRoles = (...roles) => {
   return (req, res, next) => {
-    // console.log('[Auth] Checking roles:', roles, 'User role:', req.user?.role);
     if (!req.user || !roles.includes(req.user.role)) {
-      console.log('[Auth] Access denied. User:', req.user);
       return res
         .status(403)
         .json({ error: `Access denied. Required role: ${roles.join(' or ')}` });
@@ -89,21 +103,28 @@ export const authorizeRoles = (...roles) => {
 /**
  * Centrally enforces resource-level authorization.
  * Wraps AuthorizationService into a reusable middleware.
- * Expects resource ID in req.params.id or req.params[paramName].
+ * [HARDENED]: Looks for resourceId in params, body, or query for maximum flexibility.
  */
 export const authorizeResource = (resourceType, paramName = 'id') => {
   return async (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
     const userId = req.user.id;
     const role = req.user.role;
-    const resourceId = req.params[paramName];
+
+    // Multi-source ID lookup: Priority Params > Body > Query
+    const resourceId =
+      req.params[paramName] || req.body[paramName] || req.query[paramName];
 
     if (!resourceId) {
       console.error(
-        `[Auth] Missing ${paramName} for ${resourceType} authorization.`
+        `[Auth] Missing ${paramName} for ${resourceType} authorization (checked params, body, and query).`
       );
       return res
         .status(400)
-        .json({ error: 'System error: Identity check failed (Missing ID).' });
+        .json({ error: `Missing required identity check: ${paramName}` });
     }
 
     let authorized = false;
