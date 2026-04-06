@@ -3,8 +3,8 @@ import unitController from '../controllers/unitController.js';
 import {
   authenticateToken,
   authorizeRoles,
+  authorizeResource,
 } from '../middleware/authMiddleware.js';
-import { authorizeResource } from '../middleware/resourceAuthMiddleware.js';
 
 const router = Router();
 

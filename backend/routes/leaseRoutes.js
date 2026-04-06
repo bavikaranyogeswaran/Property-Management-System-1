@@ -1,7 +1,9 @@
 import { Router } from 'express';
 import leaseController from '../controllers/leaseController.js';
-import { authenticateToken } from '../middleware/authMiddleware.js';
-import { authorizeResource } from '../middleware/resourceAuthMiddleware.js';
+import {
+  authenticateToken,
+  authorizeResource,
+} from '../middleware/authMiddleware.js';
 
 const router = Router();
 

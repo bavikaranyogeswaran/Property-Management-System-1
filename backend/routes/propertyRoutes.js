@@ -3,9 +3,10 @@ import propertyController from '../controllers/propertyController.js';
 import {
   authenticateToken,
   authorizeRoles,
+  authorizeResource,
   optionalAuthenticateToken,
 } from '../middleware/authMiddleware.js';
-import { authorizeResource } from '../middleware/resourceAuthMiddleware.js';
+
 import upload from '../middleware/upload.js';
 
 const router = Router();

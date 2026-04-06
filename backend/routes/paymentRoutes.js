@@ -4,8 +4,9 @@ import paymentController from '../controllers/paymentController.js';
 import {
   authenticateToken,
   authorizeRoles,
+  authorizeResource,
 } from '../middleware/authMiddleware.js';
-import { authorizeResource } from '../middleware/resourceAuthMiddleware.js';
+
 import validateRequest from '../middleware/validateRequest.js';
 import {
   submitPaymentSchema,

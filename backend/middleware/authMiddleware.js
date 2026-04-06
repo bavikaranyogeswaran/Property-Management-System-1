@@ -103,9 +103,18 @@ export const authorizeRoles = (...roles) => {
 /**
  * Centrally enforces resource-level authorization.
  * Wraps AuthorizationService into a reusable middleware.
- * [HARDENED]: Looks for resourceId in params, body, or query for maximum flexibility.
+ * [HARDENED]: Now requires explicit source binding (params, body, or query)
+ * to prevent ID Pollution vulnerabilities. Defaults to 'params' for safety.
+ *
+ * @param {string} resourceType - The type of resource ('property', 'unit', 'lease', 'invoice', 'payment', 'maintenance_request')
+ * @param {string} paramName - The name of the ID field in the request (default: 'id')
+ * @param {string} source - The source of the ID (params, body, or query) (default: 'params')
  */
-export const authorizeResource = (resourceType, paramName = 'id') => {
+export const authorizeResource = (
+  resourceType,
+  paramName = 'id',
+  source = 'params'
+) => {
   return async (req, res, next) => {
     if (!req.user) {
       return res.status(401).json({ error: 'Authentication required' });
@@ -114,17 +123,16 @@ export const authorizeResource = (resourceType, paramName = 'id') => {
     const userId = req.user.id;
     const role = req.user.role;
 
-    // Multi-source ID lookup: Priority Params > Body > Query
-    const resourceId =
-      req.params[paramName] || req.body[paramName] || req.query[paramName];
+    // [HARDENED] Strict source binding to prevent Parameter/ID Pollution
+    const resourceId = req[source]?.[paramName];
 
     if (!resourceId) {
       console.error(
-        `[Auth] Missing ${paramName} for ${resourceType} authorization (checked params, body, and query).`
+        `[Auth] Missing ${paramName} in req.${source} for ${resourceType} authorization.`
       );
-      return res
-        .status(400)
-        .json({ error: `Missing required identity check: ${paramName}` });
+      return res.status(400).json({
+        error: `Missing required identity check: ${paramName} (expected in ${source})`,
+      });
     }
 
     let authorized = false;
@@ -165,7 +173,8 @@ export const authorizeResource = (resourceType, paramName = 'id') => {
             resourceId
           );
           break;
-        case 'maintenanceRequest':
+        case 'maintenance_request':
+        case 'maintenanceRequest': // Keep backward compatibility for temporary internal calls if any
           authorized = await authorizationService.canAccessMaintenanceRequest(
             userId,
             role,
