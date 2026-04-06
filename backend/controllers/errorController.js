@@ -1,6 +1,7 @@
 import AppError from '../utils/AppError.js';
 import logger from '../utils/logger.js';
 import { config } from '../config/config.js';
+import { cleanupRequestAssets } from '../services/assetService.js';
 
 /**
  * Handle Specific Database Errors
@@ -61,7 +62,10 @@ const sendErrorProd = (err, req, res) => {
 /**
  * Global Error Handler Middleware
  */
-export default (err, req, res, next) => {
+export default async (err, req, res, next) => {
+  // Fire-and-forget immediate cleanup of orphaned files
+  cleanupRequestAssets(req);
+
   err.statusCode = err.statusCode || 500;
   err.status = err.status || 'error';
 
