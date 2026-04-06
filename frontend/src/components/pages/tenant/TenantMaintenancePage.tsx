@@ -386,7 +386,8 @@ export function TenantMaintenancePage() {
                         <span>•</span>
                         <span className="font-medium text-gray-700">
                           {request.category.charAt(0).toUpperCase() +
-                            request.category.slice(1)} ({request.priority})
+                            request.category.slice(1)}{' '}
+                          ({request.priority})
                         </span>
                         <span>•</span>
                         <span>Submitted: {request.submittedDate}</span>

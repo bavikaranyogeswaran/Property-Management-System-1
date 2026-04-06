@@ -33,7 +33,17 @@ class LedgerModel {
         `INSERT INTO accounting_ledger 
          (payment_id, invoice_id, lease_id, account_type, category, debit, credit, description, entry_date) 
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [paymentId, invoiceId, leaseId, accountType, category, debit, credit, description, entryDate]
+        [
+          paymentId,
+          invoiceId,
+          leaseId,
+          accountType,
+          category,
+          debit,
+          credit,
+          description,
+          entryDate,
+        ]
       );
       return result.insertId;
     } catch (err) {
@@ -42,7 +52,7 @@ class LedgerModel {
         // Usually, double-posting is an error, but we want the outer transaction to succeed if possible or handle it.
         // For audit trail, let's log but don't strictly crash if it's already recorded.
         console.warn('Attempted to double-post to ledger:', description);
-        return null; 
+        return null;
       }
       throw err;
     }
@@ -60,7 +70,7 @@ class LedgerModel {
       debit: Number(row.debit),
       credit: Number(row.credit),
       description: row.description,
-      entryDate: row.entry_date
+      entryDate: row.entry_date,
     };
   }
 
@@ -72,7 +82,7 @@ class LedgerModel {
       `SELECT * FROM accounting_ledger WHERE lease_id = ? ORDER BY entry_date DESC, entry_id DESC`,
       [leaseId]
     );
-    return rows.map(row => this.mapRow(row));
+    return rows.map((row) => this.mapRow(row));
   }
 
   /**
@@ -104,8 +114,8 @@ class LedgerModel {
       const name = row.property_name;
       if (!summary[name]) {
         summary[name] = {
-          revenue: 0,          // Collected (Credits)
-          revenueEarned: 0,    // Invoiced (Debits)
+          revenue: 0, // Collected (Credits)
+          revenueEarned: 0, // Invoiced (Debits)
           liabilityHeld: 0,
           liabilityRefunded: 0,
           expense: 0,
@@ -124,7 +134,8 @@ class LedgerModel {
         // Expenses increase with credit (in our payments-are-credits logic?)
         // Actually paymentService.js Case 'maintenance' -> Account 'expense', Credit: amount.
         // So Expenses are Credits.
-        summary[name].expense += Number(row.total_credit) - Number(row.total_debit);
+        summary[name].expense +=
+          Number(row.total_credit) - Number(row.total_debit);
       }
     });
 
@@ -136,7 +147,13 @@ class LedgerModel {
    */
   async getYearlySummary(propertyIds, year) {
     if (!propertyIds || propertyIds.length === 0) {
-      return { totalRevenue: 0, totalLiabilityHeld: 0, totalLiabilityRefunded: 0, totalExpense: 0, netOperatingIncome: 0 };
+      return {
+        totalRevenue: 0,
+        totalLiabilityHeld: 0,
+        totalLiabilityRefunded: 0,
+        totalExpense: 0,
+        netOperatingIncome: 0,
+      };
     }
 
     const [rows] = await pool.query(
@@ -222,7 +239,8 @@ class LedgerModel {
       if (row.account_type === 'revenue') {
         monthlyData[month].revenue += Number(row.total_credit);
       } else if (row.account_type === 'expense') {
-        monthlyData[month].expense += Number(row.total_credit) - Number(row.total_debit);
+        monthlyData[month].expense +=
+          Number(row.total_credit) - Number(row.total_debit);
       }
     });
 

@@ -15,7 +15,7 @@ class InvoiceController {
     } catch (error) {
       console.error(error);
       if (error.message.includes('Access denied')) {
-          return res.status(403).json({ error: error.message });
+        return res.status(403).json({ error: error.message });
       }
       res.status(500).json({ error: 'Failed to fetch invoices' });
     }
@@ -31,7 +31,7 @@ class InvoiceController {
     } catch (error) {
       console.error(error);
       if (error.message.includes('Denied')) {
-          return res.status(403).json({ error: error.message });
+        return res.status(403).json({ error: error.message });
       }
       res.status(500).json({ error: 'Error creating invoice' });
     }
@@ -42,25 +42,29 @@ class InvoiceController {
   async generateMonthlyInvoices(req, res) {
     try {
       const { year, month } = req.body;
-      const result = await invoiceService.generateMonthlyInvoices(year, month, req.user);
-      
+      const result = await invoiceService.generateMonthlyInvoices(
+        year,
+        month,
+        req.user
+      );
+
       res.json({
         message: 'Invoice generation complete',
         ...result,
       });
     } catch (error) {
       console.error('Error generating invoices:', error);
-      
+
       if (error.message.includes('already in progress')) {
         return res.status(409).json({ error: error.message });
       }
-      
+
       if (error.message.includes('recently completed')) {
         return res.status(429).json({ error: error.message });
       }
 
       if (error.message.includes('Access denied')) {
-           return res.status(403).json({ error: error.message });
+        return res.status(403).json({ error: error.message });
       }
       res.status(500).json({ error: 'Failed to generate invoices' });
     }
@@ -73,8 +77,12 @@ class InvoiceController {
       const { status } = req.body;
 
       console.log(`Update Status by ${req.user.role} ${req.user.id}`);
-      
-      const updatedInvoice = await invoiceService.updateStatus(id, status, req.user);
+
+      const updatedInvoice = await invoiceService.updateStatus(
+        id,
+        status,
+        req.user
+      );
 
       res.json({
         message: `Invoice status updated to ${status}`,
@@ -83,13 +91,16 @@ class InvoiceController {
     } catch (error) {
       console.error(error);
       if (error.message.includes('Access denied')) {
-           return res.status(403).json({ error: error.message });
+        return res.status(403).json({ error: error.message });
       }
-      if (error.message.includes('measure') || error.message.includes('Cannot mark')) {
-           return res.status(400).json({ error: error.message });
+      if (
+        error.message.includes('measure') ||
+        error.message.includes('Cannot mark')
+      ) {
+        return res.status(400).json({ error: error.message });
       }
       if (error.message.includes('not found')) {
-           return res.status(404).json({ error: error.message });
+        return res.status(404).json({ error: error.message });
       }
       res.status(500).json({ error: 'Failed to update invoice status' });
     }

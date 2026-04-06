@@ -18,38 +18,42 @@ class PropertyModel {
       street,
       city,
       district,
-        imageUrl,
-        description,
-        features,
-        managementFeePercentage,
-      } = propertyData;
-  
-      // Ensure features is a JSON string if it's an array/object, or null if empty
-      const featuresJson = features ? JSON.stringify(features) : null;
-  
-      const [result] = await db.query(
-        `INSERT INTO properties 
+      imageUrl,
+      description,
+      features,
+      managementFeePercentage,
+    } = propertyData;
+
+    // Ensure features is a JSON string if it's an array/object, or null if empty
+    const featuresJson = features ? JSON.stringify(features) : null;
+
+    const [result] = await db.query(
+      `INSERT INTO properties 
               (owner_id, name, property_type_id, property_no, street, city, district, image_url, description, features, late_fee_percentage, late_fee_type, late_fee_amount, late_fee_grace_period, tenant_deactivation_days, management_fee_percentage) 
               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          ownerId,
-          name,
-          propertyTypeId,
-          propertyNo,
-          street,
-          city,
-          district,
-          imageUrl,
-          description,
-          featuresJson,
-          propertyData.lateFeePercentage !== undefined ? propertyData.lateFeePercentage : 3.00,
-          propertyData.lateFeeType || 'flat_percentage',
-          propertyData.lateFeeAmount || 0,
-          propertyData.lateFeeGracePeriod !== undefined ? propertyData.lateFeeGracePeriod : 5,
-          propertyData.tenantDeactivationDays || 30,
-          managementFeePercentage || 0.00,
-        ]
-      );
+      [
+        ownerId,
+        name,
+        propertyTypeId,
+        propertyNo,
+        street,
+        city,
+        district,
+        imageUrl,
+        description,
+        featuresJson,
+        propertyData.lateFeePercentage !== undefined
+          ? propertyData.lateFeePercentage
+          : 3.0,
+        propertyData.lateFeeType || 'flat_percentage',
+        propertyData.lateFeeAmount || 0,
+        propertyData.lateFeeGracePeriod !== undefined
+          ? propertyData.lateFeeGracePeriod
+          : 5,
+        propertyData.tenantDeactivationDays || 30,
+        managementFeePercentage || 0.0,
+      ]
+    );
     return result.insertId;
   }
 
@@ -188,7 +192,7 @@ class PropertyModel {
     lateFeeAmount: 'late_fee_amount',
     lateFeeGracePeriod: 'late_fee_grace_period',
     tenantDeactivationDays: 'tenant_deactivation_days',
-    managementFeePercentage: 'management_fee_percentage'
+    managementFeePercentage: 'management_fee_percentage',
   };
 
   async update(id, updates) {
@@ -199,7 +203,8 @@ class PropertyModel {
       const column = PropertyModel.UPDATE_KEY_MAP[key];
       if (column && updates[key] !== undefined) {
         fields.push(`${column} = ?`);
-        const val = key === 'features' ? JSON.stringify(updates[key]) : updates[key];
+        const val =
+          key === 'features' ? JSON.stringify(updates[key]) : updates[key];
         values.push(val);
       }
     });
@@ -225,10 +230,10 @@ class PropertyModel {
 
   async getTypes() {
     const [rows] = await db.query('SELECT * FROM property_types');
-    return rows.map(row => ({
+    return rows.map((row) => ({
       id: row.type_id.toString(),
       name: row.name,
-      description: row.description
+      description: row.description,
     }));
   }
 
@@ -253,13 +258,13 @@ class PropertyModel {
       'SELECT * FROM property_images WHERE property_id = ? ORDER BY display_order ASC',
       [propertyId]
     );
-    return rows.map(row => ({
+    return rows.map((row) => ({
       id: row.image_id.toString(),
       propertyId: row.property_id.toString(),
       imageUrl: row.image_url,
       isPrimary: !!row.is_primary,
       displayOrder: row.display_order,
-      uploadedAt: row.created_at
+      uploadedAt: row.created_at,
     }));
   }
   async findOwnerDetails(propertyId) {
@@ -272,9 +277,9 @@ class PropertyModel {
     );
     if (!rows[0]) return null;
     return {
-        propertyName: rows[0].property_name,
-        ownerEmail: rows[0].owner_email,
-        ownerId: rows[0].owner_id.toString()
+      propertyName: rows[0].property_name,
+      ownerEmail: rows[0].owner_email,
+      ownerId: rows[0].owner_id.toString(),
     };
   }
 

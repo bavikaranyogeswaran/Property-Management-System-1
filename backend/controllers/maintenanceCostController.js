@@ -4,8 +4,14 @@ import { today } from '../utils/dateUtils.js';
 class MaintenanceCostController {
   async addCost(req, res) {
     try {
-      const { requestId, amount, description, recordedDate, billTo, billToTenant } =
-        req.body;
+      const {
+        requestId,
+        amount,
+        description,
+        recordedDate,
+        billTo,
+        billToTenant,
+      } = req.body;
       const isBillableToTenant = billTo === 'tenant' || billToTenant === true;
 
       // RBAC: Owner and Treasurer can add costs
@@ -13,14 +19,19 @@ class MaintenanceCostController {
         return res.status(403).json({ error: 'Access denied' });
       }
 
-      const maintenanceService = (await import('../services/maintenanceService.js')).default;
-      const costId = await maintenanceService.recordCost({
-        requestId,
-        amount,
-        description,
-        recordedDate,
-        billTo: billTo || (billToTenant ? 'tenant' : 'owner')
-      }, req.user);
+      const maintenanceService = (
+        await import('../services/maintenanceService.js')
+      ).default;
+      const costId = await maintenanceService.recordCost(
+        {
+          requestId,
+          amount,
+          description,
+          recordedDate,
+          billTo: billTo || (billToTenant ? 'tenant' : 'owner'),
+        },
+        req.user
+      );
 
       // Logic Check: Billable Maintenance
       // If flagged, generate an Invoice for the tenant.
@@ -39,7 +50,8 @@ class MaintenanceCostController {
           if (request && request.tenant_id) {
             // Find active lease for this tenant/unit?
             // invoiceModel needs leaseId.
-            const leaseModel = (await import('../models/leaseModel.js')).default;
+            const leaseModel = (await import('../models/leaseModel.js'))
+              .default;
 
             const leases = await leaseModel.findByTenantId(request.tenant_id);
 
@@ -51,7 +63,8 @@ class MaintenanceCostController {
             );
 
             if (activeLease) {
-              const invoiceModel = (await import('../models/invoiceModel.js')).default;
+              const invoiceModel = (await import('../models/invoiceModel.js'))
+                .default;
               await invoiceModel.create({
                 leaseId: activeLease.id, // Mapped model uses 'id'
                 amount: amount,
@@ -74,16 +87,22 @@ class MaintenanceCostController {
               billingSuccess = true;
             } else {
               billingSuccess = false;
-              billingError = 'No active lease found for this unit/tenant. Tenant was not billed.';
+              billingError =
+                'No active lease found for this unit/tenant. Tenant was not billed.';
             }
           } else {
             billingSuccess = false;
-            billingError = 'Maintenance request or tenant not found. Tenant was not billed.';
+            billingError =
+              'Maintenance request or tenant not found. Tenant was not billed.';
           }
         } catch (billingErr) {
-            console.error('Failed to bill tenant for maintenance cost:', billingErr);
-            billingSuccess = false;
-            billingError = 'An error occurred while generating the tenant invoice. Tenant was not billed.';
+          console.error(
+            'Failed to bill tenant for maintenance cost:',
+            billingErr
+          );
+          billingSuccess = false;
+          billingError =
+            'An error occurred while generating the tenant invoice. Tenant was not billed.';
         }
       }
 
@@ -150,11 +169,9 @@ class MaintenanceCostController {
         );
 
         if (!isAssigned) {
-          return res
-            .status(403)
-            .json({
-              error: 'Access denied. You are not assigned to this property.',
-            });
+          return res.status(403).json({
+            error: 'Access denied. You are not assigned to this property.',
+          });
         }
       }
 

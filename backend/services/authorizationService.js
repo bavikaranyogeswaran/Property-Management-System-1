@@ -1,4 +1,3 @@
-
 import propertyModel from '../models/propertyModel.js';
 import unitModel from '../models/unitModel.js';
 import leaseModel from '../models/leaseModel.js';
@@ -30,7 +29,9 @@ class AuthorizationService {
     // 3. Staff check: Only treasurers assigned to THIS property have access
     if (isAtLeast(role, ROLES.TREASURER)) {
       const assigned = await staffModel.getAssignedProperties(userId);
-      return assigned.some(p => p.property_id.toString() === propertyId.toString());
+      return assigned.some(
+        (p) => p.property_id.toString() === propertyId.toString()
+      );
     }
 
     return false;
@@ -109,7 +110,7 @@ class AuthorizationService {
    */
   async canAccessOwner(userId, role, ownerId) {
     if (role === ROLES.SYSTEM) return true;
-    
+
     // 1. Ownership check: If you are the owner, you can access your own portfolio
     if (userId.toString() === ownerId.toString()) return true;
 
@@ -118,10 +119,12 @@ class AuthorizationService {
       const assigned = await staffModel.getAssignedProperties(userId);
       // Get all properties belonging to this owner
       const properties = await propertyModel.findByOwnerId(ownerId);
-      const ownerPropertyIds = properties.map(p => p.id.toString());
-      
+      const ownerPropertyIds = properties.map((p) => p.id.toString());
+
       // Check if any assigned property matches any of the owner's properties
-      return assigned.some(assignedProp => ownerPropertyIds.includes(assignedProp.property_id.toString()));
+      return assigned.some((assignedProp) =>
+        ownerPropertyIds.includes(assignedProp.property_id.toString())
+      );
     }
 
     return false;

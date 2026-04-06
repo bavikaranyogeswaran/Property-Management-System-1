@@ -156,8 +156,8 @@ export function AppLayout({ children }: AppLayoutProps) {
                 <div className="p-4 border-b flex items-center justify-between">
                   <span className="font-semibold">Notifications</span>
                   {unreadCount > 0 && (
-                    <button 
-                      onClick={markAllAsRead} 
+                    <button
+                      onClick={markAllAsRead}
                       className="text-xs text-blue-600 hover:text-blue-800 font-medium"
                     >
                       Mark all read
@@ -172,34 +172,34 @@ export function AppLayout({ children }: AppLayoutProps) {
                   ) : (
                     <div className="divide-y">
                       {notifications.map((notification) => {
-                        const bgClass = notification.read 
-                          ? '' 
-                          : notification.severity === 'urgent' 
-                            ? 'bg-red-50/50 border-l-4 border-red-500' 
-                            : notification.severity === 'warning' 
-                              ? 'bg-yellow-50/50 border-l-4 border-yellow-500' 
+                        const bgClass = notification.read
+                          ? ''
+                          : notification.severity === 'urgent'
+                            ? 'bg-red-50/50 border-l-4 border-red-500'
+                            : notification.severity === 'warning'
+                              ? 'bg-yellow-50/50 border-l-4 border-yellow-500'
                               : 'bg-blue-50/50 border-l-4 border-blue-500';
 
                         return (
-                        <div
-                          key={notification.id}
-                          className={`p-4 hover:bg-gray-50 cursor-pointer ${bgClass}`}
-                          onClick={() =>
-                            markNotificationAsRead(notification.id)
-                          }
-                        >
-                          <div className="text-sm font-medium mb-1">
-                            {notification.title}
+                          <div
+                            key={notification.id}
+                            className={`p-4 hover:bg-gray-50 cursor-pointer ${bgClass}`}
+                            onClick={() =>
+                              markNotificationAsRead(notification.id)
+                            }
+                          >
+                            <div className="text-sm font-medium mb-1">
+                              {notification.title}
+                            </div>
+                            <div className="text-xs text-gray-600 mb-1">
+                              {notification.message}
+                            </div>
+                            <div className="text-xs text-gray-400">
+                              {new Date(
+                                notification.createdAt
+                              ).toLocaleDateString()}
+                            </div>
                           </div>
-                          <div className="text-xs text-gray-600 mb-1">
-                            {notification.message}
-                          </div>
-                          <div className="text-xs text-gray-400">
-                            {new Date(
-                              notification.createdAt
-                            ).toLocaleDateString()}
-                          </div>
-                        </div>
                         );
                       })}
                     </div>

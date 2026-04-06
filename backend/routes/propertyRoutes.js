@@ -26,7 +26,11 @@ router.post(
 );
 
 // GET /:id - Allow all users (public)
-router.get('/:id', optionalAuthenticateToken, propertyController.getPropertyById);
+router.get(
+  '/:id',
+  optionalAuthenticateToken,
+  propertyController.getPropertyById
+);
 router.get('/:id/lease-terms', propertyController.getLeaseTermsByPropertyId);
 
 // PUT /:id - Owner only (with ownership check)

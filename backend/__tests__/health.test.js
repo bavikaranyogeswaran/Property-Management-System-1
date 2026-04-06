@@ -6,14 +6,14 @@ import db from '../config/db.js';
 // Mock the database to avoid real connections during tests
 vi.mock('../config/db.js', () => ({
   default: {
-    query: vi.fn()
-  }
+    query: vi.fn(),
+  },
 }));
 
 describe('API Health & Stability', () => {
   it('should return 200 and connected status when database is online', async () => {
     // Mock successful DB response
-    db.query.mockResolvedValueOnce([[{ '1': 1 }]]);
+    db.query.mockResolvedValueOnce([[{ 1: 1 }]]);
 
     const res = await request(app).get('/api/health');
 

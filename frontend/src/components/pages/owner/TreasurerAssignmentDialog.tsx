@@ -87,8 +87,8 @@ export function TreasurerAssignmentDialog({
       const response = await apiClient.get(
         `/users/${treasurer.id}/assigned-properties`
       );
-      const serverAssignedIds: number[] = response.data.map(
-        (p: any) => Number(p.id)
+      const serverAssignedIds: number[] = response.data.map((p: any) =>
+        Number(p.id)
       );
 
       const toAdd = assignedPropertyIds.filter(

@@ -13,18 +13,36 @@ class InvoiceModel {
   //  CREATE: Writing a new bill to the ledger.
   // NOTE: Email notifications are handled by the caller (service/controller/cron layer).
   async create(data, connection = null) {
-    const { leaseId, amount, dueDate, description, type, magicTokenHash, magicTokenExpiresAt } = data;
+    const {
+      leaseId,
+      amount,
+      dueDate,
+      description,
+      type,
+      magicTokenHash,
+      magicTokenExpiresAt,
+    } = data;
     // Need to determine year/month from dueDate
     const date = parseLocalDate(dueDate);
     const year = date.getFullYear();
     const month = date.getMonth() + 1; // 1-12
 
-
     const db = connection || pool;
     try {
       const [result] = await db.query(
         'INSERT INTO rent_invoices (lease_id, year, month, amount, due_date, status, invoice_type, description, magic_token_hash, magic_token_expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [leaseId, year, month, amount, dueDate, 'pending', type, description, magicTokenHash || null, magicTokenExpiresAt || null]
+        [
+          leaseId,
+          year,
+          month,
+          amount,
+          dueDate,
+          'pending',
+          type,
+          description,
+          magicTokenHash || null,
+          magicTokenExpiresAt || null,
+        ]
       );
       const invoiceId = result.insertId;
 
@@ -33,28 +51,37 @@ class InvoiceModel {
         try {
           const ledgerModel = (await import('./ledgerModel.js')).default;
           // Use dynamic import to avoid potential circular dependencies
-          
-          const accountType = type === 'deposit' ? 'liability' : 'revenue';
-          const category = type === 'deposit' ? 'deposit_accrued' : (type || 'rent');
 
-          await ledgerModel.create({
-            invoiceId,
-            leaseId,
-            accountType,
-            category,
-            debit: Number(amount),
-            description: `Generated ${type || 'rent'} invoice: ${description || 'No description'}`,
-            entryDate: getCurrentDateString(),
-          }, db);
+          const accountType = type === 'deposit' ? 'liability' : 'revenue';
+          const category =
+            type === 'deposit' ? 'deposit_accrued' : type || 'rent';
+
+          await ledgerModel.create(
+            {
+              invoiceId,
+              leaseId,
+              accountType,
+              category,
+              debit: Number(amount),
+              description: `Generated ${type || 'rent'} invoice: ${description || 'No description'}`,
+              entryDate: getCurrentDateString(),
+            },
+            db
+          );
         } catch (ledgerErr) {
-          console.error('Failed to post initial ledger entry for invoice:', ledgerErr);
+          console.error(
+            'Failed to post initial ledger entry for invoice:',
+            ledgerErr
+          );
         }
       }
 
       return invoiceId;
     } catch (error) {
       if (error.code === 'ER_DUP_ENTRY') {
-        console.warn(`Duplicate invoice detected: Lease ${leaseId}, Period ${year}-${month}, Type ${type}`);
+        console.warn(
+          `Duplicate invoice detected: Lease ${leaseId}, Period ${year}-${month}, Type ${type}`
+        );
         return null; // Signals that creation was skipped due to existing record
       }
       throw error;
@@ -67,8 +94,8 @@ class InvoiceModel {
     const params = [leaseId, year, month];
 
     if (type) {
-        query += ' AND invoice_type = ?';
-        params.push(type);
+      query += ' AND invoice_type = ?';
+      params.push(type);
     }
 
     const db = connection || pool;
@@ -106,8 +133,12 @@ class InvoiceModel {
       unitNumber: row.unit_number,
       unitStatus: row.unit_status,
       // Late Fee Config (if joined)
-      lateFeePercentage: row.late_fee_percentage ? parseFloat(row.late_fee_percentage) : null,
-      lateFeeGracePeriod: row.late_fee_grace_period ? parseInt(row.late_fee_grace_period) : null,
+      lateFeePercentage: row.late_fee_percentage
+        ? parseFloat(row.late_fee_percentage)
+        : null,
+      lateFeeGracePeriod: row.late_fee_grace_period
+        ? parseInt(row.late_fee_grace_period)
+        : null,
       lastOrderId: row.last_order_id,
     };
   }
@@ -117,7 +148,10 @@ class InvoiceModel {
    * Use this to serialize concurrent payment gateway notifications.
    */
   async findByIdForUpdate(id, connection) {
-    if (!connection) throw new Error('findByIdForUpdate requires an active transaction connection.');
+    if (!connection)
+      throw new Error(
+        'findByIdForUpdate requires an active transaction connection.'
+      );
     const [rows] = await connection.query(
       `SELECT ri.*, u.property_id, l.unit_id 
        FROM rent_invoices ri 
@@ -146,11 +180,11 @@ class InvoiceModel {
   }
 
   async findByMagicToken(rawToken, connection = null) {
-     const crypto = await import('crypto');
-     const hash = crypto.createHash('sha256').update(rawToken).digest('hex');
-     const db = connection || pool;
-     const [rows] = await db.query(
-       `
+    const crypto = await import('crypto');
+    const hash = crypto.createHash('sha256').update(rawToken).digest('hex');
+    const db = connection || pool;
+    const [rows] = await db.query(
+      `
              SELECT ri.*, l.tenant_id, l.unit_id,
                     p.name as property_name, un.unit_number, un.status as unit_status,
                     COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id = ri.invoice_id AND status = 'verified'), 0) AS amount_paid
@@ -160,31 +194,31 @@ class InvoiceModel {
              JOIN properties p ON un.property_id = p.property_id
              WHERE ri.magic_token_hash = ? AND (ri.magic_token_expires_at IS NULL OR ri.magic_token_expires_at > NOW())
          `,
-       [hash]
-     );
-     return rows.length > 0 ? this.mapRow(rows[0]) : null;
-   }
+      [hash]
+    );
+    return rows.length > 0 ? this.mapRow(rows[0]) : null;
+  }
 
-    async clearMagicToken(invoiceId, connection = null) {
-      const db = connection || pool;
-      await db.query(
-        'UPDATE rent_invoices SET magic_token_hash = NULL, magic_token_expires_at = NULL WHERE invoice_id = ?',
-        [invoiceId]
-      );
-    }
- 
-    async updateLastOrderId(invoiceId, orderId, connection = null) {
-      const db = connection || pool;
-      await db.query(
-        'UPDATE rent_invoices SET last_order_id = ? WHERE invoice_id = ?',
-        [orderId, invoiceId]
-      );
-    }
- 
-    async findByOrderId(orderId, connection = null) {
-      const db = connection || pool;
-      const [rows] = await db.query(
-        `
+  async clearMagicToken(invoiceId, connection = null) {
+    const db = connection || pool;
+    await db.query(
+      'UPDATE rent_invoices SET magic_token_hash = NULL, magic_token_expires_at = NULL WHERE invoice_id = ?',
+      [invoiceId]
+    );
+  }
+
+  async updateLastOrderId(invoiceId, orderId, connection = null) {
+    const db = connection || pool;
+    await db.query(
+      'UPDATE rent_invoices SET last_order_id = ? WHERE invoice_id = ?',
+      [orderId, invoiceId]
+    );
+  }
+
+  async findByOrderId(orderId, connection = null) {
+    const db = connection || pool;
+    const [rows] = await db.query(
+      `
               SELECT ri.*, l.tenant_id, l.unit_id,
                      p.name as property_name, un.unit_number, un.status as unit_status,
                      COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id = ri.invoice_id AND status = 'verified'), 0) AS amount_paid
@@ -194,10 +228,10 @@ class InvoiceModel {
               JOIN properties p ON un.property_id = p.property_id
               WHERE ri.last_order_id = ?
           `,
-        [orderId]
-      );
-      return rows.length > 0 ? this.mapRow(rows[0]) : null;
-    }
+      [orderId]
+    );
+    return rows.length > 0 ? this.mapRow(rows[0]) : null;
+  }
 
   async findByTenantId(tenantId) {
     const [rows] = await pool.query(
@@ -211,7 +245,7 @@ class InvoiceModel {
         `,
       [tenantId]
     );
-    return rows.map(row => this.mapRow(row));
+    return rows.map((row) => this.mapRow(row));
   }
 
   async findAll() {
@@ -225,7 +259,7 @@ class InvoiceModel {
             JOIN properties p ON un.property_id = p.property_id
             ORDER BY ri.due_date DESC
         `);
-    return rows.map(row => this.mapRow(row));
+    return rows.map((row) => this.mapRow(row));
   }
 
   async findByOwnerId(ownerId) {
@@ -243,7 +277,7 @@ class InvoiceModel {
         `,
       [ownerId]
     );
-    return rows.map(row => this.mapRow(row));
+    return rows.map((row) => this.mapRow(row));
   }
 
   async findByTreasurerId(treasurerId) {
@@ -262,23 +296,26 @@ class InvoiceModel {
         `,
       [treasurerId]
     );
-    return rows.map(row => this.mapRow(row));
+    return rows.map((row) => this.mapRow(row));
   }
 
   async updateStatus(id, status, connection = null) {
     const db = connection || pool;
-    await db.query(
-      'UPDATE rent_invoices SET status = ? WHERE invoice_id = ?',
-      [status, id]
-    );
+    await db.query('UPDATE rent_invoices SET status = ? WHERE invoice_id = ?', [
+      status,
+      id,
+    ]);
     return this.findById(id, db);
   }
 
   async createLateFeeInvoice(data, connection = null) {
-    return await this.create({
-      ...data,
-      type: 'late_fee',
-    }, connection);
+    return await this.create(
+      {
+        ...data,
+        type: 'late_fee',
+      },
+      connection
+    );
   }
 
   async findOverdue() {
@@ -294,7 +331,7 @@ class InvoiceModel {
             AND ri.due_date < DATE_SUB(CURDATE(), INTERVAL p.late_fee_grace_period DAY)
         `
     );
-    return rows.map(row => this.mapRow(row));
+    return rows.map((row) => this.mapRow(row));
   }
 
   async findByLeaseAndDescription(leaseId, description) {
@@ -302,9 +339,14 @@ class InvoiceModel {
       'SELECT * FROM rent_invoices WHERE lease_id = ? AND description LIKE ?',
       [leaseId, `%${description}%`]
     );
-    return rows.map(row => this.mapRow(row));
+    return rows.map((row) => this.mapRow(row));
   }
-  async syncFutureRentInvoices(leaseId, newAmount, fromDate, connection = null) {
+  async syncFutureRentInvoices(
+    leaseId,
+    newAmount,
+    fromDate,
+    connection = null
+  ) {
     const db = connection || pool;
     await db.query(
       `UPDATE rent_invoices 
@@ -337,7 +379,7 @@ class InvoiceModel {
       `SELECT *, COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id = rent_invoices.invoice_id AND status = 'verified'), 0) AS amount_paid FROM rent_invoices WHERE lease_id = ? AND status IN ('pending', 'partially_paid') ORDER BY due_date ASC`,
       [leaseId]
     );
-    return rows.map(row => this.mapRow(row));
+    return rows.map((row) => this.mapRow(row));
   }
 
   // Analytics optimized query to avoid O(N) memory buildup
@@ -354,9 +396,9 @@ class InvoiceModel {
       `,
       [year]
     );
-    return rows.map(row => ({
+    return rows.map((row) => ({
       propertyName: row.property_name,
-      totalIncome: fromCents(row.total_income || 0)
+      totalIncome: fromCents(row.total_income || 0),
     }));
   }
 }

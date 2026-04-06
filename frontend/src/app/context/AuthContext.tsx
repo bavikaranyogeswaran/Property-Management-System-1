@@ -36,7 +36,7 @@ interface AuthContextType {
   updateProfile: (data: Partial<User>) => Promise<void>;
   changePassword: (data: any) => Promise<void>;
   refreshUser: () => Promise<void>;
-  
+
   // Multi-Unit (E19)
   tenantLeases: any[];
   activeLeaseId: string | null;
@@ -63,9 +63,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       setIsLoadingLeases(true);
       const res = await leaseApi.getLeases();
-      const activeOnly = res.data.filter((l: any) => l.status === 'active' || l.status === 'draft');
+      const activeOnly = res.data.filter(
+        (l: any) => l.status === 'active' || l.status === 'draft'
+      );
       setTenantLeases(activeOnly);
-      
+
       // Select active lease: Persisted > First Active > First found
       const storedId = storage.getActiveLeaseId();
       if (storedId && activeOnly.some((l: any) => l.id === storedId)) {
@@ -112,21 +114,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(storedUser);
         const remainingTime = authService.getTokenRemainingTime();
         scheduleLogout(remainingTime);
-        
+
         if (storedUser.role === 'tenant') {
-            fetchLeases(storedUser.id);
+          fetchLeases(storedUser.id);
         }
 
         // Sync with backend to ensure the local user data is not stale
-        authService.getProfile().then(user => {
-          if (user) {
+        authService
+          .getProfile()
+          .then((user) => {
+            if (user) {
               setUser(user);
-              if (user.role === 'tenant' && tenantLeases.length === 0) fetchLeases(user.id);
-          }
-        }).catch(err => {
-          console.error('[AuthContext] Initial sync failed:', err);
-          // If 401, the interceptor will handle it, otherwise keep local for now
-        });
+              if (user.role === 'tenant' && tenantLeases.length === 0)
+                fetchLeases(user.id);
+            }
+          })
+          .catch((err) => {
+            console.error('[AuthContext] Initial sync failed:', err);
+            // If 401, the interceptor will handle it, otherwise keep local for now
+          });
       } else {
         if (storedUser) {
           authService.logout();
@@ -146,7 +152,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { user } = await authService.login({ email, password });
       setUser(user);
       if (user.role === 'tenant') {
-          await fetchLeases(user.id);
+        await fetchLeases(user.id);
       }
       const remainingTime = authService.getTokenRemainingTime();
       scheduleLogout(remainingTime);

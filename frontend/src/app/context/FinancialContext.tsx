@@ -1,5 +1,15 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import apiClient, { invoiceApi, paymentApi, receiptApi } from '../../services/api';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  ReactNode,
+} from 'react';
+import apiClient, {
+  invoiceApi,
+  paymentApi,
+  receiptApi,
+} from '../../services/api';
 import { useAuth } from './AuthContext';
 import { toast } from 'sonner';
 import { toLKRFromCents, toCentsFromLKR } from '../../utils/formatters';
@@ -65,14 +75,17 @@ interface FinancialContextType {
   receipts: Receipt[];
   fetchLedgerSummary: (year: number) => Promise<LedgerSummary>;
   generateMonthlyInvoices: () => Promise<void>;
-  submitPayment: (payment: Omit<Payment, 'id' | 'submittedAt'>) => Promise<void>;
+  submitPayment: (
+    payment: Omit<Payment, 'id' | 'submittedAt'>
+  ) => Promise<void>;
   verifyPayment: (id: string, approved: boolean) => Promise<void>;
   runLateFeeAudit: () => Promise<void>;
   refreshData: () => Promise<void>;
 }
 
-const FinancialContext = createContext<FinancialContextType | undefined>(undefined);
-
+const FinancialContext = createContext<FinancialContextType | undefined>(
+  undefined
+);
 
 export function FinancialProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
@@ -85,49 +98,60 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
       // Invoices
       const invRes = await invoiceApi.getInvoices();
       if (invRes.data) {
-        setInvoices(invRes.data.map((i: any) => ({
-          ...i,
-          amount: toLKRFromCents(i.amount),
-          amountPaid: toLKRFromCents(i.amountPaid || 0),
-          dueDate: i.dueDate ? new Date(i.dueDate).toLocaleDateString('en-CA') : '',
-          generatedDate: i.createdAt ? new Date(i.createdAt).toLocaleDateString('en-CA') : '',
-        })));
+        setInvoices(
+          invRes.data.map((i: any) => ({
+            ...i,
+            amount: toLKRFromCents(i.amount),
+            amountPaid: toLKRFromCents(i.amountPaid || 0),
+            dueDate: i.dueDate
+              ? new Date(i.dueDate).toLocaleDateString('en-CA')
+              : '',
+            generatedDate: i.createdAt
+              ? new Date(i.createdAt).toLocaleDateString('en-CA')
+              : '',
+          }))
+        );
       }
 
       // Payments
       const payRes = await paymentApi.getPayments();
       if (payRes.data) {
-        setPayments(payRes.data.map((p: any) => ({
-          ...p,
-          amount: toLKRFromCents(p.amount),
-          paymentDate: (p.paymentDate || '').split('T')[0],
-          submittedAt: p.createdAt || '',
-          proofUrl: p.receiptUrl,
-        })));
+        setPayments(
+          payRes.data.map((p: any) => ({
+            ...p,
+            amount: toLKRFromCents(p.amount),
+            paymentDate: (p.paymentDate || '').split('T')[0],
+            submittedAt: p.createdAt || '',
+            proofUrl: p.receiptUrl,
+          }))
+        );
       }
 
       // Receipts
       const receiptRes = await receiptApi.getReceipts();
       if (receiptRes.data) {
-        setReceipts(receiptRes.data.map((r: any) => ({
-          ...r,
-          amount: toLKRFromCents(r.amount),
-          generatedDate: r.receiptDate || r.createdAt,
-          paymentDate: (r.paymentDate || '').split('T')[0] || r.receiptDate,
-        })));
+        setReceipts(
+          receiptRes.data.map((r: any) => ({
+            ...r,
+            amount: toLKRFromCents(r.amount),
+            generatedDate: r.receiptDate || r.createdAt,
+            paymentDate: (r.paymentDate || '').split('T')[0] || r.receiptDate,
+          }))
+        );
       }
     } catch (e) {
       console.error('Failed to fetch financial data', e);
     }
   }, []);
 
-
   useEffect(() => {
     if (user) fetchFinancialData();
   }, [user]);
 
   const fetchLedgerSummary = async (year: number): Promise<LedgerSummary> => {
-    const { data } = await apiClient.get(`/reports/ledger-summary?year=${year}`);
+    const { data } = await apiClient.get(
+      `/reports/ledger-summary?year=${year}`
+    );
     // Normalize subunit cents to display decimals
     return {
       totalRevenue: toLKRFromCents(data.totalRevenue),
@@ -148,11 +172,13 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const submitPayment = async (payment: Omit<Payment, 'id' | 'submittedAt'>) => {
+  const submitPayment = async (
+    payment: Omit<Payment, 'id' | 'submittedAt'>
+  ) => {
     try {
       const res = await paymentApi.submitPayment({
         ...payment,
-        amount: toCentsFromLKR(payment.amount)
+        amount: toCentsFromLKR(payment.amount),
       });
       if (res.status === 201) {
         toast.success('Payment submitted successfully');
@@ -174,8 +200,6 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
     }
   };
 
-
-  
   const runLateFeeAudit = async () => {
     try {
       const { adminApi } = await import('../../services/api');
@@ -188,25 +212,27 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <FinancialContext.Provider value={{ 
-      invoices, 
-      payments, 
-      receipts, 
-      fetchLedgerSummary, 
-      generateMonthlyInvoices, 
-      submitPayment, 
-      verifyPayment, 
-      runLateFeeAudit,
-      refreshData: fetchFinancialData
-    }}>
+    <FinancialContext.Provider
+      value={{
+        invoices,
+        payments,
+        receipts,
+        fetchLedgerSummary,
+        generateMonthlyInvoices,
+        submitPayment,
+        verifyPayment,
+        runLateFeeAudit,
+        refreshData: fetchFinancialData,
+      }}
+    >
       {children}
     </FinancialContext.Provider>
   );
-
 }
 
 export function useFinancial() {
   const context = useContext(FinancialContext);
-  if (context === undefined) throw new Error('useFinancial must be used within a FinancialProvider');
+  if (context === undefined)
+    throw new Error('useFinancial must be used within a FinancialProvider');
   return context;
 }

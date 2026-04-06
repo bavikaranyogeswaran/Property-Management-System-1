@@ -87,7 +87,10 @@ export function ChatInterface({
         response = await messageApi.sendToOwner(newMessage);
       } else if (mode === 'tenant-admin') {
         if (!tenantId) return;
-        response = await messageApi.sendTenantMessage(String(tenantId), newMessage);
+        response = await messageApi.sendTenantMessage(
+          String(tenantId),
+          newMessage
+        );
       } else {
         if (!leadId) return;
         response = await messageApi.sendLeadMessage(String(leadId), newMessage);

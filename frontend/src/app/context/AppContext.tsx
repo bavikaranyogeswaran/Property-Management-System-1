@@ -32,9 +32,7 @@ export function AppProvider({ children }: AppProviderProps) {
           <LeadProvider>
             <FinancialProvider>
               <MaintenanceProvider>
-                <NotificationProvider>
-                  {children}
-                </NotificationProvider>
+                <NotificationProvider>{children}</NotificationProvider>
               </MaintenanceProvider>
             </FinancialProvider>
           </LeadProvider>

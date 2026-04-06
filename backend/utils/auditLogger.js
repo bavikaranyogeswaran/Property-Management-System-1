@@ -16,9 +16,12 @@ class AuditLogger {
     connection = null
   ) {
     try {
-      const ipAddress = (req && req.headers)
-        ? (req.headers['x-forwarded-for'] || (req.socket && req.socket.remoteAddress) || 'UNKNOWN')
-        : 'SYSTEM';
+      const ipAddress =
+        req && req.headers
+          ? req.headers['x-forwarded-for'] ||
+            (req.socket && req.socket.remoteAddress) ||
+            'UNKNOWN'
+          : 'SYSTEM';
       const detailsStr =
         typeof details === 'object' ? JSON.stringify(details) : details;
 

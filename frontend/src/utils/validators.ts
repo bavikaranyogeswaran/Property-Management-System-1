@@ -165,7 +165,7 @@ export const validateLeaseDuration = (
 ): ValidationResult => {
   const start = parseDate(startDate);
   const end = parseDate(endDate);
-  
+
   if (!start || !end) {
     return { isValid: false, error: 'Invalid start or end date' };
   }

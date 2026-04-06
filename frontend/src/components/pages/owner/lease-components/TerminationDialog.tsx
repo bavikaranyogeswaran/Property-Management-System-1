@@ -23,13 +23,13 @@ export function TerminationDialog({
   leaseId,
   onClose,
   onSubmit,
-  leases
+  leases,
 }: TerminationDialogProps) {
   const [terminationDate, setTerminationDate] = useState('');
   const [terminationFee, setTerminationFee] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const lease = leases.find(l => String(l.id) === String(leaseId));
+  const lease = leases.find((l) => String(l.id) === String(leaseId));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,10 +57,12 @@ export function TerminationDialog({
           </DialogTitle>
         </DialogHeader>
         <div className="bg-amber-50 border border-amber-200 p-3 rounded-md mb-4 flex items-start gap-2">
-           <AlertCircle className="size-4 text-amber-600 mt-0.5 shrink-0" />
-           <p className="text-xs text-amber-700">
-             Ending a lease will mark the unit as vacating. You must still perform the final checkout and deposit refund after the move-out date.
-           </p>
+          <AlertCircle className="size-4 text-amber-600 mt-0.5 shrink-0" />
+          <p className="text-xs text-amber-700">
+            Ending a lease will mark the unit as vacating. You must still
+            perform the final checkout and deposit refund after the move-out
+            date.
+          </p>
         </div>
         <form onSubmit={handleSubmit} className="grid gap-4 py-4">
           <div className="grid grid-cols-4 items-center gap-4">
@@ -93,10 +95,10 @@ export function TerminationDialog({
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button 
-                type="submit" 
-                className="bg-red-600 hover:bg-red-700"
-                disabled={isSubmitting}
+            <Button
+              type="submit"
+              className="bg-red-600 hover:bg-red-700"
+              disabled={isSubmitting}
             >
               {isSubmitting ? 'Terminating...' : 'Terminate Lease'}
             </Button>

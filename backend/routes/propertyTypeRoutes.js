@@ -1,6 +1,9 @@
 import { Router } from 'express';
 import propertyTypeController from '../controllers/propertyTypeController.js';
-import { authenticateToken, authorizeRoles } from '../middleware/authMiddleware.js';
+import {
+  authenticateToken,
+  authorizeRoles,
+} from '../middleware/authMiddleware.js';
 
 const router = Router();
 

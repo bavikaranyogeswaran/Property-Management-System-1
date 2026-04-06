@@ -1,4 +1,10 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  ReactNode,
+} from 'react';
 import { notificationApi } from '../../services/api';
 import { useAuth } from './AuthContext';
 import { useProperty } from './PropertyContext';
@@ -27,7 +33,9 @@ interface NotificationContextType {
   markAllAsRead: () => Promise<void>;
 }
 
-const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
+const NotificationContext = createContext<NotificationContextType | undefined>(
+  undefined
+);
 
 export function NotificationProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
@@ -49,8 +57,8 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
             id: n.id.toString(),
             read: Boolean(n.isRead),
           }));
-        setNotifications(prev => {
-          const local = prev.filter(n => n.id.startsWith('notif-'));
+        setNotifications((prev) => {
+          const local = prev.filter((n) => n.id.startsWith('notif-'));
           return [...local, ...backendNotifs];
         });
       }
@@ -68,28 +76,47 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     leases.forEach((lease) => {
       if (lease.status !== 'active' || !lease.endDate) return;
       const endDate = new Date(lease.endDate);
-      const daysUntilExpiry = Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      const daysUntilExpiry = Math.ceil(
+        (endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+      );
       if (daysUntilExpiry < 0) return;
 
       let shouldNotify = false;
       let severity: 'info' | 'warning' | 'urgent' = 'info';
 
-      if (daysUntilExpiry <= 15) { shouldNotify = true; severity = 'urgent'; }
-      else if (daysUntilExpiry <= 30) { shouldNotify = true; severity = 'warning'; }
-      else if (daysUntilExpiry <= 60) { shouldNotify = true; severity = 'info'; }
+      if (daysUntilExpiry <= 15) {
+        shouldNotify = true;
+        severity = 'urgent';
+      } else if (daysUntilExpiry <= 30) {
+        shouldNotify = true;
+        severity = 'warning';
+      } else if (daysUntilExpiry <= 60) {
+        shouldNotify = true;
+        severity = 'info';
+      }
 
       if (shouldNotify) {
-        const unit = units.find(u => u.id === lease.unitId);
-        const tenant = tenants.find(t => t.id === lease.tenantId);
-        const property = unit ? properties.find(p => p.id === unit.propertyId) : null;
+        const unit = units.find((u) => u.id === lease.unitId);
+        const tenant = tenants.find((t) => t.id === lease.tenantId);
+        const property = unit
+          ? properties.find((p) => p.id === unit.propertyId)
+          : null;
 
-        const existingNotification = notifications.find(n => n.leaseId === lease.id && n.type === 'lease' && Math.abs((n.daysUntilExpiry || 0) - daysUntilExpiry) < 2);
+        const existingNotification = notifications.find(
+          (n) =>
+            n.leaseId === lease.id &&
+            n.type === 'lease' &&
+            Math.abs((n.daysUntilExpiry || 0) - daysUntilExpiry) < 2
+        );
 
         if (!existingNotification && unit && tenant && property) {
           generatedNotifications.push({
             id: `notif-${lease.id}-${daysUntilExpiry}`,
             type: 'lease',
-            title: daysUntilExpiry <= 7 ? '⚠️ Urgent: Lease Expiring Soon' : 'Lease Expiring Soon',
+            title:
+              daysUntilExpiry <= 7
+                ? '⚠️ Urgent: Lease Expiring Soon'
+                : 'Lease Expiring Soon',
             message: `Lease for ${tenant.name} in ${property.name} Unit ${unit.unitNumber} expires in ${daysUntilExpiry} days.`,
             targetRole: 'both',
             targetUserId: tenant.id,
@@ -106,8 +133,13 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     });
 
     if (generatedNotifications.length > 0) {
-      setNotifications(prev => {
-        const filtered = prev.filter(n => !generatedNotifications.some(gn => gn.leaseId === n.leaseId && n.type === 'lease'));
+      setNotifications((prev) => {
+        const filtered = prev.filter(
+          (n) =>
+            !generatedNotifications.some(
+              (gn) => gn.leaseId === n.leaseId && n.type === 'lease'
+            )
+        );
         return [...filtered, ...generatedNotifications];
       });
     }
@@ -119,7 +151,9 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
   const markNotificationAsRead = async (id: string) => {
     try {
-      setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, read: true } : n))
+      );
       if (!id.startsWith('notif-')) await notificationApi.markAsRead(id);
     } catch (e) {
       console.error('Failed to mark notification as read', e);
@@ -128,7 +162,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
   const markAllAsRead = async () => {
     try {
-      setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
       await notificationApi.markAllAsRead();
     } catch (e) {
       console.error('Failed to mark all notifications as read', e);
@@ -136,7 +170,9 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <NotificationContext.Provider value={{ notifications, markNotificationAsRead, markAllAsRead }}>
+    <NotificationContext.Provider
+      value={{ notifications, markNotificationAsRead, markAllAsRead }}
+    >
       {children}
     </NotificationContext.Provider>
   );
@@ -144,6 +180,9 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
 export function useNotification() {
   const context = useContext(NotificationContext);
-  if (context === undefined) throw new Error('useNotification must be used within a NotificationProvider');
+  if (context === undefined)
+    throw new Error(
+      'useNotification must be used within a NotificationProvider'
+    );
   return context;
 }

@@ -4,7 +4,7 @@ class AuditController {
   async getLogs(req, res) {
     try {
       const limit = parseInt(req.query.limit) || 50;
-      
+
       const [rows] = await db.query(
         `SELECT 
           sal.log_id as id, 
@@ -21,13 +21,16 @@ class AuditController {
          LIMIT ?`,
         [limit]
       );
-      
+
       // Parse details if they are strings
-      const formattedLogs = rows.map(log => ({
+      const formattedLogs = rows.map((log) => ({
         ...log,
-        details: typeof log.details === 'string' ? JSON.parse(log.details) : log.details
+        details:
+          typeof log.details === 'string'
+            ? JSON.parse(log.details)
+            : log.details,
       }));
-      
+
       res.json(formattedLogs);
     } catch (error) {
       console.error('Error fetching audit logs:', error);

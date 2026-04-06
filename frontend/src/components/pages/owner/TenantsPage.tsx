@@ -287,10 +287,7 @@ export function TenantsPage() {
           <DialogHeader>
             <DialogTitle>Chat with {chatTenantRow?.name}</DialogTitle>
           </DialogHeader>
-          <ChatInterface
-            mode="tenant-admin"
-            tenantId={chatTenantRow?.id}
-          />
+          <ChatInterface mode="tenant-admin" tenantId={chatTenantRow?.id} />
         </DialogContent>
       </Dialog>
     </div>

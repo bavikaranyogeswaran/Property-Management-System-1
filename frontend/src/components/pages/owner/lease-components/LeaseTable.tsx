@@ -1,10 +1,10 @@
 import React from 'react';
-import { 
-  Table, 
-  TableBody, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+import {
+  Table,
+  TableBody,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from '@/components/ui/table';
 import { FileText, Calendar, AlertCircle, XCircle } from 'lucide-react';
 import { Lease, Tenant, Unit, Property } from '@/app/context/AppContext';

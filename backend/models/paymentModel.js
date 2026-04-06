@@ -131,7 +131,7 @@ class PaymentModel {
         `,
       [treasurerId]
     );
-    return rows.map(row => this.mapRow(row));
+    return rows.map((row) => this.mapRow(row));
   }
 
   async findByInvoiceId(invoiceId, connection = null) {
@@ -140,7 +140,7 @@ class PaymentModel {
       'SELECT * FROM payments WHERE invoice_id = ?',
       [invoiceId]
     );
-    return rows.map(row => this.mapRow(row));
+    return rows.map((row) => this.mapRow(row));
   }
 
   async findByInvoiceIds(invoiceIds, connection = null) {
@@ -150,7 +150,7 @@ class PaymentModel {
       'SELECT * FROM payments WHERE invoice_id IN (?)',
       [invoiceIds]
     );
-    return rows.map(row => this.mapRow(row));
+    return rows.map((row) => this.mapRow(row));
   }
 
   async findByTenantId(tenantId) {
@@ -165,7 +165,7 @@ class PaymentModel {
         `,
       [tenantId]
     );
-    return rows.map(row => this.mapRow(row));
+    return rows.map((row) => this.mapRow(row));
   }
 
   async findByReferenceNumber(referenceNumber, connection = null) {
@@ -180,17 +180,20 @@ class PaymentModel {
   async updateStatus(id, status, verifiedBy = null, connection = null) {
     const db = connection || pool;
     // verifiedBy could be stored if we add that column, for now just status
-    const [result] = await db.query('UPDATE payments SET status = ? WHERE payment_id = ? AND status != ?', [
-      status,
-      id,
-      status, // Prevent redundant updates taking lock success
-    ]);
+    const [result] = await db.query(
+      'UPDATE payments SET status = ? WHERE payment_id = ? AND status != ?',
+      [
+        status,
+        id,
+        status, // Prevent redundant updates taking lock success
+      ]
+    );
 
     // If approved, we might want to update the invoice status too - handled in controller transaction potentially?
     // Or simple model call.
     return {
-        payment: await this.findById(id, connection),
-        changed: result.affectedRows > 0
+      payment: await this.findById(id, connection),
+      changed: result.affectedRows > 0,
     };
   }
 }

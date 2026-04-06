@@ -1,8 +1,22 @@
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { TrendingUp, TrendingDown, Star, Milestone, Info, AlertCircle, History as HistoryIcon } from 'lucide-react';
+import {
+  TrendingUp,
+  TrendingDown,
+  Star,
+  Milestone,
+  Info,
+  AlertCircle,
+  History as HistoryIcon,
+} from 'lucide-react';
 import apiClient from '@/services/api';
 
 interface BehaviorLog {
@@ -24,23 +38,30 @@ export function TenantBehaviorHistory() {
   const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => {
-    apiClient.get('/behavior/my-score')
-      .then(res => {
+    apiClient
+      .get('/behavior/my-score')
+      .then((res) => {
         setData(res.data);
         setLoading(false);
       })
-      .catch(err => {
+      .catch((err) => {
         console.error('Error fetching behavior data:', err);
         setLoading(false);
       });
   }, []);
 
   if (loading) {
-    return <div className="p-8 text-center">Loading your behavior profile...</div>;
+    return (
+      <div className="p-8 text-center">Loading your behavior profile...</div>
+    );
   }
 
   if (!data) {
-    return <div className="p-8 text-center text-gray-500">No behavior data found.</div>;
+    return (
+      <div className="p-8 text-center text-gray-500">
+        No behavior data found.
+      </div>
+    );
   }
 
   const getScoreColor = (score: number) => {
@@ -90,7 +111,8 @@ export function TenantBehaviorHistory() {
           {getScoreLabel(data.score)}
         </h3>
         <p className="text-sm text-gray-500 mt-1 max-w-sm">
-          Your behavior score reflects your history with us. High scores qualify you for renewal bonuses and priority maintenance!
+          Your behavior score reflects your history with us. High scores qualify
+          you for renewal bonuses and priority maintenance!
         </p>
       </div>
 
@@ -105,20 +127,44 @@ export function TenantBehaviorHistory() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">On-time Rent Payment</span>
-              <Badge variant="outline" className="text-green-600 bg-green-50 border-green-200">+5 pts</Badge>
+              <span className="text-sm text-gray-600">
+                On-time Rent Payment
+              </span>
+              <Badge
+                variant="outline"
+                className="text-green-600 bg-green-50 border-green-200"
+              >
+                +5 pts
+              </Badge>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-600">Lease Renewal</span>
-              <Badge variant="outline" className="text-green-600 bg-green-50 border-green-200">+20 pts</Badge>
+              <Badge
+                variant="outline"
+                className="text-green-600 bg-green-50 border-green-200"
+              >
+                +20 pts
+              </Badge>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">Minor Issue Self-Fix</span>
-              <Badge variant="outline" className="text-green-600 bg-green-50 border-green-200">+10 pts</Badge>
+              <span className="text-sm text-gray-600">
+                Minor Issue Self-Fix
+              </span>
+              <Badge
+                variant="outline"
+                className="text-green-600 bg-green-50 border-green-200"
+              >
+                +10 pts
+              </Badge>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-600">Refer a Friend</span>
-              <Badge variant="outline" className="text-green-600 bg-green-50 border-green-200">+15 pts</Badge>
+              <Badge
+                variant="outline"
+                className="text-green-600 bg-green-50 border-green-200"
+              >
+                +15 pts
+              </Badge>
             </div>
           </CardContent>
         </Card>
@@ -134,19 +180,39 @@ export function TenantBehaviorHistory() {
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-600">Late Rent Payment</span>
-              <Badge variant="outline" className="text-red-600 bg-red-50 border-red-200">-10 pts</Badge>
+              <Badge
+                variant="outline"
+                className="text-red-600 bg-red-50 border-red-200"
+              >
+                -10 pts
+              </Badge>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-600">Noise Complaints</span>
-              <Badge variant="outline" className="text-red-600 bg-red-50 border-red-200">-15 pts</Badge>
+              <Badge
+                variant="outline"
+                className="text-red-600 bg-red-50 border-red-200"
+              >
+                -15 pts
+              </Badge>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-600">Property Damage</span>
-              <Badge variant="outline" className="text-red-600 bg-red-50 border-red-200">-30 pts</Badge>
+              <Badge
+                variant="outline"
+                className="text-red-600 bg-red-50 border-red-200"
+              >
+                -30 pts
+              </Badge>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-600">Unauthorized Pets</span>
-              <Badge variant="outline" className="text-red-600 bg-red-50 border-red-200">-20 pts</Badge>
+              <Badge
+                variant="outline"
+                className="text-red-600 bg-red-50 border-red-200"
+              >
+                -20 pts
+              </Badge>
             </div>
           </CardContent>
         </Card>
@@ -159,33 +225,55 @@ export function TenantBehaviorHistory() {
             <HistoryIcon className="size-5 text-gray-500" />
             Score History
           </CardTitle>
-          <CardDescription>A complete log of your points activity.</CardDescription>
+          <CardDescription>
+            A complete log of your points activity.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             {data.logs.length > 0 ? (
               data.logs.map((log) => (
-                <div key={log.id} className="flex items-start justify-between py-3 border-b last:border-0 border-gray-100">
+                <div
+                  key={log.id}
+                  className="flex items-start justify-between py-3 border-b last:border-0 border-gray-100"
+                >
                   <div className="flex gap-3">
-                    <div className={`mt-1 p-2 rounded-lg ${log.type === 'positive' ? 'bg-green-50' : 'bg-red-50'}`}>
+                    <div
+                      className={`mt-1 p-2 rounded-lg ${log.type === 'positive' ? 'bg-green-50' : 'bg-red-50'}`}
+                    >
                       {log.type === 'positive' ? (
-                        <TrendingUp className={`size-4 ${getScoreColor(100)}`} />
+                        <TrendingUp
+                          className={`size-4 ${getScoreColor(100)}`}
+                        />
                       ) : (
-                        <TrendingDown className={`size-4 ${getScoreColor(0)}`} />
+                        <TrendingDown
+                          className={`size-4 ${getScoreColor(0)}`}
+                        />
                       )}
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-gray-900">{log.description}</p>
-                      <p className="text-xs text-gray-500">{log.category} • {new Date(log.createdAt).toLocaleDateString()}</p>
+                      <p className="text-sm font-semibold text-gray-900">
+                        {log.description}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {log.category} •{' '}
+                        {new Date(log.createdAt).toLocaleDateString()}
+                      </p>
                     </div>
                   </div>
-                  <div className={`font-bold ${log.type === 'positive' ? 'text-green-600' : 'text-red-600'}`}>
-                    {log.type === 'positive' ? '+' : ''}{log.scoreChange}
+                  <div
+                    className={`font-bold ${log.type === 'positive' ? 'text-green-600' : 'text-red-600'}`}
+                  >
+                    {log.type === 'positive' ? '+' : ''}
+                    {log.scoreChange}
                   </div>
                 </div>
               ))
             ) : (
-              <p className="text-center py-8 text-gray-400 italic">No points history yet. Start earning points by paying rent on time!</p>
+              <p className="text-center py-8 text-gray-400 italic">
+                No points history yet. Start earning points by paying rent on
+                time!
+              </p>
             )}
           </div>
         </CardContent>
@@ -194,7 +282,9 @@ export function TenantBehaviorHistory() {
       <div className="bg-amber-50 p-4 rounded-lg border border-amber-200 flex gap-3">
         <Info className="size-5 text-amber-600 shrink-0 mt-0.5" />
         <p className="text-xs text-amber-800 leading-relaxed">
-          <strong>Tip:</strong> Maintaining a score above 85 makes you a "Premium Tenant," unlocking early lease renewal options and zero-deposit moves if you switch units!
+          <strong>Tip:</strong> Maintaining a score above 85 makes you a
+          "Premium Tenant," unlocking early lease renewal options and
+          zero-deposit moves if you switch units!
         </p>
       </div>
     </div>

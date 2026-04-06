@@ -3,8 +3,8 @@ import pool from '../config/db.js';
 class UnitLockService {
   /**
    * Attempt to acquire a lock for a unit in the database.
-   * @param {string|number} unitId 
-   * @param {string|number} leadId 
+   * @param {string|number} unitId
+   * @param {string|number} leadId
    * @returns {Promise<boolean>} True if lock acquired or already held by this lead
    */
   async acquireLock(unitId, leadId) {
@@ -21,7 +21,7 @@ class UnitLockService {
       // Using FOR UPDATE ensures that if another process is also trying to lock this unit,
       // it will wait until our transaction finishes (atomicity).
       const [existing] = await connection.query(
-        "SELECT * FROM unit_locks WHERE unit_id = ? FOR UPDATE",
+        'SELECT * FROM unit_locks WHERE unit_id = ? FOR UPDATE',
         [id]
       );
 
@@ -42,7 +42,7 @@ class UnitLockService {
       // 2. Upsert lock (using REPLACE for simplicity in MySQL, or delete then insert)
       // Since unit_id is PK, we can just replace.
       await connection.query(
-        "REPLACE INTO unit_locks (unit_id, lead_id, expires_at) VALUES (?, ?, ?)",
+        'REPLACE INTO unit_locks (unit_id, lead_id, expires_at) VALUES (?, ?, ?)',
         [id, lid, expiry]
       );
 
@@ -50,7 +50,7 @@ class UnitLockService {
       return true;
     } catch (error) {
       await connection.rollback();
-      console.error("UnitLockService Error:", error);
+      console.error('UnitLockService Error:', error);
       return false;
     } finally {
       connection.release();
@@ -62,13 +62,16 @@ class UnitLockService {
    */
   async isLocked(unitId, excludeLeadId = null) {
     const [rows] = await pool.query(
-      "SELECT * FROM unit_locks WHERE unit_id = ? AND expires_at > NOW()",
+      'SELECT * FROM unit_locks WHERE unit_id = ? AND expires_at > NOW()',
       [unitId]
     );
 
     if (rows.length > 0) {
       const lock = rows[0];
-      if (!excludeLeadId || parseInt(lock.lead_id) !== parseInt(excludeLeadId)) {
+      if (
+        !excludeLeadId ||
+        parseInt(lock.lead_id) !== parseInt(excludeLeadId)
+      ) {
         return { leadId: lock.lead_id, expiresAt: lock.expires_at };
       }
     }
@@ -79,7 +82,7 @@ class UnitLockService {
    * Manually release a lock.
    */
   async releaseLock(unitId) {
-    await pool.query("DELETE FROM unit_locks WHERE unit_id = ?", [unitId]);
+    await pool.query('DELETE FROM unit_locks WHERE unit_id = ?', [unitId]);
   }
 
   /**
@@ -87,9 +90,9 @@ class UnitLockService {
    */
   async autoCleanup() {
     try {
-      await pool.query("DELETE FROM unit_locks WHERE expires_at <= NOW()");
+      await pool.query('DELETE FROM unit_locks WHERE expires_at <= NOW()');
     } catch (err) {
-      console.error("Lock Cleanup Failed:", err);
+      console.error('Lock Cleanup Failed:', err);
     }
   }
 }

@@ -88,13 +88,13 @@ class PropertyService {
     // Construct image URLs
     const imagesData = files.map((file, index) => ({
       propertyId: propertyId,
-      imageUrl: file.path || file.secure_url, 
-      isPrimary: index === 0 ? 1 : 0, 
+      imageUrl: file.path || file.secure_url,
+      isPrimary: index === 0 ? 1 : 0,
       displayOrder: index,
     }));
 
     // If any new image is primary, we MUST unset existing primary images for this property
-    const hasNewPrimary = imagesData.some(img => img.is_primary === 1);
+    const hasNewPrimary = imagesData.some((img) => img.is_primary === 1);
     if (hasNewPrimary) {
       await propertyModel.clearPrimaryImages(propertyId);
     }

@@ -61,7 +61,14 @@ export interface Lease {
   status: 'draft' | 'active' | 'expired' | 'ended' | 'cancelled';
   targetDeposit: number;
   currentDepositBalance: number;
-  depositStatus: 'pending' | 'paid' | 'awaiting_approval' | 'awaiting_acknowledgment' | 'disputed' | 'partially_refunded' | 'refunded';
+  depositStatus:
+    | 'pending'
+    | 'paid'
+    | 'awaiting_approval'
+    | 'awaiting_acknowledgment'
+    | 'disputed'
+    | 'partially_refunded'
+    | 'refunded';
   unitNumber?: string;
   propertyName?: string;
   tenantName?: string;

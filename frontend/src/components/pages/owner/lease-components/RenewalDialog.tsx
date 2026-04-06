@@ -17,14 +17,19 @@ interface RenewalDialogProps {
   request: any | null;
   leases: Lease[];
   onClose: () => void;
-  onSubmit: (requestId: string, rent: number, endDate: string, notes: string) => Promise<void>;
+  onSubmit: (
+    requestId: string,
+    rent: number,
+    endDate: string,
+    notes: string
+  ) => Promise<void>;
 }
 
 export function RenewalDialog({
   request,
   leases,
   onClose,
-  onSubmit
+  onSubmit,
 }: RenewalDialogProps) {
   const [newRenewalRent, setNewRenewalRent] = useState('');
   const [newRenewalEndDate, setNewRenewalEndDate] = useState('');
@@ -33,7 +38,10 @@ export function RenewalDialog({
 
   useEffect(() => {
     if (request) {
-      setNewRenewalRent(request.proposedMonthlyRent?.toString() || request.currentMonthlyRent.toString());
+      setNewRenewalRent(
+        request.proposedMonthlyRent?.toString() ||
+          request.currentMonthlyRent.toString()
+      );
       setNewRenewalEndDate(request.proposedEndDate || '');
       setRenewalNotes(request.negotiationNotes || '');
     }
@@ -43,20 +51,34 @@ export function RenewalDialog({
     e.preventDefault();
     if (!request) return;
 
-    const currentLease = leases.find(l => String(l.id) === String(request.lease_id));
+    const currentLease = leases.find(
+      (l) => String(l.id) === String(request.lease_id)
+    );
     const today = new Date();
-    const expectedStartDateStr = currentLease?.endDate 
-      ? new Date(new Date(currentLease.endDate).getTime() + 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    const expectedStartDateStr = currentLease?.endDate
+      ? new Date(new Date(currentLease.endDate).getTime() + 24 * 60 * 60 * 1000)
+          .toISOString()
+          .split('T')[0]
       : today.toISOString().split('T')[0];
 
-    if (newRenewalEndDate && new Date(newRenewalEndDate) <= new Date(expectedStartDateStr)) {
-      toast.error(`The renewal end date must be after the renewal start date (${expectedStartDateStr})`);
+    if (
+      newRenewalEndDate &&
+      new Date(newRenewalEndDate) <= new Date(expectedStartDateStr)
+    ) {
+      toast.error(
+        `The renewal end date must be after the renewal start date (${expectedStartDateStr})`
+      );
       return;
     }
 
     try {
       setIsSubmitting(true);
-      await onSubmit(request.id, parseFloat(newRenewalRent), newRenewalEndDate, renewalNotes);
+      await onSubmit(
+        request.id,
+        parseFloat(newRenewalRent),
+        newRenewalEndDate,
+        renewalNotes
+      );
       onClose();
     } catch (err) {
       // Error handled by parent
@@ -75,9 +97,9 @@ export function RenewalDialog({
           </DialogTitle>
         </DialogHeader>
         <div className="bg-blue-50 border border-blue-200 p-3 rounded-md mb-4 py-2">
-           <p className="text-xs text-blue-700">
-             Propose new terms to the tenant for their upcoming lease renewal.
-           </p>
+          <p className="text-xs text-blue-700">
+            Propose new terms to the tenant for their upcoming lease renewal.
+          </p>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4 pt-2">
           <div className="space-y-2">
@@ -126,10 +148,10 @@ export function RenewalDialog({
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button 
-                type="submit" 
-                className="bg-blue-600 hover:bg-blue-700"
-                disabled={isSubmitting}
+            <Button
+              type="submit"
+              className="bg-blue-600 hover:bg-blue-700"
+              disabled={isSubmitting}
             >
               {isSubmitting ? 'Sending Proposal...' : 'Send Renewal Proposal'}
             </Button>

@@ -34,7 +34,9 @@ export function OwnerDashboard() {
     fetchLedgerSummary,
   } = useApp();
 
-  const [ledgerSummary, setLedgerSummary] = useState<LedgerSummary | null>(null);
+  const [ledgerSummary, setLedgerSummary] = useState<LedgerSummary | null>(
+    null
+  );
   const currentYear = new Date().getFullYear();
 
   useEffect(() => {
@@ -51,7 +53,11 @@ export function OwnerDashboard() {
   }, [currentYear]);
 
   // Logic Fix: Calculate Balance for each invoice to support Partial Payments (Context: "is there any logics i have missed?")
-  const getInvoiceBalance = (invoiceId: string, totalAmount: number, amountPaid?: number) => {
+  const getInvoiceBalance = (
+    invoiceId: string,
+    totalAmount: number,
+    amountPaid?: number
+  ) => {
     if (amountPaid !== undefined) {
       return Math.max(0, totalAmount - amountPaid);
     }
@@ -223,25 +229,33 @@ export function OwnerDashboard() {
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="bg-white p-4 rounded-lg shadow-sm border border-indigo-50">
-                <p className="text-sm text-gray-500 font-medium">Net Operating Income</p>
+                <p className="text-sm text-gray-500 font-medium">
+                  Net Operating Income
+                </p>
                 <p className="text-2xl font-bold text-indigo-700">
                   {formatLKR(ledgerSummary.netOperatingIncome)}
                 </p>
               </div>
               <div className="bg-white p-4 rounded-lg shadow-sm border border-indigo-50">
-                <p className="text-sm text-gray-500 font-medium">True Revenue</p>
+                <p className="text-sm text-gray-500 font-medium">
+                  True Revenue
+                </p>
                 <p className="text-xl font-semibold text-emerald-600">
                   {formatLKR(ledgerSummary.totalRevenue)}
                 </p>
               </div>
               <div className="bg-white p-4 rounded-lg shadow-sm border border-indigo-50">
-                <p className="text-sm text-gray-500 font-medium">Deposits Held (Liability)</p>
+                <p className="text-sm text-gray-500 font-medium">
+                  Deposits Held (Liability)
+                </p>
                 <p className="text-xl font-semibold text-blue-600">
                   {formatLKR(ledgerSummary.totalLiabilityHeld)}
                 </p>
               </div>
               <div className="bg-white p-4 rounded-lg shadow-sm border border-indigo-50">
-                <p className="text-sm text-gray-500 font-medium">Expenses (Maintenance)</p>
+                <p className="text-sm text-gray-500 font-medium">
+                  Expenses (Maintenance)
+                </p>
                 <p className="text-xl font-semibold text-red-600">
                   {formatLKR(ledgerSummary.totalExpense)}
                 </p>
@@ -386,7 +400,11 @@ export function OwnerDashboard() {
                   const tenant = tenants.find((t) => t.id === invoice.tenantId);
                   const unit = units.find((u) => u.id === invoice.unitId);
                   const isOverdue = new Date(invoice.dueDate) < new Date();
-                  const balance = getInvoiceBalance(invoice.id, invoice.amount, invoice.amountPaid);
+                  const balance = getInvoiceBalance(
+                    invoice.id,
+                    invoice.amount,
+                    invoice.amountPaid
+                  );
                   const isPartial = balance < invoice.amount;
 
                   return (

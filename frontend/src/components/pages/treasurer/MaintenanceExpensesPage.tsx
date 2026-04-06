@@ -176,7 +176,10 @@ export function MaintenanceExpensesPage() {
                         </TableCell>
                         <TableCell className="align-top">
                           <div className="font-medium">{request.title}</div>
-                          <Badge variant="secondary" className="text-[10px] h-4 px-1 mt-1 capitalize">
+                          <Badge
+                            variant="secondary"
+                            className="text-[10px] h-4 px-1 mt-1 capitalize"
+                          >
                             {request.category}
                           </Badge>
                         </TableCell>
@@ -209,9 +212,7 @@ export function MaintenanceExpensesPage() {
                           </Badge>
                         </TableCell>
                         <TableCell className="align-top font-medium">
-                          {totalCost > 0
-                            ? formatLKR(totalCost)
-                            : '-'}
+                          {totalCost > 0 ? formatLKR(totalCost) : '-'}
                         </TableCell>
                         <TableCell className="align-top text-right">
                           <Button

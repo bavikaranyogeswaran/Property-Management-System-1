@@ -49,7 +49,9 @@ export const tenantSetupPasswordSchema = resetPasswordSchema.and(
     nicDoc: z.any().optional(),
     monthlyIncome: z.coerce.number().min(0, 'Income must be a valid number'),
     permanentAddress: z.string().min(1, 'Permanent Address is required'),
-    emergencyContactName: z.string().min(1, 'Emergency Contact Name is required'),
+    emergencyContactName: z
+      .string()
+      .min(1, 'Emergency Contact Name is required'),
     emergencyContactPhone: slPhoneSchema,
   })
 );
@@ -58,4 +60,6 @@ export type PasswordUpdateFormValues = z.infer<typeof passwordUpdateSchema>;
 export type LoginFormValues = z.infer<typeof loginSchema>;
 export type ForgotPasswordFormValues = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordFormValues = z.infer<typeof resetPasswordSchema>;
-export type TenantSetupPasswordFormValues = z.infer<typeof tenantSetupPasswordSchema>;
+export type TenantSetupPasswordFormValues = z.infer<
+  typeof tenantSetupPasswordSchema
+>;

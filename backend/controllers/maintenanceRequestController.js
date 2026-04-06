@@ -25,10 +25,10 @@ class MaintenanceRequestController {
     } catch (error) {
       console.error(error);
       if (error.message.includes('Access denied')) {
-          return res.status(403).json({ error: error.message });
+        return res.status(403).json({ error: error.message });
       }
       if (error.message.includes('reached')) {
-          return res.status(429).json({ error: error.message });
+        return res.status(429).json({ error: error.message });
       }
       res.status(500).json({ error: error.message });
     }
@@ -40,8 +40,8 @@ class MaintenanceRequestController {
       return res.json(requests);
     } catch (error) {
       console.error(error);
-       if (error.message.includes('Access denied')) {
-          return res.status(403).json({ error: error.message });
+      if (error.message.includes('Access denied')) {
+        return res.status(403).json({ error: error.message });
       }
       res.status(500).json({ error: 'Failed to fetch requests' });
     }
@@ -52,15 +52,19 @@ class MaintenanceRequestController {
       const { id } = req.params;
       const { status } = req.body;
 
-      const updated = await maintenanceService.updateStatus(id, status, req.user);
+      const updated = await maintenanceService.updateStatus(
+        id,
+        status,
+        req.user
+      );
       res.json(updated);
     } catch (error) {
       console.error(error);
       if (error.message.includes('Only owners')) {
-           return res.status(403).json({ error: error.message });
+        return res.status(403).json({ error: error.message });
       }
       if (error.message.includes('Access denied')) {
-           return res.status(403).json({ error: error.message });
+        return res.status(403).json({ error: error.message });
       }
       res.status(500).json({ error: 'Failed to update status' });
     }
@@ -69,20 +73,26 @@ class MaintenanceRequestController {
   //  BILL TENANT: If the damage was the tenant's fault, we send them a bill (Invoice).
   async createInvoice(req, res) {
     try {
-      const invoiceId = await maintenanceService.createInvoice(req.body, req.user);
+      const invoiceId = await maintenanceService.createInvoice(
+        req.body,
+        req.user
+      );
       res
         .status(201)
         .json({ message: 'Maintenance Invoice Created', invoiceId });
     } catch (error) {
       console.error(error);
       if (error.message.includes('Access denied')) {
-           return res.status(403).json({ error: error.message });
+        return res.status(403).json({ error: error.message });
       }
-      if (error.message.includes('not found') || error.message.includes('No active lease')) {
-           return res.status(404).json({ error: error.message });
+      if (
+        error.message.includes('not found') ||
+        error.message.includes('No active lease')
+      ) {
+        return res.status(404).json({ error: error.message });
       }
       if (error.message.includes('already exists')) {
-           return res.status(409).json({ error: error.message });
+        return res.status(409).json({ error: error.message });
       }
       res.status(500).json({ error: 'Failed to create invoice' });
     }

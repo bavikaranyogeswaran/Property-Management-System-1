@@ -1,4 +1,10 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  ReactNode,
+} from 'react';
 import apiClient from '../../services/api';
 import { useAuth } from './AuthContext';
 import { toast } from 'sonner';
@@ -37,7 +43,9 @@ interface UserContextType {
   treasurers: Treasurer[];
   owners: any[]; // Using any for now to avoid complex type export issues
   addTenant: (tenant: Omit<Tenant, 'id' | 'createdAt'>) => void;
-  addTreasurer: (treasurer: Omit<Treasurer, 'id' | 'createdAt'> & { id?: string }) => void;
+  addTreasurer: (
+    treasurer: Omit<Treasurer, 'id' | 'createdAt'> & { id?: string }
+  ) => void;
   updateTreasurer: (id: string, treasurer: Partial<Treasurer>) => void;
   deleteTreasurer: (id: string) => void;
 }
@@ -70,10 +78,14 @@ export function UserProvider({ children }: { children: ReactNode }) {
       try {
         const tRes = await apiClient.get('/users/tenants');
         if (tRes.data) {
-          setTenants(tRes.data.map((t: any) => ({
-            ...t,
-            monthlyIncome: t.monthlyIncome ? toLKRFromCents(t.monthlyIncome) : undefined
-          })));
+          setTenants(
+            tRes.data.map((t: any) => ({
+              ...t,
+              monthlyIncome: t.monthlyIncome
+                ? toLKRFromCents(t.monthlyIncome)
+                : undefined,
+            }))
+          );
         }
       } catch (e) {
         console.error('Failed to fetch tenants', e);
@@ -101,28 +113,42 @@ export function UserProvider({ children }: { children: ReactNode }) {
       id: `tenant-${Date.now()}`,
       createdAt: new Date().toISOString().split('T')[0],
     };
-    setTenants(prev => [...prev, newTenant]);
+    setTenants((prev) => [...prev, newTenant]);
   };
 
-  const addTreasurer = (treasurer: Omit<Treasurer, 'id' | 'createdAt'> & { id?: string }) => {
+  const addTreasurer = (
+    treasurer: Omit<Treasurer, 'id' | 'createdAt'> & { id?: string }
+  ) => {
     const newTreasurer: Treasurer = {
       ...treasurer,
       id: treasurer.id || `treasurer-${Date.now()}`,
       createdAt: new Date().toISOString().split('T')[0],
     };
-    setTreasurers(prev => [...prev, newTreasurer]);
+    setTreasurers((prev) => [...prev, newTreasurer]);
   };
 
   const updateTreasurer = (id: string, updates: Partial<Treasurer>) => {
-    setTreasurers(prev => prev.map(t => (t.id === id ? { ...t, ...updates } : t)));
+    setTreasurers((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, ...updates } : t))
+    );
   };
 
   const deleteTreasurer = (id: string) => {
-    setTreasurers(prev => prev.filter(t => t.id !== id));
+    setTreasurers((prev) => prev.filter((t) => t.id !== id));
   };
 
   return (
-    <UserContext.Provider value={{ tenants, treasurers, owners, addTenant, addTreasurer, updateTreasurer, deleteTreasurer }}>
+    <UserContext.Provider
+      value={{
+        tenants,
+        treasurers,
+        owners,
+        addTenant,
+        addTreasurer,
+        updateTreasurer,
+        deleteTreasurer,
+      }}
+    >
       {children}
     </UserContext.Provider>
   );
@@ -130,6 +156,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
 export function useUser() {
   const context = useContext(UserContext);
-  if (context === undefined) throw new Error('useUser must be used within a UserProvider');
+  if (context === undefined)
+    throw new Error('useUser must be used within a UserProvider');
   return context;
 }

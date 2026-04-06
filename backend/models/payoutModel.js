@@ -2,12 +2,28 @@ import pool from '../config/db.js';
 
 class PayoutModel {
   async create(data, connection) {
-    const { ownerId, grossAmount, commissionAmount, expensesAmount, netAmount, periodStart, periodEnd } = data;
+    const {
+      ownerId,
+      grossAmount,
+      commissionAmount,
+      expensesAmount,
+      netAmount,
+      periodStart,
+      periodEnd,
+    } = data;
     const db = connection || pool;
     try {
       const [result] = await db.query(
         'INSERT INTO owner_payouts (owner_id, gross_amount, commission_amount, expenses_amount, amount, period_start, period_end) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        [ownerId, grossAmount, commissionAmount, expensesAmount, netAmount, periodStart, periodEnd]
+        [
+          ownerId,
+          grossAmount,
+          commissionAmount,
+          expensesAmount,
+          netAmount,
+          periodStart,
+          periodEnd,
+        ]
       );
       return result.insertId;
     } catch (error) {
@@ -23,7 +39,7 @@ class PayoutModel {
       'SELECT * FROM owner_payouts WHERE owner_id = ? ORDER BY generated_at DESC',
       [ownerId]
     );
-    return rows.map(row => ({
+    return rows.map((row) => ({
       id: row.payout_id.toString(),
       ownerId: row.owner_id.toString(),
       grossAmount: Number(row.gross_amount),
@@ -39,7 +55,7 @@ class PayoutModel {
       generatedAt: row.generated_at,
       processedAt: row.processed_at,
       acknowledgedAt: row.acknowledged_at,
-      disputeReason: row.dispute_reason
+      disputeReason: row.dispute_reason,
     }));
   }
 
@@ -83,9 +99,15 @@ class PayoutModel {
   }
 
   // Core Logic: Rent - Expenses (Captures snapshot of IDs to prevent race conditions)
-  async calculateNetPayout(ownerId, startDate, endDate, connection, selection = null) {
+  async calculateNetPayout(
+    ownerId,
+    startDate,
+    endDate,
+    connection,
+    selection = null
+  ) {
     const db = connection || pool;
-    
+
     // 1. Snapshot Income IDs and Total
     let incomeQuery = `
             SELECT p.payment_id as paymentId, p.amount, prop.management_fee_percentage as fee, ri.invoice_type as invoiceType,
@@ -104,21 +126,21 @@ class PayoutModel {
     const incomeParams = [ownerId, endDate];
 
     if (selection?.incomeIds && selection.incomeIds.length > 0) {
-        incomeQuery += ` AND p.payment_id IN (?)`;
-        incomeParams.push(selection.incomeIds);
+      incomeQuery += ` AND p.payment_id IN (?)`;
+      incomeParams.push(selection.incomeIds);
     }
 
     const [incomeRows] = await db.query(incomeQuery, incomeParams);
 
-    const incomeIds = incomeRows.map(r => r.paymentId);
+    const incomeIds = incomeRows.map((r) => r.paymentId);
     const totalGross = incomeRows.reduce((sum, r) => sum + Number(r.amount), 0);
     const totalCommission = incomeRows.reduce((sum, r) => {
-        if (['rent', 'late_fee'].includes(r.invoiceType)) {
-            const fee = Number(r.fee || 0);
-            const comm = Math.round(Number(r.amount) * (fee / 100));
-            return sum + comm;
-        }
-        return sum;
+      if (['rent', 'late_fee'].includes(r.invoiceType)) {
+        const fee = Number(r.fee || 0);
+        const comm = Math.round(Number(r.amount) * (fee / 100));
+        return sum + comm;
+      }
+      return sum;
     }, 0);
 
     // 2. Snapshot Expense IDs and Total
@@ -138,14 +160,17 @@ class PayoutModel {
     const expenseParams = [ownerId, endDate];
 
     if (selection?.expenseIds && selection.expenseIds.length > 0) {
-        expenseQuery += ` AND mc.cost_id IN (?)`;
-        expenseParams.push(selection.expenseIds);
+      expenseQuery += ` AND mc.cost_id IN (?)`;
+      expenseParams.push(selection.expenseIds);
     }
 
     const [expenseRows] = await db.query(expenseQuery, expenseParams);
 
-    const expenseIds = expenseRows.map(r => r.costId);
-    const totalExpenses = expenseRows.reduce((sum, r) => sum + Number(r.amount), 0);
+    const expenseIds = expenseRows.map((r) => r.costId);
+    const totalExpenses = expenseRows.reduce(
+      (sum, r) => sum + Number(r.amount),
+      0
+    );
 
     return {
       totalGross,
@@ -156,15 +181,15 @@ class PayoutModel {
       expenseIds,
       // Pass back full details for the frontend preview list
       details: {
-          income: incomeRows,
-          expenses: expenseRows
-      }
+        income: incomeRows,
+        expenses: expenseRows,
+      },
     };
   }
 
   async linkRecordsToPayout(payoutId, incomeIds, expenseIds, connection) {
     const db = connection || pool;
-    
+
     // Link payments to the new payout IF there are any IDs
     if (incomeIds && incomeIds.length > 0) {
       await db.query(

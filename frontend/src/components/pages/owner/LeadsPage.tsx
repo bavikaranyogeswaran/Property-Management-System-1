@@ -1,10 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  useApp,
-  Lead,
-  Visit,
-} from '@/app/context/AppContext';
+import { useApp, Lead, Visit } from '@/app/context/AppContext';
 import { useLease } from '@/app/context/LeaseContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -115,41 +111,50 @@ export function LeadsPage() {
     }
   };
 
-
   useEffect(() => {
     if (selectedLead) {
-      const initialStartDate = selectedLead.moveInDate 
+      const initialStartDate = selectedLead.moveInDate
         ? new Date(selectedLead.moveInDate).toISOString().split('T')[0]
         : new Date().toISOString().split('T')[0];
-      
+
       // Auto-identify unit if not pre-filled
       let autoUnitId = selectedLead.interestedUnit || '';
-      
+
       if (!autoUnitId) {
         // 1. Check if lead had a specific unit visit
-        const leadVisit = visits.find(v => String(v.leadId) === String(selectedLead.id) && v.unitId);
+        const leadVisit = visits.find(
+          (v) => String(v.leadId) === String(selectedLead.id) && v.unitId
+        );
         if (leadVisit && leadVisit.unitId) {
-            autoUnitId = leadVisit.unitId;
+          autoUnitId = leadVisit.unitId;
         } else {
-            // 2. Check if property has only one available unit
-            const availableUnits = units.filter(u => String(u.propertyId) === String(selectedLead.propertyId) && u.status === 'available');
-            if (availableUnits.length === 1) {
-                autoUnitId = availableUnits[0].id;
-            }
+          // 2. Check if property has only one available unit
+          const availableUnits = units.filter(
+            (u) =>
+              String(u.propertyId) === String(selectedLead.propertyId) &&
+              u.status === 'available'
+          );
+          if (availableUnits.length === 1) {
+            autoUnitId = availableUnits[0].id;
+          }
         }
       }
 
-      setConversionData(prev => ({
+      setConversionData((prev) => ({
         ...prev,
         startDate: initialStartDate,
         unitId: autoUnitId,
-        leaseTermId: selectedLead.leaseTermId || ''
+        leaseTermId: selectedLead.leaseTermId || '',
       }));
     }
   }, [selectedLead, units, visits]);
 
   useEffect(() => {
-    if (selectedLead?.preferredTermMonths && conversionData.startDate && !conversionData.leaseTermId) {
+    if (
+      selectedLead?.preferredTermMonths &&
+      conversionData.startDate &&
+      !conversionData.leaseTermId
+    ) {
       const start = new Date(conversionData.startDate);
       const end = new Date(start);
       end.setMonth(end.getMonth() + selectedLead.preferredTermMonths);
@@ -158,48 +163,59 @@ export function LeadsPage() {
         endDate: end.toISOString().split('T')[0],
       }));
     }
-  }, [selectedLead?.preferredTermMonths, conversionData.startDate, conversionData.leaseTermId]);
+  }, [
+    selectedLead?.preferredTermMonths,
+    conversionData.startDate,
+    conversionData.leaseTermId,
+  ]);
 
   useEffect(() => {
     if (conversionData.leaseTermId) {
-        const term = leaseTerms.find(t => 
-            String(t.id) === String(conversionData.leaseTermId) || 
-            String(t.leaseTermId) === String(conversionData.leaseTermId)
-        );
-        if (term) {
-            if (term.type === 'periodic') {
-                setConversionData(prev => ({ ...prev, endDate: '' }));
-            } else if (term.durationMonths && conversionData.startDate) {
-                const start = new Date(conversionData.startDate);
-                const end = new Date(start);
-                end.setMonth(end.getMonth() + term.durationMonths);
-                setConversionData(prev => ({ ...prev, endDate: end.toISOString().split('T')[0] }));
-            }
+      const term = leaseTerms.find(
+        (t) =>
+          String(t.id) === String(conversionData.leaseTermId) ||
+          String(t.leaseTermId) === String(conversionData.leaseTermId)
+      );
+      if (term) {
+        if (term.type === 'periodic') {
+          setConversionData((prev) => ({ ...prev, endDate: '' }));
+        } else if (term.durationMonths && conversionData.startDate) {
+          const start = new Date(conversionData.startDate);
+          const end = new Date(start);
+          end.setMonth(end.getMonth() + term.durationMonths);
+          setConversionData((prev) => ({
+            ...prev,
+            endDate: end.toISOString().split('T')[0],
+          }));
         }
+      }
     }
   }, [conversionData.leaseTermId, conversionData.startDate, leaseTerms]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     try {
       if (!e.target.files || !e.target.files[0]) return;
-      
+
       setIsUploading(true);
-      const loadingToastId = toast.loading("Uploading lease document...");
-      
+      const loadingToastId = toast.loading('Uploading lease document...');
+
       const formData = new FormData();
       formData.append('file', e.target.files[0]);
-      
+
       const uploadRes = await apiClient.post('/upload', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
       });
-      
-      setConversionData(prev => ({ ...prev, documentUrl: uploadRes.data.url }));
-      
+
+      setConversionData((prev) => ({
+        ...prev,
+        documentUrl: uploadRes.data.url,
+      }));
+
       toast.dismiss(loadingToastId);
-      toast.success("Document uploaded successfully");
-    } catch(err) {
+      toast.success('Document uploaded successfully');
+    } catch (err) {
       toast.dismiss();
       toast.error('Failed to upload document');
     } finally {
@@ -234,7 +250,10 @@ export function LeadsPage() {
         documentUrl: '',
       });
     } catch (error: any) {
-      const errorMsg = error.response?.data?.error || error.message || 'Failed to convert lead';
+      const errorMsg =
+        error.response?.data?.error ||
+        error.message ||
+        'Failed to convert lead';
       toast.error(errorMsg);
     }
   };
@@ -452,23 +471,35 @@ export function LeadsPage() {
                 </TableCell>
                 <TableCell>
                   {(() => {
-                    const unit = units.find((u) => u.id === lead.interestedUnit);
-                    const property = properties.find((p) => p.id === lead.propertyId);
-                    
+                    const unit = units.find(
+                      (u) => u.id === lead.interestedUnit
+                    );
+                    const property = properties.find(
+                      (p) => p.id === lead.propertyId
+                    );
+
                     if (unit) {
                       return (
                         <div>
-                          <div className="font-medium text-gray-900">{property?.name || 'Unknown Property'}</div>
-                          <div className="text-xs text-gray-500">Unit: {unit.unitNumber}</div>
+                          <div className="font-medium text-gray-900">
+                            {property?.name || 'Unknown Property'}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            Unit: {unit.unitNumber}
+                          </div>
                         </div>
                       );
                     }
-                    
+
                     if (property) {
                       return (
                         <div>
-                          <div className="font-medium text-gray-900">{property.name}</div>
-                          <div className="text-xs text-blue-600 font-medium italic">Whole Property</div>
+                          <div className="font-medium text-gray-900">
+                            {property.name}
+                          </div>
+                          <div className="text-xs text-blue-600 font-medium italic">
+                            Whole Property
+                          </div>
                         </div>
                       );
                     }
@@ -488,10 +519,16 @@ export function LeadsPage() {
                       <span className="font-medium">Term:</span>{' '}
                       {(() => {
                         if (lead.leaseTermId) {
-                          const term = leaseTerms.find(t => String(t.id) === String(lead.leaseTermId) || String(t.leaseTermId) === String(lead.leaseTermId));
+                          const term = leaseTerms.find(
+                            (t) =>
+                              String(t.id) === String(lead.leaseTermId) ||
+                              String(t.leaseTermId) === String(lead.leaseTermId)
+                          );
                           if (term) return term.name;
                         }
-                        return lead.preferredTermMonths ? `${lead.preferredTermMonths} months` : '-';
+                        return lead.preferredTermMonths
+                          ? `${lead.preferredTermMonths} months`
+                          : '-';
                       })()}
                     </div>
                     <div>
@@ -575,9 +612,7 @@ export function LeadsPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-semibold text-gray-900">
-            Leads
-          </h2>
+          <h2 className="text-2xl font-semibold text-gray-900">Leads</h2>
           <p className="text-sm text-gray-500 mt-1">
             Manage prospective tenants and upcoming visits
           </p>
@@ -670,8 +705,9 @@ export function LeadsPage() {
           </DialogHeader>
           <div className="space-y-4 pt-4">
             <p className="text-sm text-gray-600">
-              Are you sure you want to drop <strong>{selectedLead?.name}</strong>? 
-              This will move them to the "Dropped" category and stop any further processing.
+              Are you sure you want to drop{' '}
+              <strong>{selectedLead?.name}</strong>? This will move them to the
+              "Dropped" category and stop any further processing.
             </p>
             <div className="flex gap-2 justify-end">
               <Button
@@ -683,8 +719,8 @@ export function LeadsPage() {
               >
                 Cancel
               </Button>
-              <Button 
-                variant="destructive" 
+              <Button
+                variant="destructive"
                 onClick={async () => {
                   if (selectedLead) {
                     await handleStatusChange(selectedLead.id, 'dropped');
@@ -707,227 +743,264 @@ export function LeadsPage() {
               <DialogTitle>Convert Lead to Tenant</DialogTitle>
             </DialogHeader>
             <div className="flex-1 overflow-y-auto p-6 pt-2">
-          <div className="space-y-4 mt-4">
-            <p className="text-sm text-gray-600">
-              Are you sure you want to convert{' '}
-              <strong>{selectedLead?.name}</strong> to a tenant?
-            </p>
-
-            <div className="space-y-2">
-              <Label htmlFor="conv-lease-term">Lease Model / Term</Label>
-              <select
-                id="conv-lease-term"
-                className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                value={conversionData.leaseTermId}
-                onChange={(e) => setConversionData({ ...conversionData, leaseTermId: e.target.value })}
-              >
-                <option value="" disabled>Select a Lease Term</option>
-                {leaseTerms.map(term => (
-                  <option key={term.id} value={term.id}>
-                    {term.name} ({term.durationMonths} months)
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="conv-start-date">Lease Start Date</Label>
-                <Input
-                  id="conv-start-date"
-                  type="date"
-                  value={conversionData.startDate}
-                  onChange={(e) =>
-                    setConversionData({
-                      ...conversionData,
-                      startDate: e.target.value,
-                    })
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="conv-end-date">Lease End Date</Label>
-                <div className="flex flex-col gap-2">
-                  <Input
-                    id="conv-end-date"
-                    type="date"
-                    value={conversionData.endDate}
-                    required
-                    onChange={(e) =>
-                      setConversionData({
-                        ...conversionData,
-                        endDate: e.target.value,
-                      })
-                    }
-                  />
-                </div>
-                <p className="text-[10px] text-gray-500">
-                  {selectedLead?.preferredTermMonths 
-                    ? `Pre-filled with lead's ${selectedLead.preferredTermMonths}mo preference`
-                    : 'Required (Min 90 days recommended)'}
+              <div className="space-y-4 mt-4">
+                <p className="text-sm text-gray-600">
+                  Are you sure you want to convert{' '}
+                  <strong>{selectedLead?.name}</strong> to a tenant?
                 </p>
-              </div>
-            </div>
-            {/* Unit Selection Logic */}
-            <div className="space-y-2 pt-2 border-t">
-              <Label>Unit Assignment</Label>
-              {selectedLead?.interestedUnit ? (
-                <div className="space-y-3">
-                  <div className="p-3 bg-gray-50 rounded-md border text-sm text-gray-700 flex justify-between items-center">
-                    <span>
-                      Interested Unit:{' '}
-                      <strong className="text-gray-900">
-                        {units.find((u) => u.id === selectedLead.interestedUnit)
-                          ?.unitNumber || 'Unknown'}
-                      </strong>
-                    </span>
-                    {(() => {
-                        const unit = units.find((u) => u.id === selectedLead.interestedUnit);
-                        if (!unit) return null;
-                        
-                        const statusColors: Record<string, string> = {
-                            available: 'bg-green-100 text-green-700',
-                            occupied: 'bg-blue-100 text-blue-700',
-                            maintenance: 'bg-red-100 text-red-700',
-                            reserved: 'bg-yellow-100 text-yellow-700'
-                        };
 
-                        return (
-                            <Badge className={`${statusColors[unit.status] || 'bg-gray-100'} border-none`}>
-                                {unit.status.toUpperCase()}
-                            </Badge>
-                        );
-                    })()}
-                  </div>
-
-                  {(() => {
-                    const unit = units.find((u) => u.id === selectedLead.interestedUnit);
-                    if (unit?.status === 'maintenance') {
-                      return (
-                        <div className="p-3 bg-red-50 border border-red-200 rounded-md flex gap-2 items-start text-red-700">
-                          <AlertCircle className="size-4 mt-0.5 shrink-0" />
-                          <div className="text-xs">
-                            <p className="font-bold">Unit Under Maintenance</p>
-                            <p>This unit is currently offline for repairs. You cannot create a lease until maintenance is completed.</p>
-                          </div>
-                        </div>
-                      );
-                    }
-                    if (unit?.status === 'occupied') {
-                      return (
-                        <div className="p-3 bg-blue-50 border border-blue-100 rounded-md flex gap-2 items-start text-blue-700">
-                            <AlertCircle className="size-4 mt-0.5 shrink-0" />
-                            <div className="text-xs">
-                                <p className="font-bold">Unit Currently Occupied</p>
-                                <p>This unit is currently leased. Ensure the move-in date ({conversionData.startDate}) is after the current tenant vacates.</p>
-                            </div>
-                        </div>
-                      );
-                    }
-                    return null;
-                  })()}
-                </div>
-              ) : (
                 <div className="space-y-2">
-                  <p className="text-xs text-gray-500">
-                    This lead is interested in the{' '}
-                    <strong>Whole Property</strong>. Select a unit to create a
-                    lease automatically.
-                  </p>
+                  <Label htmlFor="conv-lease-term">Lease Model / Term</Label>
                   <select
-                    className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                    value={conversionData.unitId}
+                    id="conv-lease-term"
+                    className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                    value={conversionData.leaseTermId}
                     onChange={(e) =>
                       setConversionData({
                         ...conversionData,
-                        unitId: e.target.value,
+                        leaseTermId: e.target.value,
                       })
                     }
                   >
-                    <option value="">Select a Unit (Optional)</option>
-                    {selectedLead &&
-                      units
-                        .filter(
-                          (u) =>
-                            u.propertyId === selectedLead.propertyId &&
-                            u.status === 'available'
-                        )
-                        .map((u) => (
-                          <option key={u.id} value={u.id}>
-                            Unit {u.unitNumber} - {u.type} (LKR {u.monthlyRent})
-                          </option>
-                        ))}
+                    <option value="" disabled>
+                      Select a Lease Term
+                    </option>
+                    {leaseTerms.map((term) => (
+                      <option key={term.id} value={term.id}>
+                        {term.name} ({term.durationMonths} months)
+                      </option>
+                    ))}
                   </select>
-                  {conversionData.unitId && (
-                    <p className="text-xs text-green-600">
-                      Lease will be created for this unit.
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="conv-start-date">Lease Start Date</Label>
+                    <Input
+                      id="conv-start-date"
+                      type="date"
+                      value={conversionData.startDate}
+                      onChange={(e) =>
+                        setConversionData({
+                          ...conversionData,
+                          startDate: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="conv-end-date">Lease End Date</Label>
+                    <div className="flex flex-col gap-2">
+                      <Input
+                        id="conv-end-date"
+                        type="date"
+                        value={conversionData.endDate}
+                        required
+                        onChange={(e) =>
+                          setConversionData({
+                            ...conversionData,
+                            endDate: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
+                    <p className="text-[10px] text-gray-500">
+                      {selectedLead?.preferredTermMonths
+                        ? `Pre-filled with lead's ${selectedLead.preferredTermMonths}mo preference`
+                        : 'Required (Min 90 days recommended)'}
                     </p>
-                  )}
-                  {!conversionData.unitId && (
-                    <p className="text-xs text-amber-600">
-                      No unit selected. Tenant will be created WITHOUT an active
-                      lease.
-                    </p>
+                  </div>
+                </div>
+                {/* Unit Selection Logic */}
+                <div className="space-y-2 pt-2 border-t">
+                  <Label>Unit Assignment</Label>
+                  {selectedLead?.interestedUnit ? (
+                    <div className="space-y-3">
+                      <div className="p-3 bg-gray-50 rounded-md border text-sm text-gray-700 flex justify-between items-center">
+                        <span>
+                          Interested Unit:{' '}
+                          <strong className="text-gray-900">
+                            {units.find(
+                              (u) => u.id === selectedLead.interestedUnit
+                            )?.unitNumber || 'Unknown'}
+                          </strong>
+                        </span>
+                        {(() => {
+                          const unit = units.find(
+                            (u) => u.id === selectedLead.interestedUnit
+                          );
+                          if (!unit) return null;
+
+                          const statusColors: Record<string, string> = {
+                            available: 'bg-green-100 text-green-700',
+                            occupied: 'bg-blue-100 text-blue-700',
+                            maintenance: 'bg-red-100 text-red-700',
+                            reserved: 'bg-yellow-100 text-yellow-700',
+                          };
+
+                          return (
+                            <Badge
+                              className={`${statusColors[unit.status] || 'bg-gray-100'} border-none`}
+                            >
+                              {unit.status.toUpperCase()}
+                            </Badge>
+                          );
+                        })()}
+                      </div>
+
+                      {(() => {
+                        const unit = units.find(
+                          (u) => u.id === selectedLead.interestedUnit
+                        );
+                        if (unit?.status === 'maintenance') {
+                          return (
+                            <div className="p-3 bg-red-50 border border-red-200 rounded-md flex gap-2 items-start text-red-700">
+                              <AlertCircle className="size-4 mt-0.5 shrink-0" />
+                              <div className="text-xs">
+                                <p className="font-bold">
+                                  Unit Under Maintenance
+                                </p>
+                                <p>
+                                  This unit is currently offline for repairs.
+                                  You cannot create a lease until maintenance is
+                                  completed.
+                                </p>
+                              </div>
+                            </div>
+                          );
+                        }
+                        if (unit?.status === 'occupied') {
+                          return (
+                            <div className="p-3 bg-blue-50 border border-blue-100 rounded-md flex gap-2 items-start text-blue-700">
+                              <AlertCircle className="size-4 mt-0.5 shrink-0" />
+                              <div className="text-xs">
+                                <p className="font-bold">
+                                  Unit Currently Occupied
+                                </p>
+                                <p>
+                                  This unit is currently leased. Ensure the
+                                  move-in date ({conversionData.startDate}) is
+                                  after the current tenant vacates.
+                                </p>
+                              </div>
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <p className="text-xs text-gray-500">
+                        This lead is interested in the{' '}
+                        <strong>Whole Property</strong>. Select a unit to create
+                        a lease automatically.
+                      </p>
+                      <select
+                        className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        value={conversionData.unitId}
+                        onChange={(e) =>
+                          setConversionData({
+                            ...conversionData,
+                            unitId: e.target.value,
+                          })
+                        }
+                      >
+                        <option value="">Select a Unit (Optional)</option>
+                        {selectedLead &&
+                          units
+                            .filter(
+                              (u) =>
+                                u.propertyId === selectedLead.propertyId &&
+                                u.status === 'available'
+                            )
+                            .map((u) => (
+                              <option key={u.id} value={u.id}>
+                                Unit {u.unitNumber} - {u.type} (LKR{' '}
+                                {u.monthlyRent})
+                              </option>
+                            ))}
+                      </select>
+                      {conversionData.unitId && (
+                        <p className="text-xs text-green-600">
+                          Lease will be created for this unit.
+                        </p>
+                      )}
+                      {!conversionData.unitId && (
+                        <p className="text-xs text-amber-600">
+                          No unit selected. Tenant will be created WITHOUT an
+                          active lease.
+                        </p>
+                      )}
+                    </div>
                   )}
                 </div>
-              )}
-            </div>
-            
-            {/* Document Upload */}
-            <div className="space-y-2 pt-2 border-t">
-              <Label>Lease Document</Label>
-              <div className="flex items-center gap-2">
-                <Input
-                  type="file"
-                  accept=".pdf,.doc,.docx"
-                  onChange={handleFileUpload}
-                  disabled={isUploading}
-                  className="cursor-pointer"
-                />
-              </div>
-              {conversionData.documentUrl && (
-                <p className="text-xs text-green-600 flex items-center gap-1">
-                  <CheckCircle className="size-3" />
-                  Document attached
-                </p>
-              )}
-              <p className="text-[10px] text-gray-500">
-                Optional: Upload the signed rental agreement now.
-              </p>
-            </div>
-            
-            {/* Conversion Notice */}
-            <div className="p-3 bg-blue-50 border border-blue-100 rounded-md flex gap-2 items-start text-blue-700">
-              <AlertCircle className="size-4 mt-0.5 shrink-0" />
-              <div className="text-xs">
-                <p className="font-bold uppercase tracking-wider mb-1">Deposit & Holding Policy</p>
-                <p>Converting this lead will create a <strong>Draft Lease</strong> and immediately generate a <strong>Security Deposit Invoice</strong>. The tenant will be notified to pay this to hold the unit.</p>
-              </div>
-            </div>
 
-            <div className="flex gap-2 justify-end">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setIsConvertDialogOpen(false);
-                  setSelectedLead(null);
-                }}
-              >
-                Cancel
-              </Button>
-              <Button 
-                onClick={handleConvert}
-                disabled={(() => {
-                    const unitId = selectedLead?.interestedUnit || conversionData.unitId;
-                    const unit = units.find(u => String(u.id) === String(unitId));
-                    return unit?.status === 'maintenance';
-                })()}
-              >
-                Convert to Tenant
-              </Button>
-            </div>
-            </div>
+                {/* Document Upload */}
+                <div className="space-y-2 pt-2 border-t">
+                  <Label>Lease Document</Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="file"
+                      accept=".pdf,.doc,.docx"
+                      onChange={handleFileUpload}
+                      disabled={isUploading}
+                      className="cursor-pointer"
+                    />
+                  </div>
+                  {conversionData.documentUrl && (
+                    <p className="text-xs text-green-600 flex items-center gap-1">
+                      <CheckCircle className="size-3" />
+                      Document attached
+                    </p>
+                  )}
+                  <p className="text-[10px] text-gray-500">
+                    Optional: Upload the signed rental agreement now.
+                  </p>
+                </div>
+
+                {/* Conversion Notice */}
+                <div className="p-3 bg-blue-50 border border-blue-100 rounded-md flex gap-2 items-start text-blue-700">
+                  <AlertCircle className="size-4 mt-0.5 shrink-0" />
+                  <div className="text-xs">
+                    <p className="font-bold uppercase tracking-wider mb-1">
+                      Deposit & Holding Policy
+                    </p>
+                    <p>
+                      Converting this lead will create a{' '}
+                      <strong>Draft Lease</strong> and immediately generate a{' '}
+                      <strong>Security Deposit Invoice</strong>. The tenant will
+                      be notified to pay this to hold the unit.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex gap-2 justify-end">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setIsConvertDialogOpen(false);
+                      setSelectedLead(null);
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleConvert}
+                    disabled={(() => {
+                      const unitId =
+                        selectedLead?.interestedUnit || conversionData.unitId;
+                      const unit = units.find(
+                        (u) => String(u.id) === String(unitId)
+                      );
+                      return unit?.status === 'maintenance';
+                    })()}
+                  >
+                    Convert to Tenant
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
         </DialogContent>

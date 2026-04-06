@@ -213,10 +213,7 @@ export function PropertiesPage() {
               ) {
                 const targetImage = response.images[primaryImageIndex];
                 if (targetImage) {
-                  await setPropertyPrimaryImage(
-                    newProperty.id,
-                    targetImage.id
-                  );
+                  await setPropertyPrimaryImage(newProperty.id, targetImage.id);
                 }
               }
             } catch (uploadError: any) {
@@ -255,8 +252,7 @@ export function PropertiesPage() {
           try {
             for (const unit of quickUnits) {
               const unitTypeName =
-                unitTypes.find((t) => t.id === unit.unitTypeId)?.name ||
-                '';
+                unitTypes.find((t) => t.id === unit.unitTypeId)?.name || '';
               await addUnit({
                 propertyId: savedPropertyId,
                 unitNumber: unit.unitNumber,
@@ -339,7 +335,7 @@ export function PropertiesPage() {
         ? [{ id: 'primary-preview', url: property.imageUrl, isPrimary: true }]
         : []
     );
-    
+
     // Reset unit related state to avoid state leaks from previous dialog sessions
     setQuickUnits([]);
     setNewUnitNumber('');
@@ -615,10 +611,7 @@ export function PropertiesPage() {
                                 >
                                   <option value={0}>Select Type</option>
                                   {propertyTypes.map((type) => (
-                                    <option
-                                      key={type.id}
-                                      value={type.id}
-                                    >
+                                    <option key={type.id} value={type.id}>
                                       {type.name}
                                     </option>
                                   ))}
@@ -737,8 +730,12 @@ export function PropertiesPage() {
                                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                   {...field}
                                 >
-                                  <option value="flat_percentage">Flat Percentage (%)</option>
-                                  <option value="daily_fixed">Daily Fixed Amount (LKR)</option>
+                                  <option value="flat_percentage">
+                                    Flat Percentage (%)
+                                  </option>
+                                  <option value="daily_fixed">
+                                    Daily Fixed Amount (LKR)
+                                  </option>
                                 </select>
                               </FormControl>
                               <FormMessage />
@@ -746,7 +743,8 @@ export function PropertiesPage() {
                           )}
                         />
 
-                        {propertyForm.watch('lateFeeType') === 'flat_percentage' ? (
+                        {propertyForm.watch('lateFeeType') ===
+                        'flat_percentage' ? (
                           <FormField
                             control={propertyForm.control}
                             name="lateFeePercentage"
@@ -754,18 +752,23 @@ export function PropertiesPage() {
                               <FormItem>
                                 <FormLabel>Standard Late Fee (%)</FormLabel>
                                 <FormControl>
-                                  <Input 
-                                    type="number" 
-                                    step="0.01" 
+                                  <Input
+                                    type="number"
+                                    step="0.01"
                                     min="0"
-                                    {...field} 
-                                    onChange={e => {
-                                      const val = e.target.value === '' ? '' : parseFloat(e.target.value);
+                                    {...field}
+                                    onChange={(e) => {
+                                      const val =
+                                        e.target.value === ''
+                                          ? ''
+                                          : parseFloat(e.target.value);
                                       field.onChange(val);
                                     }}
                                   />
                                 </FormControl>
-                                <p className="text-[0.8rem] text-muted-foreground">Applied monthly on overdue balance</p>
+                                <p className="text-[0.8rem] text-muted-foreground">
+                                  Applied monthly on overdue balance
+                                </p>
                                 <FormMessage />
                               </FormItem>
                             )}
@@ -778,18 +781,23 @@ export function PropertiesPage() {
                               <FormItem>
                                 <FormLabel>Daily Late Fee (LKR)</FormLabel>
                                 <FormControl>
-                                  <Input 
-                                    type="number" 
+                                  <Input
+                                    type="number"
                                     step="100"
                                     min="0"
-                                    {...field} 
-                                    onChange={e => {
-                                      const val = e.target.value === '' ? '' : parseInt(e.target.value);
+                                    {...field}
+                                    onChange={(e) => {
+                                      const val =
+                                        e.target.value === ''
+                                          ? ''
+                                          : parseInt(e.target.value);
                                       field.onChange(val);
                                     }}
                                   />
                                 </FormControl>
-                                <p className="text-[0.8rem] text-muted-foreground">Applied daily while overdue</p>
+                                <p className="text-[0.8rem] text-muted-foreground">
+                                  Applied daily while overdue
+                                </p>
                                 <FormMessage />
                               </FormItem>
                             )}
@@ -803,18 +811,23 @@ export function PropertiesPage() {
                             <FormItem>
                               <FormLabel>Grace Period (Days)</FormLabel>
                               <FormControl>
-                                <Input 
-                                  type="number" 
+                                <Input
+                                  type="number"
                                   step="1"
                                   min="0"
-                                  {...field} 
-                                  onChange={e => {
-                                    const val = e.target.value === '' ? '' : parseInt(e.target.value);
+                                  {...field}
+                                  onChange={(e) => {
+                                    const val =
+                                      e.target.value === ''
+                                        ? ''
+                                        : parseInt(e.target.value);
                                     field.onChange(val);
                                   }}
                                 />
                               </FormControl>
-                              <p className="text-[0.8rem] text-muted-foreground">Days after due date before late fees apply</p>
+                              <p className="text-[0.8rem] text-muted-foreground">
+                                Days after due date before late fees apply
+                              </p>
                               <FormMessage />
                             </FormItem>
                           )}
@@ -827,18 +840,24 @@ export function PropertiesPage() {
                             <FormItem>
                               <FormLabel>Tenant Deactivation (Days)</FormLabel>
                               <FormControl>
-                                <Input 
-                                  type="number" 
+                                <Input
+                                  type="number"
                                   step="1"
                                   min="0"
-                                  {...field} 
-                                  onChange={e => {
-                                    const val = e.target.value === '' ? '' : parseInt(e.target.value);
+                                  {...field}
+                                  onChange={(e) => {
+                                    const val =
+                                      e.target.value === ''
+                                        ? ''
+                                        : parseInt(e.target.value);
                                     field.onChange(val);
                                   }}
                                 />
                               </FormControl>
-                              <p className="text-[0.8rem] text-muted-foreground">Days after lease end before portal access revocation</p>
+                              <p className="text-[0.8rem] text-muted-foreground">
+                                Days after lease end before portal access
+                                revocation
+                              </p>
                               <FormMessage />
                             </FormItem>
                           )}
@@ -969,10 +988,7 @@ export function PropertiesPage() {
                               >
                                 <option value={0}>Select Type</option>
                                 {unitTypes?.map((type) => (
-                                  <option
-                                    key={type.id}
-                                    value={type.id}
-                                  >
+                                  <option key={type.id} value={type.id}>
                                     {type.name}
                                   </option>
                                 ))}

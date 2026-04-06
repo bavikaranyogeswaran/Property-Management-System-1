@@ -8,7 +8,11 @@ const router = Router();
 router.get('/:token', guestPaymentController.getInvoiceDetails);
 
 // POST /api/public/invoice/:token/submit
-router.post('/:token/submit', upload.single('proof'), guestPaymentController.submitPayment);
+router.post(
+  '/:token/submit',
+  upload.single('proof'),
+  guestPaymentController.submitPayment
+);
 
 // GET /api/public/invoice/:token/status (Polling for successful activation)
 router.get('/:token/status', guestPaymentController.getActivationStatus);
@@ -17,6 +21,9 @@ router.get('/:token/status', guestPaymentController.getActivationStatus);
 router.get('/:token/onboarding-status', guestPaymentController.getStatus);
 
 // GET /api/public/invoice/checkout-status/:orderId (Polling using PayHere Order ID)
-router.get('/checkout-status/:orderId', guestPaymentController.getActivationStatusByOrder);
+router.get(
+  '/checkout-status/:orderId',
+  guestPaymentController.getActivationStatusByOrder
+);
 
 export default router;

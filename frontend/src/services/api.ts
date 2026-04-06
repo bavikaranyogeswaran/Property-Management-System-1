@@ -11,7 +11,8 @@
 import axios from 'axios';
 
 // Ensure this matches the backend URL
-export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+export const API_BASE_URL =
+  import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -42,7 +43,9 @@ apiClient.interceptors.response.use(
 
       if (!isLoginRequest) {
         // Clear token if invalid/expired for non-login requests
-        console.warn('Authentication failed (401), clearing token and redirecting to login.');
+        console.warn(
+          'Authentication failed (401), clearing token and redirecting to login.'
+        );
         localStorage.removeItem('authToken');
         localStorage.removeItem('user');
         // Redirect to login
@@ -103,24 +106,34 @@ export const invoiceApi = {
 };
 
 export const payoutApi = {
-  preview: (ownerId: string, startDate: string, endDate: string, selection?: { incomeIds?: string[]; expenseIds?: string[] }) => {
+  preview: (
+    ownerId: string,
+    startDate: string,
+    endDate: string,
+    selection?: { incomeIds?: string[]; expenseIds?: string[] }
+  ) => {
     let url = `/payouts/preview?ownerId=${ownerId}&startDate=${startDate}&endDate=${endDate}`;
     if (selection?.incomeIds?.length) {
-      selection.incomeIds.forEach(id => url += `&incomeIds=${id}`);
+      selection.incomeIds.forEach((id) => (url += `&incomeIds=${id}`));
     }
     if (selection?.expenseIds?.length) {
-      selection.expenseIds.forEach(id => url += `&expenseIds=${id}`);
+      selection.expenseIds.forEach((id) => (url += `&expenseIds=${id}`));
     }
     return apiClient.get(url);
   },
-  create: (data: { ownerId: string; startDate: string; endDate: string; selection?: { incomeIds?: string[]; expenseIds?: string[] } }) =>
-    apiClient.post('/payouts/create', data),
-  getHistory: (ownerId?: string) => 
+  create: (data: {
+    ownerId: string;
+    startDate: string;
+    endDate: string;
+    selection?: { incomeIds?: string[]; expenseIds?: string[] };
+  }) => apiClient.post('/payouts/create', data),
+  getHistory: (ownerId?: string) =>
     apiClient.get(`/payouts/history${ownerId ? `?ownerId=${ownerId}` : ''}`),
-  markAsPaid: (id: string, data: { bankReference: string; proofUrl?: string }) =>
-    apiClient.put(`/payouts/${id}/paid`, data),
-  acknowledge: (id: string) =>
-    apiClient.put(`/payouts/${id}/acknowledge`),
+  markAsPaid: (
+    id: string,
+    data: { bankReference: string; proofUrl?: string }
+  ) => apiClient.put(`/payouts/${id}/paid`, data),
+  acknowledge: (id: string) => apiClient.put(`/payouts/${id}/acknowledge`),
   dispute: (id: string, reason: string) =>
     apiClient.put(`/payouts/${id}/dispute`, { reason }),
   getDetails: (id: string) => apiClient.get(`/payouts/${id}/details`),
@@ -143,7 +156,8 @@ export const userApi = {
 export const leaseApi = {
   getLeases: () => apiClient.get('/leases'),
   getById: (id: string) => apiClient.get(`/leases/${id}`),
-  updateNotice: (id: string, status: string) => apiClient.put(`/leases/${id}/notice`, { status }),
+  updateNotice: (id: string, status: string) =>
+    apiClient.put(`/leases/${id}/notice`, { status }),
 };
 
 // Receipts
@@ -159,28 +173,36 @@ export const adminApi = {
 
 // Guest / Public API (No Auth Token Required)
 export const guestApi = {
-  getInvoiceDetails: (token: string) => apiClient.get(`/public/invoice/${token}`),
-  submitPayment: (token: string, data: FormData) => 
+  getInvoiceDetails: (token: string) =>
+    apiClient.get(`/public/invoice/${token}`),
+  submitPayment: (token: string, data: FormData) =>
     apiClient.post(`/public/invoice/${token}/submit`, data, {
-      headers: { 'Content-Type': 'multipart/form-data' }
+      headers: { 'Content-Type': 'multipart/form-data' },
     }),
-  getOnboardingStatus: (token: string) => apiClient.get(`/public/invoice/${token}/onboarding-status`),
-  getActivationStatus: (token: string) => apiClient.get(`/public/invoice/${token}/status`),
+  getOnboardingStatus: (token: string) =>
+    apiClient.get(`/public/invoice/${token}/onboarding-status`),
+  getActivationStatus: (token: string) =>
+    apiClient.get(`/public/invoice/${token}/status`),
 };
 
 export const messageApi = {
   // Owner endpoints
   getLeadMessages: (leadId: string) => apiClient.get(`/messages/${leadId}`),
-  sendLeadMessage: (leadId: string, content: string) => apiClient.post(`/messages/${leadId}`, { content }),
+  sendLeadMessage: (leadId: string, content: string) =>
+    apiClient.post(`/messages/${leadId}`, { content }),
   markLeadRead: (leadId: string) => apiClient.put(`/messages/${leadId}/read`),
-  
-  getTenantMessages: (tenantId: string) => apiClient.get(`/messages/owner/tenant/${tenantId}`),
-  sendTenantMessage: (tenantId: string, content: string) => apiClient.post(`/messages/owner/tenant/${tenantId}`, { content }),
-  markTenantRead: (tenantId: string) => apiClient.put(`/messages/owner/tenant/${tenantId}/read`),
+
+  getTenantMessages: (tenantId: string) =>
+    apiClient.get(`/messages/owner/tenant/${tenantId}`),
+  sendTenantMessage: (tenantId: string, content: string) =>
+    apiClient.post(`/messages/owner/tenant/${tenantId}`, { content }),
+  markTenantRead: (tenantId: string) =>
+    apiClient.put(`/messages/owner/tenant/${tenantId}/read`),
 
   // Tenant endpoints (The tenant views their own thread)
   getMyThread: () => apiClient.get('/messages/tenant/thread'),
-  sendToOwner: (content: string) => apiClient.post('/messages/tenant/thread', { content }),
+  sendToOwner: (content: string) =>
+    apiClient.post('/messages/tenant/thread', { content }),
   markMyThreadRead: () => apiClient.put('/messages/tenant/thread/read'),
 };
 

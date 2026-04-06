@@ -45,6 +45,30 @@ services:
     networks:
       - pms-network
 
+  worker:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: pms-worker
+    restart: always
+    depends_on:
+      - db
+    environment:
+      - DB_HOST=db
+      - DB_USER=${DB_USER:-pms_user}
+      - DB_PASSWORD=${DB_PASSWORD:-password}
+      - DB_NAME=${DB_NAME:-pms_database}
+      - JWT_SECRET=${JWT_SECRET}
+      - CLOUDINARY_CLOUD_NAME=${CLOUDINARY_CLOUD_NAME}
+      - CLOUDINARY_API_KEY=${CLOUDINARY_API_KEY}
+      - CLOUDINARY_API_SECRET=${CLOUDINARY_API_SECRET}
+      - PORT=3000
+    command: node worker.js
+    volumes:
+      - pms_uploads_data:/app/uploads
+    networks:
+      - pms-network
+
   # Frontend Service (Vite + Nginx)
   frontend:
     build:

@@ -12,7 +12,9 @@ class ReceiptModel {
       receiptNumber,
     } = data;
     // generatedDate becomes receipt_date. Ensure valid date linked to payment.
-    const dateValue = generatedDate ? parseLocalDate(generatedDate) : getLocalTime();
+    const dateValue = generatedDate
+      ? parseLocalDate(generatedDate)
+      : getLocalTime();
 
     const db = connection || pool;
     const [result] = await db.query(

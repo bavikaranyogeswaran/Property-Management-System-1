@@ -110,7 +110,7 @@ export function LoginPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormControl>
-                       <div className="relative">
+                        <div className="relative">
                           <Input
                             placeholder="Enter your password"
                             type={showPassword ? 'text' : 'password'}

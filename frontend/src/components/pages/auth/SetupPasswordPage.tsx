@@ -109,9 +109,7 @@ export function SetupPasswordPage() {
       if (errorMsg === 'Validation Error' && Array.isArray(details)) {
         toast.error(`Validation Error: ${details.join(', ')}`);
       } else {
-        toast.error(
-          errorMsg || 'Failed to set password. Link may be expired.'
-        );
+        toast.error(errorMsg || 'Failed to set password. Link may be expired.');
       }
     }
   };
@@ -203,7 +201,9 @@ export function SetupPasswordPage() {
                           variant="ghost"
                           size="sm"
                           className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          onClick={() =>
+                            setShowConfirmPassword(!showConfirmPassword)
+                          }
                         >
                           {showConfirmPassword ? (
                             <EyeOff className="size-4 text-gray-500" />
@@ -225,11 +225,13 @@ export function SetupPasswordPage() {
                     <h3 className="font-semibold text-lg text-gray-900">
                       Profile Details
                     </h3>
-                    
+
                     <FormField
                       control={form.control}
                       name="nicDoc"
-                      render={({ field: { value, onChange, ...fieldProps } }) => (
+                      render={({
+                        field: { value, onChange, ...fieldProps },
+                      }) => (
                         <FormItem>
                           <FormLabel>NIC Document / Image *</FormLabel>
                           <FormControl>
@@ -244,13 +246,14 @@ export function SetupPasswordPage() {
                             />
                           </FormControl>
                           <CardDescription className="text-[10px] mt-1">
-                            Upload a clear photo or PDF of your NIC (Front & Back).
+                            Upload a clear photo or PDF of your NIC (Front &
+                            Back).
                           </CardDescription>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
-                    
+
                     <FormField
                       control={form.control}
                       name="nic"
@@ -264,7 +267,7 @@ export function SetupPasswordPage() {
                         </FormItem>
                       )}
                     />
-                    
+
                     <FormField
                       control={form.control}
                       name="monthlyIncome"
@@ -272,7 +275,13 @@ export function SetupPasswordPage() {
                         <FormItem>
                           <FormLabel>Monthly Income (LKR) *</FormLabel>
                           <FormControl>
-                            <Input type="number" min="0" step="0.01" placeholder="0.00" {...field} />
+                            <Input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              placeholder="0.00"
+                              {...field}
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -286,7 +295,10 @@ export function SetupPasswordPage() {
                         <FormItem>
                           <FormLabel>Permanent Address *</FormLabel>
                           <FormControl>
-                            <Input placeholder="Full permanent address" {...field} />
+                            <Input
+                              placeholder="Full permanent address"
+                              {...field}
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>

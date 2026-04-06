@@ -48,7 +48,7 @@ export const validatePassword = (password) => {
  */
 export const validatePhoneNumber = (phone) => {
   if (!phone) {
-      return { isValid: false, error: 'Phone number is required' };
+    return { isValid: false, error: 'Phone number is required' };
   }
 
   // Sri Lankan phone number patterns:
@@ -130,17 +130,17 @@ import { parseLocalDate } from './dateUtils.js';
  */
 export const validateLeaseDuration = (startDate, endDate, minDays = 90) => {
   const start = parseLocalDate(startDate);
-  
+
   if (!start) {
     return { isValid: false, error: 'Invalid start date' };
   }
 
   if (!endDate) {
-      return { isValid: false, error: 'End date is required.' };
+    return { isValid: false, error: 'End date is required.' };
   }
 
   const end = parseLocalDate(endDate);
-  
+
   if (!end) {
     return { isValid: false, error: 'Invalid end date' };
   }

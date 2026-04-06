@@ -7,7 +7,7 @@ class MaintenanceCostModel {
       'SELECT * FROM maintenance_costs WHERE request_id = ? ORDER BY recorded_date DESC',
       [requestId]
     );
-    return rows.map(row => ({
+    return rows.map((row) => ({
       id: row.cost_id.toString(),
       requestId: row.request_id.toString(),
       description: row.description,
@@ -16,7 +16,7 @@ class MaintenanceCostModel {
       invoiceId: row.invoice_id,
       isReimbursable: !!row.is_reimbursable,
       billTo: row.bill_to,
-      status: row.status
+      status: row.status,
     }));
   }
 
@@ -31,7 +31,7 @@ class MaintenanceCostModel {
         `,
       [tenantId]
     );
-    return rows.map(row => ({
+    return rows.map((row) => ({
       id: row.cost_id.toString(),
       requestId: row.request_id.toString(),
       description: row.description,
@@ -40,16 +40,32 @@ class MaintenanceCostModel {
       invoiceId: row.invoice_id,
       isReimbursable: !!row.is_reimbursable,
       billTo: row.bill_to,
-      status: row.status
+      status: row.status,
     }));
   }
 
   async create(data, connection = null) {
-    const { requestId, description, amount, recordedDate, invoiceId, isReimbursable, billTo } = data;
+    const {
+      requestId,
+      description,
+      amount,
+      recordedDate,
+      invoiceId,
+      isReimbursable,
+      billTo,
+    } = data;
     const db = connection || pool;
     const [result] = await db.query(
       'INSERT INTO maintenance_costs (request_id, description, amount, recorded_date, invoice_id, is_reimbursable, bill_to) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [requestId, description, amount, recordedDate || getLocalTime(), invoiceId || null, isReimbursable || false, billTo || 'owner']
+      [
+        requestId,
+        description,
+        amount,
+        recordedDate || getLocalTime(),
+        invoiceId || null,
+        isReimbursable || false,
+        billTo || 'owner',
+      ]
     );
     return result.insertId;
   }
@@ -58,7 +74,7 @@ class MaintenanceCostModel {
     const [rows] = await pool.query(
       'SELECT * FROM maintenance_costs ORDER BY recorded_date DESC'
     );
-    return rows.map(row => ({
+    return rows.map((row) => ({
       id: row.cost_id.toString(),
       requestId: row.request_id.toString(),
       description: row.description,
@@ -67,7 +83,7 @@ class MaintenanceCostModel {
       invoiceId: row.invoice_id,
       isReimbursable: !!row.is_reimbursable,
       billTo: row.bill_to,
-      status: row.status
+      status: row.status,
     }));
   }
 
@@ -100,7 +116,7 @@ class MaintenanceCostModel {
             JOIN properties p ON u.property_id = p.property_id
             ORDER BY mc.recorded_date DESC
         `);
-    return rows.map(row => ({
+    return rows.map((row) => ({
       id: row.cost_id.toString(),
       requestId: row.request_id.toString(),
       description: row.description,
@@ -111,7 +127,7 @@ class MaintenanceCostModel {
       billTo: row.bill_to,
       status: row.status,
       propertyName: row.property_name,
-      propertyId: row.property_id
+      propertyId: row.property_id,
     }));
   }
 
@@ -129,7 +145,7 @@ class MaintenanceCostModel {
         `,
       [userId]
     );
-    return rows.map(row => ({
+    return rows.map((row) => ({
       id: row.cost_id.toString(),
       requestId: row.request_id.toString(),
       description: row.description,
@@ -140,7 +156,7 @@ class MaintenanceCostModel {
       billTo: row.bill_to,
       status: row.status,
       propertyName: row.property_name,
-      propertyId: row.property_id
+      propertyId: row.property_id,
     }));
   }
 
@@ -167,7 +183,7 @@ class MaintenanceCostModel {
       isReimbursable: !!row.is_reimbursable,
       billTo: row.bill_to,
       status: row.status,
-      propertyId: row.property_id
+      propertyId: row.property_id,
     };
   }
 

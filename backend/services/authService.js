@@ -6,7 +6,8 @@ import userModel from '../models/userModel.js';
 import tenantModel from '../models/tenantModel.js';
 
 const JWT_SECRET = process.env.JWT_SECRET;
-if (!JWT_SECRET) throw new Error('FATAL: JWT_SECRET is not set in the environment variables.');
+if (!JWT_SECRET)
+  throw new Error('FATAL: JWT_SECRET is not set in the environment variables.');
 
 class AuthService {
   async login(email, password) {
@@ -23,7 +24,13 @@ class AuthService {
     }
 
     const token = sign(
-      { id: user.id, role: user.role, name: user.name, email: user.email, tokenVersion: user.tokenVersion || 0 },
+      {
+        id: user.id,
+        role: user.role,
+        name: user.name,
+        email: user.email,
+        tokenVersion: user.tokenVersion || 0,
+      },
       JWT_SECRET,
       { expiresIn: '24h' }
     );
@@ -55,7 +62,7 @@ class AuthService {
   async setupPassword(token, password, tenantData = null) {
     try {
       const decoded = jwt.verify(token, JWT_SECRET);
-      
+
       if (decoded.type !== 'setup_password' && decoded.type !== 'invite') {
         throw new Error('Invalid token type');
       }
@@ -79,17 +86,15 @@ class AuthService {
   async requestPasswordReset(email) {
     // 1. Find user (don't throw error if not found - security parity)
     const user = await userModel.findByEmail(email);
-    
+
     // 2. If user exists, generate token and send email
     if (user) {
-      const resetToken = jwt.sign(
-        { id: user.id, type: 'reset' },
-        JWT_SECRET,
-        { expiresIn: '1h' }
-      );
-      
+      const resetToken = jwt.sign({ id: user.id, type: 'reset' }, JWT_SECRET, {
+        expiresIn: '1h',
+      });
+
       await emailService.sendPasswordResetEmail(user.email, resetToken);
-      
+
       // Log audit
       try {
         const auditLogger = (await import('../utils/auditLogger.js')).default;
@@ -97,7 +102,7 @@ class AuthService {
           userId: user.id,
           actionType: 'PASSWORD_RESET_REQUESTED',
           entityId: user.id,
-          details: { email }
+          details: { email },
         });
       } catch (e) {
         console.error('Audit log failed for password reset request:', e);
@@ -135,7 +140,7 @@ class AuthService {
         await auditLogger.log({
           userId: decoded.id,
           actionType: 'PASSWORD_RESET_COMPLETED',
-          entityId: decoded.id
+          entityId: decoded.id,
         });
       } catch (e) {
         console.error('Audit log failed for password reset completion:', e);

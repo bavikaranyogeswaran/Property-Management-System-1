@@ -2,7 +2,14 @@ import db from '../config/db.js';
 
 class MessageModel {
   async create(data) {
-    const { leadId = null, tenantId = null, senderId, content, senderType = 'user', senderLeadId = null } = data;
+    const {
+      leadId = null,
+      tenantId = null,
+      senderId,
+      content,
+      senderType = 'user',
+      senderLeadId = null,
+    } = data;
 
     if (senderType === 'lead') {
       const [result] = await db.query(
@@ -11,7 +18,7 @@ class MessageModel {
       );
       return result.insertId;
     }
-    
+
     const [result] = await db.query(
       'INSERT INTO messages (lead_id, tenant_id, sender_id, sender_type, content) VALUES (?, ?, ?, ?, ?)',
       [leadId, tenantId, senderId, senderType, content]

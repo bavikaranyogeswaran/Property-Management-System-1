@@ -230,7 +230,8 @@ export function PublicPropertyDetailsPage() {
     (sum, u) => sum + (u.pendingApplicationsCount || 0),
     0
   );
-  const isHighDemand = pendingCount > availableUnitsCount && availableUnitsCount > 0;
+  const isHighDemand =
+    pendingCount > availableUnitsCount && availableUnitsCount > 0;
 
   const minRent =
     propertyUnits.length > 0
@@ -251,7 +252,6 @@ export function PublicPropertyDetailsPage() {
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back to Listings
             </Button>
-            
           </div>
         </nav>
 
@@ -517,17 +517,20 @@ export function PublicPropertyDetailsPage() {
                               unit.status === 'available'
                                 ? 'bg-green-500 hover:bg-green-600 border-none'
                                 : unit.status === 'reserved'
-                                ? 'bg-orange-500 hover:bg-orange-600 border-none'
-                                : 'bg-gray-500 hover:bg-gray-600 border-none'
+                                  ? 'bg-orange-500 hover:bg-orange-600 border-none'
+                                  : 'bg-gray-500 hover:bg-gray-600 border-none'
                             }
                           >
-                            {unit.status === 'reserved' ? 'UNDER APPLICATION' : unit.status.toUpperCase()}
+                            {unit.status === 'reserved'
+                              ? 'UNDER APPLICATION'
+                              : unit.status.toUpperCase()}
                           </Badge>
-                          {(unit.pendingApplicationsCount || 0) > 0 && unit.status === 'available' && (
-                            <Badge className="bg-orange-500/90 hover:bg-orange-600 border-none text-[10px]">
-                              {unit.pendingApplicationsCount} PENDING
-                            </Badge>
-                          )}
+                          {(unit.pendingApplicationsCount || 0) > 0 &&
+                            unit.status === 'available' && (
+                              <Badge className="bg-orange-500/90 hover:bg-orange-600 border-none text-[10px]">
+                                {unit.pendingApplicationsCount} PENDING
+                              </Badge>
+                            )}
                         </div>
                       </div>
 
@@ -541,12 +544,12 @@ export function PublicPropertyDetailsPage() {
                               </h3>
                               <p className="text-gray-500">{unit.type}</p>
                             </div>
-                             <p className="text-xl font-bold text-blue-600">
-                               {formatLKR(unit.monthlyRent)}
-                               <span className="text-sm font-normal text-gray-500">
-                                 /mo
-                               </span>
-                             </p>
+                            <p className="text-xl font-bold text-blue-600">
+                              {formatLKR(unit.monthlyRent)}
+                              <span className="text-sm font-normal text-gray-500">
+                                /mo
+                              </span>
+                            </p>
                           </div>
                         </div>
 
@@ -566,8 +569,8 @@ export function PublicPropertyDetailsPage() {
                             {unit.status === 'available'
                               ? "I'm Interested"
                               : unit.status === 'occupied'
-                              ? "Inquire for Future"
-                              : 'Unavailable'}
+                                ? 'Inquire for Future'
+                                : 'Unavailable'}
                           </Button>
                         </div>
                       </div>
@@ -874,7 +877,9 @@ export function PublicPropertyDetailsPage() {
                       Whole Property / Any Available Unit
                     </option>
                   )}
-                  {propertyUnits.some((u) => u.status !== 'available' && u.status !== 'occupied') && (
+                  {propertyUnits.some(
+                    (u) => u.status !== 'available' && u.status !== 'occupied'
+                  ) && (
                     <option value="" disabled>
                       Select a specific unit (Whole property unavailable due to
                       occupancy/maintenance)
@@ -884,8 +889,11 @@ export function PublicPropertyDetailsPage() {
                     .filter((u) => u.status !== 'maintenance')
                     .map((u) => (
                       <option key={u.id} value={u.id}>
-                        Unit {u.unitNumber} - {u.type} ({formatLKR(u.monthlyRent)}/mo) 
-                        {u.status !== 'available' ? ` (${u.status.toUpperCase()})` : ''}
+                        Unit {u.unitNumber} - {u.type} (
+                        {formatLKR(u.monthlyRent)}/mo)
+                        {u.status !== 'available'
+                          ? ` (${u.status.toUpperCase()})`
+                          : ''}
                       </option>
                     ))}
                 </select>
@@ -900,16 +908,22 @@ export function PublicPropertyDetailsPage() {
                 value={interestFormData.leaseTermId}
                 onChange={(e) => {
                   const val = e.target.value;
-                  const term = leaseTerms.find(t => String(t.id) === val || String(t.leaseTermId) === val);
+                  const term = leaseTerms.find(
+                    (t) => String(t.id) === val || String(t.leaseTermId) === val
+                  );
                   setInterestFormData({
                     ...interestFormData,
                     leaseTermId: val,
-                    preferredTermMonths: term?.durationMonths?.toString() || interestFormData.preferredTermMonths
+                    preferredTermMonths:
+                      term?.durationMonths?.toString() ||
+                      interestFormData.preferredTermMonths,
                   });
                 }}
               >
-                <option value="" disabled>Select a Lease Term</option>
-                {leaseTerms.map(t => (
+                <option value="" disabled>
+                  Select a Lease Term
+                </option>
+                {leaseTerms.map((t) => (
                   <option key={t.id} value={t.id.toString()}>
                     {t.name} ({t.durationMonths} months)
                   </option>

@@ -42,7 +42,11 @@ class AuthController {
         tenantData.nicUrl = req.file.path || req.file.secure_url;
       }
 
-      const result = await authService.setupPassword(token, password, tenantData);
+      const result = await authService.setupPassword(
+        token,
+        password,
+        tenantData
+      );
       res.json(result);
     } catch (error) {
       res.status(400).json({ error: error.message });

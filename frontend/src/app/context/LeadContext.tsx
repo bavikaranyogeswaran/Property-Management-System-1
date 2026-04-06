@@ -1,4 +1,10 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  ReactNode,
+} from 'react';
 import apiClient from '../../services/api';
 import { useAuth } from './AuthContext';
 import { toast } from 'sonner';
@@ -57,7 +63,12 @@ interface LeadContextType {
   visits: Visit[];
   addLead: (lead: Omit<Lead, 'id' | 'createdAt'>) => Promise<void>;
   updateLead: (id: string, lead: Partial<Lead>) => Promise<void>;
-  convertLeadToTenant: (leadId: string, startDate?: string, endDate?: string, data?: any) => Promise<string>;
+  convertLeadToTenant: (
+    leadId: string,
+    startDate?: string,
+    endDate?: string,
+    data?: any
+  ) => Promise<string>;
   fetchVisits: () => Promise<void>;
   scheduleVisit: (visitData: any) => Promise<any>;
   updateVisitStatus: (id: string, status: Visit['status']) => Promise<void>;
@@ -68,7 +79,9 @@ const LeadContext = createContext<LeadContextType | undefined>(undefined);
 export function LeadProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [leads, setLeads] = useState<Lead[]>([]);
-  const [leadStageHistory, setLeadStageHistory] = useState<LeadStageHistory[]>([]);
+  const [leadStageHistory, setLeadStageHistory] = useState<LeadStageHistory[]>(
+    []
+  );
   const [visits, setVisits] = useState<Visit[]>([]);
 
   const fetchLeads = async () => {
@@ -76,12 +89,15 @@ export function LeadProvider({ children }: { children: ReactNode }) {
       if (user?.role !== 'owner') return;
       const response = await apiClient.get('/leads');
       if (response.status === 200) {
-        setLeads(response.data.map((l: any) => ({
-          ...l, id: l.id.toString(),
-          interestedUnit: l.interestedUnit?.toString(),
-          propertyId: l.propertyId?.toString(),
-          tenantId: l.tenantId?.toString()
-        })));
+        setLeads(
+          response.data.map((l: any) => ({
+            ...l,
+            id: l.id.toString(),
+            interestedUnit: l.interestedUnit?.toString(),
+            propertyId: l.propertyId?.toString(),
+            tenantId: l.tenantId?.toString(),
+          }))
+        );
       }
     } catch (error) {
       console.error('Failed to fetch leads:', error);
@@ -120,17 +136,21 @@ export function LeadProvider({ children }: { children: ReactNode }) {
     try {
       const response = await apiClient.post('/leads', lead);
       const newLead: Lead = {
-        ...lead, id: response.data.id.toString(),
-        createdAt: new Date().toISOString().split('T')[0]
+        ...lead,
+        id: response.data.id.toString(),
+        createdAt: new Date().toISOString().split('T')[0],
       };
-      setLeads(prev => [...prev, newLead]);
-      setLeadStageHistory(prev => [...prev, {
-        id: `history-${Date.now()}`,
-        leadId: newLead.id,
-        fromStatus: null,
-        toStatus: lead.status,
-        changedAt: new Date().toISOString()
-      }]);
+      setLeads((prev) => [...prev, newLead]);
+      setLeadStageHistory((prev) => [
+        ...prev,
+        {
+          id: `history-${Date.now()}`,
+          leadId: newLead.id,
+          fromStatus: null,
+          toStatus: lead.status,
+          changedAt: new Date().toISOString(),
+        },
+      ]);
     } catch (error) {
       console.error('Failed to add lead:', error);
       throw error;
@@ -140,31 +160,59 @@ export function LeadProvider({ children }: { children: ReactNode }) {
   const updateLead = async (id: string, updates: Partial<Lead>) => {
     try {
       await apiClient.put(`/leads/${id}`, updates);
-      const currentLead = leads.find(l => l.id === id);
-      if (currentLead && updates.status && updates.status !== currentLead.status) {
-        const history = leadStageHistory.filter(h => h.leadId === id).sort((a,b) => new Date(b.changedAt).getTime() - new Date(a.changedAt).getTime())[0];
-        const duration = history ? Math.floor((new Date().getTime() - new Date(history.changedAt).getTime()) / (1000*60*60*24)) : 0;
+      const currentLead = leads.find((l) => l.id === id);
+      if (
+        currentLead &&
+        updates.status &&
+        updates.status !== currentLead.status
+      ) {
+        const history = leadStageHistory
+          .filter((h) => h.leadId === id)
+          .sort(
+            (a, b) =>
+              new Date(b.changedAt).getTime() - new Date(a.changedAt).getTime()
+          )[0];
+        const duration = history
+          ? Math.floor(
+              (new Date().getTime() - new Date(history.changedAt).getTime()) /
+                (1000 * 60 * 60 * 24)
+            )
+          : 0;
         const toStatus = updates.status as Lead['status'];
-        setLeadStageHistory(prev => [...prev, {
-          id: `history-${Date.now()}`,
-          leadId: id,
-          fromStatus: currentLead.status,
-          toStatus,
-          changedAt: new Date().toISOString(),
-          durationInPreviousStage: duration
-        }]);
+        setLeadStageHistory((prev) => [
+          ...prev,
+          {
+            id: `history-${Date.now()}`,
+            leadId: id,
+            fromStatus: currentLead.status,
+            toStatus,
+            changedAt: new Date().toISOString(),
+            durationInPreviousStage: duration,
+          },
+        ]);
       }
-      setLeads(prev => prev.map(l => l.id === id ? { ...l, ...updates } : l));
+      setLeads((prev) =>
+        prev.map((l) => (l.id === id ? { ...l, ...updates } : l))
+      );
     } catch (error) {
       console.error('Failed to update lead:', error);
     }
   };
 
-  const convertLeadToTenant = async (leadId: string, startDate?: string, endDate?: string, data?: any) => {
+  const convertLeadToTenant = async (
+    leadId: string,
+    startDate?: string,
+    endDate?: string,
+    data?: any
+  ) => {
     try {
       const payload: any = { startDate, endDate };
-      if (typeof data === 'string') payload.unitId = data; else if (data) Object.assign(payload, data);
-      const response = await apiClient.post(`/leads/${leadId}/convert`, payload);
+      if (typeof data === 'string') payload.unitId = data;
+      else if (data) Object.assign(payload, data);
+      const response = await apiClient.post(
+        `/leads/${leadId}/convert`,
+        payload
+      );
       window.location.reload();
       return response.data.tenantId;
     } catch (error) {
@@ -187,7 +235,9 @@ export function LeadProvider({ children }: { children: ReactNode }) {
   const updateVisitStatus = async (id: string, status: Visit['status']) => {
     try {
       await apiClient.patch(`/visits/${id}/status`, { status });
-      setVisits(prev => prev.map(v => v.id === id ? { ...v, status } : v));
+      setVisits((prev) =>
+        prev.map((v) => (v.id === id ? { ...v, status } : v))
+      );
       toast.success(`Visit ${status}`);
     } catch (error) {
       console.error('Failed to update visit status:', error);
@@ -196,7 +246,19 @@ export function LeadProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <LeadContext.Provider value={{ leads, leadStageHistory, visits, addLead, updateLead, convertLeadToTenant, fetchVisits, scheduleVisit, updateVisitStatus }}>
+    <LeadContext.Provider
+      value={{
+        leads,
+        leadStageHistory,
+        visits,
+        addLead,
+        updateLead,
+        convertLeadToTenant,
+        fetchVisits,
+        scheduleVisit,
+        updateVisitStatus,
+      }}
+    >
       {children}
     </LeadContext.Provider>
   );
@@ -204,6 +266,7 @@ export function LeadProvider({ children }: { children: ReactNode }) {
 
 export function useLead() {
   const context = useContext(LeadContext);
-  if (context === undefined) throw new Error('useLead must be used within a LeadProvider');
+  if (context === undefined)
+    throw new Error('useLead must be used within a LeadProvider');
   return context;
 }

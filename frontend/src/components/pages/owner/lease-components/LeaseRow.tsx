@@ -1,26 +1,23 @@
 import React from 'react';
-import { 
-  TableRow, 
-  TableCell 
-} from '@/components/ui/table';
+import { TableRow, TableCell } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { 
-  Eye, 
-  Calendar, 
-  Home, 
-  User, 
-  XCircle, 
-  CheckCircle, 
-  AlertCircle, 
-  AlertTriangle, 
-  PlayCircle, 
-  ShieldCheck, 
-  Share2, 
-  RefreshCw, 
+import {
+  Eye,
+  Calendar,
+  Home,
+  User,
+  XCircle,
+  CheckCircle,
+  AlertCircle,
+  AlertTriangle,
+  PlayCircle,
+  ShieldCheck,
+  Share2,
+  RefreshCw,
   Unlock,
   TrendingUp,
-  RotateCcw
+  RotateCcw,
 } from 'lucide-react';
 import { Lease, Tenant, Unit, Property } from '@/app/context/AppContext';
 import { formatLKR } from '@/utils/formatters';
@@ -74,11 +71,13 @@ export function LeaseRow({
   setAdjustmentsLeaseId,
   fetchAdjustments,
   setRefundLeaseId,
-  setRefundType
+  setRefundType,
 }: LeaseRowProps) {
   const tenant = tenants.find((t) => t.id === lease.tenantId);
   const unit = units.find((u) => u.id === lease.unitId);
-  const property = unit ? properties.find((p) => p.id === unit.propertyId) : null;
+  const property = unit
+    ? properties.find((p) => p.id === unit.propertyId)
+    : null;
 
   let isExpiringSoon = false;
   if (lease.status === 'active' && lease.endDate) {
@@ -91,7 +90,9 @@ export function LeaseRow({
       <TableCell>
         <div className="flex items-center gap-2">
           <User className="size-4 text-gray-400" />
-          <span className="font-medium">{lease.tenantName || tenant?.name || 'Unknown'}</span>
+          <span className="font-medium">
+            {lease.tenantName || tenant?.name || 'Unknown'}
+          </span>
         </div>
       </TableCell>
       <TableCell>
@@ -99,7 +100,9 @@ export function LeaseRow({
           <Home className="size-4 text-gray-400" />
           <div className="text-sm">
             <div className="font-medium">{property?.name || 'Unknown'}</div>
-            <div className="text-gray-500">Unit {unit?.unitNumber || 'N/A'}</div>
+            <div className="text-gray-500">
+              Unit {unit?.unitNumber || 'N/A'}
+            </div>
           </div>
         </div>
       </TableCell>
@@ -115,10 +118,17 @@ export function LeaseRow({
         <div className="text-sm">
           <div className="flex items-center gap-1">
             <Calendar className="size-3 text-gray-400" />
-            {lease.endDate || <span className="text-blue-600 font-medium italic">Month-to-Month</span>}
+            {lease.endDate || (
+              <span className="text-blue-600 font-medium italic">
+                Month-to-Month
+              </span>
+            )}
           </div>
           {isExpiringSoon && (
-            <Badge variant="outline" className="text-xs mt-1 border-orange-300 text-orange-700">
+            <Badge
+              variant="outline"
+              className="text-xs mt-1 border-orange-300 text-orange-700"
+            >
               Expiring Soon
             </Badge>
           )}
@@ -132,26 +142,37 @@ export function LeaseRow({
       <TableCell>
         <Badge
           variant={
-            lease.status === 'active' ? 'secondary' : 
-            lease.status === 'expired' ? 'outline' : 
-            'outline'
+            lease.status === 'active'
+              ? 'secondary'
+              : lease.status === 'expired'
+                ? 'outline'
+                : 'outline'
           }
           className={
-            lease.status === 'active' ? 'bg-green-100 text-green-700' : 
-            lease.status === 'expired' ? 'bg-amber-100 text-amber-700 border-amber-200' :
-            lease.status === 'draft' ? 'bg-gray-100 text-gray-700 border-gray-200' :
-            ''
+            lease.status === 'active'
+              ? 'bg-green-100 text-green-700'
+              : lease.status === 'expired'
+                ? 'bg-amber-100 text-amber-700 border-amber-200'
+                : lease.status === 'draft'
+                  ? 'bg-gray-100 text-gray-700 border-gray-200'
+                  : ''
           }
         >
-          {lease.status === 'draft' ? (
-            lease.depositStatus === 'paid' ? 'Awaiting Verification' : 'Awaiting Deposit'
-          ) : lease.status}
+          {lease.status === 'draft'
+            ? lease.depositStatus === 'paid'
+              ? 'Awaiting Verification'
+              : 'Awaiting Deposit'
+            : lease.status}
         </Badge>
-        {lease.status === 'draft' && lease.verificationStatus === 'verified' && (
-          <Badge variant="outline" className="ml-1 bg-blue-50 text-blue-700 border-blue-200">
-             Docs OK
-          </Badge>
-        )}
+        {lease.status === 'draft' &&
+          lease.verificationStatus === 'verified' && (
+            <Badge
+              variant="outline"
+              className="ml-1 bg-blue-50 text-blue-700 border-blue-200"
+            >
+              Docs OK
+            </Badge>
+          )}
       </TableCell>
       <TableCell className="text-right">
         <div className="flex gap-2 justify-end">
@@ -170,7 +191,11 @@ export function LeaseRow({
                   size="sm"
                   variant="ghost"
                   onClick={async () => {
-                    if (window.confirm('Have you reviewed and verified all required documents for this tenant?')) {
+                    if (
+                      window.confirm(
+                        'Have you reviewed and verified all required documents for this tenant?'
+                      )
+                    ) {
                       await verifyLeaseDocuments(lease.id);
                     }
                   }}
@@ -213,38 +238,46 @@ export function LeaseRow({
           )}
           {lease.status === 'draft' && lease.magicToken && (
             <>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => {
-                const url = `${window.location.origin}/pay/${lease.magicToken}`;
-                navigator.clipboard.writeText(url);
-                toast.success('Payment Link copied to clipboard');
-              }}
-              className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-              title="Copy Guest Payment Link"
-            >
-              <Share2 className="size-4" />
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={async () => {
-                try {
-                  await apiClient.post(`/leases/${lease.id}/regenerate-token`);
-                  toast.success('Payment link resent to tenant\'s email');
-                } catch (err: any) {
-                  toast.error(err.response?.data?.error || 'Failed to resend payment link');
-                }
-              }}
-              className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
-              title="Resend Payment Link via Email"
-            >
-              <RefreshCw className="size-4" />
-            </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  const url = `${window.location.origin}/pay/${lease.magicToken}`;
+                  navigator.clipboard.writeText(url);
+                  toast.success('Payment Link copied to clipboard');
+                }}
+                className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                title="Copy Guest Payment Link"
+              >
+                <Share2 className="size-4" />
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={async () => {
+                  try {
+                    await apiClient.post(
+                      `/leases/${lease.id}/regenerate-token`
+                    );
+                    toast.success("Payment link resent to tenant's email");
+                  } catch (err: any) {
+                    toast.error(
+                      err.response?.data?.error ||
+                        'Failed to resend payment link'
+                    );
+                  }
+                }}
+                className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                title="Resend Payment Link via Email"
+              >
+                <RefreshCw className="size-4" />
+              </Button>
             </>
           )}
-          {(lease.status === 'expired' || (lease.status === 'ended' && unit?.status === 'maintenance' && !lease.actualCheckoutAt)) && (
+          {(lease.status === 'expired' ||
+            (lease.status === 'ended' &&
+              unit?.status === 'maintenance' &&
+              !lease.actualCheckoutAt)) && (
             <Button
               size="sm"
               variant="ghost"
@@ -255,17 +288,18 @@ export function LeaseRow({
               <CheckCircle className="size-4" />
             </Button>
           )}
-          {(lease.status === 'ended' || lease.status === 'expired') && unit?.status === 'maintenance' && (
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => unit && setMarkAvailableUnitId(unit.id)}
-              className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
-              title="Mark Unit as Available"
-            >
-              <Unlock className="size-4" />
-            </Button>
-          )}
+          {(lease.status === 'ended' || lease.status === 'expired') &&
+            unit?.status === 'maintenance' && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => unit && setMarkAvailableUnitId(unit.id)}
+                className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                title="Mark Unit as Available"
+              >
+                <Unlock className="size-4" />
+              </Button>
+            )}
           {lease.status === 'active' && (
             <>
               <Button
@@ -274,10 +308,10 @@ export function LeaseRow({
                 onClick={() => {
                   setRenewLeaseId(lease.id);
                   setRenewDate(
-                    lease.endDate 
+                    lease.endDate
                       ? new Date(lease.endDate).toISOString().split('T')[0]
                       : new Date().toISOString().split('T')[0]
-                  ); 
+                  );
                   setRenewRent(lease.monthlyRent.toString());
                 }}
                 className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
@@ -295,40 +329,47 @@ export function LeaseRow({
                 <XCircle className="size-4" />
               </Button>
               {user?.role === 'owner' && (
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => {
-                  setAdjustmentsLeaseId(lease.id);
-                  fetchAdjustments(lease.id);
-                }}
-                className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
-                title="Manage Rent Adjustments"
-              >
-                <TrendingUp className="size-4" />
-              </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    setAdjustmentsLeaseId(lease.id);
+                    fetchAdjustments(lease.id);
+                  }}
+                  className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                  title="Manage Rent Adjustments"
+                >
+                  <TrendingUp className="size-4" />
+                </Button>
+              )}
+            </>
+          )}
+          {(lease.status === 'ended' || lease.noticeStatus === 'vacating') &&
+            lease.depositStatus !== 'refunded' && (
+              <>
+                {(user?.role === 'treasurer' ||
+                  (user?.role === 'owner' &&
+                    ['paid', 'partially_refunded'].includes(
+                      lease.depositStatus || ''
+                    ))) &&
+                  !['awaiting_approval', 'disputed'].includes(
+                    lease.depositStatus || ''
+                  ) && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        setRefundLeaseId(lease.id);
+                        setRefundType('request');
+                      }}
+                      className="text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                      title="Request Refund / Offset"
+                    >
+                      <RotateCcw className="size-4" />
+                    </Button>
+                  )}
+              </>
             )}
-            </>
-          )}
-          {(lease.status === 'ended' || lease.noticeStatus === 'vacating') && lease.depositStatus !== 'refunded' && (
-            <>
-              {((user?.role === 'treasurer') || (user?.role === 'owner' && ['paid', 'partially_refunded'].includes(lease.depositStatus || ''))) &&
-                !['awaiting_approval', 'disputed'].includes(lease.depositStatus || '') && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => {
-                      setRefundLeaseId(lease.id);
-                      setRefundType('request');
-                    }}
-                    className="text-orange-600 hover:text-orange-700 hover:bg-orange-50"
-                    title="Request Refund / Offset"
-                  >
-                    <RotateCcw className="size-4" />
-                  </Button>
-                )}
-            </>
-          )}
         </div>
       </TableCell>
     </TableRow>

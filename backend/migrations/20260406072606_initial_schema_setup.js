@@ -1,9 +1,11 @@
 export const up = async (knex) => {
-  // BASELINE CHECK: If the 'users' table already exists, we assume the initial schema 
+  // BASELINE CHECK: If the 'users' table already exists, we assume the initial schema
   // is already present and skip the raw SQL execution to prevent errors.
   const hasTable = await knex.schema.hasTable('users');
   if (hasTable) {
-    console.log('[Migration] "users" table detected. Marking baseline as complete without execution.');
+    console.log(
+      '[Migration] "users" table detected. Marking baseline as complete without execution.'
+    );
     return;
   }
 
@@ -492,7 +494,7 @@ export const down = async (knex) => {
   // To keep it clean, we drop tables in reverse order of creation
   // and handle foreign key constraints by disabling checks temporarily.
   await knex.raw('SET FOREIGN_KEY_CHECKS = 0');
-  
+
   const tables = [
     'cron_checkpoints',
     'renewal_requests',
@@ -526,7 +528,7 @@ export const down = async (knex) => {
     'owners',
     'tenant_behavior_logs',
     'tenants',
-    'users'
+    'users',
   ];
 
   for (const table of tables) {

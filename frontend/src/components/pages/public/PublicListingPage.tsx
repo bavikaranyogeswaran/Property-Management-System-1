@@ -174,11 +174,13 @@ export function PublicListingPage({
     setInterestProperty(property);
     setInterestFormData((prev) => ({ ...prev, interestedUnit: '' }));
     setIsInterestDialogOpen(true);
-    
+
     // Fetch lease terms for this property
     setFetchingTerms(true);
     try {
-      const response = await apiClient.get(`/properties/${property.id}/lease-terms`);
+      const response = await apiClient.get(
+        `/properties/${property.id}/lease-terms`
+      );
       setLeaseTerms(response.data);
     } catch (e) {
       console.error('Failed to fetch terms', e);
@@ -302,7 +304,8 @@ export function PublicListingPage({
                       (sum, u) => sum + (u.pendingApplicationsCount || 0),
                       0
                     );
-                    const isHighDemand = pendingCount > availableCount && availableCount > 0;
+                    const isHighDemand =
+                      pendingCount > availableCount && availableCount > 0;
 
                     // Show block if there are ANY units (even if 0 available)
                     // Hide only if property has NO units created (Total = 0)
@@ -353,8 +356,9 @@ export function PublicListingPage({
                         const rents = units
                           .filter((u) => u.propertyId === property.id)
                           .map((u) => u.monthlyRent);
-                        const validRents = rents.filter(r => r > 0);
-                        const minRent = validRents.length > 0 ? Math.min(...validRents) : 0;
+                        const validRents = rents.filter((r) => r > 0);
+                        const minRent =
+                          validRents.length > 0 ? Math.min(...validRents) : 0;
                         return minRent > 0 ? formatLKR(minRent) : 'N/A';
                       })()}
                     </p>
@@ -467,17 +471,23 @@ export function PublicListingPage({
                 value={interestFormData.leaseTermId}
                 onChange={(e) => {
                   const val = e.target.value;
-                  const term = leaseTerms.find(t => String(t.id) === val || String(t.leaseTermId) === val);
+                  const term = leaseTerms.find(
+                    (t) => String(t.id) === val || String(t.leaseTermId) === val
+                  );
                   setInterestFormData({
                     ...interestFormData,
                     leaseTermId: val,
-                    preferredTermMonths: term?.durationMonths?.toString() || interestFormData.preferredTermMonths
+                    preferredTermMonths:
+                      term?.durationMonths?.toString() ||
+                      interestFormData.preferredTermMonths,
                   });
                 }}
                 required
               >
-                <option value="" disabled>Select a Lease Term</option>
-                {leaseTerms.map(t => (
+                <option value="" disabled>
+                  Select a Lease Term
+                </option>
+                {leaseTerms.map((t) => (
                   <option key={t.id} value={t.id.toString()}>
                     {t.name} ({t.durationMonths} months)
                   </option>
@@ -561,7 +571,8 @@ export function PublicListingPage({
                           </option>
                           {avail.map((u) => (
                             <option key={u.id} value={u.id}>
-                              Unit {u.unitNumber} - {u.type} ({formatLKR(u.monthlyRent)}/mo)
+                              Unit {u.unitNumber} - {u.type} (
+                              {formatLKR(u.monthlyRent)}/mo)
                             </option>
                           ))}
                         </>

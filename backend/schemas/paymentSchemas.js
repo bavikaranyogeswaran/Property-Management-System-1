@@ -9,8 +9,6 @@ export const submitPaymentSchema = Joi.object({
   evidenceUrl: Joi.string().uri().allow('', null),
 });
 
-
-
 export const verifyPaymentSchema = Joi.object({
   status: Joi.string().valid('verified', 'rejected').required(),
   reason: Joi.string().allow('', null),

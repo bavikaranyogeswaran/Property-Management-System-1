@@ -34,8 +34,6 @@ import { formatLKR } from '@/utils/formatters';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
-
-
 export function OwnerInvoicesPage() {
   const { user } = useAuth();
   const {
@@ -62,7 +60,7 @@ export function OwnerInvoicesPage() {
 
   const pendingInvoices = invoices.filter((i) => i.status === 'pending');
   const paidInvoices = invoices.filter((i) => i.status === 'paid');
-  
+
   const d = new Date();
   const year = d.getFullYear();
   const month = String(d.getMonth() + 1).padStart(2, '0');
@@ -86,14 +84,18 @@ export function OwnerInvoicesPage() {
     {
       label: 'Pending',
       value: pendingInvoices.length,
-      subtitle: formatLKR(pendingInvoices.reduce((sum, i) => sum + i.amount, 0)),
+      subtitle: formatLKR(
+        pendingInvoices.reduce((sum, i) => sum + i.amount, 0)
+      ),
       icon: Clock,
       color: 'bg-orange-50 text-orange-700',
     },
     {
       label: 'Overdue',
       value: overdueInvoices.length,
-      subtitle: formatLKR(overdueInvoices.reduce((sum, i) => sum + i.amount, 0)),
+      subtitle: formatLKR(
+        overdueInvoices.reduce((sum, i) => sum + i.amount, 0)
+      ),
       icon: AlertCircle,
       color: 'bg-red-50 text-red-700',
     },
@@ -123,7 +125,9 @@ export function OwnerInvoicesPage() {
             <TableHead>Due Date</TableHead>
             <TableHead>Generated</TableHead>
             <TableHead>Status</TableHead>
-            {(user?.role === 'treasurer' || (invoicesList.length > 0 && invoicesList.every(i => i.status === 'paid'))) && (
+            {(user?.role === 'treasurer' ||
+              (invoicesList.length > 0 &&
+                invoicesList.every((i) => i.status === 'paid'))) && (
               <TableHead className="text-right">Actions</TableHead>
             )}
           </TableRow>
@@ -160,11 +164,15 @@ export function OwnerInvoicesPage() {
                   {formatLKR(invoice.amount)}
                 </TableCell>
                 <TableCell className="align-middle h-14">
-                  <div className={`flex flex-col gap-0.5 ${isOverdue ? 'text-red-600 font-medium' : ''}`}>
+                  <div
+                    className={`flex flex-col gap-0.5 ${isOverdue ? 'text-red-600 font-medium' : ''}`}
+                  >
                     <span>{invoice.dueDate}</span>
                   </div>
                 </TableCell>
-                <TableCell className="align-middle h-14">{invoice.generatedDate}</TableCell>
+                <TableCell className="align-middle h-14">
+                  {invoice.generatedDate}
+                </TableCell>
                 <TableCell className="align-middle h-14">
                   <div className="flex gap-2">
                     <Badge
@@ -172,7 +180,7 @@ export function OwnerInvoicesPage() {
                         invoice.status === 'paid'
                           ? 'default'
                           : invoice.status === 'partially_paid'
-                            ? 'outline' 
+                            ? 'outline'
                             : isOverdue
                               ? 'destructive'
                               : 'secondary'
@@ -199,43 +207,44 @@ export function OwnerInvoicesPage() {
                     )}
                   </div>
                 </TableCell>
-                
-                {(user?.role === 'treasurer' || (invoicesList.length > 0 && invoicesList.every(i => i.status === 'paid'))) && (
+
+                {(user?.role === 'treasurer' ||
+                  (invoicesList.length > 0 &&
+                    invoicesList.every((i) => i.status === 'paid'))) && (
                   <TableCell className="text-right align-middle h-14">
                     <div className="flex items-center justify-end gap-2">
+                      {invoice.status === 'paid' &&
+                        receipt &&
+                        (() => {
+                          const receiptPayment = payments.find(
+                            (p) => p.id === receipt.paymentId
+                          );
+                          if (!receiptPayment || !tenant || !unit || !property)
+                            return null;
 
-
-                    {invoice.status === 'paid' &&
-                      receipt &&
-                      (() => {
-                        const receiptPayment = payments.find(
-                          (p) => p.id === receipt.paymentId
-                        );
-                        if (!receiptPayment || !tenant || !unit || !property)
-                          return null;
-
-                        return (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              setSelectedReceipt({
-                                receipt,
-                                tenantName: tenant.name,
-                                tenantEmail: tenant.email,
-                                propertyName: property.name,
-                                unitNumber: unit.unitNumber,
-                                paymentMethod: receiptPayment.paymentMethod,
-                                paymentDate: receiptPayment.paymentDate,
-                                description: invoice.description || 'Rent Payment',
-                              });
-                            }}
-                          >
-                            <Download className="size-4 mr-2" />
-                            Receipt
-                          </Button>
-                        );
-                      })()}
+                          return (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setSelectedReceipt({
+                                  receipt,
+                                  tenantName: tenant.name,
+                                  tenantEmail: tenant.email,
+                                  propertyName: property.name,
+                                  unitNumber: unit.unitNumber,
+                                  paymentMethod: receiptPayment.paymentMethod,
+                                  paymentDate: receiptPayment.paymentDate,
+                                  description:
+                                    invoice.description || 'Rent Payment',
+                                });
+                              }}
+                            >
+                              <Download className="size-4 mr-2" />
+                              Receipt
+                            </Button>
+                          );
+                        })()}
                     </div>
                   </TableCell>
                 )}
@@ -266,7 +275,11 @@ export function OwnerInvoicesPage() {
         </div>
         <div className="flex items-center gap-2">
           {(user?.role === 'treasurer' || user?.role === 'owner') && (
-            <Button variant="outline" onClick={runLateFeeAudit} className="text-red-700 border-red-200 hover:bg-red-50">
+            <Button
+              variant="outline"
+              onClick={runLateFeeAudit}
+              className="text-red-700 border-red-200 hover:bg-red-50"
+            >
               <AlertCircle className="size-4 mr-2" />
               Run Late Fee Audit
             </Button>

@@ -116,7 +116,6 @@ export const TenantDetailsDialog: React.FC<TenantDetailsDialogProps> = ({
             <div className="flex-1 overflow-y-auto p-6 pt-2 space-y-6">
               {/* Header Section with ScoreCard */}
               <div className="flex flex-col md:flex-row gap-6">
-                
                 {/* Tenant Info - Takes up remaining space */}
                 <div className="flex-1 flex flex-col gap-6 min-w-[300px]">
                   <div className="flex flex-col sm:flex-row items-start gap-4">
@@ -132,20 +131,33 @@ export const TenantDetailsDialog: React.FC<TenantDetailsDialogProps> = ({
                         </div>
                         <div className="flex items-center gap-2 text-sm text-gray-600">
                           <Phone className="size-4 shrink-0" />
-                          <span className="whitespace-nowrap">{tenant.phone}</span>
+                          <span className="whitespace-nowrap">
+                            {tenant.phone}
+                          </span>
                         </div>
                         <div className="flex items-center gap-2 text-sm text-gray-600">
                           <Calendar className="size-4 shrink-0" />
-                          <span>Member since {tenant.createdAt ? new Date(tenant.createdAt).toLocaleDateString() : 'N/A'}</span>
+                          <span>
+                            Member since{' '}
+                            {tenant.createdAt
+                              ? new Date(tenant.createdAt).toLocaleDateString()
+                              : 'N/A'}
+                          </span>
                         </div>
                       </div>
                     </div>
                     {lease ? (
-                      <Badge variant="secondary" className="bg-green-100 text-green-700 whitespace-nowrap">
+                      <Badge
+                        variant="secondary"
+                        className="bg-green-100 text-green-700 whitespace-nowrap"
+                      >
                         Active Tenant
                       </Badge>
                     ) : (
-                      <Badge variant="outline" className="text-gray-500 whitespace-nowrap">
+                      <Badge
+                        variant="outline"
+                        className="text-gray-500 whitespace-nowrap"
+                      >
                         Inactive
                       </Badge>
                     )}
@@ -157,11 +169,17 @@ export const TenantDetailsDialog: React.FC<TenantDetailsDialogProps> = ({
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <p className="text-sm text-gray-600">NIC / ID</p>
-                        <p className="font-medium break-all">{tenant.nic || 'Not provided'}</p>
+                        <p className="font-medium break-all">
+                          {tenant.nic || 'Not provided'}
+                        </p>
                       </div>
                       <div>
-                        <p className="text-sm text-gray-600">Employment Status</p>
-                        <p className="font-medium">{tenant.employmentStatus || 'Not provided'}</p>
+                        <p className="text-sm text-gray-600">
+                          Employment Status
+                        </p>
+                        <p className="font-medium">
+                          {tenant.employmentStatus || 'Not provided'}
+                        </p>
                       </div>
                       <div>
                         <p className="text-sm text-gray-600">Monthly Income</p>
@@ -172,15 +190,19 @@ export const TenantDetailsDialog: React.FC<TenantDetailsDialogProps> = ({
                         </p>
                       </div>
                       <div>
-                        <p className="text-sm text-gray-600">Permanent Address</p>
+                        <p className="text-sm text-gray-600">
+                          Permanent Address
+                        </p>
                         <p className="font-medium text-sm line-clamp-2">
                           {tenant.permanentAddress || 'Not provided'}
                         </p>
                       </div>
                       {tenant.nicUrl && (
                         <div className="mt-2">
-                          <p className="text-sm text-gray-600 mb-1">NIC Document</p>
-                          <button 
+                          <p className="text-sm text-gray-600 mb-1">
+                            NIC Document
+                          </p>
+                          <button
                             onClick={() => setIsNicPreviewOpen(true)}
                             className="text-blue-600 hover:underline text-sm font-medium flex items-center gap-1"
                           >
@@ -191,8 +213,10 @@ export const TenantDetailsDialog: React.FC<TenantDetailsDialogProps> = ({
                       )}
                       {tenant.tinUrl && (
                         <div className="mt-2">
-                          <p className="text-sm text-gray-600 mb-1">TIN Document</p>
-                          <button 
+                          <p className="text-sm text-gray-600 mb-1">
+                            TIN Document
+                          </p>
+                          <button
                             onClick={() => setIsTinPreviewOpen(true)}
                             className="text-blue-600 hover:underline text-sm font-medium flex items-center gap-1"
                           >
@@ -204,7 +228,7 @@ export const TenantDetailsDialog: React.FC<TenantDetailsDialogProps> = ({
                       {tenant.idCardUrl && (
                         <div className="mt-2">
                           <p className="text-sm text-gray-600 mb-1">ID Card</p>
-                          <button 
+                          <button
                             onClick={() => setIsIdCardPreviewOpen(true)}
                             className="text-blue-600 hover:underline text-sm font-medium flex items-center gap-1"
                           >
@@ -294,28 +318,32 @@ export const TenantDetailsDialog: React.FC<TenantDetailsDialogProps> = ({
           <div className="mt-4 flex flex-col items-center gap-4">
             <div className="w-full border rounded-lg overflow-hidden bg-gray-50 flex items-center justify-center min-h-[400px]">
               {tenant.nicUrl?.toLowerCase().endsWith('.pdf') ? (
-                <iframe 
-                  src={`${API_URL}/documents/view/${tenant.id}?type=nic`} 
+                <iframe
+                  src={`${API_URL}/documents/view/${tenant.id}?type=nic`}
                   className="w-full h-[500px]"
                   title="NIC PDF Preview"
                 />
               ) : (
-                <img 
-                  src={`${API_URL}/documents/view/${tenant.id}?type=nic`} 
-                  alt="NIC Document" 
+                <img
+                  src={`${API_URL}/documents/view/${tenant.id}?type=nic`}
+                  alt="NIC Document"
                   className="max-w-full h-auto"
                 />
               )}
             </div>
             <div className="flex justify-end w-full gap-2">
-              <Button variant="outline" onClick={() => {
-                window.open(`${API_URL}/documents/view/${tenant.id}?type=nic`, '_blank');
-              }}>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  window.open(
+                    `${API_URL}/documents/view/${tenant.id}?type=nic`,
+                    '_blank'
+                  );
+                }}
+              >
                 Open in New Tab
               </Button>
-              <Button onClick={() => setIsNicPreviewOpen(false)}>
-                Close
-              </Button>
+              <Button onClick={() => setIsNicPreviewOpen(false)}>Close</Button>
             </div>
           </div>
         </DialogContent>
@@ -323,13 +351,29 @@ export const TenantDetailsDialog: React.FC<TenantDetailsDialogProps> = ({
       {/* TIN Preview */}
       <Dialog open={isTinPreviewOpen} onOpenChange={setIsTinPreviewOpen}>
         <DialogContent className="sm:max-w-[700px]">
-          <DialogHeader><DialogTitle>TIN Document Preview</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>TIN Document Preview</DialogTitle>
+          </DialogHeader>
           <div className="mt-4 flex flex-col items-center gap-4">
             <div className="w-full border rounded-lg overflow-hidden bg-gray-50 flex items-center justify-center min-h-[400px]">
-              <iframe src={`${API_URL}/documents/view/${tenant.id}?type=tin`} className="w-full h-[500px]" title="TIN Preview" />
+              <iframe
+                src={`${API_URL}/documents/view/${tenant.id}?type=tin`}
+                className="w-full h-[500px]"
+                title="TIN Preview"
+              />
             </div>
             <div className="flex justify-end w-full gap-2">
-              <Button variant="outline" onClick={() => window.open(`${API_URL}/documents/view/${tenant.id}?type=tin`, '_blank')}>Open in New Tab</Button>
+              <Button
+                variant="outline"
+                onClick={() =>
+                  window.open(
+                    `${API_URL}/documents/view/${tenant.id}?type=tin`,
+                    '_blank'
+                  )
+                }
+              >
+                Open in New Tab
+              </Button>
               <Button onClick={() => setIsTinPreviewOpen(false)}>Close</Button>
             </div>
           </div>
@@ -339,14 +383,32 @@ export const TenantDetailsDialog: React.FC<TenantDetailsDialogProps> = ({
       {/* ID Card Preview */}
       <Dialog open={isIdCardPreviewOpen} onOpenChange={setIsIdCardPreviewOpen}>
         <DialogContent className="sm:max-w-[700px]">
-          <DialogHeader><DialogTitle>ID Card Preview</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>ID Card Preview</DialogTitle>
+          </DialogHeader>
           <div className="mt-4 flex flex-col items-center gap-4">
             <div className="w-full border rounded-lg overflow-hidden bg-gray-50 flex items-center justify-center min-h-[400px]">
-              <iframe src={`${API_URL}/documents/view/${tenant.id}?type=id_card`} className="w-full h-[500px]" title="ID Card Preview" />
+              <iframe
+                src={`${API_URL}/documents/view/${tenant.id}?type=id_card`}
+                className="w-full h-[500px]"
+                title="ID Card Preview"
+              />
             </div>
             <div className="flex justify-end w-full gap-2">
-              <Button variant="outline" onClick={() => window.open(`${API_URL}/documents/view/${tenant.id}?type=id_card`, '_blank')}>Open in New Tab</Button>
-              <Button onClick={() => setIsIdCardPreviewOpen(false)}>Close</Button>
+              <Button
+                variant="outline"
+                onClick={() =>
+                  window.open(
+                    `${API_URL}/documents/view/${tenant.id}?type=id_card`,
+                    '_blank'
+                  )
+                }
+              >
+                Open in New Tab
+              </Button>
+              <Button onClick={() => setIsIdCardPreviewOpen(false)}>
+                Close
+              </Button>
             </div>
           </div>
         </DialogContent>

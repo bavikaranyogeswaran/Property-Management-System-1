@@ -38,10 +38,9 @@ class LeadTokenModel {
    */
   async invalidateForLead(leadId, connection = null) {
     const dbConn = connection || db;
-    await dbConn.query(
-      'DELETE FROM lead_access_tokens WHERE lead_id = ?',
-      [leadId]
-    );
+    await dbConn.query('DELETE FROM lead_access_tokens WHERE lead_id = ?', [
+      leadId,
+    ]);
   }
 
   /**

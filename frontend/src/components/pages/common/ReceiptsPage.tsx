@@ -19,7 +19,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Eye, Download, FileText, Search, Calendar, User, Building2, Hash } from 'lucide-react';
+import {
+  Eye,
+  Download,
+  FileText,
+  Search,
+  Calendar,
+  User,
+  Building2,
+  Hash,
+} from 'lucide-react';
 import { ReceiptViewer } from '@/components/common/ReceiptViewer';
 import { formatLKR } from '@/utils/formatters';
 

@@ -27,7 +27,7 @@ class MessageController {
         leadId,
         senderId,
         content,
-        senderType: 'user'
+        senderType: 'user',
       });
 
       // Update last contacted
@@ -56,7 +56,11 @@ class MessageController {
       const lead = await leadModel.findById(leadId);
       if (!lead) return res.status(404).json({ error: 'Lead not found' });
 
-      if (req.user.role !== 'owner' && req.user.role !== 'admin' && req.user.role !== 'tenant') {
+      if (
+        req.user.role !== 'owner' &&
+        req.user.role !== 'admin' &&
+        req.user.role !== 'tenant'
+      ) {
         return res.status(403).json({ error: 'Access denied' });
       }
 
@@ -82,7 +86,8 @@ class MessageController {
   // For tenant fetching their own messages
   async getTenantMessages(req, res) {
     try {
-      const tenantId = req.user.role === 'tenant' ? req.user.id : req.params.tenantId;
+      const tenantId =
+        req.user.role === 'tenant' ? req.user.id : req.params.tenantId;
       const messages = await messageModel.findByTenantId(tenantId);
       res.json(messages);
     } catch (error) {
@@ -93,17 +98,19 @@ class MessageController {
   // For anyone sending a message in a tenant thread
   async sendTenantMessage(req, res) {
     try {
-      const tenantId = req.user.role === 'tenant' ? req.user.id : req.params.tenantId;
+      const tenantId =
+        req.user.role === 'tenant' ? req.user.id : req.params.tenantId;
       const { content } = req.body;
       const senderId = req.user.id;
 
-      if (!content) return res.status(400).json({ error: 'Message content required' });
+      if (!content)
+        return res.status(400).json({ error: 'Message content required' });
 
       const messageId = await messageModel.create({
         tenantId,
         senderId,
         content,
-        senderType: 'user'
+        senderType: 'user',
       });
 
       res.status(201).json({
@@ -115,7 +122,7 @@ class MessageController {
         createdAt: new Date(),
         isRead: false,
         senderRole: req.user.role,
-        senderName: req.user.name || 'User'
+        senderName: req.user.name || 'User',
       });
     } catch (error) {
       res.status(500).json({ error: error.message });
@@ -124,7 +131,8 @@ class MessageController {
 
   async markTenantRead(req, res) {
     try {
-      const tenantId = req.user.role === 'tenant' ? req.user.id : req.params.tenantId;
+      const tenantId =
+        req.user.role === 'tenant' ? req.user.id : req.params.tenantId;
       await messageModel.markAllAsReadForTenant(tenantId, req.user.id);
       res.json({ success: true });
     } catch (error) {

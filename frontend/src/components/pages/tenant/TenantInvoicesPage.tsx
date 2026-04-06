@@ -64,7 +64,7 @@ export function TenantInvoicesPage() {
     referenceNumber: '',
     paymentDate: new Date().toISOString().split('T')[0],
   });
-  
+
   const [preparingPayHere, setPreparingPayHere] = useState(false);
   const [payHereData, setPayHereData] = useState<any>(null);
 
@@ -74,7 +74,9 @@ export function TenantInvoicesPage() {
   const tenantInvoices = currentLease
     ? invoices.filter((i) => i.leaseId === currentLease.id)
     : [];
-  const pendingInvoices = tenantInvoices.filter((i) => i.status === 'pending' || i.status === 'partially_paid');
+  const pendingInvoices = tenantInvoices.filter(
+    (i) => i.status === 'pending' || i.status === 'partially_paid'
+  );
   const paidInvoices = tenantInvoices.filter((i) => i.status === 'paid');
   // Fix: Compare dates strictly (YYYY-MM-DD string comparison works if format is ISO)
   // Fix: Compare dates strictly (YYYY-MM-DD string comparison works if format is ISO)
@@ -155,13 +157,23 @@ export function TenantInvoicesPage() {
     {
       label: 'Pending Invoices',
       value: pendingInvoices.length,
-      subtitle: formatLKR(pendingInvoices.reduce((sum, i) => sum + getInvoiceBalance(i.id, i.amount), 0)),
+      subtitle: formatLKR(
+        pendingInvoices.reduce(
+          (sum, i) => sum + getInvoiceBalance(i.id, i.amount),
+          0
+        )
+      ),
       color: 'bg-orange-50 text-orange-700',
     },
     {
       label: 'Overdue',
       value: overdueInvoices.length,
-      subtitle: formatLKR(overdueInvoices.reduce((sum, i) => sum + getInvoiceBalance(i.id, i.amount), 0)),
+      subtitle: formatLKR(
+        overdueInvoices.reduce(
+          (sum, i) => sum + getInvoiceBalance(i.id, i.amount),
+          0
+        )
+      ),
       color: 'bg-red-50 text-red-700',
     },
     {
@@ -194,24 +206,31 @@ export function TenantInvoicesPage() {
 
   const handlePayOnline = async () => {
     if (!selectedInvoice) return;
-    
+
     try {
       setPreparingPayHere(true);
-      const response = await apiClient.post('/payhere/checkout', { invoiceId: selectedInvoice });
+      const response = await apiClient.post('/payhere/checkout', {
+        invoiceId: selectedInvoice,
+      });
       const checkoutData = response.data.data;
-      
+
       setPayHereData(checkoutData);
-      
+
       // Simulation mode bypass (Forced in development or if flag is set)
-      const SHOULD_SIMULATE = String(import.meta.env.VITE_ENABLE_PAYMENT_SIMULATION) === 'true' || import.meta.env.DEV;
-      
+      const SHOULD_SIMULATE =
+        String(import.meta.env.VITE_ENABLE_PAYMENT_SIMULATION) === 'true' ||
+        import.meta.env.DEV;
+
       if (SHOULD_SIMULATE) {
-        console.log('%c[PAYMENT SIMULATOR] Redirecting...', 'background: #2563eb; color: #fff; padding: 5px; border-radius: 5px; font-weight: bold;');
+        console.log(
+          '%c[PAYMENT SIMULATOR] Redirecting...',
+          'background: #2563eb; color: #fff; padding: 5px; border-radius: 5px; font-weight: bold;'
+        );
         const queryParams = new URLSearchParams({
           ...checkoutData,
-          items: checkoutData.items || `Invoice #${selectedInvoice}`
+          items: checkoutData.items || `Invoice #${selectedInvoice}`,
         }).toString();
-        
+
         setTimeout(() => {
           // Close dialog then navigate
           setIsPaymentDialogOpen(false);
@@ -220,17 +239,17 @@ export function TenantInvoicesPage() {
         return;
       }
 
-
-
       // Auto-submit PayHere form after a short delay
       setTimeout(() => {
-        const form = document.getElementById('payhere-checkout-tenant-form') as HTMLFormElement;
+        const form = document.getElementById(
+          'payhere-checkout-tenant-form'
+        ) as HTMLFormElement;
         if (form) form.submit();
       }, 100);
-
-
     } catch (err: any) {
-      toast.error('Failed to initialize online payment. Please use bank transfer or try again.');
+      toast.error(
+        'Failed to initialize online payment. Please use bank transfer or try again.'
+      );
       console.error('PayHere Tenant Init Error:', err);
     } finally {
       setPreparingPayHere(false);
@@ -259,11 +278,12 @@ export function TenantInvoicesPage() {
                 </p>
                 <p className="text-sm text-red-700">
                   Total overdue amount:{' '}
-                  {formatLKR(overdueInvoices
-                    .reduce(
+                  {formatLKR(
+                    overdueInvoices.reduce(
                       (sum, i) => sum + getInvoiceBalance(i.id, i.amount),
                       0
-                    ))}
+                    )
+                  )}
                 </p>
               </div>
             </div>
@@ -452,7 +472,8 @@ export function TenantInvoicesPage() {
                                       paymentMethod:
                                         receiptPayment.paymentMethod,
                                       paymentDate: receiptPayment.paymentDate,
-                                      description: invoice.description || 'Rent Invoice',
+                                      description:
+                                        invoice.description || 'Rent Invoice',
                                     });
                                   }}
                                 >
@@ -528,19 +549,30 @@ export function TenantInvoicesPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
-                  <SelectItem value="Online Payment">Online Payment (PayHere)</SelectItem>
+                  <SelectItem value="Online Payment">
+                    Online Payment (PayHere)
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             {paymentData.paymentMethod === 'Online Payment' ? (
-               <div className="p-6 bg-blue-50 rounded-xl border border-blue-100 flex flex-col items-center text-center space-y-4 animate-in zoom-in duration-300">
-                  <img src="https://www.payhere.lk/downloads/images/payhere_short_banner.png" alt="PayHere" className="h-8" />
-                  <div>
-                    <h4 className="font-bold text-blue-900">Secure Instant Payment</h4>
-                    <p className="text-xs text-blue-700">Pay using Visa or Mastercard. Your invoice will be marked as paid <strong>immediately</strong>.</p>
-                  </div>
-               </div>
+              <div className="p-6 bg-blue-50 rounded-xl border border-blue-100 flex flex-col items-center text-center space-y-4 animate-in zoom-in duration-300">
+                <img
+                  src="https://www.payhere.lk/downloads/images/payhere_short_banner.png"
+                  alt="PayHere"
+                  className="h-8"
+                />
+                <div>
+                  <h4 className="font-bold text-blue-900">
+                    Secure Instant Payment
+                  </h4>
+                  <p className="text-xs text-blue-700">
+                    Pay using Visa or Mastercard. Your invoice will be marked as
+                    paid <strong>immediately</strong>.
+                  </p>
+                </div>
+              </div>
             ) : (
               <div className="space-y-4 animate-in slide-in-from-top-2 duration-300">
                 <div className="space-y-2">
@@ -602,8 +634,8 @@ export function TenantInvoicesPage() {
                 Cancel
               </Button>
               {paymentData.paymentMethod === 'Online Payment' ? (
-                <Button 
-                  type="button" 
+                <Button
+                  type="button"
                   onClick={handlePayOnline}
                   disabled={preparingPayHere}
                   className="bg-blue-600 hover:bg-blue-700 font-bold"
@@ -618,24 +650,60 @@ export function TenantInvoicesPage() {
 
           {/* PayHere Hidden Form for Tenant Portal */}
           {payHereData && (
-            <form 
-              id="payhere-checkout-tenant-form" 
-              method="post" 
+            <form
+              id="payhere-checkout-tenant-form"
+              method="post"
               action="https://sandbox.payhere.lk/pay/checkout"
               className="hidden"
             >
-              <input type="hidden" name="merchant_id" value={payHereData.merchant_id} />
-              <input type="hidden" name="return_url" value={payHereData.return_url} />
-              <input type="hidden" name="cancel_url" value={payHereData.cancel_url} />
-              <input type="hidden" name="notify_url" value={payHereData.notify_url} />
-              <input type="hidden" name="order_id" value={payHereData.order_id} />
+              <input
+                type="hidden"
+                name="merchant_id"
+                value={payHereData.merchant_id}
+              />
+              <input
+                type="hidden"
+                name="return_url"
+                value={payHereData.return_url}
+              />
+              <input
+                type="hidden"
+                name="cancel_url"
+                value={payHereData.cancel_url}
+              />
+              <input
+                type="hidden"
+                name="notify_url"
+                value={payHereData.notify_url}
+              />
+              <input
+                type="hidden"
+                name="order_id"
+                value={payHereData.order_id}
+              />
               <input type="hidden" name="items" value={payHereData.items} />
-              <input type="hidden" name="currency" value={payHereData.currency} />
+              <input
+                type="hidden"
+                name="currency"
+                value={payHereData.currency}
+              />
               <input type="hidden" name="amount" value={payHereData.amount} />
-              <input type="hidden" name="first_name" value={payHereData.first_name} />
-              <input type="hidden" name="last_name" value={payHereData.last_name} />
+              <input
+                type="hidden"
+                name="first_name"
+                value={payHereData.first_name}
+              />
+              <input
+                type="hidden"
+                name="last_name"
+                value={payHereData.last_name}
+              />
               <input type="hidden" name="email" value={payHereData.email} />
-              <input type="hidden" name="phone" value={payHereData.phone || ''} />
+              <input
+                type="hidden"
+                name="phone"
+                value={payHereData.phone || ''}
+              />
               <input type="hidden" name="address" value={payHereData.address} />
               <input type="hidden" name="city" value={payHereData.city} />
               <input type="hidden" name="country" value={payHereData.country} />

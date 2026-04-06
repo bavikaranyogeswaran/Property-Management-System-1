@@ -10,13 +10,17 @@ class GuestPaymentController {
     try {
       const { token } = req.params;
       const invoice = await invoiceModel.findByMagicToken(token);
-      
+
       if (!invoice) {
-        return res.status(404).json({ error: 'Invalid or expired payment link.' });
+        return res
+          .status(404)
+          .json({ error: 'Invalid or expired payment link.' });
       }
-      
+
       if (invoice.status === 'paid') {
-        return res.status(400).json({ error: 'This invoice has already been paid.' });
+        return res
+          .status(400)
+          .json({ error: 'This invoice has already been paid.' });
       }
 
       // Return only safe public information
@@ -27,7 +31,7 @@ class GuestPaymentController {
         propertyName: invoice.propertyName,
         unitNumber: invoice.unitNumber,
         description: invoice.description,
-        status: invoice.status
+        status: invoice.status,
       });
     } catch (error) {
       console.error('Magic Link GET Error:', error);
@@ -39,16 +43,23 @@ class GuestPaymentController {
     try {
       const { token } = req.params;
       const file = req.file; // From multer
-      
-      const paymentId = await paymentService.submitGuestPayment(req.body, token, file);
-      
-      res.status(201).json({ 
-        message: 'Payment evidence submitted successfully. Our team will verify it shortly.',
-        paymentId 
+
+      const paymentId = await paymentService.submitGuestPayment(
+        req.body,
+        token,
+        file
+      );
+
+      res.status(201).json({
+        message:
+          'Payment evidence submitted successfully. Our team will verify it shortly.',
+        paymentId,
       });
     } catch (error) {
       console.error('Magic Link POST Error:', error);
-      res.status(400).json({ error: error.message || 'Failed to submit payment' });
+      res
+        .status(400)
+        .json({ error: error.message || 'Failed to submit payment' });
     }
   }
 
@@ -60,14 +71,14 @@ class GuestPaymentController {
     try {
       const { token } = req.params;
       const invoice = await invoiceModel.findByMagicToken(token);
-      
+
       if (!invoice) {
         return res.status(404).json({ error: 'Invalid or expired token.' });
       }
 
       // Check if invoice is paid
       const isPaid = invoice.status === 'paid';
-      
+
       // Check associated lease status
       const lease = await leaseModel.findById(invoice.leaseId);
       const isActive = lease && lease.status === 'active';
@@ -76,7 +87,11 @@ class GuestPaymentController {
       if (isPaid && isActive) {
         // Generate a standard onboarding token
         setupToken = jwt.sign(
-          { id: Number(lease.tenantId), type: 'setup_password', role: 'tenant' },
+          {
+            id: Number(lease.tenantId),
+            type: 'setup_password',
+            role: 'tenant',
+          },
           JWT_SECRET,
           { expiresIn: '1h' } // Short-lived for this specific redirect
         );
@@ -86,11 +101,11 @@ class GuestPaymentController {
         paid: isPaid,
         active: isActive,
         type: invoice.invoiceType,
-        setupToken: setupToken
+        setupToken: setupToken,
       });
     } catch (error) {
-       console.error('Check Activation Status Error:', error);
-       res.status(500).json({ error: 'Failed to check status' });
+      console.error('Check Activation Status Error:', error);
+      res.status(500).json({ error: 'Failed to check status' });
     }
   }
 
@@ -102,34 +117,38 @@ class GuestPaymentController {
     try {
       const { orderId } = req.params;
       const invoice = await invoiceModel.findByOrderId(orderId);
- 
+
       if (!invoice) {
         return res.status(404).json({ error: 'Order not found.' });
       }
- 
+
       // Reuse the same verification logic as the token-based check
       const isPaid = invoice.status === 'paid';
       const lease = await leaseModel.findById(invoice.leaseId);
       const isActive = lease && lease.status === 'active';
- 
+
       let setupToken = null;
       if (isPaid && isActive) {
         setupToken = jwt.sign(
-          { id: Number(lease.tenantId), type: 'setup_password', role: 'tenant' },
+          {
+            id: Number(lease.tenantId),
+            type: 'setup_password',
+            role: 'tenant',
+          },
           JWT_SECRET,
           { expiresIn: '1h' }
         );
       }
- 
+
       res.json({
         paid: isPaid,
         active: isActive,
         type: invoice.invoiceType,
-        setupToken: setupToken
+        setupToken: setupToken,
       });
     } catch (error) {
-       console.error('Check Order Status Error:', error);
-       res.status(500).json({ error: 'Failed to check order status' });
+      console.error('Check Order Status Error:', error);
+      res.status(500).json({ error: 'Failed to check order status' });
     }
   }
 
@@ -141,9 +160,11 @@ class GuestPaymentController {
     try {
       const { token } = req.params;
       const invoice = await invoiceModel.findByMagicToken(token);
-      
+
       if (!invoice) {
-        return res.status(404).json({ error: 'Invalid or expired onboarding link.' });
+        return res
+          .status(404)
+          .json({ error: 'Invalid or expired onboarding link.' });
       }
 
       // Fetch the full lease to get verification details
@@ -158,7 +179,7 @@ class GuestPaymentController {
           amount: invoice.amount,
           status: invoice.status,
           type: invoice.invoiceType,
-          description: invoice.description
+          description: invoice.description,
         },
         lease: {
           id: lease.id,
@@ -167,13 +188,13 @@ class GuestPaymentController {
             isVerified: lease.isDocumentsVerified,
             status: lease.verificationStatus, // pending, verified, rejected
             reason: lease.verificationRejectionReason,
-            documentUrl: lease.documentUrl
-          }
+            documentUrl: lease.documentUrl,
+          },
         },
         property: {
           name: invoice.propertyName,
-          unitNumber: invoice.unitNumber
-        }
+          unitNumber: invoice.unitNumber,
+        },
       });
     } catch (error) {
       console.error('Get Onboarding Status Error:', error);

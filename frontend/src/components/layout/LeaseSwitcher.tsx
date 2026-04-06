@@ -11,7 +11,13 @@ import { Home } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
 export const LeaseSwitcher: React.FC = () => {
-  const { user, tenantLeases, activeLeaseId, setActiveLeaseId, isLoadingLeases } = useAuth();
+  const {
+    user,
+    tenantLeases,
+    activeLeaseId,
+    setActiveLeaseId,
+    isLoadingLeases,
+  } = useAuth();
 
   if (user?.role !== 'tenant' || tenantLeases.length <= 1) {
     return null;
@@ -37,8 +43,13 @@ export const LeaseSwitcher: React.FC = () => {
             <SelectValue placeholder="Select Unit">
               {activeLease ? (
                 <span className="flex items-center gap-1.5 overflow-hidden">
-                  <span className="truncate">Unit {activeLease.unitNumber}</span>
-                  <Badge variant="outline" className="text-[9px] h-4 px-1 font-normal border-blue-200 text-blue-600">
+                  <span className="truncate">
+                    Unit {activeLease.unitNumber}
+                  </span>
+                  <Badge
+                    variant="outline"
+                    className="text-[9px] h-4 px-1 font-normal border-blue-200 text-blue-600"
+                  >
                     {activeLease.propertyName}
                   </Badge>
                 </span>
@@ -48,23 +59,32 @@ export const LeaseSwitcher: React.FC = () => {
             </SelectValue>
           </SelectTrigger>
           <SelectContent className="max-w-[280px]">
-             <div className="p-2 border-b bg-gray-50/50">
-                <p className="text-[10px] font-bold text-gray-500 uppercase">Your Portfolio</p>
-             </div>
+            <div className="p-2 border-b bg-gray-50/50">
+              <p className="text-[10px] font-bold text-gray-500 uppercase">
+                Your Portfolio
+              </p>
+            </div>
             {tenantLeases.map((lease) => (
-              <SelectItem 
-                key={lease.id} 
-                value={lease.id} 
+              <SelectItem
+                key={lease.id}
+                value={lease.id}
                 className="text-sm py-2.5 focus:bg-blue-50 focus:text-blue-700"
               >
                 <div className="flex flex-col gap-0.5">
                   <span className="font-bold flex items-center gap-2">
                     Unit {lease.unitNumber}
                     {lease.status === 'draft' && (
-                        <Badge variant="outline" className="bg-orange-50 text-orange-600 border-orange-200 text-[8px] h-3.5 px-1 uppercase">Pending Setup</Badge>
+                      <Badge
+                        variant="outline"
+                        className="bg-orange-50 text-orange-600 border-orange-200 text-[8px] h-3.5 px-1 uppercase"
+                      >
+                        Pending Setup
+                      </Badge>
                     )}
                   </span>
-                  <span className="text-[10px] text-gray-500 font-normal leading-none">{lease.propertyName}</span>
+                  <span className="text-[10px] text-gray-500 font-normal leading-none">
+                    {lease.propertyName}
+                  </span>
                 </div>
               </SelectItem>
             ))}

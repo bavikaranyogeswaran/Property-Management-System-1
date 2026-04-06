@@ -96,10 +96,13 @@ export function OwnerMaintenancePage() {
   );
 
   const filteredRequests = maintenanceRequests.filter((r) => {
-    const matchesCategory = filterCategory === 'all' || r.category === filterCategory;
-    const matchesPriority = filterPriority === 'all' || r.priority === filterPriority;
-    const matchesSearch = r.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          r.description.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCategory =
+      filterCategory === 'all' || r.category === filterCategory;
+    const matchesPriority =
+      filterPriority === 'all' || r.priority === filterPriority;
+    const matchesSearch =
+      r.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      r.description.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesCategory && matchesPriority && matchesSearch;
   });
 
@@ -265,7 +268,10 @@ export function OwnerMaintenancePage() {
                 <TableCell className="font-medium max-w-xs">
                   <div className="flex flex-col">
                     <span>{request.title}</span>
-                    <Badge variant="secondary" className="w-fit text-[10px] h-4 px-1 mt-1 capitalize">
+                    <Badge
+                      variant="secondary"
+                      className="w-fit text-[10px] h-4 px-1 mt-1 capitalize"
+                    >
                       {request.category}
                     </Badge>
                   </div>
@@ -293,7 +299,9 @@ export function OwnerMaintenancePage() {
                 <TableCell>
                   {costs.length > 0 ? (
                     <div>
-                      <span className="font-semibold">{formatLKR(totalCost)}</span>
+                      <span className="font-semibold">
+                        {formatLKR(totalCost)}
+                      </span>
                       <span className="text-xs text-gray-500 ml-1">
                         ({costs.length})
                       </span>
@@ -347,7 +355,11 @@ export function OwnerMaintenancePage() {
                         setBillFormData({
                           amount: getTotalCost(request.id).toString(),
                           description: `Maintenance Bill: ${request.title}`,
-                          dueDate: new Date(new Date().setDate(new Date().getDate() + 7)).toISOString().split('T')[0],
+                          dueDate: new Date(
+                            new Date().setDate(new Date().getDate() + 7)
+                          )
+                            .toISOString()
+                            .split('T')[0],
                         });
                         setIsBillDialogOpen(true);
                         setIsCostDialogOpen(false);
@@ -427,8 +439,8 @@ export function OwnerMaintenancePage() {
         </div>
         <div className="space-y-2">
           <Label>Search</Label>
-          <Input 
-            placeholder="Search by title or description..." 
+          <Input
+            placeholder="Search by title or description..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
@@ -598,7 +610,14 @@ export function OwnerMaintenancePage() {
                           </span>
                         </div>
                         <div className="flex items-center gap-3">
-                          <Badge variant={cost.billTo === 'tenant' ? 'destructive' : 'secondary'} className="text-[10px] h-4 py-0 px-1">
+                          <Badge
+                            variant={
+                              cost.billTo === 'tenant'
+                                ? 'destructive'
+                                : 'secondary'
+                            }
+                            className="text-[10px] h-4 py-0 px-1"
+                          >
                             {cost.billTo === 'tenant' ? 'Tenant' : 'Owner'}
                           </Badge>
                           <span className="font-semibold">
@@ -658,20 +677,27 @@ export function OwnerMaintenancePage() {
               </div>
               <div className="space-y-2">
                 <Label>Bill Responsibility To</Label>
-                <Select 
-                  value={costFormData.billTo} 
-                  onValueChange={(val: 'owner' | 'tenant') => setCostFormData({ ...costFormData, billTo: val })}
+                <Select
+                  value={costFormData.billTo}
+                  onValueChange={(val: 'owner' | 'tenant') =>
+                    setCostFormData({ ...costFormData, billTo: val })
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select who to bill" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="owner">Owner (Deduct from Payout)</SelectItem>
-                    <SelectItem value="tenant">Tenant (Billed via Invoice/Deposit)</SelectItem>
+                    <SelectItem value="owner">
+                      Owner (Deduct from Payout)
+                    </SelectItem>
+                    <SelectItem value="tenant">
+                      Tenant (Billed via Invoice/Deposit)
+                    </SelectItem>
                   </SelectContent>
                 </Select>
                 <p className="text-[10px] text-gray-500 italic">
-                  * Items billed to tenants will NOT be deducted from your next payout.
+                  * Items billed to tenants will NOT be deducted from your next
+                  payout.
                 </p>
               </div>
               <div className="flex gap-2 justify-end">
@@ -839,7 +865,9 @@ export function OwnerMaintenancePage() {
                         <span className="text-gray-600">
                           {cost.description}
                         </span>
-                        <span className="font-medium">{formatLKR(cost.amount)}</span>
+                        <span className="font-medium">
+                          {formatLKR(cost.amount)}
+                        </span>
                       </div>
                     ))}
                   </div>
@@ -865,7 +893,11 @@ export function OwnerMaintenancePage() {
                       setBillFormData({
                         amount: getTotalCost(selectedRequest.id).toString(),
                         description: `Maintenance Bill: ${selectedRequest.title}`,
-                        dueDate: new Date(new Date().setDate(new Date().getDate() + 7)).toISOString().split('T')[0],
+                        dueDate: new Date(
+                          new Date().setDate(new Date().getDate() + 7)
+                        )
+                          .toISOString()
+                          .split('T')[0],
                       });
                       setIsBillDialogOpen(true);
                     }}
@@ -902,20 +934,25 @@ export function OwnerMaintenancePage() {
                 <p className="font-medium">{selectedRequest.title}</p>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Total Recorded Cost:</span>
-                  <span className="font-semibold">{formatLKR(getTotalCost(selectedRequest.id))}</span>
+                  <span className="font-semibold">
+                    {formatLKR(getTotalCost(selectedRequest.id))}
+                  </span>
                 </div>
               </div>
 
               {/* Grace Period Warning */}
               {(() => {
-                const tenant = tenants.find(t => t.id === selectedRequest.tenantId);
-                // In a real app, we'd check the lease status here too. 
+                const tenant = tenants.find(
+                  (t) => t.id === selectedRequest.tenantId
+                );
+                // In a real app, we'd check the lease status here too.
                 // For simplicity, we just provide a generic notice that it works for departed tenants now.
                 return (
                   <div className="p-3 bg-blue-50 border border-blue-100 rounded-md flex gap-2 items-start">
                     <AlertCircle className="size-4 text-blue-600 mt-0.5 flex-shrink-0" />
                     <p className="text-xs text-blue-800">
-                      Invoices can now be sent to former tenants within 30 days of lease end.
+                      Invoices can now be sent to former tenants within 30 days
+                      of lease end.
                     </p>
                   </div>
                 );
@@ -929,7 +966,9 @@ export function OwnerMaintenancePage() {
                   step="0.01"
                   min="0"
                   value={billFormData.amount}
-                  onChange={(e) => setBillFormData({ ...billFormData, amount: e.target.value })}
+                  onChange={(e) =>
+                    setBillFormData({ ...billFormData, amount: e.target.value })
+                  }
                   required
                 />
               </div>
@@ -939,7 +978,12 @@ export function OwnerMaintenancePage() {
                 <Input
                   id="bill-description"
                   value={billFormData.description}
-                  onChange={(e) => setBillFormData({ ...billFormData, description: e.target.value })}
+                  onChange={(e) =>
+                    setBillFormData({
+                      ...billFormData,
+                      description: e.target.value,
+                    })
+                  }
                   required
                 />
               </div>
@@ -950,7 +994,12 @@ export function OwnerMaintenancePage() {
                   id="bill-due-date"
                   type="date"
                   value={billFormData.dueDate}
-                  onChange={(e) => setBillFormData({ ...billFormData, dueDate: e.target.value })}
+                  onChange={(e) =>
+                    setBillFormData({
+                      ...billFormData,
+                      dueDate: e.target.value,
+                    })
+                  }
                   required
                 />
               </div>
@@ -963,7 +1012,10 @@ export function OwnerMaintenancePage() {
                 >
                   Cancel
                 </Button>
-                <Button type="submit" className="bg-purple-600 hover:bg-purple-700">
+                <Button
+                  type="submit"
+                  className="bg-purple-600 hover:bg-purple-700"
+                >
                   Create Invoice
                 </Button>
               </div>

@@ -177,10 +177,23 @@ function AppContent() {
       <Route path="/setup-password" element={<SetupPasswordPage />} />
       <Route path="/cancel-visit" element={<CancelVisitPage />} />
       <Route path="/payment-success" element={<PaymentSuccessPage />} />
-      <Route path="/pay/:token" element={<PublicPropertiesWrapper><GuestPaymentPage /></PublicPropertiesWrapper>} />
-      <Route path="/onboarding/:token" element={<PublicPropertiesWrapper><OnboardingStatusPage /></PublicPropertiesWrapper>} />
+      <Route
+        path="/pay/:token"
+        element={
+          <PublicPropertiesWrapper>
+            <GuestPaymentPage />
+          </PublicPropertiesWrapper>
+        }
+      />
+      <Route
+        path="/onboarding/:token"
+        element={
+          <PublicPropertiesWrapper>
+            <OnboardingStatusPage />
+          </PublicPropertiesWrapper>
+        }
+      />
       <Route path="/payhere-simulation" element={<PayHereSimulationPage />} />
-
 
       {/* Public/Shared Properties Route */}
       <Route

@@ -1,7 +1,10 @@
 import { Router } from 'express';
 import paymentController from '../controllers/paymentController.js';
 
-import { authenticateToken, authorizeRoles } from '../middleware/authMiddleware.js';
+import {
+  authenticateToken,
+  authorizeRoles,
+} from '../middleware/authMiddleware.js';
 import { authorizeResource } from '../middleware/resourceAuthMiddleware.js';
 import validateRequest from '../middleware/validateRequest.js';
 import {

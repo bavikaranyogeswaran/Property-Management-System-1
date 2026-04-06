@@ -109,28 +109,36 @@ export function AnalyticsPage() {
   // Optimize data fetching for O(N) complexity using Hash Maps for O(1) lookups
   // 1. Group units by propertyId
   const unitsByProperty = new Map<string, typeof units>();
-  units.forEach(u => {
-    if (!unitsByProperty.has(u.propertyId)) unitsByProperty.set(u.propertyId, []);
+  units.forEach((u) => {
+    if (!unitsByProperty.has(u.propertyId))
+      unitsByProperty.set(u.propertyId, []);
     unitsByProperty.get(u.propertyId)!.push(u);
   });
 
   // 2. Group active leases by unitId
   const activeLeasesByUnit = new Map<string, typeof leases>();
-  leases.filter(l => l.status === 'active').forEach(l => {
-    if (!activeLeasesByUnit.has(l.unitId)) activeLeasesByUnit.set(l.unitId, []);
-    activeLeasesByUnit.get(l.unitId)!.push(l);
-  });
+  leases
+    .filter((l) => l.status === 'active')
+    .forEach((l) => {
+      if (!activeLeasesByUnit.has(l.unitId))
+        activeLeasesByUnit.set(l.unitId, []);
+      activeLeasesByUnit.get(l.unitId)!.push(l);
+    });
 
   // 3. Group maintenance requests by unitId
-  const maintenanceRequestsByUnit = new Map<string, typeof maintenanceRequests>();
-  maintenanceRequests.forEach(r => {
-    if (!maintenanceRequestsByUnit.has(r.unitId)) maintenanceRequestsByUnit.set(r.unitId, []);
+  const maintenanceRequestsByUnit = new Map<
+    string,
+    typeof maintenanceRequests
+  >();
+  maintenanceRequests.forEach((r) => {
+    if (!maintenanceRequestsByUnit.has(r.unitId))
+      maintenanceRequestsByUnit.set(r.unitId, []);
     maintenanceRequestsByUnit.get(r.unitId)!.push(r);
   });
 
   // 4. Group maintenance costs by requestId
   const costsByRequest = new Map<string, typeof maintenanceCosts>();
-  maintenanceCosts.forEach(c => {
+  maintenanceCosts.forEach((c) => {
     if (!costsByRequest.has(c.requestId)) costsByRequest.set(c.requestId, []);
     costsByRequest.get(c.requestId)!.push(c);
   });
@@ -138,10 +146,12 @@ export function AnalyticsPage() {
   // Calculate property revenue using O(1) lookups
   const propertyRevenueData = properties.map((property) => {
     const propertyUnits = unitsByProperty.get(property.id) || [];
-    
+
     const revenue = propertyUnits.reduce((sum, u) => {
       const unitLeases = activeLeasesByUnit.get(u.id) || [];
-      return sum + unitLeases.reduce((leaseSum, l) => leaseSum + l.monthlyRent, 0);
+      return (
+        sum + unitLeases.reduce((leaseSum, l) => leaseSum + l.monthlyRent, 0)
+      );
     }, 0);
 
     return {
@@ -156,13 +166,16 @@ export function AnalyticsPage() {
   // Calculate property maintenance using O(1) lookups
   const maintenanceCostByProperty = properties.map((property) => {
     const propertyUnits = unitsByProperty.get(property.id) || [];
-    
+
     const totalCost = propertyUnits.reduce((sum, u) => {
       const unitRequests = maintenanceRequestsByUnit.get(u.id) || [];
-      return sum + unitRequests.reduce((reqSum, r) => {
-        const costs = costsByRequest.get(r.id) || [];
-        return reqSum + costs.reduce((s, c) => s + c.amount, 0);
-      }, 0);
+      return (
+        sum +
+        unitRequests.reduce((reqSum, r) => {
+          const costs = costsByRequest.get(r.id) || [];
+          return reqSum + costs.reduce((s, c) => s + c.amount, 0);
+        }, 0)
+      );
     }, 0);
 
     return {
@@ -675,12 +688,14 @@ export function AnalyticsPage() {
                   <tbody>
                     {properties.map((property) => {
                       const propUnits = unitsByProperty.get(property.id) || [];
-                      const propRequests = propUnits.flatMap(u => maintenanceRequestsByUnit.get(u.id) || []);
-                      
+                      const propRequests = propUnits.flatMap(
+                        (u) => maintenanceRequestsByUnit.get(u.id) || []
+                      );
+
                       const propCompleted = propRequests.filter(
                         (r) => r.status === 'completed'
                       ).length;
-                      
+
                       const propCost = propRequests.reduce((sum, r) => {
                         const costs = costsByRequest.get(r.id) || [];
                         return sum + costs.reduce((s, c) => s + c.amount, 0);
@@ -712,7 +727,9 @@ export function AnalyticsPage() {
                       <td className="py-3">
                         {formatLKR(totalMaintenanceCost)}
                       </td>
-                      <td className="py-3">{formatLKR(Number(avgMaintenanceCost))}</td>
+                      <td className="py-3">
+                        {formatLKR(Number(avgMaintenanceCost))}
+                      </td>
                     </tr>
                   </tbody>
                 </table>
@@ -883,44 +900,57 @@ export function AnalyticsPage() {
                   <tbody>
                     {(() => {
                       // Pre-compute maps for O(1) lookups during tenant mapping
-                      const invoicesByTenant = new Map<string, typeof invoices>();
-                      invoices.forEach(i => {
-                        if (!invoicesByTenant.has(i.tenantId)) invoicesByTenant.set(i.tenantId, []);
+                      const invoicesByTenant = new Map<
+                        string,
+                        typeof invoices
+                      >();
+                      invoices.forEach((i) => {
+                        if (!invoicesByTenant.has(i.tenantId))
+                          invoicesByTenant.set(i.tenantId, []);
                         invoicesByTenant.get(i.tenantId)!.push(i);
                       });
 
-                      const receiptsByTenant = new Map<string, typeof receipts>();
-                      receipts.forEach(r => {
-                        if (!receiptsByTenant.has(r.tenantId)) receiptsByTenant.set(r.tenantId, []);
+                      const receiptsByTenant = new Map<
+                        string,
+                        typeof receipts
+                      >();
+                      receipts.forEach((r) => {
+                        if (!receiptsByTenant.has(r.tenantId))
+                          receiptsByTenant.set(r.tenantId, []);
                         receiptsByTenant.get(r.tenantId)!.push(r);
                       });
 
                       return tenants.map((tenant) => {
-                        const tenantInvoices = invoicesByTenant.get(tenant.id) || [];
+                        const tenantInvoices =
+                          invoicesByTenant.get(tenant.id) || [];
                         const tenantPaid = tenantInvoices.filter(
                           (i) => i.status === 'paid'
                         ).length;
                         const tenantPending = tenantInvoices.filter(
                           (i) => i.status === 'pending'
                         ).length;
-                        const tenantTotal = (receiptsByTenant.get(tenant.id) || [])
-                          .reduce((sum, r) => sum + r.amount, 0);
+                        const tenantTotal = (
+                          receiptsByTenant.get(tenant.id) || []
+                        ).reduce((sum, r) => sum + r.amount, 0);
 
                         return (
-                        <tr key={tenant.id} className="border-b last:border-0">
-                          <td className="py-3 font-medium">{tenant.name}</td>
-                          <td className="py-3">{tenantInvoices.length}</td>
-                          <td className="py-3 text-green-700 font-semibold">
-                            {tenantPaid}
-                          </td>
-                          <td className="py-3 text-orange-700">
-                            {tenantPending}
-                          </td>
-                          <td className="py-3 font-semibold">
-                            {formatLKR(tenantTotal)}
-                          </td>
-                        </tr>
-                      );
+                          <tr
+                            key={tenant.id}
+                            className="border-b last:border-0"
+                          >
+                            <td className="py-3 font-medium">{tenant.name}</td>
+                            <td className="py-3">{tenantInvoices.length}</td>
+                            <td className="py-3 text-green-700 font-semibold">
+                              {tenantPaid}
+                            </td>
+                            <td className="py-3 text-orange-700">
+                              {tenantPending}
+                            </td>
+                            <td className="py-3 font-semibold">
+                              {formatLKR(tenantTotal)}
+                            </td>
+                          </tr>
+                        );
                       });
                     })()}
                   </tbody>

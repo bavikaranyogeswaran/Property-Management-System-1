@@ -15,7 +15,7 @@ cloudinary.config({
 const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: {
-    folder: 'pms_uploads', 
+    folder: 'pms_uploads',
     resource_type: 'auto',
     allowed_formats: ['jpg', 'jpeg', 'png', 'webp', 'pdf', 'doc', 'docx'],
     public_id: (req, file) => {
@@ -37,7 +37,7 @@ const privateStorage = new CloudinaryStorage({
     allowed_formats: ['jpg', 'jpeg', 'png', 'webp', 'pdf', 'doc', 'docx'],
     public_id: (req, file) => {
       const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-      return `doc-${uniqueSuffix}`; 
+      return `doc-${uniqueSuffix}`;
     },
   },
 });
@@ -48,15 +48,17 @@ const fileFilter = (req, file, cb) => {
   const extname = allowedTypes.test(
     path.extname(file.originalname).toLowerCase()
   );
-  
+
   const mimetypePatterns = [
     /^image\//,
     /^application\/pdf$/,
     /^application\/msword$/,
-    /^application\/vnd\.openxmlformats-officedocument\.wordprocessingml\.document$/
+    /^application\/vnd\.openxmlformats-officedocument\.wordprocessingml\.document$/,
   ];
-  
-  const mimetype = mimetypePatterns.some(pattern => pattern.test(file.mimetype));
+
+  const mimetype = mimetypePatterns.some((pattern) =>
+    pattern.test(file.mimetype)
+  );
 
   if (extname || mimetype) {
     cb(null, true);

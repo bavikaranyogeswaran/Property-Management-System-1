@@ -12,6 +12,11 @@ router.post(
   authenticateToken,
   invoiceController.generateMonthlyInvoices
 ); // Bulk generation
-router.patch('/:id/status', authenticateToken, authorizeResource('invoice'), invoiceController.updateStatus);
+router.patch(
+  '/:id/status',
+  authenticateToken,
+  authorizeResource('invoice'),
+  invoiceController.updateStatus
+);
 
 export default router;

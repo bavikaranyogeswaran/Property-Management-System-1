@@ -1,4 +1,3 @@
-
 import behaviorService from '../services/behaviorService.js';
 
 export const addBehaviorLog = async (req, res) => {
@@ -6,10 +5,17 @@ export const addBehaviorLog = async (req, res) => {
   const { type, category, scoreChange, description, recordedBy } = req.body;
 
   try {
-     const newScore = await behaviorService.addBehaviorLog({
-         type, category, scoreChange, description, recordedBy
-     }, tenantId);
- 
+    const newScore = await behaviorService.addBehaviorLog(
+      {
+        type,
+        category,
+        scoreChange,
+        description,
+        recordedBy,
+      },
+      tenantId
+    );
+
     res.status(201).json({
       message: 'Behavior log added successfully',
       newScore,

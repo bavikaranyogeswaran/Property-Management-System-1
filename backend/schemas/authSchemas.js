@@ -27,7 +27,8 @@ export const setupPasswordSchema = Joi.object({
       .pattern(/^([0-9]{9}[xXvV]|[0-9]{12})$/)
       .optional()
       .messages({
-        'string.pattern.base': 'Please enter a valid Sri Lankan NIC (e.g., 123456789V or 199012345678).',
+        'string.pattern.base':
+          'Please enter a valid Sri Lankan NIC (e.g., 123456789V or 199012345678).',
       }),
     monthlyIncome: Joi.number().min(0).required(),
     permanentAddress: Joi.string().required(),
@@ -36,7 +37,8 @@ export const setupPasswordSchema = Joi.object({
       .pattern(/^(\+94|0)?[1-9]\d{8}$/)
       .required()
       .messages({
-        'string.pattern.base': 'Please enter a valid Sri Lankan phone number (e.g., +94 77 123 4567 or 0771234567).',
+        'string.pattern.base':
+          'Please enter a valid Sri Lankan phone number (e.g., +94 77 123 4567 or 0771234567).',
       }),
   }).optional(),
 });

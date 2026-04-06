@@ -28,15 +28,19 @@ export function TenantPaymentSummaryPage() {
 
   const tenantPayments = currentLease
     ? payments.filter((p) => {
-        const inv = invoices.find(i => i.id === p.invoiceId);
+        const inv = invoices.find((i) => i.id === p.invoiceId);
         return inv?.leaseId === currentLease.id;
       })
     : [];
 
   // Payment stats
-  const verifiedPayments = tenantPayments.filter((p) => p.status === 'verified');
+  const verifiedPayments = tenantPayments.filter(
+    (p) => p.status === 'verified'
+  );
   const pendingPayments = tenantPayments.filter((p) => p.status === 'pending');
-  const rejectedPayments = tenantPayments.filter((p) => p.status === 'rejected');
+  const rejectedPayments = tenantPayments.filter(
+    (p) => p.status === 'rejected'
+  );
 
   const totalPaid = verifiedPayments.reduce((sum, p) => sum + p.amount, 0);
   const totalPending = pendingPayments.reduce((sum, p) => sum + p.amount, 0);
@@ -68,7 +72,10 @@ export function TenantPaymentSummaryPage() {
     for (let i = 11; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-      const label = d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+      const label = d.toLocaleDateString('en-US', {
+        month: 'short',
+        year: 'numeric',
+      });
       months[key] = { paid: 0, count: 0 };
     }
 
@@ -87,7 +94,10 @@ export function TenantPaymentSummaryPage() {
       const d = new Date(parseInt(year), parseInt(month) - 1, 1);
       return {
         key,
-        label: d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
+        label: d.toLocaleDateString('en-US', {
+          month: 'short',
+          year: '2-digit',
+        }),
         ...val,
       };
     });
@@ -299,12 +309,8 @@ export function TenantPaymentSummaryPage() {
                       className="flex items-center justify-between"
                     >
                       <div className="flex items-center gap-2">
-                        <div
-                          className={`size-3 rounded-full ${s.color}`}
-                        />
-                        <span className="text-sm text-gray-600">
-                          {s.label}
-                        </span>
+                        <div className={`size-3 rounded-full ${s.color}`} />
+                        <span className="text-sm text-gray-600">{s.label}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-medium">{s.count}</span>

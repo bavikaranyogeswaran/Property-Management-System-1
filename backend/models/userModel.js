@@ -31,10 +31,10 @@ class UserModel {
     // So we should probably exclude users where email LIKE 'deleted_%'.
 
     const [rows] = await pool.query(
-      "SELECT user_id as id, name, email, phone, role, status, created_at as createdAt FROM users WHERE role = ? AND is_archived = FALSE",
+      'SELECT user_id as id, name, email, phone, role, status, created_at as createdAt FROM users WHERE role = ? AND is_archived = FALSE',
       [role]
     );
-    return rows.map(row => ({
+    return rows.map((row) => ({
       ...row,
       id: row.id.toString(),
     }));
@@ -71,7 +71,7 @@ class UserModel {
         `,
       [ownerId]
     );
-    return rows.map(row => ({
+    return rows.map((row) => ({
       ...row,
       id: row.id.toString(),
     }));
@@ -112,7 +112,7 @@ class UserModel {
         `,
       [treasurerId]
     );
-    return rows.map(row => ({
+    return rows.map((row) => ({
       ...row,
       id: row.id.toString(),
     }));
@@ -214,7 +214,10 @@ class UserModel {
     if (!user) return false;
 
     // Archive email to allow reusing the same email for new registrations
-    const archivedEmail = `deleted_${id}_${Date.now()}_${user.email}`.substring(0, 100);
+    const archivedEmail = `deleted_${id}_${Date.now()}_${user.email}`.substring(
+      0,
+      100
+    );
 
     const [result] = await db.query(
       'UPDATE users SET archived_at = NOW(), is_archived = TRUE, email = ?, status = ?, name = CONCAT(name, " (Deleted)"), token_version = token_version + 1 WHERE user_id = ?',
@@ -240,7 +243,7 @@ class UserModel {
     );
     return result.affectedRows > 0;
   }
-  
+
   async incrementTokenVersion(id, connection = null) {
     const db = connection || pool;
     const [result] = await db.query(

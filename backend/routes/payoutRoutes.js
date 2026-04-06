@@ -17,13 +17,21 @@ router.get('/history', authenticateToken, payoutController.getHistory);
 router.put('/:id/paid', authenticateToken, payoutController.markAsPaid);
 
 // Owner Acknowledgment
-router.put('/:id/acknowledge', authenticateToken, payoutController.acknowledgePayout);
+router.put(
+  '/:id/acknowledge',
+  authenticateToken,
+  payoutController.acknowledgePayout
+);
 
 // Owner Dispute
 router.put('/:id/dispute', authenticateToken, payoutController.disputePayout);
 
 // Get Payout Details (Owner/Treasurer)
-router.get('/:id/details', authenticateToken, payoutController.getPayoutDetails);
+router.get(
+  '/:id/details',
+  authenticateToken,
+  payoutController.getPayoutDetails
+);
 
 // Export Payout CSV (Owner/Treasurer)
 router.get('/:id/export', authenticateToken, payoutController.exportPayoutCSV);

@@ -78,16 +78,19 @@ class LeadModel {
 
   async update(id, data, connection = null) {
     const dbConn = connection || db;
-    
+
     // Fetch current status to detect transitions for history tracking
     let currentStatus = null;
     if (data.status) {
-      const [rows] = await dbConn.query('SELECT status FROM leads WHERE lead_id = ?', [id]);
+      const [rows] = await dbConn.query(
+        'SELECT status FROM leads WHERE lead_id = ?',
+        [id]
+      );
       if (rows.length > 0) {
         currentStatus = rows[0].status;
       }
     }
-    
+
     const fields = [];
     const values = [];
 
@@ -147,9 +150,14 @@ class LeadModel {
       `UPDATE leads SET ${fields.join(', ')} WHERE lead_id = ?`,
       values
     );
-     
+
     // Log history if the status actually changed
-    if (result.affectedRows > 0 && data.status && currentStatus && currentStatus !== data.status) {
+    if (
+      result.affectedRows > 0 &&
+      data.status &&
+      currentStatus &&
+      currentStatus !== data.status
+    ) {
       await leadStageHistoryModel.create(
         id,
         currentStatus,
@@ -222,7 +230,7 @@ class LeadModel {
 
   async dropLeadsForUnit(unitId, connection = null) {
     const dbConn = connection || db;
-    
+
     // Find leads before updating to log history
     const [leadsToDrop] = await dbConn.query(
       `SELECT lead_id, status FROM leads WHERE unit_id = ? AND status = 'interested'`,
@@ -302,7 +310,8 @@ class LeadModel {
   }
 
   async findByTreasurerId(treasurerId) {
-    const [rows] = await db.query(`
+    const [rows] = await db.query(
+      `
       SELECT l.lead_id as id, l.property_id as propertyId, l.unit_id as interestedUnit,
              l.name, l.email, l.phone, l.notes, l.internal_notes as internalNotes,
              l.move_in_date as moveInDate, l.occupants_count as occupantsCount,
@@ -312,7 +321,9 @@ class LeadModel {
       INNER JOIN properties p ON l.property_id = p.property_id
       INNER JOIN staff_property_assignments spa ON p.property_id = spa.property_id
       WHERE spa.user_id = ?
-      ORDER BY l.created_at DESC`, [treasurerId]);
+      ORDER BY l.created_at DESC`,
+      [treasurerId]
+    );
     return rows;
   }
 
@@ -329,7 +340,7 @@ class LeadModel {
     if (staleLeads.length === 0) return 0;
 
     // Bulk update
-    const ids = staleLeads.map(l => l.lead_id);
+    const ids = staleLeads.map((l) => l.lead_id);
     await db.query(
       `UPDATE leads SET status = 'dropped',
        notes = CONCAT(COALESCE(notes, ''), ' [System: Auto-expired after ${daysThreshold} days of inactivity]')
@@ -340,7 +351,9 @@ class LeadModel {
     // Log stage history for each
     for (const lead of staleLeads) {
       await leadStageHistoryModel.create(
-        lead.lead_id, lead.status, 'dropped',
+        lead.lead_id,
+        lead.status,
+        'dropped',
         `System: Auto-expired after ${daysThreshold} days`
       );
     }

@@ -63,7 +63,7 @@ export const BehaviorLogList: React.FC<BehaviorLogListProps> = ({ logs }) => {
                 </TableCell>
                 <TableCell>{log.description}</TableCell>
                 <TableCell
-                   className={`text-right font-medium ${log.scoreChange >= 0 ? 'text-green-600' : 'text-red-600'}`}
+                  className={`text-right font-medium ${log.scoreChange >= 0 ? 'text-green-600' : 'text-red-600'}`}
                 >
                   {log.scoreChange > 0 ? '+' : ''}
                   {log.scoreChange}

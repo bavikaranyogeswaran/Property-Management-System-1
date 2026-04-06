@@ -25,7 +25,12 @@ class EmailService {
     }
   }
 
-  async sendWelcomeLead(email, name, propertyName = 'our property', portalToken = null) {
+  async sendWelcomeLead(
+    email,
+    name,
+    propertyName = 'our property',
+    portalToken = null
+  ) {
     const portalUrl = portalToken
       ? `${process.env.FRONTEND_URL || 'http://localhost:5173'}/lead/portal?token=${portalToken}`
       : null;
@@ -212,7 +217,14 @@ class EmailService {
     }
   }
 
-  async sendDepositMagicLink(email, name, propertyName, unitNumber, amount, magicToken) {
+  async sendDepositMagicLink(
+    email,
+    name,
+    propertyName,
+    unitNumber,
+    amount,
+    magicToken
+  ) {
     const link = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/pay/${magicToken}`;
     const formattedAmount = new Intl.NumberFormat('en-LK', {
       style: 'currency',
@@ -446,7 +458,9 @@ class EmailService {
 
     try {
       const statusColor = status === 'completed' ? '#16a34a' : '#2563eb';
-      const statusDisplay = status.replace('_', ' ').charAt(0).toUpperCase() + status.replace('_', ' ').slice(1);
+      const statusDisplay =
+        status.replace('_', ' ').charAt(0).toUpperCase() +
+        status.replace('_', ' ').slice(1);
 
       await this.transporter.sendMail({
         from: `"Property Management System" <${process.env.SMTP_USER}>`,
@@ -575,13 +589,16 @@ class EmailService {
 
   async sendLeaseExpiryReminder(email, details) {
     const { daysCount, endDate, propertyName, unitNumber, role } = details;
-    const subject = role === 'tenant' 
-        ? `Your Lease is Expiring in ${daysCount} Days` 
+    const subject =
+      role === 'tenant'
+        ? `Your Lease is Expiring in ${daysCount} Days`
         : `Urgent: Lease for Unit ${unitNumber} Expiring in ${daysCount} Days`;
 
     if (!this.transporter) {
       console.log('==================================================');
-      console.log(`[EMAIL MOCK] Lease Expiry (${daysCount} days) to ${email} (${role})`);
+      console.log(
+        `[EMAIL MOCK] Lease Expiry (${daysCount} days) to ${email} (${role})`
+      );
       console.log(`Property: ${propertyName}, Unit: ${unitNumber}`);
       console.log(`End Date: ${endDate}`);
       console.log('==================================================');
@@ -589,14 +606,19 @@ class EmailService {
     }
 
     try {
-      const title = role === 'tenant' ? 'Lease Expiration Notice' : 'Unit Lease Expiry Notice';
-      const intro = role === 'tenant' 
-        ? `We are writing to remind you that your lease for <strong>${propertyName} (Unit ${unitNumber})</strong> is scheduled to end on <strong>${endDate}</strong> (${daysCount} days from now).`
-        : `This is an automated reminder that the lease for <strong>${propertyName} (Unit ${unitNumber})</strong> will expire on <strong>${endDate}</strong> (${daysCount} days from now).`;
+      const title =
+        role === 'tenant'
+          ? 'Lease Expiration Notice'
+          : 'Unit Lease Expiry Notice';
+      const intro =
+        role === 'tenant'
+          ? `We are writing to remind you that your lease for <strong>${propertyName} (Unit ${unitNumber})</strong> is scheduled to end on <strong>${endDate}</strong> (${daysCount} days from now).`
+          : `This is an automated reminder that the lease for <strong>${propertyName} (Unit ${unitNumber})</strong> will expire on <strong>${endDate}</strong> (${daysCount} days from now).`;
 
-      const actionText = role === 'tenant'
-        ? 'If you wish to renew your lease or discuss your options, please contact your property manager as soon as possible.'
-        : 'Please review this lease and initiate renewal discussions or prepare for the turnover process.';
+      const actionText =
+        role === 'tenant'
+          ? 'If you wish to renew your lease or discuss your options, please contact your property manager as soon as possible.'
+          : 'Please review this lease and initiate renewal discussions or prepare for the turnover process.';
 
       await this.transporter.sendMail({
         from: `"Property Management System" <${process.env.SMTP_USER}>`,
@@ -674,35 +696,34 @@ class EmailService {
   }
 
   async sendVisitScheduledToVisitor(visitorEmail, visitDetails) {
-    const { 
-        visitorName, 
-        propertyName, 
-        unitNumber, 
-        scheduledDate, 
-        visitId 
-    } = visitDetails;
-    
+    const { visitorName, propertyName, unitNumber, scheduledDate, visitId } =
+      visitDetails;
+
     const dateStr = new Date(scheduledDate).toLocaleString();
     const cancelLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/cancel-visit?id=${visitId}`;
 
     if (!this.transporter) {
-        console.log('==================================================');
-        console.log(`[EMAIL MOCK] Visit Scheduled Confirmation to Visitor: ${visitorEmail}`);
-        console.log(`Property/Unit: ${propertyName}${unitNumber ? ' (Unit ' + unitNumber + ')' : ''}`);
-        console.log(`Date: ${dateStr}`);
-        console.log(`Cancellation Link: ${cancelLink}`);
-        console.log('==================================================');
-        return true;
+      console.log('==================================================');
+      console.log(
+        `[EMAIL MOCK] Visit Scheduled Confirmation to Visitor: ${visitorEmail}`
+      );
+      console.log(
+        `Property/Unit: ${propertyName}${unitNumber ? ' (Unit ' + unitNumber + ')' : ''}`
+      );
+      console.log(`Date: ${dateStr}`);
+      console.log(`Cancellation Link: ${cancelLink}`);
+      console.log('==================================================');
+      return true;
     }
 
     try {
-        await this.transporter.sendMail({
-            from: `"Property Management System" <${process.env.SMTP_USER}>`,
-            to: visitorEmail,
-            subject: `Visit Scheduled: ${propertyName}`,
-            html: this._getTemplate(
-                'Visit Scheduled Successfully',
-                `
+      await this.transporter.sendMail({
+        from: `"Property Management System" <${process.env.SMTP_USER}>`,
+        to: visitorEmail,
+        subject: `Visit Scheduled: ${propertyName}`,
+        html: this._getTemplate(
+          'Visit Scheduled Successfully',
+          `
                 <p>Hi ${visitorName},</p>
                 <p>Your visit to <strong>${propertyName}</strong> ${unitNumber ? '(Unit ' + unitNumber + ')' : ''} has been scheduled.</p>
                 
@@ -719,23 +740,26 @@ class EmailService {
 
                 <p style="color: #64748b; font-size: 14px;">Please note: We will contact you if there are any changes to this schedule.</p>
                 `
-            ),
-        });
-        return true;
+        ),
+      });
+      return true;
     } catch (e) {
-        console.error('Error sending visit confirmation to visitor:', e);
-        return false;
+      console.error('Error sending visit confirmation to visitor:', e);
+      return false;
     }
   }
 
   async sendVisitReminder(visitorEmail, visitDetails) {
-    const { visitorName, propertyName, unitNumber, scheduledDate } = visitDetails;
+    const { visitorName, propertyName, unitNumber, scheduledDate } =
+      visitDetails;
     const dateStr = new Date(scheduledDate).toLocaleString();
 
     if (!this.transporter) {
       console.log('==================================================');
       console.log(`[EMAIL MOCK] Visit Reminder to: ${visitorEmail}`);
-      console.log(`Property/Unit: ${propertyName}${unitNumber ? ' (Unit ' + unitNumber + ')' : ''}`);
+      console.log(
+        `Property/Unit: ${propertyName}${unitNumber ? ' (Unit ' + unitNumber + ')' : ''}`
+      );
       console.log(`Date: ${dateStr}`);
       console.log('==================================================');
       return true;

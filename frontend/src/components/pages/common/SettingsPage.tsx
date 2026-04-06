@@ -15,7 +15,19 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
-import { User, Lock, Shield, Trash, Eye, EyeOff, Activity, RefreshCcw, History, CheckCircle2, XCircle } from 'lucide-react';
+import {
+  User,
+  Lock,
+  Shield,
+  Trash,
+  Eye,
+  EyeOff,
+  Activity,
+  RefreshCcw,
+  History,
+  CheckCircle2,
+  XCircle,
+} from 'lucide-react';
 import axios from 'axios';
 import { toast } from 'sonner';
 
@@ -94,22 +106,22 @@ export function SettingsPage() {
     e.preventDefault();
     try {
       // Send only updatable fields
-      const { 
-        name, 
-        phone, 
-        permanentAddress, 
-        emergencyContactName, 
-        emergencyContactPhone, 
-        employmentStatus 
-      } = profileData;
-      
-      await updateProfile({ 
-        name, 
+      const {
+        name,
         phone,
         permanentAddress,
         emergencyContactName,
         emergencyContactPhone,
-        employmentStatus
+        employmentStatus,
+      } = profileData;
+
+      await updateProfile({
+        name,
+        phone,
+        permanentAddress,
+        emergencyContactName,
+        emergencyContactPhone,
+        employmentStatus,
       });
       toast.success('Profile updated successfully');
     } catch (error: any) {
@@ -210,43 +222,64 @@ export function SettingsPage() {
                 {user?.role === 'tenant' && (
                   <div className="space-y-6 pt-6 border-t mt-6">
                     <div className="space-y-4">
-                      <h3 className="text-sm font-medium text-gray-900 border-l-4 border-blue-500 pl-3">Residential Details</h3>
+                      <h3 className="text-sm font-medium text-gray-900 border-l-4 border-blue-500 pl-3">
+                        Residential Details
+                      </h3>
                       <div className="space-y-2">
-                        <Label htmlFor="permanentAddress">Permanent Address</Label>
+                        <Label htmlFor="permanentAddress">
+                          Permanent Address
+                        </Label>
                         <Input
                           id="permanentAddress"
                           placeholder="Line 1, Line 2, City"
                           value={profileData.permanentAddress}
                           onChange={(e) =>
-                            setProfileData({ ...profileData, permanentAddress: e.target.value })
+                            setProfileData({
+                              ...profileData,
+                              permanentAddress: e.target.value,
+                            })
                           }
                         />
-                        <p className="text-[10px] text-gray-500 italic">As mentioned in legal records/NIC.</p>
+                        <p className="text-[10px] text-gray-500 italic">
+                          As mentioned in legal records/NIC.
+                        </p>
                       </div>
                     </div>
 
                     <div className="space-y-4">
-                      <h3 className="text-sm font-medium text-gray-900 border-l-4 border-blue-500 pl-3">Emergency Contacts</h3>
+                      <h3 className="text-sm font-medium text-gray-900 border-l-4 border-blue-500 pl-3">
+                        Emergency Contacts
+                      </h3>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-2">
-                          <Label htmlFor="emergencyContactName">Contact Person</Label>
+                          <Label htmlFor="emergencyContactName">
+                            Contact Person
+                          </Label>
                           <Input
                             id="emergencyContactName"
                             placeholder="Full Name"
                             value={profileData.emergencyContactName}
                             onChange={(e) =>
-                              setProfileData({ ...profileData, emergencyContactName: e.target.value })
+                              setProfileData({
+                                ...profileData,
+                                emergencyContactName: e.target.value,
+                              })
                             }
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor="emergencyContactPhone">Contact Number</Label>
+                          <Label htmlFor="emergencyContactPhone">
+                            Contact Number
+                          </Label>
                           <Input
                             id="emergencyContactPhone"
                             placeholder="07XXXXXXXX"
                             value={profileData.emergencyContactPhone}
                             onChange={(e) =>
-                              setProfileData({ ...profileData, emergencyContactPhone: e.target.value })
+                              setProfileData({
+                                ...profileData,
+                                emergencyContactPhone: e.target.value,
+                              })
                             }
                           />
                         </div>
@@ -254,12 +287,14 @@ export function SettingsPage() {
                     </div>
 
                     <div className="space-y-4">
-                      <h3 className="text-sm font-medium text-gray-900 border-l-4 border-blue-500 pl-3">Identity & Employment</h3>
+                      <h3 className="text-sm font-medium text-gray-900 border-l-4 border-blue-500 pl-3">
+                        Identity & Employment
+                      </h3>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-2">
                           <Label htmlFor="nic">NIC Number (Read Only)</Label>
                           <div className="relative">
-                             <Input
+                            <Input
                               id="nic"
                               value={user?.nic || ''}
                               readOnly
@@ -268,16 +303,23 @@ export function SettingsPage() {
                             />
                             <Lock className="w-3.5 h-3.5 text-gray-400 absolute right-3 top-3" />
                           </div>
-                          <p className="text-[10px] text-gray-500">Contact property management to update NIC.</p>
+                          <p className="text-[10px] text-gray-500">
+                            Contact property management to update NIC.
+                          </p>
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor="employmentStatus">Employment Status</Label>
+                          <Label htmlFor="employmentStatus">
+                            Employment Status
+                          </Label>
                           <select
                             id="employmentStatus"
                             className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                             value={profileData.employmentStatus}
                             onChange={(e) =>
-                              setProfileData({ ...profileData, employmentStatus: e.target.value })
+                              setProfileData({
+                                ...profileData,
+                                employmentStatus: e.target.value,
+                              })
                             }
                           >
                             <option value="">Select Status</option>
@@ -330,7 +372,9 @@ export function SettingsPage() {
                               variant="ghost"
                               size="sm"
                               className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                              onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                              onClick={() =>
+                                setShowCurrentPassword(!showCurrentPassword)
+                              }
                             >
                               {showCurrentPassword ? (
                                 <EyeOff className="size-4 text-gray-500" />
@@ -361,7 +405,9 @@ export function SettingsPage() {
                               variant="ghost"
                               size="sm"
                               className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                              onClick={() => setShowNewPassword(!showNewPassword)}
+                              onClick={() =>
+                                setShowNewPassword(!showNewPassword)
+                              }
                             >
                               {showNewPassword ? (
                                 <EyeOff className="size-4 text-gray-500" />
@@ -392,7 +438,9 @@ export function SettingsPage() {
                               variant="ghost"
                               size="sm"
                               className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                              onClick={() =>
+                                setShowConfirmPassword(!showConfirmPassword)
+                              }
                             >
                               {showConfirmPassword ? (
                                 <EyeOff className="size-4 text-gray-500" />
@@ -569,9 +617,12 @@ function SystemTools() {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get('http://localhost:3000/api/system/cron-logs', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await axios.get(
+        'http://localhost:3000/api/system/cron-logs',
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
       setLogs(response.data);
     } catch (error) {
       console.error('Failed to fetch cron logs:', error);
@@ -582,14 +633,23 @@ function SystemTools() {
   };
 
   const handleTriggerCron = async () => {
-    if (!window.confirm('This will trigger the billing and synchronization process for any missed days since the last successful run. Continue?')) return;
-    
+    if (
+      !window.confirm(
+        'This will trigger the billing and synchronization process for any missed days since the last successful run. Continue?'
+      )
+    )
+      return;
+
     setTriggering(true);
     try {
       const token = localStorage.getItem('token');
-      await axios.post('http://localhost:3000/api/system/cron-run', {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await axios.post(
+        'http://localhost:3000/api/system/cron-run',
+        {},
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
       toast.success('Nightly billing process triggered successfully.');
       // Refresh logs after a short delay
       setTimeout(fetchLogs, 2000);
@@ -620,14 +680,18 @@ function SystemTools() {
               <Activity className="size-5" />
             </div>
             <div>
-              <p className="font-semibold text-blue-900">Billing Engine & Sync</p>
-              <p className="text-xs text-blue-700">Manages rent generation, late fees, and unit synchronization.</p>
+              <p className="font-semibold text-blue-900">
+                Billing Engine & Sync
+              </p>
+              <p className="text-xs text-blue-700">
+                Manages rent generation, late fees, and unit synchronization.
+              </p>
             </div>
           </div>
-          <Button 
-            onClick={handleTriggerCron} 
+          <Button
+            onClick={handleTriggerCron}
             disabled={triggering}
-            variant="default" 
+            variant="default"
             className="shadow-sm"
           >
             {triggering ? (
@@ -645,7 +709,13 @@ function SystemTools() {
               <History className="size-4 text-gray-500" />
               Recent Automated Activity
             </h3>
-            <Button variant="ghost" size="sm" onClick={fetchLogs} disabled={loading} className="h-8 text-xs">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={fetchLogs}
+              disabled={loading}
+              className="h-8 text-xs"
+            >
               Refresh Logs
             </Button>
           </div>
@@ -653,22 +723,37 @@ function SystemTools() {
           <div className="border rounded-md overflow-hidden bg-white">
             <div className="max-h-[300px] overflow-y-auto">
               {loading && logs.length === 0 ? (
-                <div className="p-8 text-center text-gray-400 text-sm">Loading activity...</div>
+                <div className="p-8 text-center text-gray-400 text-sm">
+                  Loading activity...
+                </div>
               ) : logs.length === 0 ? (
-                <div className="p-8 text-center text-gray-400 text-sm">No recent activity found.</div>
+                <div className="p-8 text-center text-gray-400 text-sm">
+                  No recent activity found.
+                </div>
               ) : (
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50 border-b sticky top-0">
                     <tr>
-                      <th className="px-4 py-2 text-left font-medium text-gray-500">Execution Date</th>
-                      <th className="px-4 py-2 text-left font-medium text-gray-500">Status</th>
-                      <th className="px-4 py-2 text-left font-medium text-gray-500">Finished At</th>
+                      <th className="px-4 py-2 text-left font-medium text-gray-500">
+                        Execution Date
+                      </th>
+                      <th className="px-4 py-2 text-left font-medium text-gray-500">
+                        Status
+                      </th>
+                      <th className="px-4 py-2 text-left font-medium text-gray-500">
+                        Finished At
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
                     {logs.map((log) => (
-                      <tr key={log.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-4 py-2 font-medium">{log.executionDate.split('T')[0]}</td>
+                      <tr
+                        key={log.id}
+                        className="hover:bg-gray-50 transition-colors"
+                      >
+                        <td className="px-4 py-2 font-medium">
+                          {log.executionDate.split('T')[0]}
+                        </td>
                         <td className="px-4 py-2">
                           {log.status === 'success' ? (
                             <Badge className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100 flex items-center gap-1 w-fit">
@@ -676,16 +761,26 @@ function SystemTools() {
                               Success
                             </Badge>
                           ) : log.status === 'failed' ? (
-                            <Badge variant="destructive" className="flex items-center gap-1 w-fit">
+                            <Badge
+                              variant="destructive"
+                              className="flex items-center gap-1 w-fit"
+                            >
                               <XCircle className="size-3" />
                               Failed
                             </Badge>
                           ) : (
-                            <Badge variant="secondary" className="animate-pulse">Running</Badge>
+                            <Badge
+                              variant="secondary"
+                              className="animate-pulse"
+                            >
+                              Running
+                            </Badge>
                           )}
                         </td>
                         <td className="px-4 py-2 text-gray-500 text-xs">
-                          {log.endedAt ? new Date(log.endedAt).toLocaleString() : '-'}
+                          {log.endedAt
+                            ? new Date(log.endedAt).toLocaleString()
+                            : '-'}
                         </td>
                       </tr>
                     ))}
@@ -722,7 +817,8 @@ function LeaseTermManager() {
       addLeaseTerm({
         name: newTerm.name,
         type: newTerm.type,
-        durationMonths: newTerm.type === 'fixed' ? newTerm.durationMonths : undefined,
+        durationMonths:
+          newTerm.type === 'fixed' ? newTerm.durationMonths : undefined,
         noticePeriodMonths: newTerm.noticePeriodMonths,
         isDefault: false,
       });
@@ -742,7 +838,10 @@ function LeaseTermManager() {
         <Badge variant="outline">Fixed Terms Only</Badge>
       </div>
 
-      <form onSubmit={handleAddTerm} className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <form
+        onSubmit={handleAddTerm}
+        className="grid grid-cols-1 sm:grid-cols-3 gap-3"
+      >
         <div className="sm:col-span-1">
           <Input
             placeholder="Name (e.g. 1 Year Fixed)"
@@ -756,7 +855,12 @@ function LeaseTermManager() {
             placeholder="Months"
             min="3"
             value={newTerm.durationMonths}
-            onChange={(e) => setNewTerm({ ...newTerm, durationMonths: parseInt(e.target.value) })}
+            onChange={(e) =>
+              setNewTerm({
+                ...newTerm,
+                durationMonths: parseInt(e.target.value),
+              })
+            }
           />
         </div>
         <div className="sm:col-span-1 flex gap-2">
@@ -774,7 +878,9 @@ function LeaseTermManager() {
           >
             <div className="flex items-center gap-3">
               <span className="font-medium">{term.name}</span>
-              <span className="text-gray-500 text-xs">({term.durationMonths} months)</span>
+              <span className="text-gray-500 text-xs">
+                ({term.durationMonths} months)
+              </span>
             </div>
             <Button
               variant="ghost"

@@ -24,9 +24,9 @@ class LeaseTermController {
       await leaseTermService.updateLeaseTerm(req.params.id, req.body, req.user);
       res.json({ message: 'Lease term updated successfully' });
     } catch (error) {
-        if (error.message.includes('not found')) {
-            return res.status(404).json({ error: error.message });
-        }
+      if (error.message.includes('not found')) {
+        return res.status(404).json({ error: error.message });
+      }
       res.status(500).json({ error: error.message });
     }
   }
@@ -36,9 +36,9 @@ class LeaseTermController {
       await leaseTermService.deleteLeaseTerm(req.params.id, req.user);
       res.json({ message: 'Lease term deleted successfully' });
     } catch (error) {
-        if (error.message.includes('not found')) {
-            return res.status(404).json({ error: error.message });
-        }
+      if (error.message.includes('not found')) {
+        return res.status(404).json({ error: error.message });
+      }
       res.status(500).json({ error: error.message });
     }
   }

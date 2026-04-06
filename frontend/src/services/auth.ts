@@ -50,7 +50,7 @@ export const authService = {
     try {
       const payload = JSON.parse(atob(token.split('.')[1]));
       const expiry = payload.exp * 1000;
-      
+
       if (Date.now() >= expiry) {
         storage.clear();
         return false;

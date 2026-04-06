@@ -1,4 +1,10 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  ReactNode,
+} from 'react';
 import apiClient from '../../services/api';
 import { useAuth } from './AuthContext';
 import { toast } from 'sonner';
@@ -54,14 +60,19 @@ interface PropertyContextType {
   propertyTypes: PropertyType[];
   unitTypes: UnitType[];
   units: Unit[];
-  
+
   // Property operations
-  addProperty: (property: Omit<Property, 'id' | 'createdAt'>) => Promise<Property | undefined>;
+  addProperty: (
+    property: Omit<Property, 'id' | 'createdAt'>
+  ) => Promise<Property | undefined>;
   updateProperty: (id: string, property: Partial<Property>) => Promise<void>;
   deleteProperty: (id: string) => Promise<void>;
   uploadPropertyImages: (propertyId: string, files: File[]) => Promise<any>;
   getPropertyImages: (propertyId: string) => Promise<any[]>;
-  setPropertyPrimaryImage: (propertyId: string, imageId: string) => Promise<void>;
+  setPropertyPrimaryImage: (
+    propertyId: string,
+    imageId: string
+  ) => Promise<void>;
   deletePropertyImage: (propertyId: string, imageId: string) => Promise<void>;
 
   // Unit operations
@@ -81,7 +92,9 @@ interface PropertyContextType {
   deleteUnitType: (id: number) => Promise<void>;
 }
 
-const PropertyContext = createContext<PropertyContextType | undefined>(undefined);
+const PropertyContext = createContext<PropertyContextType | undefined>(
+  undefined
+);
 
 export function PropertyProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
@@ -123,10 +136,12 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
     try {
       const response = await apiClient.get('/units');
       if (response.status === 200) {
-        setUnits(response.data.map((u: any) => ({
-          ...u,
-          monthlyRent: toLKRFromCents(u.monthlyRent)
-        })));
+        setUnits(
+          response.data.map((u: any) => ({
+            ...u,
+            monthlyRent: toLKRFromCents(u.monthlyRent),
+          }))
+        );
       }
     } catch (e) {
       console.error('Failed to fetch units', e);
@@ -140,12 +155,14 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
     fetchUnits();
   }, [user]);
 
-  const addProperty = async (property: Omit<Property, 'id' | 'createdAt'>): Promise<Property | undefined> => {
+  const addProperty = async (
+    property: Omit<Property, 'id' | 'createdAt'>
+  ): Promise<Property | undefined> => {
     try {
       const response = await apiClient.post('/properties', property);
       if (response.status === 201) {
         const mapped = response.data;
-        setProperties(prev => [...prev, mapped]);
+        setProperties((prev) => [...prev, mapped]);
         return mapped;
       }
     } catch (e) {
@@ -158,10 +175,12 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
     try {
       await apiClient.put(`/properties/${id}`, updates);
       if (updates.propertyTypeId) {
-        const type = propertyTypes.find(t => t.id === updates.propertyTypeId);
+        const type = propertyTypes.find((t) => t.id === updates.propertyTypeId);
         if (type) updates.typeName = type.name;
       }
-      setProperties(prev => prev.map(p => (p.id === id ? { ...p, ...updates } : p)));
+      setProperties((prev) =>
+        prev.map((p) => (p.id === id ? { ...p, ...updates } : p))
+      );
     } catch (e) {
       console.error('Failed to update property', e);
       throw e;
@@ -171,7 +190,7 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
   const deleteProperty = async (id: string) => {
     try {
       await apiClient.delete(`/properties/${id}`);
-      setProperties(prev => prev.filter(p => p.id !== id));
+      setProperties((prev) => prev.filter((p) => p.id !== id));
     } catch (e) {
       console.error('Failed to delete property', e);
       throw e;
@@ -181,12 +200,19 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
   const uploadPropertyImages = async (propertyId: string, files: File[]) => {
     try {
       const formData = new FormData();
-      files.forEach(file => formData.append('images', file));
-      const response = await apiClient.post(`/properties/${propertyId}/images`, formData);
+      files.forEach((file) => formData.append('images', file));
+      const response = await apiClient.post(
+        `/properties/${propertyId}/images`,
+        formData
+      );
       if (response.status === 201 && response.data.images?.length > 0) {
         const primary = response.data.images.find((img: any) => img.isPrimary);
         if (primary) {
-          setProperties(prev => prev.map(p => p.id === propertyId ? { ...p, imageUrl: primary.imageUrl } : p));
+          setProperties((prev) =>
+            prev.map((p) =>
+              p.id === propertyId ? { ...p, imageUrl: primary.imageUrl } : p
+            )
+          );
         }
       }
       return response.data;
@@ -206,9 +232,14 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const setPropertyPrimaryImage = async (propertyId: string, imageId: string) => {
+  const setPropertyPrimaryImage = async (
+    propertyId: string,
+    imageId: string
+  ) => {
     try {
-      await apiClient.put(`/properties/${propertyId}/images/${imageId}/primary`);
+      await apiClient.put(
+        `/properties/${propertyId}/images/${imageId}/primary`
+      );
     } catch (e) {
       console.error('Failed to set primary image', e);
       throw e;
@@ -224,15 +255,17 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const addUnit = async (unit: Omit<Unit, 'id' | 'createdAt'>): Promise<Unit | undefined> => {
+  const addUnit = async (
+    unit: Omit<Unit, 'id' | 'createdAt'>
+  ): Promise<Unit | undefined> => {
     try {
       const response = await apiClient.post('/units', {
         ...unit,
-        monthlyRent: toCentsFromLKR(unit.monthlyRent)
+        monthlyRent: toCentsFromLKR(unit.monthlyRent),
       });
       if (response.status === 201) {
         const newUnit: Unit = { ...response.data, id: response.data.id };
-        setUnits(prev => [...prev, newUnit]);
+        setUnits((prev) => [...prev, newUnit]);
         return newUnit;
       }
     } catch (e) {
@@ -245,10 +278,18 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
     try {
       const response = await apiClient.put(`/units/${id}`, {
         ...updates,
-        monthlyRent: updates.monthlyRent ? toCentsFromLKR(updates.monthlyRent) : undefined
+        monthlyRent: updates.monthlyRent
+          ? toCentsFromLKR(updates.monthlyRent)
+          : undefined,
       });
       if (response.status === 200) {
-        setUnits(prev => prev.map(u => (u.id === id ? { ...u, ...response.data, id: response.data.id || u.id } : u)));
+        setUnits((prev) =>
+          prev.map((u) =>
+            u.id === id
+              ? { ...u, ...response.data, id: response.data.id || u.id }
+              : u
+          )
+        );
       }
     } catch (e) {
       console.error('Failed to update unit', e);
@@ -259,7 +300,7 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
   const deleteUnit = async (id: string) => {
     try {
       await apiClient.delete(`/units/${id}`);
-      setUnits(prev => prev.filter(u => u.id !== id));
+      setUnits((prev) => prev.filter((u) => u.id !== id));
     } catch (e) {
       console.error('Failed to delete unit', e);
       throw e;
@@ -270,7 +311,9 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
     try {
       await apiClient.patch(`/units/${unitId}/mark-available`);
       // Optimistically update local state
-      setUnits(prev => prev.map(u => u.id === unitId ? { ...u, status: 'available' } : u));
+      setUnits((prev) =>
+        prev.map((u) => (u.id === unitId ? { ...u, status: 'available' } : u))
+      );
     } catch (e) {
       console.error('Failed to mark unit as available', e);
       throw e;
@@ -280,12 +323,21 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
   const uploadUnitImages = async (unitId: string, files: File[]) => {
     try {
       const formData = new FormData();
-      files.forEach(file => formData.append('images', file));
-      const response = await apiClient.post(`/units/${unitId}/images`, formData);
+      files.forEach((file) => formData.append('images', file));
+      const response = await apiClient.post(
+        `/units/${unitId}/images`,
+        formData
+      );
       if (response.status === 201 && response.data.images?.length > 0) {
-        const primary = response.data.images.find((img: any) => img.is_primary) || response.data.images[0];
+        const primary =
+          response.data.images.find((img: any) => img.is_primary) ||
+          response.data.images[0];
         if (primary) {
-          setUnits(prev => prev.map(u => u.id === unitId ? { ...u, imageUrl: primary.image_url } : u));
+          setUnits((prev) =>
+            prev.map((u) =>
+              u.id === unitId ? { ...u, imageUrl: primary.image_url } : u
+            )
+          );
         }
       }
       return response.data;
@@ -326,7 +378,7 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
   const addPropertyType = async (type: Omit<PropertyType, 'id'>) => {
     try {
       const response = await apiClient.post('/property-types', type);
-      setPropertyTypes(prev => [...prev, response.data]);
+      setPropertyTypes((prev) => [...prev, response.data]);
       toast.success('Property type added');
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to add property type');
@@ -336,7 +388,7 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
   const deletePropertyType = async (id: number) => {
     try {
       await apiClient.delete(`/property-types/${id}`);
-      setPropertyTypes(prev => prev.filter(t => t.id !== id));
+      setPropertyTypes((prev) => prev.filter((t) => t.id !== id));
       toast.success('Property type deleted');
     } catch (error) {
       toast.error('Failed to delete property type');
@@ -346,7 +398,7 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
   const addUnitType = async (type: Omit<UnitType, 'id'>) => {
     try {
       const response = await apiClient.post('/unit-types', type);
-      setUnitTypes(prev => [...prev, response.data]);
+      setUnitTypes((prev) => [...prev, response.data]);
       toast.success('Unit type added');
     } catch (error) {
       toast.error('Failed to add unit type');
@@ -356,7 +408,7 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
   const deleteUnitType = async (id: number) => {
     try {
       await apiClient.delete(`/unit-types/${id}`);
-      setUnitTypes(prev => prev.filter(t => t.id !== id));
+      setUnitTypes((prev) => prev.filter((t) => t.id !== id));
       toast.success('Unit type deleted');
     } catch (error) {
       toast.error('Failed to delete unit type');
@@ -364,12 +416,33 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <PropertyContext.Provider value={{
-      properties, propertyTypes, unitTypes, units,
-      addProperty, updateProperty, deleteProperty, uploadPropertyImages, getPropertyImages, setPropertyPrimaryImage, deletePropertyImage,
-      addUnit, updateUnit, deleteUnit, markUnitAvailable, uploadUnitImages, getUnitImages, setUnitPrimaryImage, deleteUnitImage,
-      addPropertyType, deletePropertyType, addUnitType, deleteUnitType
-    }}>
+    <PropertyContext.Provider
+      value={{
+        properties,
+        propertyTypes,
+        unitTypes,
+        units,
+        addProperty,
+        updateProperty,
+        deleteProperty,
+        uploadPropertyImages,
+        getPropertyImages,
+        setPropertyPrimaryImage,
+        deletePropertyImage,
+        addUnit,
+        updateUnit,
+        deleteUnit,
+        markUnitAvailable,
+        uploadUnitImages,
+        getUnitImages,
+        setUnitPrimaryImage,
+        deleteUnitImage,
+        addPropertyType,
+        deletePropertyType,
+        addUnitType,
+        deleteUnitType,
+      }}
+    >
       {children}
     </PropertyContext.Provider>
   );
@@ -377,6 +450,7 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
 
 export function useProperty() {
   const context = useContext(PropertyContext);
-  if (context === undefined) throw new Error('useProperty must be used within a PropertyProvider');
+  if (context === undefined)
+    throw new Error('useProperty must be used within a PropertyProvider');
   return context;
 }

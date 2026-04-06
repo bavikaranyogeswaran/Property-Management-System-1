@@ -1,4 +1,3 @@
-
 import leadService from '../services/leadService.js';
 import userService from '../services/userService.js';
 
@@ -17,7 +16,9 @@ class LeadController {
       const leadModel = (await import('../models/leadModel.js')).default;
       const isOwner = await leadModel.verifyOwnership(id, req.user.id);
       if (!isOwner) {
-        return res.status(403).json({ error: 'Access denied. This lead does not belong to your property.' });
+        return res.status(403).json({
+          error: 'Access denied. This lead does not belong to your property.',
+        });
       }
 
       const {
@@ -46,7 +47,7 @@ class LeadController {
         endDate,
         {
           ...tenantData,
-          documentUrl: req.body.documentUrl
+          documentUrl: req.body.documentUrl,
         },
         req.user
       );
@@ -61,9 +62,9 @@ class LeadController {
       const leads = await leadService.getLeads(req.user);
       res.json(leads);
     } catch (error) {
-        if (error.message.includes('Access denied')) {
-            return res.status(403).json({ error: error.message });
-        }
+      if (error.message.includes('Access denied')) {
+        return res.status(403).json({ error: error.message });
+      }
       res.status(500).json({ error: error.message });
     }
   }
@@ -88,19 +89,23 @@ class LeadController {
   async createLead(req, res) {
     try {
       const result = await leadService.registerInterest(req.body);
-      
+
       if (result.isNew) {
-          res.status(201).json({ id: result.id, message: result.message });
+        res.status(201).json({ id: result.id, message: result.message });
       } else {
-          res.status(200).json({ id: result.id, message: result.message });
+        res.status(200).json({ id: result.id, message: result.message });
       }
     } catch (error) {
       // Logic from service errors
-      if (error.message.includes('required') || error.message.includes('Invalid') || error.message.includes('Cannot express interest')) {
-           return res.status(400).json({ error: error.message });
+      if (
+        error.message.includes('required') ||
+        error.message.includes('Invalid') ||
+        error.message.includes('Cannot express interest')
+      ) {
+        return res.status(400).json({ error: error.message });
       }
       if (error.message.includes('already associated')) {
-           return res.status(409).json({ error: error.message });
+        return res.status(409).json({ error: error.message });
       }
       console.error('Error creating lead:', error);
       res.status(500).json({ error: error.message });
@@ -113,12 +118,12 @@ class LeadController {
       await leadService.updateLead(id, req.body, req.user);
       res.json({ message: 'Lead updated successfully' });
     } catch (error) {
-        if (error.message.includes('Access denied')) {
-            return res.status(403).json({ error: error.message });
-        }
-        if (error.message.includes('not found')) {
-            return res.status(404).json({ error: error.message });
-        }
+      if (error.message.includes('Access denied')) {
+        return res.status(403).json({ error: error.message });
+      }
+      if (error.message.includes('not found')) {
+        return res.status(404).json({ error: error.message });
+      }
       res.status(400).json({ error: error.message });
     }
   }
@@ -128,9 +133,9 @@ class LeadController {
       const history = await leadService.getLeadStageHistory(req.user);
       res.json(history);
     } catch (error) {
-        if (error.message.includes('Access denied')) {
-            return res.status(403).json({ error: error.message });
-        }
+      if (error.message.includes('Access denied')) {
+        return res.status(403).json({ error: error.message });
+      }
       res.status(500).json({ error: error.message });
     }
   }

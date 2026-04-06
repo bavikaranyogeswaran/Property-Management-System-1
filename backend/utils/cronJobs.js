@@ -8,40 +8,96 @@ import tenantModel from '../models/tenantModel.js';
 import billingEngine from './billingEngine.js';
 import paymentService from '../services/paymentService.js';
 import leaseService from '../services/leaseService.js';
-import { getCurrentDateString, getLocalTime, today, now, parseLocalDate, addDays, formatToLocalDate } from './dateUtils.js';
+import {
+  getCurrentDateString,
+  getLocalTime,
+  today,
+  now,
+  parseLocalDate,
+  addDays,
+  formatToLocalDate,
+} from './dateUtils.js';
 import { moneyMath, fromCents } from './moneyUtils.js';
 
 // --- CONFIGURATION ---
 const LATE_FEE_PERCENTAGE = 0.03;
 
 /**
- * In-Memory Mutex Lock for Cron Jobs (Coding Level)
+ * Distributed Lock for Cron Jobs using Database Transactions
+ * 
+ * Instead of an in-memory Set(), we use 'SELECT ... FOR UPDATE' on the cron_checkpoints table.
+ * This prevents two separate containers from starting the same job simultaneously.
  */
-const activeLocks = new Set();
-
-const runWithLock = async (jobName, taskFn) => {
-  if (activeLocks.has(jobName)) {
-    console.warn(`[Cron] Job "${jobName}" is already locked (in-memory). Aborting.`);
-    return;
-  }
-
-  activeLocks.add(jobName);
-  console.log(`[Cron] Locked job: ${jobName} (in-memory)`);
-  
+const runWithDistributedLock = async (jobName, taskFn) => {
+  const connection = await db.getConnection();
   try {
+    await connection.beginTransaction();
+
+    // 1. Attempt to acquire an exclusive lock on the job row
+    const [rows] = await connection.query(
+      'SELECT status, updated_at FROM cron_checkpoints WHERE job_name = ? FOR UPDATE',
+      [jobName]
+    );
+
+    const now = new Date();
+    
+    if (rows.length > 0) {
+      const lock = rows[0];
+      const lastUpdate = new Date(lock.updated_at);
+      const diffMinutes = (now.getTime() - lastUpdate.getTime()) / (1000 * 60);
+
+      // 2. Safety Check: If a job is 'running' but has been silent for > 60 minutes, 
+      // assume the container crashed and allow this process to reclaim it.
+      if (lock.status === 'running' && diffMinutes < 60) {
+        console.warn(`[Worker] Job "${jobName}" is currently locked by another process. Skipping.`);
+        await connection.rollback();
+        return;
+      }
+    }
+
+    // 3. Mark the job as 'running' globally
+    await connection.query(
+      `INSERT INTO cron_checkpoints (job_name, last_success_date, status, message, updated_at)
+       VALUES (?, CURDATE(), 'running', 'Job started', NOW())
+       ON DUPLICATE KEY UPDATE status = 'running', message = 'Job started', updated_at = NOW()`,
+      [jobName]
+    );
+
+    // Commit the lock status
+    await connection.commit();
+    console.log(`[Worker] Acquired lock for job: ${jobName}`);
+
+    // 4. Execute the Actual Task
     await taskFn();
+
+    // 5. Mark the job as 'success'
+    await db.query(
+      "UPDATE cron_checkpoints SET status = 'success', message = 'Completed successfully', updated_at = NOW(), last_success_date = CURDATE() WHERE job_name = ?",
+      [jobName]
+    );
+    console.log(`[Worker] Job "${jobName}" completed and unlocked.`);
+
   } catch (err) {
-    console.error(`[Cron] Error in locked job "${jobName}":`, err);
+    console.error(`[Worker] Error in job "${jobName}":`, err);
+    // 6. Mark the job as 'failed' so it can be retried or debugged
+    await db.query(
+      "UPDATE cron_checkpoints SET status = 'failed', message = ?, updated_at = NOW() WHERE job_name = ?",
+      [err.message, jobName]
+    );
   } finally {
-    activeLocks.delete(jobName);
-    console.log(`[Cron] Unlocked job: ${jobName} (in-memory)`);
+    connection.release();
   }
 };
 
 /**
  * [B5 FIX] Write checkpoint to cron_checkpoints table (UPSERT — one row per job)
  */
-const logCronExecution = async (jobName, executionDate, status, message = null) => {
+const logCronExecution = async (
+  jobName,
+  executionDate,
+  status,
+  message = null
+) => {
   try {
     await db.query(
       `INSERT INTO cron_checkpoints (job_name, last_success_date, status, message) 
@@ -65,26 +121,29 @@ export const generateRentInvoices = async () => {
   const lockName = `generate_invoices_${currentYear}_${currentMonth}`;
   try {
     const [existingLock] = await db.query(
-        "SELECT status, updated_at FROM cron_checkpoints WHERE job_name = ? LIMIT 1",
-        [lockName]
+      'SELECT status, updated_at FROM cron_checkpoints WHERE job_name = ? LIMIT 1',
+      [lockName]
     );
 
     if (existingLock.length > 0) {
-        const lastUpdate = new Date(existingLock[0].updated_at);
-        const diffMinutes = (new Date().getTime() - lastUpdate.getTime()) / (1000 * 60);
+      const lastUpdate = new Date(existingLock[0].updated_at);
+      const diffMinutes =
+        (new Date().getTime() - lastUpdate.getTime()) / (1000 * 60);
 
-        if (existingLock[0].status === 'running' && diffMinutes < 15) {
-            console.log(`[Cron] Skipping Rent Invoicing: Manual process "${lockName}" is currently running.`);
-            return;
-        }
+      if (existingLock[0].status === 'running' && diffMinutes < 15) {
+        console.log(
+          `[Cron] Skipping Rent Invoicing: Manual process "${lockName}" is currently running.`
+        );
+        return;
+      }
     }
 
     // Set/Update lock for automation
     await db.query(
-        `INSERT INTO cron_checkpoints (job_name, last_success_date, status, message) 
+      `INSERT INTO cron_checkpoints (job_name, last_success_date, status, message) 
          VALUES (?, ?, 'running', 'Automated generation started')
          ON DUPLICATE KEY UPDATE status = 'running', updated_at = NOW(), message = 'Automated generation refreshed'`,
-        [lockName, `${currentYear}-${String(currentMonth).padStart(2, '0')}-01`]
+      [lockName, `${currentYear}-${String(currentMonth).padStart(2, '0')}-01`]
     );
 
     const activeLeases = await leaseModel.findActive();
@@ -93,7 +152,12 @@ export const generateRentInvoices = async () => {
     let createdCount = 0;
     for (const lease of activeLeases) {
       const adjustments = await leaseModel.getAdjustments(lease.id);
-      const leaseRentInfo = billingEngine.calculateMonthlyRent(lease, currentYear, currentMonth, adjustments);
+      const leaseRentInfo = billingEngine.calculateMonthlyRent(
+        lease,
+        currentYear,
+        currentMonth,
+        adjustments
+      );
 
       if (!leaseRentInfo) continue;
       const dueDateStr = leaseRentInfo.dueDate;
@@ -124,7 +188,10 @@ export const generateRentInvoices = async () => {
         try {
           await paymentService.applyTenantCredit(invoiceId);
         } catch (err) {
-          console.error(`[Cron] Failed to auto-apply credit to generated rent invoice ${invoiceId}:`, err);
+          console.error(
+            `[Cron] Failed to auto-apply credit to generated rent invoice ${invoiceId}:`,
+            err
+          );
         }
 
         await notificationModel.create({
@@ -133,7 +200,6 @@ export const generateRentInvoices = async () => {
           type: 'invoice',
           isRead: false,
         });
-
 
         // Send Email
         try {
@@ -161,15 +227,15 @@ export const generateRentInvoices = async () => {
 
     // RELEASE LOCK
     await db.query(
-        "UPDATE cron_checkpoints SET status = 'success', message = ?, updated_at = NOW() WHERE job_name = ?",
-        [`Automated generation complete: ${createdCount} created`, lockName]
+      "UPDATE cron_checkpoints SET status = 'success', message = ?, updated_at = NOW() WHERE job_name = ?",
+      [`Automated generation complete: ${createdCount} created`, lockName]
     );
   } catch (error) {
     console.error('Error in automated invoicing:', error);
     // Release with failure
     await db.query(
-        "UPDATE cron_checkpoints SET status = 'failed', message = ?, updated_at = NOW() WHERE job_name = ?",
-        [error.message, lockName]
+      "UPDATE cron_checkpoints SET status = 'failed', message = ?, updated_at = NOW() WHERE job_name = ?",
+      [error.message, lockName]
     );
   }
 };
@@ -265,7 +331,7 @@ export const sendLeaseExpiryWarnings = async () => {
   console.log('Running lease expiry warning check...');
   // Warn at 30 and 60 days
   const currentToday = now();
-  
+
   const dateStr30 = formatToLocalDate(addDays(currentToday, 30));
   const dateStr60 = formatToLocalDate(addDays(currentToday, 60));
 
@@ -291,7 +357,7 @@ export const sendLeaseExpiryWarnings = async () => {
       );
       for (const lease of expiringLeases) {
         const daysCount = lease.end_date === dateStr30 ? 30 : 60;
-        
+
         // 1. Notify Tenant
         await notificationModel.create({
           userId: lease.tenant_id,
@@ -302,13 +368,13 @@ export const sendLeaseExpiryWarnings = async () => {
 
         // 1b. Email Tenant
         if (lease.tenant_email) {
-            await emailService.sendLeaseExpiryReminder(lease.tenant_email, {
-                daysCount,
-                endDate: lease.end_date,
-                propertyName: lease.property_name,
-                unitNumber: lease.unit_number,
-                role: 'tenant'
-            });
+          await emailService.sendLeaseExpiryReminder(lease.tenant_email, {
+            daysCount,
+            endDate: lease.end_date,
+            propertyName: lease.property_name,
+            unitNumber: lease.unit_number,
+            role: 'tenant',
+          });
         }
 
         // 2. Notify Owner
@@ -322,13 +388,13 @@ export const sendLeaseExpiryWarnings = async () => {
 
           // 2b. Email Owner
           if (lease.owner_email) {
-              await emailService.sendLeaseExpiryReminder(lease.owner_email, {
-                  daysCount,
-                  endDate: lease.end_date,
-                  propertyName: lease.property_name,
-                  unitNumber: lease.unit_number,
-                  role: 'owner'
-              });
+            await emailService.sendLeaseExpiryReminder(lease.owner_email, {
+              daysCount,
+              endDate: lease.end_date,
+              propertyName: lease.property_name,
+              unitNumber: lease.unit_number,
+              role: 'owner',
+            });
           }
         }
       }
@@ -342,7 +408,7 @@ export const sendLeaseExpiryWarnings = async () => {
 export const applyLateFees = async () => {
   console.log('Running late fee automation...');
   const todayStr = formatToLocalDate(now());
-  
+
   try {
     const overdueInvoices = await invoiceModel.findOverdue();
     console.log(
@@ -352,17 +418,22 @@ export const applyLateFees = async () => {
     let appliedCount = 0;
     for (const inv of overdueInvoices) {
       const isDaily = inv.lateFeeType === 'daily_fixed';
-      
+
       if (isDaily) {
         // DAILY ACCRUAL LOGIC
         // Check if a late fee for "Today" already exists for this specific base invoice
         const [todayFeeExists] = await db.query(
           "SELECT 1 FROM rent_invoices WHERE lease_id = ? AND description LIKE ? AND invoice_type = 'late_fee' AND DATE(created_at) = CURDATE() LIMIT 1",
-          [inv.lease_id, `%Daily Late Fee for ${todayStr}%Invoice #${inv.invoice_id}%`]
+          [
+            inv.lease_id,
+            `%Daily Late Fee for ${todayStr}%Invoice #${inv.invoice_id}%`,
+          ]
         );
 
         if (todayFeeExists.length > 0) {
-          console.log(`Daily fee already applied for Invoice #${inv.invoice_id} on ${todayStr}. Skipping.`);
+          console.log(
+            `Daily fee already applied for Invoice #${inv.invoice_id} on ${todayStr}. Skipping.`
+          );
           continue;
         }
 
@@ -381,7 +452,6 @@ export const applyLateFees = async () => {
           await paymentService.applyTenantCredit(lateFeeInvoiceId);
           appliedCount++;
         }
-
       } else {
         // FLAT PERCENTAGE LOGIC (Once every 30 days)
         const [feeExists] = await db.query(
@@ -390,12 +460,20 @@ export const applyLateFees = async () => {
         );
 
         if (feeExists.length > 0) {
-          console.log(`Flat late fee already exists for Invoice #${inv.invoice_id} in last 30 days. Skipping.`);
+          console.log(
+            `Flat late fee already exists for Invoice #${inv.invoice_id} in last 30 days. Skipping.`
+          );
           continue;
         }
 
-        const feePercentage = inv.lateFeePercentage !== null ? (inv.lateFeePercentage / 100) : LATE_FEE_PERCENTAGE;
-        const flatFeeAmount = moneyMath(inv.amount).mul(feePercentage).round().value();
+        const feePercentage =
+          inv.lateFeePercentage !== null
+            ? inv.lateFeePercentage / 100
+            : LATE_FEE_PERCENTAGE;
+        const flatFeeAmount = moneyMath(inv.amount)
+          .mul(feePercentage)
+          .round()
+          .value();
 
         const lateFeeInvoiceId = await invoiceModel.createLateFeeInvoice({
           leaseId: inv.lease_id,
@@ -412,10 +490,12 @@ export const applyLateFees = async () => {
 
       // SHARED POST-APPLICATION LOGIC (Notifications & Score)
       // Only runs if a fee was actually applied in this loop
-      const lastAppliedFee = await db.query(
-        "SELECT amount, invoice_id FROM rent_invoices WHERE lease_id = ? AND invoice_type = 'late_fee' ORDER BY created_at DESC LIMIT 1",
-        [inv.lease_id]
-      ).then(([rows]) => rows[0]);
+      const lastAppliedFee = await db
+        .query(
+          "SELECT amount, invoice_id FROM rent_invoices WHERE lease_id = ? AND invoice_type = 'late_fee' ORDER BY created_at DESC LIMIT 1",
+          [inv.lease_id]
+        )
+        .then(([rows]) => rows[0]);
 
       if (lastAppliedFee) {
         // Notify Tenant
@@ -433,16 +513,19 @@ export const applyLateFees = async () => {
           [inv.lease_id, `%Invoice #${inv.invoice_id}%`]
         );
 
-        if (firstFee.length === 1) { // This is the first one
+        if (firstFee.length === 1) {
+          // This is the first one
           try {
-            const behaviorLogModel = (await import('../models/behaviorLogModel.js')).default;
+            const behaviorLogModel = (
+              await import('../models/behaviorLogModel.js')
+            ).default;
             await behaviorLogModel.create({
-                tenantId: inv.tenant_id,
-                type: 'negative',
-                category: 'Payment',
-                scoreChange: -10,
-                description: `Initial late payment penalty for Invoice #${inv.invoice_id}`,
-                recordedBy: null
+              tenantId: inv.tenant_id,
+              type: 'negative',
+              category: 'Payment',
+              scoreChange: -10,
+              description: `Initial late payment penalty for Invoice #${inv.invoice_id}`,
+              recordedBy: null,
             });
             await tenantModel.incrementBehaviorScore(inv.tenant_id, -10);
           } catch (scoreErr) {
@@ -456,7 +539,9 @@ export const applyLateFees = async () => {
         }
       }
     }
-    console.log(`Finished checking late fees. Applied ${appliedCount} new fees.`);
+    console.log(
+      `Finished checking late fees. Applied ${appliedCount} new fees.`
+    );
   } catch (error) {
     console.error('Error in late fee automation:', error);
   }
@@ -487,9 +572,14 @@ export const syncUnitStatuses = async () => {
     );
 
     if (shouldBeOccupied.length > 0) {
-      console.log(`[Sync] Found ${shouldBeOccupied.length} units that should be 'occupied'. Syncing...`);
-      const ids = shouldBeOccupied.map(u => u.unit_id);
-      await db.query(`UPDATE units SET status = 'occupied' WHERE unit_id IN (?)`, [ids]);
+      console.log(
+        `[Sync] Found ${shouldBeOccupied.length} units that should be 'occupied'. Syncing...`
+      );
+      const ids = shouldBeOccupied.map((u) => u.unit_id);
+      await db.query(
+        `UPDATE units SET status = 'occupied' WHERE unit_id IN (?)`,
+        [ids]
+      );
     }
 
     // STAGE 2: FORCE 'reserved' for units with future claims (no active lease today)
@@ -518,9 +608,14 @@ export const syncUnitStatuses = async () => {
     );
 
     if (shouldBeReserved.length > 0) {
-      console.log(`[Sync] Found ${shouldBeReserved.length} units with future claims that should be 'reserved'. Syncing...`);
-      const ids = shouldBeReserved.map(u => u.unit_id);
-      await db.query(`UPDATE units SET status = 'reserved' WHERE unit_id IN (?)`, [ids]);
+      console.log(
+        `[Sync] Found ${shouldBeReserved.length} units with future claims that should be 'reserved'. Syncing...`
+      );
+      const ids = shouldBeReserved.map((u) => u.unit_id);
+      await db.query(
+        `UPDATE units SET status = 'reserved' WHERE unit_id IN (?)`,
+        [ids]
+      );
     }
 
     // STAGE 3: FORCE 'available' for units with NO valid claims (current or future)
@@ -545,9 +640,14 @@ export const syncUnitStatuses = async () => {
     );
 
     if (shouldBeAvailable.length > 0) {
-        console.log(`[Sync] Found ${shouldBeAvailable.length} units with NO valid claims that should be 'available'. Syncing...`);
-        const ids = shouldBeAvailable.map(u => u.unit_id);
-        await db.query(`UPDATE units SET status = 'available' WHERE unit_id IN (?)`, [ids]);
+      console.log(
+        `[Sync] Found ${shouldBeAvailable.length} units with NO valid claims that should be 'available'. Syncing...`
+      );
+      const ids = shouldBeAvailable.map((u) => u.unit_id);
+      await db.query(
+        `UPDATE units SET status = 'available' WHERE unit_id IN (?)`,
+        [ids]
+      );
     }
   } catch (error) {
     console.error('Error syncing unit statuses:', error);
@@ -558,7 +658,7 @@ export const syncUnitStatuses = async () => {
 export const sendRentReminders = async () => {
   const currentToday = now();
   const targetDay = billingEngine.RENT_DUE_DAY - 3;
-  
+
   if (currentToday.getDate() !== targetDay) return;
 
   console.log('Running automated rent reminders...');
@@ -567,15 +667,18 @@ export const sendRentReminders = async () => {
     const dueDate = `${currentToday.getFullYear()}-${String(currentToday.getMonth() + 1).padStart(2, '0')}-${String(billingEngine.RENT_DUE_DAY).padStart(2, '0')}`;
 
     for (const lease of activeLeases) {
-        // Fetch tenant email
-        const [userRows] = await db.query('SELECT email FROM users WHERE user_id = ?', [lease.tenantId]);
-        if (userRows.length > 0 && userRows[0].email) {
-            await emailService.sendRentReminder(userRows[0].email, {
-                amount: fromCents(lease.monthlyRent),
-                dueDate: dueDate,
-                daysLeft: 3
-            });
-        }
+      // Fetch tenant email
+      const [userRows] = await db.query(
+        'SELECT email FROM users WHERE user_id = ?',
+        [lease.tenantId]
+      );
+      if (userRows.length > 0 && userRows[0].email) {
+        await emailService.sendRentReminder(userRows[0].email, {
+          amount: fromCents(lease.monthlyRent),
+          dueDate: dueDate,
+          daysLeft: 3,
+        });
+      }
     }
   } catch (error) {
     console.error('Error in automated rent reminders:', error);
@@ -587,7 +690,8 @@ export const sendRentReminders = async () => {
 export const cleanupOldNotifications = async () => {
   console.log('Running notification cleanup...');
   try {
-    const notificationModel = (await import('../models/notificationModel.js')).default;
+    const notificationModel = (await import('../models/notificationModel.js'))
+      .default;
 
     // Delete read notifications older than 30 days
     const readDeleted = await notificationModel.deleteOlderThan(30);
@@ -629,7 +733,10 @@ export const sendVisitReminders = async () => {
           });
         }
       } catch (emailErr) {
-        console.error(`Failed to send visit reminder for visit ${visit.visit_id}:`, emailErr);
+        console.error(
+          `Failed to send visit reminder for visit ${visit.visit_id}:`,
+          emailErr
+        );
       }
     }
     console.log(`Sent ${upcoming.length} visit reminders.`);
@@ -679,41 +786,43 @@ export const expireDraftLeases = async () => {
     );
 
     if (staleDrafts.length > 0) {
-      console.log(`Found ${staleDrafts.length} stale draft leases. Expiring...`);
-      const ids = staleDrafts.map(l => l.lease_id);
-      
+      console.log(
+        `Found ${staleDrafts.length} stale draft leases. Expiring...`
+      );
+      const ids = staleDrafts.map((l) => l.lease_id);
+
       const connection = await db.getConnection();
       try {
         await connection.beginTransaction();
-        
+
         // Cancel the leases
         await connection.query(
           "UPDATE leases SET status = 'cancelled' WHERE lease_id IN (?)",
           [ids]
         );
-        
+
         // [NEW] Return unit status to 'available' only if it was 'reserved' and no other active/draft leases exist.
-        const uniqueUnitIds = [...new Set(staleDrafts.map(l => l.unit_id))];
+        const uniqueUnitIds = [...new Set(staleDrafts.map((l) => l.unit_id))];
         for (const unitId of uniqueUnitIds) {
-            const [otherClaims] = await connection.query(
-                "SELECT lease_id FROM leases WHERE unit_id = ? AND status IN ('active', 'draft', 'pending')",
-                [unitId]
+          const [otherClaims] = await connection.query(
+            "SELECT lease_id FROM leases WHERE unit_id = ? AND status IN ('active', 'draft', 'pending')",
+            [unitId]
+          );
+          if (otherClaims.length === 0) {
+            // Important: Only revert if the unit is currently 'reserved'.
+            // If it's already 'maintenance' or 'occupied' by another workflow, don't overwrite it.
+            await connection.query(
+              "UPDATE units SET status = 'available' WHERE unit_id = ? AND status = 'reserved'",
+              [unitId]
             );
-            if (otherClaims.length === 0) {
-                // Important: Only revert if the unit is currently 'reserved'. 
-                // If it's already 'maintenance' or 'occupied' by another workflow, don't overwrite it.
-                await connection.query(
-                    "UPDATE units SET status = 'available' WHERE unit_id = ? AND status = 'reserved'", 
-                    [unitId]
-                );
-            }
+          }
         }
-        
+
         // Void their pending security deposit invoices
         for (const leaseId of ids) {
-           await invoiceModel.voidPendingByLeaseId(leaseId, connection);
+          await invoiceModel.voidPendingByLeaseId(leaseId, connection);
         }
-        
+
         await connection.commit();
         console.log(`Successfully expired ${staleDrafts.length} draft leases.`);
       } catch (innerErr) {
@@ -733,8 +842,10 @@ export const expireDraftLeases = async () => {
  * provided they have no active or future (draft) leases.
  */
 export const deactivateFormerTenants = async (targetDate = null) => {
-  const referenceDate = targetDate ? parseLocalDate(targetDate) : getLocalTime();
-  
+  const referenceDate = targetDate
+    ? parseLocalDate(targetDate)
+    : getLocalTime();
+
   try {
     const [formerTenants] = await db.query(
       `SELECT u.user_id, u.email
@@ -758,17 +869,21 @@ export const deactivateFormerTenants = async (targetDate = null) => {
     );
 
     if (formerTenants.length > 0) {
-      console.log(`Found ${formerTenants.length} former tenants eligible for deactivation.`);
-      const ids = formerTenants.map(t => t.user_id);
-      
+      console.log(
+        `Found ${formerTenants.length} former tenants eligible for deactivation.`
+      );
+      const ids = formerTenants.map((t) => t.user_id);
+
       await db.query(
         "UPDATE users SET status = 'inactive' WHERE user_id IN (?)",
         [ids]
       );
 
       for (const tenant of formerTenants) {
-        console.log(`[Revocation] Deactivated account for former tenant: ${tenant.email} (User ID: ${tenant.user_id})`);
-        
+        console.log(
+          `[Revocation] Deactivated account for former tenant: ${tenant.email} (User ID: ${tenant.user_id})`
+        );
+
         // Log to Audit trail
         try {
           const auditLogger = (await import('./auditLogger.js')).default;
@@ -776,10 +891,16 @@ export const deactivateFormerTenants = async (targetDate = null) => {
             userId: null, // System action
             actionType: 'TENANT_ACCESS_REVOKED',
             entityId: tenant.user_id,
-            details: { reason: 'Lease ended past property-specific deactivation period', referenceDate }
+            details: {
+              reason: 'Lease ended past property-specific deactivation period',
+              referenceDate,
+            },
           });
         } catch (auditErr) {
-          console.error(`Failed to log audit for revocation of ${tenant.user_id}:`, auditErr);
+          console.error(
+            `Failed to log audit for revocation of ${tenant.user_id}:`,
+            auditErr
+          );
         }
       }
     }
@@ -808,25 +929,33 @@ export const autoAcknowledgeRefunds = async () => {
          ORDER BY created_at DESC LIMIT 1`,
         [lease.lease_id]
       );
-      
+
       let approvalDateStr;
       if (approvalLogs.length > 0) {
-         approvalDateStr = formatToLocalDate(approvalLogs[0].created_at);
+        approvalDateStr = formatToLocalDate(approvalLogs[0].created_at);
       } else {
-         const fallbackDate = new Date();
-         fallbackDate.setDate(fallbackDate.getDate() - 8);
-         approvalDateStr = formatToLocalDate(fallbackDate);
+        const fallbackDate = new Date();
+        fallbackDate.setDate(fallbackDate.getDate() - 8);
+        approvalDateStr = formatToLocalDate(fallbackDate);
       }
 
-      const diffDays = (parseLocalDate(today()) - parseLocalDate(approvalDateStr)) / (1000 * 60 * 60 * 24);
+      const diffDays =
+        (parseLocalDate(today()) - parseLocalDate(approvalDateStr)) /
+        (1000 * 60 * 60 * 24);
       if (diffDays >= 7) {
-        console.log(`[Auto-Ack] Auto-acknowledging refund for lease ${lease.lease_id} after 7 days.`);
-        
+        console.log(
+          `[Auto-Ack] Auto-acknowledging refund for lease ${lease.lease_id} after 7 days.`
+        );
+
         const currentBalance = Number(lease.real_deposit_balance || 0);
         const proposedAmount = Number(lease.proposed_refund_amount || 0);
-        const finalStatus = proposedAmount >= currentBalance ? 'refunded' : 'partially_refunded';
+        const finalStatus =
+          proposedAmount >= currentBalance ? 'refunded' : 'partially_refunded';
 
-        await db.query(`UPDATE leases SET deposit_status = ? WHERE lease_id = ?`, [finalStatus, lease.lease_id]);
+        await db.query(
+          `UPDATE leases SET deposit_status = ? WHERE lease_id = ?`,
+          [finalStatus, lease.lease_id]
+        );
 
         try {
           const auditLogger = (await import('./auditLogger.js')).default;
@@ -834,10 +963,17 @@ export const autoAcknowledgeRefunds = async () => {
             userId: null,
             actionType: 'DEPOSIT_REFUND_ACKNOWLEDGED',
             entityId: lease.lease_id,
-            details: { status: finalStatus, amount: proposedAmount, mechanism: 'auto_timeout' },
+            details: {
+              status: finalStatus,
+              amount: proposedAmount,
+              mechanism: 'auto_timeout',
+            },
           });
         } catch (auditErr) {
-          console.error(`Failed to log auto-ack audit for ${lease.lease_id}:`, auditErr);
+          console.error(
+            `Failed to log auto-ack audit for ${lease.lease_id}:`,
+            auditErr
+          );
         }
       }
     }
@@ -873,21 +1009,23 @@ export const escalateOverdueMaintenance = async () => {
         const elapsedHours = (nowTime - createdTime) / (1000 * 60 * 60);
         if (elapsedHours > thresholdHours) {
           const alertMsg = `[SLA BREACH] Maintenance request '${req.title}' for Unit ${req.unit_number} (${req.property_name}) is overdue based on its ${req.priority} priority. Action required.`;
-          
+
           await notificationModel.create({
             userId: req.owner_id,
             message: alertMsg,
             type: 'maintenance',
-            severity: 'urgent'
+            severity: 'urgent',
           });
 
-          const [treasurers] = await db.query(`SELECT user_id FROM users WHERE role = 'treasurer'`);
+          const [treasurers] = await db.query(
+            `SELECT user_id FROM users WHERE role = 'treasurer'`
+          );
           for (const t of treasurers) {
             await notificationModel.create({
               userId: t.user_id,
               message: alertMsg,
               type: 'maintenance',
-              severity: 'urgent'
+              severity: 'urgent',
             });
           }
         }
@@ -925,13 +1063,18 @@ export const runNightlyCron = async (targetDate = null) => {
     await expireDraftLeases();
     await deactivateFormerTenants(executionDate);
     await escalateOverdueMaintenance();
-    
+
     // 5. Refund Operations
     await autoAcknowledgeRefunds();
 
     await logCronExecution('nightly_billing', executionDate, 'success');
   } catch (err) {
-    await logCronExecution('nightly_billing', executionDate, 'failed', err.message);
+    await logCronExecution(
+      'nightly_billing',
+      executionDate,
+      'failed',
+      err.message
+    );
     throw err;
   }
 };
@@ -940,7 +1083,7 @@ export const runNightlyCron = async (targetDate = null) => {
  * Main Entry Point with Backfill Logic
  */
 export const executeNightlyPayload = async () => {
-  await runWithLock('nightly_billing', async () => {
+  await runWithDistributedLock('nightly_billing', async () => {
     // [B5 FIX] BACKFILL LOGIC: Read from cron_checkpoints instead of cron_logs
     const [lastRun] = await db.query(
       "SELECT last_success_date AS execution_date FROM cron_checkpoints WHERE job_name = 'nightly_billing' AND status = 'success' LIMIT 1"

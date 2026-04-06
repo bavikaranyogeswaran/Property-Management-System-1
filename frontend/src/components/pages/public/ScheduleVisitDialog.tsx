@@ -12,7 +12,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
-import { Loader2, Calendar as CalendarIcon, Clock, AlertCircle } from 'lucide-react';
+import {
+  Loader2,
+  Calendar as CalendarIcon,
+  Clock,
+  AlertCircle,
+} from 'lucide-react';
 import apiClient from '@/services/api';
 
 interface Property {
@@ -69,7 +74,9 @@ export function ScheduleVisitDialog({
       const fetchTerms = async () => {
         setFetchingTerms(true);
         try {
-          const response = await apiClient.get(`/properties/${property.id}/lease-terms`);
+          const response = await apiClient.get(
+            `/properties/${property.id}/lease-terms`
+          );
           setLeaseTerms(response.data);
         } catch (e) {
           console.error('Failed to fetch terms', e);
@@ -105,11 +112,13 @@ export function ScheduleVisitDialog({
     const scheduledDateTime = new Date(`${formData.date}T${formData.time}`);
     const now = new Date();
     const twoHoursFromNow = new Date(now.getTime() + 2 * 60 * 60 * 1000);
-    
+
     if (scheduledDateTime < twoHoursFromNow) {
-        toast.error('Visits must be scheduled at least 2 hours in advance. Please select a later time.');
-        setLoading(false);
-        return;
+      toast.error(
+        'Visits must be scheduled at least 2 hours in advance. Please select a later time.'
+      );
+      setLoading(false);
+      return;
     }
 
     try {
@@ -199,8 +208,6 @@ export function ScheduleVisitDialog({
               </div>
             </div>
 
-            
-
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="date">Preferred Date</Label>
@@ -223,7 +230,9 @@ export function ScheduleVisitDialog({
                     required
                     className="w-full h-10 px-3 py-2 border rounded-md text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                     value={formData.time}
-                    onChange={(e) => setFormData(prev => ({ ...prev, time: e.target.value }))}
+                    onChange={(e) =>
+                      setFormData((prev) => ({ ...prev, time: e.target.value }))
+                    }
                   >
                     <option value="">Select a slot</option>
                     {/* Generates slots from 09:00 to 17:00 */}

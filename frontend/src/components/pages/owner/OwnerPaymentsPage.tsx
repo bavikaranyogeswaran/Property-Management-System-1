@@ -126,9 +126,7 @@ export function OwnerPaymentsPage() {
     return sorted.map((payment) => {
       const tenant = tenants.find((t) => t.id === payment.tenantId);
       const invoice = invoices.find((i) => i.id === payment.invoiceId);
-      const unit = invoice
-        ? units.find((u) => u.id === invoice.unitId)
-        : null;
+      const unit = invoice ? units.find((u) => u.id === invoice.unitId) : null;
       const property = unit
         ? properties.find((p) => p.id === unit.propertyId)
         : null;
@@ -146,17 +144,11 @@ export function OwnerPaymentsPage() {
             )}
           </TableCell>
           <TableCell>
-            <div className="text-sm font-medium">
-              {tenant?.name || 'N/A'}
-            </div>
-            <div className="text-xs text-gray-500">
-              {tenant?.email || ''}
-            </div>
+            <div className="text-sm font-medium">{tenant?.name || 'N/A'}</div>
+            <div className="text-xs text-gray-500">{tenant?.email || ''}</div>
           </TableCell>
           <TableCell>
-            <div className="text-sm font-medium">
-              {property?.name || 'N/A'}
-            </div>
+            <div className="text-sm font-medium">{property?.name || 'N/A'}</div>
             <div className="text-xs text-gray-500">
               Unit {unit?.unitNumber || 'N/A'}
             </div>
@@ -184,9 +176,7 @@ export function OwnerPaymentsPage() {
                 {payment.status === 'verified' && (
                   <CheckCircle className="size-3" />
                 )}
-                {payment.status === 'pending' && (
-                  <Clock className="size-3" />
-                )}
+                {payment.status === 'pending' && <Clock className="size-3" />}
                 {payment.status === 'rejected' && (
                   <XCircle className="size-3" />
                 )}

@@ -19,7 +19,9 @@ class UnitController {
           return res.status(404).json({ error: 'Property not found' });
         }
         if (String(property.ownerId) !== String(req.user.id)) {
-          return res.status(403).json({ error: 'You do not own this property' });
+          return res
+            .status(403)
+            .json({ error: 'You do not own this property' });
         }
       }
 
@@ -83,7 +85,9 @@ class UnitController {
       if (req.user.role === 'owner') {
         const property = await propertyModel.findById(unit.propertyId);
         if (!property || String(property.ownerId) !== String(req.user.id)) {
-          return res.status(403).json({ error: 'You do not own the property associated with this unit.' });
+          return res.status(403).json({
+            error: 'You do not own the property associated with this unit.',
+          });
         }
       }
 
@@ -108,16 +112,21 @@ class UnitController {
       if (req.user.role === 'owner') {
         const property = await propertyModel.findById(unit.propertyId);
         if (!property || String(property.ownerId) !== String(req.user.id)) {
-          return res.status(403).json({ error: 'You do not own the property associated with this unit.' });
+          return res.status(403).json({
+            error: 'You do not own the property associated with this unit.',
+          });
         }
       }
 
       // 2. Lease check: Block if any active or pending leases exist
       const leaseModel = (await import('../models/leaseModel.js')).default;
-      const activeLeaseCount = await leaseModel.countActiveByUnitId(req.params.id);
+      const activeLeaseCount = await leaseModel.countActiveByUnitId(
+        req.params.id
+      );
       if (activeLeaseCount > 0) {
-        return res.status(400).json({ 
-          error: 'Cannot archive unit with active or pending leases. Please terminate or finish leases first.' 
+        return res.status(400).json({
+          error:
+            'Cannot archive unit with active or pending leases. Please terminate or finish leases first.',
         });
       }
 
@@ -145,23 +154,35 @@ class UnitController {
       if (req.user.role === 'owner') {
         const property = await propertyModel.findById(unit.propertyId);
         if (!property || String(property.ownerId) !== String(req.user.id)) {
-          return res.status(403).json({ error: 'You do not own the property associated with this unit.' });
+          return res.status(403).json({
+            error: 'You do not own the property associated with this unit.',
+          });
         }
       }
 
       if (unit.status !== 'maintenance') {
-        return res.status(400).json({ error: `Unit is currently '${unit.status}', not 'maintenance'. Only maintenance units can be marked available.` });
+        return res.status(400).json({
+          error: `Unit is currently '${unit.status}', not 'maintenance'. Only maintenance units can be marked available.`,
+        });
       }
 
       // Safety: ensure no active lease is running on this unit
       const leaseModel = (await import('../models/leaseModel.js')).default;
-      const activeLeaseCount = await leaseModel.countActiveByUnitId(req.params.id);
+      const activeLeaseCount = await leaseModel.countActiveByUnitId(
+        req.params.id
+      );
       if (activeLeaseCount > 0) {
-        return res.status(409).json({ error: 'Cannot mark unit as available — it still has an active lease.' });
+        return res.status(409).json({
+          error:
+            'Cannot mark unit as available — it still has an active lease.',
+        });
       }
 
       await unitModel.update(req.params.id, { status: 'available' });
-      res.json({ message: 'Unit marked as available successfully', unitId: req.params.id });
+      res.json({
+        message: 'Unit marked as available successfully',
+        unitId: req.params.id,
+      });
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
@@ -176,29 +197,42 @@ class UnitController {
       if (req.user.role === 'owner') {
         const property = await propertyModel.findById(unit.propertyId);
         if (!property || String(property.ownerId) !== String(req.user.id)) {
-          return res.status(403).json({ error: 'You do not own the property associated with this unit.' });
+          return res.status(403).json({
+            error: 'You do not own the property associated with this unit.',
+          });
         }
       } else if (req.user.role === 'treasurer') {
-         const staffModel = (await import('../models/staffModel.js')).default;
-         const isAssigned = await staffModel.isStaffAssignedToProperty(req.user.id, unit.propertyId);
-         if (!isAssigned) {
-             return res.status(403).json({ error: 'You are not assigned to manage this property.' });
-         }
+        const staffModel = (await import('../models/staffModel.js')).default;
+        const isAssigned = await staffModel.isStaffAssignedToProperty(
+          req.user.id,
+          unit.propertyId
+        );
+        if (!isAssigned) {
+          return res
+            .status(403)
+            .json({ error: 'You are not assigned to manage this property.' });
+        }
       }
 
       // Check if it's actually locked
       if (unit.isTurnoverCleared && unit.status !== 'maintenance') {
-        return res.status(400).json({ error: 'Unit does not have a pending turnover clearance.' });
+        return res
+          .status(400)
+          .json({ error: 'Unit does not have a pending turnover clearance.' });
       }
 
-      await unitModel.update(req.params.id, { 
+      await unitModel.update(req.params.id, {
         isTurnoverCleared: true,
-        status: (unit.futureLeaseCount > 0 || unit.pendingApplicationsCount > 0) ? 'reserved' : 'available'
+        status:
+          unit.futureLeaseCount > 0 || unit.pendingApplicationsCount > 0
+            ? 'reserved'
+            : 'available',
       });
 
-      res.json({ 
-        message: 'Turnover cleared successfully. Unit is now ready for the next occupancy.', 
-        unitId: req.params.id 
+      res.json({
+        message:
+          'Turnover cleared successfully. Unit is now ready for the next occupancy.',
+        unitId: req.params.id,
       });
     } catch (error) {
       res.status(500).json({ error: error.message });

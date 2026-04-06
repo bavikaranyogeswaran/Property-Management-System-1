@@ -16,7 +16,12 @@ interface RefundDialogProps {
   leaseId: string | null;
   type: 'request' | 'approve' | 'dispute';
   onClose: () => void;
-  onSubmit: (leaseId: string, amount: number, notes: string, type: 'request' | 'approve' | 'dispute') => Promise<void>;
+  onSubmit: (
+    leaseId: string,
+    amount: number,
+    notes: string,
+    type: 'request' | 'approve' | 'dispute'
+  ) => Promise<void>;
   leases: Lease[];
 }
 
@@ -25,13 +30,13 @@ export function RefundDialog({
   type,
   onClose,
   onSubmit,
-  leases
+  leases,
 }: RefundDialogProps) {
   const [amount, setAmount] = useState('');
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const lease = leases.find(l => String(l.id) === String(leaseId));
+  const lease = leases.find((l) => String(l.id) === String(leaseId));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,8 +60,11 @@ export function RefundDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <RotateCcw className="size-5 text-orange-600" />
-            {type === 'request' ? 'Request Security Deposit Refund' : 
-             type === 'approve' ? 'Approve Refund Request' : 'Dispute Refund Request'}
+            {type === 'request'
+              ? 'Request Security Deposit Refund'
+              : type === 'approve'
+                ? 'Approve Refund Request'
+                : 'Dispute Refund Request'}
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 pt-4">
@@ -73,18 +81,23 @@ export function RefundDialog({
                 required
               />
               <p className="text-xs text-gray-500 italic">
-                Verified Ledger Balance: LKR {lease?.currentDepositBalance || '0'}
+                Verified Ledger Balance: LKR{' '}
+                {lease?.currentDepositBalance || '0'}
               </p>
             </div>
           )}
-          
+
           <div className="space-y-2">
             <Label htmlFor="refundNotes">
               {type === 'dispute' ? 'Reason for Dispute' : 'Notes / Remarks'}
             </Label>
             <Textarea
               id="refundNotes"
-              placeholder={type === 'dispute' ? 'Explain why part or all of the refund is being disputed...' : 'Optional notes...'}
+              placeholder={
+                type === 'dispute'
+                  ? 'Explain why part or all of the refund is being disputed...'
+                  : 'Optional notes...'
+              }
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               required={type === 'dispute'}
@@ -95,14 +108,22 @@ export function RefundDialog({
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button 
-              type="submit" 
-              className={type === 'dispute' ? 'bg-red-600 hover:bg-red-700' : 'bg-orange-600 hover:bg-orange-700'}
+            <Button
+              type="submit"
+              className={
+                type === 'dispute'
+                  ? 'bg-red-600 hover:bg-red-700'
+                  : 'bg-orange-600 hover:bg-orange-700'
+              }
               disabled={isSubmitting}
             >
-              {isSubmitting ? 'Processing...' : 
-               type === 'request' ? 'Submit Request' : 
-               type === 'approve' ? 'Confirm Approval' : 'Submit Dispute'}
+              {isSubmitting
+                ? 'Processing...'
+                : type === 'request'
+                  ? 'Submit Request'
+                  : type === 'approve'
+                    ? 'Confirm Approval'
+                    : 'Submit Dispute'}
             </Button>
           </div>
         </form>

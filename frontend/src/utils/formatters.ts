@@ -1,4 +1,3 @@
-
 /**
  * Global currency formatters for LKR.
  * All amounts passed should be in dollars/LKR (NOT cents).

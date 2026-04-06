@@ -10,10 +10,15 @@ const MERCHANT_SECRET = (process.env.PAYHERE_SECRET || '').trim();
  * Formula: md5(merchant_id + order_id + amount + currency + md5(secret).toUpperCase()).toUpperCase()
  */
 export const generateCheckoutHash = (orderId, amount, currency = 'LKR') => {
-    const amountFormatted = Number(amount).toFixed(2);
-    const secretHash = crypto.createHash('md5').update(MERCHANT_SECRET).digest('hex').toUpperCase();
-    const hashInput = MERCHANT_ID + orderId + amountFormatted + currency + secretHash;
-    return crypto.createHash('md5').update(hashInput).digest('hex').toUpperCase();
+  const amountFormatted = Number(amount).toFixed(2);
+  const secretHash = crypto
+    .createHash('md5')
+    .update(MERCHANT_SECRET)
+    .digest('hex')
+    .toUpperCase();
+  const hashInput =
+    MERCHANT_ID + orderId + amountFormatted + currency + secretHash;
+  return crypto.createHash('md5').update(hashInput).digest('hex').toUpperCase();
 };
 
 /**
@@ -21,26 +26,41 @@ export const generateCheckoutHash = (orderId, amount, currency = 'LKR') => {
  * Formula: md5(merchant_id + order_id + payhere_amount + payhere_currency + status_code + md5(secret).toUpperCase()).toUpperCase()
  */
 export const validateNotificationHash = (payload) => {
-    const {
-        merchant_id,
-        order_id,
-        payhere_amount,
-        payhere_currency,
-        status_code,
-        md5sig,
-        is_simulation
-    } = payload;
+  const {
+    merchant_id,
+    order_id,
+    payhere_amount,
+    payhere_currency,
+    status_code,
+    md5sig,
+    is_simulation,
+  } = payload;
 
-    // Verify Merchant ID matches our configuration
-    if (merchant_id !== MERCHANT_ID) {
-        console.error(`[PayHereUtils] Merchant ID mismatch. Received: ${merchant_id}, Expected: ${MERCHANT_ID}`);
-        return false;
-    }
+  // Verify Merchant ID matches our configuration
+  if (merchant_id !== MERCHANT_ID) {
+    console.error(
+      `[PayHereUtils] Merchant ID mismatch. Received: ${merchant_id}, Expected: ${MERCHANT_ID}`
+    );
+    return false;
+  }
 
-    const secretHash = crypto.createHash('md5').update(MERCHANT_SECRET || '').digest('hex').toUpperCase();
-    const hashInput = (merchant_id || '') + (order_id || '') + (payhere_amount || '') + (payhere_currency || '') + (status_code || '') + secretHash;
-    const calculatedHash = crypto.createHash('md5').update(hashInput).digest('hex').toUpperCase();
+  const secretHash = crypto
+    .createHash('md5')
+    .update(MERCHANT_SECRET || '')
+    .digest('hex')
+    .toUpperCase();
+  const hashInput =
+    (merchant_id || '') +
+    (order_id || '') +
+    (payhere_amount || '') +
+    (payhere_currency || '') +
+    (status_code || '') +
+    secretHash;
+  const calculatedHash = crypto
+    .createHash('md5')
+    .update(hashInput)
+    .digest('hex')
+    .toUpperCase();
 
-    return calculatedHash === md5sig;
+  return calculatedHash === md5sig;
 };
-

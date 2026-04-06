@@ -235,14 +235,17 @@ class UserController {
       }
       const { userId, propertyId } = req.body;
       await staffModel.assignProperty(userId, propertyId);
-      
+
       const auditLogger = (await import('../utils/auditLogger.js')).default;
-      await auditLogger.log({
-        userId: req.user.id,
-        actionType: 'PROPERTY_ASSIGNED_TO_STAFF',
-        entityId: propertyId,
-        details: { staffUserId: userId }
-      }, req);
+      await auditLogger.log(
+        {
+          userId: req.user.id,
+          actionType: 'PROPERTY_ASSIGNED_TO_STAFF',
+          entityId: propertyId,
+          details: { staffUserId: userId },
+        },
+        req
+      );
 
       res.json({ message: 'Property assigned successfully' });
     } catch (error) {
@@ -256,23 +259,23 @@ class UserController {
   async removeProperty(req, res) {
     try {
       if (req.user.role !== 'owner') {
-        return res
-          .status(403)
-          .json({
-            error:
-              'Access denied. Only Owners can remove property assignments.',
-          });
+        return res.status(403).json({
+          error: 'Access denied. Only Owners can remove property assignments.',
+        });
       }
       const { userId, propertyId } = req.params;
       await staffModel.removePropertyAssignment(userId, propertyId);
-      
+
       const auditLogger = (await import('../utils/auditLogger.js')).default;
-      await auditLogger.log({
-        userId: req.user.id,
-        actionType: 'PROPERTY_REMOVED_FROM_STAFF',
-        entityId: propertyId,
-        details: { staffUserId: userId }
-      }, req);
+      await auditLogger.log(
+        {
+          userId: req.user.id,
+          actionType: 'PROPERTY_REMOVED_FROM_STAFF',
+          entityId: propertyId,
+          details: { staffUserId: userId },
+        },
+        req
+      );
 
       res.json({ message: 'Property assignment removed' });
     } catch (error) {
@@ -303,23 +306,31 @@ class UserController {
   async forceLogout(req, res) {
     try {
       if (req.user.role !== 'owner') {
-        return res.status(403).json({ error: 'Access denied. Only Owners can force logout users.' });
+        return res.status(403).json({
+          error: 'Access denied. Only Owners can force logout users.',
+        });
       }
 
       const { id } = req.params;
       const success = await userService.incrementTokenVersion(id);
-      
+
       if (!success) {
         return res.status(404).json({ error: 'User not found' });
       }
 
       const auditLogger = (await import('../utils/auditLogger.js')).default;
-      await auditLogger.log({
-        userId: req.user.id,
-        actionType: 'SECURITY_FORCE_LOGOUT',
-        entityId: id,
-        details: { targetUserId: id, reason: req.body.reason || 'Administrative action' }
-      }, req);
+      await auditLogger.log(
+        {
+          userId: req.user.id,
+          actionType: 'SECURITY_FORCE_LOGOUT',
+          entityId: id,
+          details: {
+            targetUserId: id,
+            reason: req.body.reason || 'Administrative action',
+          },
+        },
+        req
+      );
 
       res.json({ message: 'User sessions invalidated successfully.' });
     } catch (error) {

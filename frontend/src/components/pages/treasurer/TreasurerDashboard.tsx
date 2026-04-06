@@ -207,7 +207,11 @@ export function TreasurerDashboard() {
               <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
                 <span className="text-sm text-gray-700">Outstanding</span>
                 <span className="text-lg font-semibold text-gray-700">
-                  {formatLKR(expectedMonthlyRevenue - totalVerifiedAmount - totalPendingAmount)}
+                  {formatLKR(
+                    expectedMonthlyRevenue -
+                      totalVerifiedAmount -
+                      totalPendingAmount
+                  )}
                 </span>
               </div>
             </div>
@@ -237,7 +241,9 @@ export function TreasurerDashboard() {
                 {pendingInvoices.length}
               </p>
               <p className="text-xs text-gray-600 mt-1">
-                {formatLKR(pendingInvoices.reduce((sum, i) => sum + i.amount, 0))}
+                {formatLKR(
+                  pendingInvoices.reduce((sum, i) => sum + i.amount, 0)
+                )}
               </p>
             </div>
             <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">

@@ -1,14 +1,20 @@
 import React from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { 
-  CheckCircle2, 
+import {
+  CheckCircle2,
   ArrowRight,
   ShieldCheck,
   LayoutDashboard,
-  Receipt
+  Receipt,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardFooter,
+} from '@/components/ui/card';
 import { useAuth } from '@/app/context/AuthContext';
 import { useFinancial } from '@/app/context/FinancialContext';
 import { useEffect } from 'react';
@@ -23,7 +29,7 @@ export default function PaymentSuccessPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { refreshData } = useFinancial();
-  
+
   // Refresh data on mount to ensure dashboard shows "Paid" instead of "Overdue"
   useEffect(() => {
     if (user) {
@@ -31,7 +37,6 @@ export default function PaymentSuccessPage() {
     }
   }, [user, refreshData]);
 
-  
   // Potential tokens from URL (sent by PayHere or our Simulator)
   const token = searchParams.get('token');
   const orderId = searchParams.get('order_id');
@@ -40,7 +45,7 @@ export default function PaymentSuccessPage() {
   const handleReturnAction = () => {
     // [ONBOARDING FIX] Check for guest token first to redirect to status tracker
     const guestToken = localStorage.getItem('guestToken') || token;
-    
+
     if (guestToken && !user) {
       navigate(`/onboarding/${guestToken}`);
       return;
@@ -60,7 +65,7 @@ export default function PaymentSuccessPage() {
       <div className="w-full max-w-md animate-in fade-in zoom-in duration-500 scale-in-95">
         <Card className="border-none shadow-[0_20px_50px_rgba(0,0,0,0.1)] rounded-3xl overflow-hidden bg-white">
           <div className="h-2 bg-green-500 w-full" />
-          
+
           <CardHeader className="text-center pt-10 pb-4">
             <div className="flex justify-center mb-6">
               <div className="w-24 h-24 bg-green-50 rounded-full flex items-center justify-center ring-4 ring-green-50/50 animate-bounce">
@@ -77,34 +82,37 @@ export default function PaymentSuccessPage() {
 
           <CardContent className="px-8 pb-8 space-y-4">
             <div className="bg-slate-50 border border-slate-100 rounded-2xl p-6 flex flex-col items-center text-center">
-                <span className="text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-1">
-                  Confirmation Code
-                </span>
-                <span className="text-sm font-mono font-bold text-slate-700 break-all">
-                  {orderId || 'PMS-AUTO-' + Date.now().toString().slice(-6)}
-                </span>
+              <span className="text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-1">
+                Confirmation Code
+              </span>
+              <span className="text-sm font-mono font-bold text-slate-700 break-all">
+                {orderId || 'PMS-AUTO-' + Date.now().toString().slice(-6)}
+              </span>
             </div>
 
             <div className="flex items-start gap-3 p-4 bg-blue-50/50 rounded-xl border border-blue-50">
-               <ShieldCheck className="w-5 h-5 text-blue-500 mt-0.5 shrink-0" />
-               <p className="text-xs text-blue-800/80 leading-relaxed font-medium">
-                  An automated receipt and confirmation email have been sent to your registered address for your records.
-               </p>
+              <ShieldCheck className="w-5 h-5 text-blue-500 mt-0.5 shrink-0" />
+              <p className="text-xs text-blue-800/80 leading-relaxed font-medium">
+                An automated receipt and confirmation email have been sent to
+                your registered address for your records.
+              </p>
             </div>
           </CardContent>
 
           <CardFooter className="flex flex-col gap-3 p-8 pt-0">
-            <Button 
+            <Button
               onClick={handleReturnAction}
               className="w-full h-12 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl shadow-lg shadow-green-100 transition-all flex items-center justify-center gap-2"
             >
               <LayoutDashboard className="w-5 h-5" />
-              {user?.role === 'tenant' ? 'Go to My Invoices' : 'Go to Dashboard'}
+              {user?.role === 'tenant'
+                ? 'Go to My Invoices'
+                : 'Go to Dashboard'}
               <ArrowRight className="w-4 h-4 ml-1 opacity-50" />
             </Button>
-            
-            <Button 
-              variant="ghost" 
+
+            <Button
+              variant="ghost"
               onClick={() => navigate('/receipts')}
               className="w-full text-slate-500 hover:text-slate-800 hover:bg-slate-50 font-medium"
             >

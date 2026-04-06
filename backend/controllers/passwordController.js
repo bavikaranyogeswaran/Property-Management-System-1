@@ -55,8 +55,10 @@ class PasswordController {
       // For now, keep it here or create a service method
       // Actually, since this is "authenticated" change, moving it to authService is cleaner too.
       // But for simplicity of this specific task, let's just use the userModel.
-      
-      const user = await (await import('../models/userModel.js')).default.findById(userId);
+
+      const user = await (
+        await import('../models/userModel.js')
+      ).default.findById(userId);
       if (!user) {
         return res.status(404).json({ error: 'User not found' });
       }
@@ -74,7 +76,9 @@ class PasswordController {
       const salt = await bcrypt.genSalt(10);
       const passwordHash = await bcrypt.hash(newPassword, salt);
 
-      await (await import('../models/userModel.js')).default.updatePassword(userId, passwordHash);
+      await (
+        await import('../models/userModel.js')
+      ).default.updatePassword(userId, passwordHash);
 
       res.json({ message: 'Password updated successfully' });
     } catch (error) {

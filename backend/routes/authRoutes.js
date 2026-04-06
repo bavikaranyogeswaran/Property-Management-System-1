@@ -19,14 +19,21 @@ import {
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 mins
   max: 10, // 10 attempts
-  message: { error: 'Too many login attempts. Please try again after 15 minutes.' },
+  message: {
+    error: 'Too many login attempts. Please try again after 15 minutes.',
+  },
   standardHeaders: true,
   legacyHeaders: false,
 });
 
 import upload from '../middleware/upload.js';
 
-router.post('/login', loginLimiter, validateRequest(loginSchema), authController.login);
+router.post(
+  '/login',
+  loginLimiter,
+  validateRequest(loginSchema),
+  authController.login
+);
 router.post(
   '/verify-email',
   validateRequest(verifyEmailSchema),

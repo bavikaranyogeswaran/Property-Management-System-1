@@ -18,7 +18,7 @@ const extractPublicId = (url) => {
   const parts = url.split('/');
   const uploadIndex = parts.indexOf('upload');
   if (uploadIndex === -1) return null;
-  
+
   // Public ID starts after the version (v12345)
   // Everything after upload/v... until the last dot
   const publicIdWithExt = parts.slice(uploadIndex + 2).join('/');
@@ -63,10 +63,15 @@ class ImageController {
       }));
 
       // If any new image is primary, clear existing ones first
-      const hasNewPrimary = images.some(img => img.isPrimary);
+      const hasNewPrimary = images.some((img) => img.isPrimary);
       if (hasNewPrimary) {
         // Direct update to FALSE is safer/easier here
-        await (await import('../config/db.js')).default.query('UPDATE property_images SET is_primary = FALSE WHERE property_id = ?', [propertyId]);
+        await (
+          await import('../config/db.js')
+        ).default.query(
+          'UPDATE property_images SET is_primary = FALSE WHERE property_id = ?',
+          [propertyId]
+        );
       }
 
       await propertyImageModel.createMultiple(propertyId, images);
@@ -123,13 +128,15 @@ class ImageController {
   async deletePropertyImage(req, res) {
     try {
       const { imageId } = req.params;
-      
+
       // Get image details first to get the URL
-      const [rows] = await (await import('../config/db.js')).default.query(
-          'SELECT image_url FROM property_images WHERE image_id = ?',
-          [imageId]
+      const [rows] = await (
+        await import('../config/db.js')
+      ).default.query(
+        'SELECT image_url FROM property_images WHERE image_id = ?',
+        [imageId]
       );
-      
+
       const imageUrl = rows[0]?.image_url;
       const success = await propertyImageModel.deleteById(imageId);
 
@@ -144,7 +151,10 @@ class ImageController {
           await cloudinary.uploader.destroy(publicId);
           console.log(`Cloudinary asset deleted: ${publicId}`);
         } catch (cloudinaryErr) {
-          console.error(`Failed to delete Cloudinary asset ${publicId}:`, cloudinaryErr);
+          console.error(
+            `Failed to delete Cloudinary asset ${publicId}:`,
+            cloudinaryErr
+          );
         }
       }
 
@@ -179,9 +189,14 @@ class ImageController {
       }));
 
       // If any new image is primary, clear existing ones first
-      const hasNewPrimary = images.some(img => img.isPrimary);
+      const hasNewPrimary = images.some((img) => img.isPrimary);
       if (hasNewPrimary) {
-        await (await import('../config/db.js')).default.query('UPDATE unit_images SET is_primary = FALSE WHERE unit_id = ?', [unitId]);
+        await (
+          await import('../config/db.js')
+        ).default.query(
+          'UPDATE unit_images SET is_primary = FALSE WHERE unit_id = ?',
+          [unitId]
+        );
       }
 
       await unitImageModel.createMultiple(unitId, images);
@@ -237,11 +252,12 @@ class ImageController {
       const { imageId } = req.params;
 
       // Get image details first to get the URL
-      const [rows] = await (await import('../config/db.js')).default.query(
-          'SELECT image_url FROM unit_images WHERE image_id = ?',
-          [imageId]
-      );
-      
+      const [rows] = await (
+        await import('../config/db.js')
+      ).default.query('SELECT image_url FROM unit_images WHERE image_id = ?', [
+        imageId,
+      ]);
+
       const imageUrl = rows[0]?.image_url;
       const success = await unitImageModel.deleteById(imageId);
 
@@ -256,7 +272,10 @@ class ImageController {
           await cloudinary.uploader.destroy(publicId);
           console.log(`Cloudinary asset deleted: ${publicId}`);
         } catch (cloudinaryErr) {
-          console.error(`Failed to delete Cloudinary asset ${publicId}:`, cloudinaryErr);
+          console.error(
+            `Failed to delete Cloudinary asset ${publicId}:`,
+            cloudinaryErr
+          );
         }
       }
 

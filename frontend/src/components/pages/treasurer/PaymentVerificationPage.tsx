@@ -50,7 +50,9 @@ export function PaymentVerificationPage() {
     {
       label: 'Pending Verification',
       value: pendingPayments.length,
-      subtitle: formatLKR(pendingPayments.reduce((sum, p) => sum + p.amount, 0)),
+      subtitle: formatLKR(
+        pendingPayments.reduce((sum, p) => sum + p.amount, 0)
+      ),
       color: 'bg-orange-50 text-orange-700',
     },
     {
@@ -63,7 +65,9 @@ export function PaymentVerificationPage() {
     {
       label: 'Total Verified',
       value: verifiedPayments.length,
-      subtitle: formatLKR(verifiedPayments.reduce((sum, p) => sum + p.amount, 0)),
+      subtitle: formatLKR(
+        verifiedPayments.reduce((sum, p) => sum + p.amount, 0)
+      ),
       color: 'bg-blue-50 text-blue-700',
     },
     {
@@ -77,9 +81,15 @@ export function PaymentVerificationPage() {
     const payment = payments.find((p) => p.id === selectedPayment);
     if (!payment) return null;
 
-    const invoice = invoices.find((i) => String(i.id) === String(payment.invoiceId));
-    const tenant = tenants.find((t) => String(t.id) === String(payment.tenantId));
-    const unit = invoice ? units.find((u) => String(u.id) === String(invoice.unitId)) : null;
+    const invoice = invoices.find(
+      (i) => String(i.id) === String(payment.invoiceId)
+    );
+    const tenant = tenants.find(
+      (t) => String(t.id) === String(payment.tenantId)
+    );
+    const unit = invoice
+      ? units.find((u) => String(u.id) === String(invoice.unitId))
+      : null;
     const property = unit
       ? properties.find((p) => String(p.id) === String(unit.propertyId))
       : null;
@@ -106,7 +116,9 @@ export function PaymentVerificationPage() {
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Amount</p>
-                  <p className="text-lg font-semibold">{formatLKR(payment.amount)}</p>
+                  <p className="text-lg font-semibold">
+                    {formatLKR(payment.amount)}
+                  </p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Payment Method</p>
@@ -136,7 +148,8 @@ export function PaymentVerificationPage() {
                     variant="outline"
                     className="w-full bg-white hover:bg-blue-50 text-blue-700 border-blue-200"
                     onClick={() => {
-                      if (payment.proofUrl) window.open(payment.proofUrl, '_blank');
+                      if (payment.proofUrl)
+                        window.open(payment.proofUrl, '_blank');
                     }}
                   >
                     <ExternalLink className="size-4 mr-2" />
@@ -298,7 +311,9 @@ export function PaymentVerificationPage() {
               </TableHeader>
               <TableBody>
                 {pendingPayments.map((payment) => {
-                  const tenant = tenants.find((t) => String(t.id) === String(payment.tenantId));
+                  const tenant = tenants.find(
+                    (t) => String(t.id) === String(payment.tenantId)
+                  );
                   const invoice = invoices.find(
                     (i) => String(i.id) === String(payment.invoiceId)
                   );
@@ -306,7 +321,9 @@ export function PaymentVerificationPage() {
                     ? units.find((u) => String(u.id) === String(invoice.unitId))
                     : null;
                   const property = unit
-                    ? properties.find((p) => String(p.id) === String(unit.propertyId))
+                    ? properties.find(
+                        (p) => String(p.id) === String(unit.propertyId)
+                      )
                     : null;
 
                   return (

@@ -1,4 +1,3 @@
-
 import visitService from '../services/visitService.js';
 
 class VisitController {
@@ -16,12 +15,12 @@ class VisitController {
       });
     } catch (error) {
       console.error('Error scheduling visit:', error);
-      const isBusinessError = 
-        error.message.includes('Missing') || 
-        error.message.includes('booked') || 
-        error.message.includes('not available') || 
+      const isBusinessError =
+        error.message.includes('Missing') ||
+        error.message.includes('booked') ||
+        error.message.includes('not available') ||
         error.message.includes('advance');
-        
+
       if (isBusinessError) {
         return res.status(400).json({ error: error.message });
       }
@@ -64,10 +63,10 @@ class VisitController {
     } catch (error) {
       console.error('Error updating visit status:', error);
       if (error.message.includes('Invalid status')) {
-           return res.status(400).json({ error: error.message });
+        return res.status(400).json({ error: error.message });
       }
       if (error.message.includes('not found')) {
-           return res.status(404).json({ error: 'Visit not found' });
+        return res.status(404).json({ error: 'Visit not found' });
       }
       res.status(500).json({ error: 'Failed to update status' });
     }

@@ -35,7 +35,10 @@ const OwnerPayoutsPage: React.FC = () => {
   };
 
   const handleAcknowledge = async (payoutId: string) => {
-    if (!confirm('Are you sure you want to acknowledge receipt of this payout?')) return;
+    if (
+      !confirm('Are you sure you want to acknowledge receipt of this payout?')
+    )
+      return;
     try {
       setActionLoading(payoutId);
       await payoutApi.acknowledge(payoutId);
@@ -91,8 +94,12 @@ const OwnerPayoutsPage: React.FC = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-semibold text-gray-900">Owner Payouts</h2>
-          <p className="text-sm text-gray-500 mt-1">Manage and reconcile your payouts</p>
+          <h2 className="text-2xl font-semibold text-gray-900">
+            Owner Payouts
+          </h2>
+          <p className="text-sm text-gray-500 mt-1">
+            Manage and reconcile your payouts
+          </p>
         </div>
       </div>
 
@@ -100,11 +107,14 @@ const OwnerPayoutsPage: React.FC = () => {
       <div className="bg-blue-50 border-l-4 border-blue-400 p-4 rounded shadow-sm">
         <div className="flex">
           <div className="flex-shrink-0">
-             <FileText className="h-5 w-5 text-blue-400" />
+            <FileText className="h-5 w-5 text-blue-400" />
           </div>
           <div className="ml-3">
             <p className="text-sm text-blue-700">
-              Payouts are generated and processed by the Treasurer. Once a payout is marked as <strong>Paid</strong>, please verify the transfer in your bank and click <strong>Acknowledge</strong> to confirm receipt.
+              Payouts are generated and processed by the Treasurer. Once a
+              payout is marked as <strong>Paid</strong>, please verify the
+              transfer in your bank and click <strong>Acknowledge</strong> to
+              confirm receipt.
             </p>
           </div>
         </div>
@@ -166,10 +176,10 @@ const OwnerPayoutsPage: React.FC = () => {
                         p.status === 'acknowledged'
                           ? 'bg-green-100 text-green-800'
                           : p.status === 'paid'
-                          ? 'bg-blue-100 text-blue-800'
-                          : p.status === 'disputed'
-                          ? 'bg-red-100 text-red-800'
-                          : 'bg-yellow-100 text-yellow-800'
+                            ? 'bg-blue-100 text-blue-800'
+                            : p.status === 'disputed'
+                              ? 'bg-red-100 text-red-800'
+                              : 'bg-yellow-100 text-yellow-800'
                       }`}
                     >
                       {p.status}
@@ -198,7 +208,7 @@ const OwnerPayoutsPage: React.FC = () => {
                           </button>
                         </>
                       )}
-                       <button
+                      <button
                         onClick={() => setSelectedPayoutId(p.id)}
                         className="p-1 text-blue-600 hover:bg-blue-50 rounded"
                         title="View Reconciliation"
@@ -221,9 +231,9 @@ const OwnerPayoutsPage: React.FC = () => {
         )}
       </div>
 
-      <PayoutDetailModal 
-        payoutId={selectedPayoutId} 
-        onClose={() => setSelectedPayoutId(null)} 
+      <PayoutDetailModal
+        payoutId={selectedPayoutId}
+        onClose={() => setSelectedPayoutId(null)}
       />
     </div>
   );

@@ -20,17 +20,17 @@ class LeaseModel {
       status,
       securityDeposit,
       depositStatus,
-      reservationExpiresInDays // [NEW] Pass days to use DB-native math
+      reservationExpiresInDays, // [NEW] Pass days to use DB-native math
     } = data;
     const dbConn = connection || db;
-    
+
     // [HARDENED] Use SQL-native timestamp math if reservationExpiresInDays is provided
     let expiryExpr = '?';
     let expiryValue = data.reservationExpiresAt || null;
-    
+
     if (reservationExpiresInDays) {
-        expiryExpr = `DATE_ADD(UTC_TIMESTAMP(), INTERVAL ? DAY)`;
-        expiryValue = reservationExpiresInDays;
+      expiryExpr = `DATE_ADD(UTC_TIMESTAMP(), INTERVAL ? DAY)`;
+      expiryValue = reservationExpiresInDays;
     }
 
     const [result] = await dbConn.query(
@@ -89,12 +89,16 @@ class LeaseModel {
       const column = LeaseModel.UPDATE_KEY_MAP[key];
       if (column && data[key] !== undefined) {
         // [HARDENED] Support for SQL-native timestamp updates if needed
-        if (key === 'reservationExpiresAt' && typeof data[key] === 'object' && data[key].sql) {
-            fields.push(`${column} = ${data[key].sql}`);
-            // No value to push for raw SQL fragments
+        if (
+          key === 'reservationExpiresAt' &&
+          typeof data[key] === 'object' &&
+          data[key].sql
+        ) {
+          fields.push(`${column} = ${data[key].sql}`);
+          // No value to push for raw SQL fragments
         } else {
-            fields.push(`${column} = ?`);
-            values.push(data[key]);
+          fields.push(`${column} = ?`);
+          values.push(data[key]);
         }
       }
     });
@@ -130,7 +134,7 @@ class LeaseModel {
       query += ` AND p.owner_id = ?`;
       params.push(ownerId);
     }
-    
+
     if (treasurerId) {
       query += ` AND EXISTS (
         SELECT 1 FROM staff_property_assignments spa 
@@ -174,9 +178,12 @@ class LeaseModel {
    * Use this to prevent concurrent status changes during critical transactions.
    */
   async findByIdForUpdate(id, connection) {
-    if (!connection) throw new Error('findByIdForUpdate requires an active transaction connection.');
+    if (!connection)
+      throw new Error(
+        'findByIdForUpdate requires an active transaction connection.'
+      );
     const [rows] = await connection.query(
-      "SELECT * FROM leases WHERE lease_id = ? FOR UPDATE",
+      'SELECT * FROM leases WHERE lease_id = ? FOR UPDATE',
       [id]
     );
     if (rows.length === 0) return null;
@@ -224,7 +231,13 @@ class LeaseModel {
     return this.mapRows(rows);
   }
 
-  async checkOverlap(unitId, startDate, endDate, excludeLeaseId = null, connection = null) {
+  async checkOverlap(
+    unitId,
+    startDate,
+    endDate,
+    excludeLeaseId = null,
+    connection = null
+  ) {
     const dbConn = connection || db;
     let query = `
             SELECT lease_id FROM leases 
@@ -252,7 +265,7 @@ class LeaseModel {
     );
     return result.affectedRows > 0;
   }
-  
+
   async countActiveByUnitId(unitId, connection = null) {
     const dbConn = connection || db;
     const [rows] = await dbConn.query(
@@ -302,7 +315,7 @@ class LeaseModel {
       targetAmount,
       paidAmount,
       isFullyPaid: paidAmount >= targetAmount,
-      shortfall: Math.max(0, targetAmount - paidAmount)
+      shortfall: Math.max(0, targetAmount - paidAmount),
     };
   }
 
@@ -344,7 +357,7 @@ class LeaseModel {
   // ============================================================================
   //  RENT ADJUSTMENTS (Addendums)
   // ============================================================================
-  
+
   async getEffectiveRent(leaseId, date, connection = null) {
     const dbConn = connection || db;
     const [adjustments] = await dbConn.query(
@@ -353,11 +366,11 @@ class LeaseModel {
        ORDER BY effective_date DESC LIMIT 1`,
       [leaseId, date]
     );
-    
+
     if (adjustments.length > 0) {
       return Number(adjustments[0].new_monthly_rent);
     }
-    
+
     const [leases] = await dbConn.query(
       `SELECT monthly_rent FROM leases WHERE lease_id = ?`,
       [leaseId]
@@ -381,19 +394,19 @@ class LeaseModel {
       `SELECT * FROM lease_rent_adjustments WHERE lease_id = ? ORDER BY effective_date ASC`,
       [leaseId]
     );
-    return rows.map(r => ({
+    return rows.map((r) => ({
       id: r.adjustment_id.toString(),
       leaseId: r.lease_id.toString(),
       effectiveDate: formatToLocalDate(r.effective_date),
       newMonthlyRent: Number(r.new_monthly_rent),
       notes: r.notes,
-      createdAt: r.created_at
+      createdAt: r.created_at,
     }));
   }
-  
+
   /**
    * E5: Automated Rent Escalation
-   * Finds active leases where (start_date + N months) <= targetDate 
+   * Finds active leases where (start_date + N months) <= targetDate
    * AND the escalation hasn't been applied for this cycle yet.
    */
   async findLeasesNeedingEscalation(targetDateString) {
@@ -423,7 +436,7 @@ class LeaseModel {
   async getAdjustments(leaseId, connection = null) {
     const dbConn = connection || db;
     const [rows] = await dbConn.query(
-      "SELECT * FROM lease_rent_adjustments WHERE lease_id = ? ORDER BY effective_date ASC",
+      'SELECT * FROM lease_rent_adjustments WHERE lease_id = ? ORDER BY effective_date ASC',
       [leaseId]
     );
     return rows;

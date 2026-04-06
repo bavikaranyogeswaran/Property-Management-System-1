@@ -10,14 +10,19 @@ export const propertySchema = z.object({
   propertyTypeId: z.number().min(1, 'Property type is required'),
   description: z.string().optional(),
   features: z.array(z.string()).optional(),
-  lateFeePercentage: z.number()
+  lateFeePercentage: z
+    .number()
     .min(0, 'Late fee cannot be negative')
     .max(100, 'Late fee cannot exceed 100%'),
   lateFeeType: z.enum(['flat_percentage', 'daily_fixed']),
   lateFeeAmount: z.number().min(0, 'Amount cannot be negative'),
-  lateFeeGracePeriod: z.number().int()
+  lateFeeGracePeriod: z
+    .number()
+    .int()
     .min(0, 'Grace period cannot be negative'),
-  tenantDeactivationDays: z.number().int()
+  tenantDeactivationDays: z
+    .number()
+    .int()
     .min(0, 'Deactivation days cannot be negative'),
 });
 

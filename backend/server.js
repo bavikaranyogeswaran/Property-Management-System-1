@@ -30,7 +30,12 @@ const PORT = process.env.PORT || 3000;
 //  - Helmet: Puts secure locks on the messages (Security Headers).
 //  - JSON: Translates incoming messages into a language the app matches (JavaScript Objects).
 // ============================================================================
-app.use(cors({ origin: process.env.FRONTEND_URL || 'http://localhost:5173', credentials: true }));
+app.use(
+  cors({
+    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+    credentials: true,
+  })
+);
 app.set('trust proxy', 1);
 app.use(
   helmet({
@@ -39,8 +44,18 @@ app.use(
       directives: {
         ...helmet.contentSecurityPolicy.getDefaultDirectives(),
         'frame-ancestors': ["'self'", 'http://localhost:5173'], // Allow frontend to frame backend content
-        'img-src': ["'self'", 'data:', 'http://localhost:3000', 'https://res.cloudinary.com'],
-        'connect-src': ["'self'", 'http://localhost:3000', 'https://api.cloudinary.com', 'https://res.cloudinary.com'],
+        'img-src': [
+          "'self'",
+          'data:',
+          'http://localhost:3000',
+          'https://res.cloudinary.com',
+        ],
+        'connect-src': [
+          "'self'",
+          'http://localhost:3000',
+          'https://api.cloudinary.com',
+          'https://res.cloudinary.com',
+        ],
       },
     },
   })
@@ -61,7 +76,7 @@ app.use('/api/auth', authLimiter);
 // Increased to 1000 to accommodate multiple dashboard requests
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 1000, 
+  max: 1000,
   message: 'Too many requests from this IP, please try again after 15 minutes',
 });
 app.use('/api', apiLimiter);
@@ -112,19 +127,19 @@ app.get('/api/health', async (req, res) => {
   try {
     // Attempt to query the database to verify connectivity
     await db.query('SELECT 1');
-    res.json({ 
-      status: 'ok', 
-      app: 'up', 
+    res.json({
+      status: 'ok',
+      app: 'up',
       database: 'connected',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
   } catch (error) {
     console.error('[Health Check] Database connection failed:', error.message);
-    res.status(503).json({ 
-      status: 'error', 
-      app: 'up', 
-      database: 'disconnected', 
-      error: error.message 
+    res.status(503).json({
+      status: 'error',
+      app: 'up',
+      database: 'disconnected',
+      error: error.message,
     });
   }
 });
@@ -198,12 +213,8 @@ app.use((err, req, res, next) => {
 //  and then open the doors to listen for requests on the specified Port.
 // ============================================================================
 
-// Cron Jobs (Automated Tasks)
-import initCronJobs from './utils/cronJobs.js';
-
-// Only start the server and cron jobs if not running in a test environment
+// Only start the server if not running in a test environment
 if (process.env.NODE_ENV !== 'test') {
-  initCronJobs();
   app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
   });

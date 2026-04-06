@@ -70,14 +70,14 @@ export function TenantDashboard() {
   // Multi-Unit Logic (E19): Use active lease from context
   const currentLease = leasesFromAuth.find((l) => l.id === activeLeaseId);
 
-  const tenantInvoices = currentLease 
-    ? invoices.filter(i => i.leaseId === currentLease.id)
+  const tenantInvoices = currentLease
+    ? invoices.filter((i) => i.leaseId === currentLease.id)
     : [];
   const pendingInvoices = tenantInvoices.filter((i) => i.status === 'pending');
   const paidInvoices = tenantInvoices.filter((i) => i.status === 'paid');
 
   const tenantPayments = currentLease
-    ? payments.filter(p => p.tenantId === user?.id) // Keep all payments for visibility, or filter by invoice's lease if possible
+    ? payments.filter((p) => p.tenantId === user?.id) // Keep all payments for visibility, or filter by invoice's lease if possible
     : [];
   const pendingPayments = tenantPayments.filter((p) => p.status === 'pending');
   const verifiedPayments = tenantPayments.filter(
@@ -85,7 +85,7 @@ export function TenantDashboard() {
   );
 
   const tenantMaintenanceRequests = currentLease
-    ? maintenanceRequests.filter(r => r.unitId === currentLease.unitId)
+    ? maintenanceRequests.filter((r) => r.unitId === currentLease.unitId)
     : [];
   const openRequests = tenantMaintenanceRequests.filter(
     (r) => r.status === 'submitted' || r.status === 'in_progress'
@@ -204,9 +204,13 @@ export function TenantDashboard() {
         {stats.map((stat, index) => {
           const Icon = stat.icon;
           return (
-            <Card 
-              key={index} 
-              className={(stat as any).onClick ? "cursor-pointer hover:shadow-md transition-shadow" : ""}
+            <Card
+              key={index}
+              className={
+                (stat as any).onClick
+                  ? 'cursor-pointer hover:shadow-md transition-shadow'
+                  : ''
+              }
               onClick={(stat as any).onClick}
             >
               <CardContent className="p-6">
@@ -230,7 +234,7 @@ export function TenantDashboard() {
         })}
 
         {/* Featured Behavior Score Card */}
-        <Card 
+        <Card
           className="lg:col-span-2 cursor-pointer hover:shadow-lg transition-all border-amber-100 bg-gradient-to-br from-amber-50 to-orange-50 overflow-hidden relative group"
           onClick={() => setIsBehaviorOpen(true)}
         >
@@ -240,16 +244,24 @@ export function TenantDashboard() {
           <CardContent className="p-6 relative z-10">
             <div className="flex items-start justify-between">
               <div className="space-y-1">
-                <p className="text-sm font-medium text-amber-800 uppercase tracking-wider">Behavior Profile</p>
+                <p className="text-sm font-medium text-amber-800 uppercase tracking-wider">
+                  Behavior Profile
+                </p>
                 <div className="flex items-baseline gap-2">
-                  <h3 className="text-4xl font-bold text-amber-900">{behaviorSummary ? behaviorSummary.score : '...'}</h3>
+                  <h3 className="text-4xl font-bold text-amber-900">
+                    {behaviorSummary ? behaviorSummary.score : '...'}
+                  </h3>
                   <span className="text-amber-700 font-medium">Points</span>
                 </div>
                 <p className="text-sm text-amber-700 font-semibold mt-2 flex items-center gap-1">
                   <Trophy className="size-4" />
                   Excellent Standing
                 </p>
-                <Button variant="ghost" size="sm" className="mt-4 text-amber-700 hover:text-amber-900 hover:bg-amber-100 p-0 h-auto font-bold flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="mt-4 text-amber-700 hover:text-amber-900 hover:bg-amber-100 p-0 h-auto font-bold flex items-center gap-2"
+                >
                   View Full History & Rules
                   <TrendingUp className="size-4" />
                 </Button>
@@ -284,7 +296,9 @@ export function TenantDashboard() {
                 </p>
                 <p className="text-sm text-red-700">
                   Total amount:{' '}
-                  {formatLKR(overdueInvoices.reduce((sum, inv) => sum + inv.amount, 0))}
+                  {formatLKR(
+                    overdueInvoices.reduce((sum, inv) => sum + inv.amount, 0)
+                  )}
                 </p>
               </div>
             </div>
@@ -400,9 +414,7 @@ export function TenantDashboard() {
           <DialogHeader>
             <DialogTitle>Chat with Property Owner</DialogTitle>
           </DialogHeader>
-          <ChatInterface
-            mode="tenant"
-          />
+          <ChatInterface mode="tenant" />
         </DialogContent>
       </Dialog>
       <Dialog open={isBehaviorOpen} onOpenChange={setIsBehaviorOpen}>

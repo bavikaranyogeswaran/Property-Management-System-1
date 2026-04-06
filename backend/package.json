@@ -13,7 +13,8 @@
     "migrate:rollback": "knex migrate:rollback",
     "migrate:status": "knex migrate:status",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "lint:check": "prettier --check ."
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

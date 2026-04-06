@@ -153,10 +153,10 @@ class TenantModel {
 
     const newScore = Math.min(100, Math.max(0, currentScore + scoreChange));
 
-    await db.query(
-      'UPDATE tenants SET behavior_score = ? WHERE user_id = ?',
-      [newScore, userId]
-    );
+    await db.query('UPDATE tenants SET behavior_score = ? WHERE user_id = ?', [
+      newScore,
+      userId,
+    ]);
     return newScore;
   }
 

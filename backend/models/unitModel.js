@@ -225,7 +225,10 @@ class UnitModel {
       let status = row.status;
       if (row.active_lease_count > 0) {
         status = 'occupied';
-      } else if (row.pending_application_count > 0 || row.future_lease_count > 0) {
+      } else if (
+        row.pending_application_count > 0 ||
+        row.future_lease_count > 0
+      ) {
         status = 'reserved';
       }
 
@@ -245,7 +248,6 @@ class UnitModel {
       };
     });
   }
-
 
   async updateImageUrl(unitId, imageUrl, connection = null) {
     const dbConn = connection || db;
@@ -327,14 +329,14 @@ class UnitModel {
 
     // Transform string vacancies back into array mapping Report Service expectations
     const propertyStats = {};
-    rows.forEach(row => {
+    rows.forEach((row) => {
       propertyStats[row.propertyName] = {
         total: row.total,
         occupied: row.occupied,
-        vacancies: row.vacancies ? row.vacancies.split(',') : []
-      }
+        vacancies: row.vacancies ? row.vacancies.split(',') : [],
+      };
     });
-    
+
     return propertyStats;
   }
 }

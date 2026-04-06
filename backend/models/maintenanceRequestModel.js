@@ -190,7 +190,8 @@ class MaintenanceRequestModel {
 
   //  CREATE REQUEST: Writing down a new complaint card.
   async create(data) {
-    const { unitId, tenantId, title, description, priority, category, images } = data;
+    const { unitId, tenantId, title, description, priority, category, images } =
+      data;
 
     const connection = await pool.getConnection();
     try {
@@ -260,7 +261,7 @@ class MaintenanceRequestModel {
 
   async findRecentDuplicate(unitId, tenantId, title, description) {
     // [HARDENED ANTI-SPAM] Check for EXACT Title + Description match within last 5 minutes
-    // This allows different issues (different descriptions) with the same title, 
+    // This allows different issues (different descriptions) with the same title,
     // but prevents accidental double-clicks or identical spam.
     const [rows] = await pool.query(
       `SELECT request_id FROM maintenance_requests 

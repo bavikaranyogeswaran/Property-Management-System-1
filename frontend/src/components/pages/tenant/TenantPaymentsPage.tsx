@@ -54,7 +54,7 @@ export function TenantPaymentsPage() {
 
   const tenantPayments = currentLease
     ? payments.filter((p) => {
-        const inv = invoices.find(i => i.id === p.invoiceId);
+        const inv = invoices.find((i) => i.id === p.invoiceId);
         return inv?.leaseId === currentLease.id;
       })
     : [];
@@ -131,7 +131,9 @@ export function TenantPaymentsPage() {
             </div>
           </div>
         </TableCell>
-        <TableCell className="font-semibold">{formatLKR(payment.amount)}</TableCell>
+        <TableCell className="font-semibold">
+          {formatLKR(payment.amount)}
+        </TableCell>
         <TableCell>
           <div className="text-sm">
             <div className="font-medium">{payment.paymentMethod}</div>
