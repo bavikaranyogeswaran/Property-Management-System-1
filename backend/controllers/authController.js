@@ -6,52 +6,37 @@
 // ============================================================================
 
 import authService from '../services/authService.js';
+import catchAsync from '../utils/catchAsync.js';
 import { validatePassword, validateEmail } from '../utils/validators.js';
+import AppError from '../utils/AppError.js';
 
 class AuthController {
   //  LOGIN: Checks email & password. If correct, gives a digital "Key" (Token).
-  async login(req, res) {
-    try {
-      const { email, password } = req.body;
+  login = catchAsync(async (req, res, next) => {
+    const { email, password } = req.body;
+    const result = await authService.login(email, password);
+    res.json(result);
+  });
 
-      const result = await authService.login(email, password);
-      res.json(result);
-    } catch (error) {
-      res.status(401).json({ error: error.message });
+  verifyEmail = catchAsync(async (req, res, next) => {
+    const { token } = req.body;
+    const result = await authService.verifyEmail(token);
+    res.json(result);
+  });
+
+  setupPassword = catchAsync(async (req, res, next) => {
+    const { token, password, tenantData: initialTenantData } = req.body;
+    let tenantData = initialTenantData;
+
+    // If a file was uploaded, add its path to tenantData
+    if (req.file) {
+      tenantData = tenantData || {};
+      tenantData.nicUrl = req.file.path || req.file.secure_url;
     }
-  }
-  async verifyEmail(req, res) {
-    try {
-      const { token } = req.body;
 
-      const result = await authService.verifyEmail(token);
-      res.json(result);
-    } catch (error) {
-      res.status(400).json({ error: error.message });
-    }
-  }
-
-  async setupPassword(req, res) {
-    try {
-      const { token, password, tenantData: initialTenantData } = req.body;
-      let tenantData = initialTenantData;
-
-      // If a file was uploaded, add its path to tenantData
-      if (req.file) {
-        tenantData = tenantData || {};
-        tenantData.nicUrl = req.file.path || req.file.secure_url;
-      }
-
-      const result = await authService.setupPassword(
-        token,
-        password,
-        tenantData
-      );
-      res.json(result);
-    } catch (error) {
-      res.status(400).json({ error: error.message });
-    }
-  }
+    const result = await authService.setupPassword(token, password, tenantData);
+    res.json(result);
+  });
 }
 
 export default new AuthController();

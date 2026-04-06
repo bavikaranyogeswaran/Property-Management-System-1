@@ -13,12 +13,23 @@ import helmet from 'helmet';
 import { apiLimiter, publicPortalLimiter } from './utils/rateLimiters.js';
 import { config, validateConfig } from './config/config.js';
 import initCronJobs from './utils/cronJobs.js';
+import globalErrorHandler from './controllers/errorController.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import db from './config/db.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// 1. Monitor for Uncaught Exceptions (e.g., Reference Errors)
+process.on('uncaughtException', (err) => {
+  logger.error('UNCAUGHT EXCEPTION! 💥 Shutting down...', {
+    name: err.name,
+    message: err.message,
+    stack: err.stack,
+  });
+  process.exit(1);
+});
 
 // Validate Configuration on Startup (Fail Fast)
 validateConfig();
@@ -166,35 +177,12 @@ app.use('/api/audit-logs', auditRoutes);
 app.use('/api', imageRoutes);
 
 // ============================================================================
-//  ERROR HANDLING (The Complaint Department)
+//  GLOBAL ERROR MANAGEMENT (The Security Escort)
 // ============================================================================
-//  If something goes wrong (file too big, database error), this section
-//  catches the problem and sends a clear error message back to the user.
+//  All errors are funneled here to ensure consistent responses and
+//  prevent sensitive data (stack traces) from leaking in production.
 // ============================================================================
-app.use((err, req, res, next) => {
-  if (process.env.NODE_ENV !== 'production') {
-    console.error(err.stack);
-  }
-
-  if (err.code === 'LIMIT_FILE_SIZE') {
-    return res
-      .status(413)
-      .json({ error: 'File too large. Maximum size is 5MB.' });
-  }
-
-  if (err.message === 'Only image files are allowed') {
-    return res.status(400).json({ error: err.message });
-  }
-
-  if (err.code === 'ER_DUP_ENTRY') {
-    return res.status(409).json({ error: 'Duplicate entry' });
-  }
-
-  res.status(500).json({
-    error: err.message || 'Something went wrong!',
-    ...(process.env.NODE_ENV !== 'production' && { stack: err.stack }),
-  });
-});
+app.use(globalErrorHandler);
 
 // ============================================================================
 //  START SERVER (Opening the Doors)
@@ -204,11 +192,23 @@ app.use((err, req, res, next) => {
 // ============================================================================
 
 // Only start the server if not running in a test environment
-if (process.env.NODE_ENV !== 'test') {
-  app.listen(PORT, () => {
+if (config.env !== 'test') {
+  const server = app.listen(PORT, () => {
     logger.info(`Server is running on port ${PORT}`, {
       port: PORT,
-      env: process.env.NODE_ENV || 'development',
+      env: config.env,
+    });
+  });
+
+  // 2. Monitor for Unhandled Rejections (e.g., Database connection failures)
+  process.on('unhandledRejection', (err) => {
+    logger.error('UNHANDLED REJECTION! 💥 Shutting down...', {
+      name: err.name,
+      message: err.message,
+      stack: err.stack,
+    });
+    server.close(() => {
+      process.exit(1);
     });
   });
 }
