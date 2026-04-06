@@ -39,10 +39,13 @@ export const cleanupRequestAssets = async (req) => {
 
     if (assetsToDelete.length === 0) return;
 
-    logger.info(`[Asset Cleanup] Identified ${assetsToDelete.length} orphaned assets to remove.`, {
-      path: req.originalUrl,
-      public_ids: assetsToDelete,
-    });
+    logger.info(
+      `[Asset Cleanup] Identified ${assetsToDelete.length} orphaned assets to remove.`,
+      {
+        path: req.originalUrl,
+        public_ids: assetsToDelete,
+      }
+    );
 
     // Fire-and-forget deletion to not block the error response
     // But still log the outcome for auditability
@@ -52,15 +55,24 @@ export const cleanupRequestAssets = async (req) => {
           if (result.result === 'ok') {
             logger.info(`[Asset Cleanup] Successfully deleted: ${publicId}`);
           } else {
-            logger.warn(`[Asset Cleanup] Deletion result NOT 'ok' for ${publicId}:`, result);
+            logger.warn(
+              `[Asset Cleanup] Deletion result NOT 'ok' for ${publicId}:`,
+              result
+            );
           }
         })
       )
     ).catch((err) => {
-      logger.error('[Asset Cleanup] Fatal error during batch deletion:', err.message);
+      logger.error(
+        '[Asset Cleanup] Fatal error during batch deletion:',
+        err.message
+      );
     });
   } catch (error) {
-    logger.error('[Asset Cleanup] Critical failure in cleanup logic:', error.message);
+    logger.error(
+      '[Asset Cleanup] Critical failure in cleanup logic:',
+      error.message
+    );
   }
 };
 
