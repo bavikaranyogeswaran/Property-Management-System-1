@@ -40,6 +40,9 @@ jobs:
       - name: Check formatting (Prettier)
         run: npm run lint:check
 
+      - name: Security Audit (NPM)
+        run: npm audit --omit=dev --audit-level=high
+
       - name: Wait for Database
         run: |
           echo "Waiting for MySQL to be ready..."
@@ -102,6 +105,9 @@ jobs:
 
       - name: Check formatting (Prettier)
         run: npm run lint:check
+
+      - name: Security Audit (NPM)
+        run: npm audit --omit=dev --audit-level=high
 
       - name: Build production bundle
         run: npm run build
