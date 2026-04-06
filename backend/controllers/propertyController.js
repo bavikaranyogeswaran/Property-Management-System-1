@@ -8,152 +8,112 @@
 import propertyService from '../services/propertyService.js';
 import propertyModel from '../models/propertyModel.js';
 import leaseTermModel from '../models/leaseTermModel.js';
+import catchAsync from '../utils/catchAsync.js';
+import AppError from '../utils/AppError.js';
 
 class PropertyController {
   //  ADD PROPERTY: Owner registers a new building into the system.
-  async createProperty(req, res) {
-    try {
-      // Owner ID from authenticated user (assuming owner role verification in middleware)
-      const ownerId = req.user.id;
-      const property = await propertyService.createProperty({
-        ...req.body,
-        ownerId,
-      });
-      res.status(201).json(property);
-    } catch (error) {
-      res.status(500).json({ error: error.message });
-    }
-  }
+  createProperty = catchAsync(async (req, res, next) => {
+    // Owner ID from authenticated user (assuming owner role verification in middleware)
+    const ownerId = req.user.id;
+    const property = await propertyService.createProperty({
+      ...req.body,
+      ownerId,
+    });
+    res.status(201).json(property);
+  });
 
   //  LIST PROPERTIES: Shows all the buildings we manage.
   //  - Public: Shows available units to potential tenants.
   //  - Owner: Shows all their assets.
-  async getProperties(req, res) {
-    try {
-      // Check if user is authenticated (req.user exists)
-      // If authenticated, we *could* filter by owner, but the current requirement seems to be
-      // "Show all properties" on the main page, or maybe "Show Owner's properties" in dashboard.
-      // The route is currently PUBLIC in `propertyRoutes.js`.
-      // Let's pass `null` or handle it based on role if needed.
-      // For now, to match the previous logic but safely:
+  getProperties = catchAsync(async (req, res, next) => {
+    const userId = req.user ? req.user.id : null;
+    const isPublic = req.query.public === 'true';
 
-      const userId = req.user ? req.user.id : null;
-      const isPublic = req.query.public === 'true';
-
-      let properties;
-      if (!isPublic && req.user && req.user.role === 'treasurer') {
-        // Treasurer sees only assigned properties (unless browsing public)
-        const staffModel = (await import('../models/staffModel.js')).default;
-        properties = await staffModel.getAssignedProperties(req.user.id);
-      } else if (!isPublic && req.user && req.user.role === 'owner') {
-        // Owner sees only their own properties
-        properties = await propertyService.getProperties(userId);
-      } else {
-        // Public view, Guest, or Tenant (tenants need to see all properties to look up their unit's info)
-        properties = await propertyService.getProperties(null);
-      }
-
-      res.json(properties);
-    } catch (error) {
-      res.status(500).json({ error: error.message });
+    let properties;
+    if (!isPublic && req.user && req.user.role === 'treasurer') {
+      // Treasurer sees only assigned properties (unless browsing public)
+      const staffModel = (await import('../models/staffModel.js')).default;
+      properties = await staffModel.getAssignedProperties(req.user.id);
+    } else if (!isPublic && req.user && req.user.role === 'owner') {
+      // Owner sees only their own properties
+      properties = await propertyService.getProperties(userId);
+    } else {
+      // Public view, Guest, or Tenant (tenants need to see all properties to look up their unit's info)
+      properties = await propertyService.getProperties(null);
     }
-  }
 
-  async getPropertyById(req, res) {
-    try {
-      const property = await propertyService.getPropertyById(req.params.id);
-      if (!property)
-        return res.status(404).json({ error: 'Property not found' });
-      res.json(property);
-    } catch (error) {
-      res.status(500).json({ error: error.message });
+    res.json(properties);
+  });
+
+  getPropertyById = catchAsync(async (req, res, next) => {
+    const property = await propertyService.getPropertyById(req.params.id);
+    if (!property) {
+      return next(new AppError('Property not found', 404));
     }
-  }
+    res.json(property);
+  });
 
-  async updateProperty(req, res) {
-    try {
-      // Ownership check
-      const property = await propertyModel.findById(req.params.id);
-      if (!property) {
-        return res.status(404).json({ error: 'Property not found' });
-      }
-      if (
-        req.user.role === 'owner' &&
-        String(property.ownerId) !== String(req.user.id)
-      ) {
-        return res.status(403).json({ error: 'You do not own this property' });
-      }
-
-      const updated = await propertyService.updateProperty(
-        req.params.id,
-        req.body
-      );
-      res.json(updated);
-    } catch (error) {
-      res.status(500).json({ error: error.message });
+  updateProperty = catchAsync(async (req, res, next) => {
+    const property = await propertyModel.findById(req.params.id);
+    if (!property) {
+      return next(new AppError('Property not found', 404));
     }
-  }
-
-  async deleteProperty(req, res) {
-    try {
-      // Ownership check
-      const property = await propertyModel.findById(req.params.id);
-      if (!property) {
-        return res.status(404).json({ error: 'Property not found' });
-      }
-      if (
-        req.user.role === 'owner' &&
-        String(property.ownerId) !== String(req.user.id)
-      ) {
-        return res.status(403).json({ error: 'You do not own this property' });
-      }
-
-      await propertyService.deleteProperty(req.params.id);
-      res.json({ message: 'Property deleted successfully' });
-    } catch (error) {
-      console.error('Error deleting property:', error);
-      res.status(500).json({ error: 'Failed to delete property' });
+    if (
+      req.user.role === 'owner' &&
+      String(property.ownerId) !== String(req.user.id)
+    ) {
+      return next(new AppError('You do not own this property', 403));
     }
-  }
 
-  async uploadImages(req, res) {
-    try {
-      const propertyId = req.params.id;
-      const files = req.files;
+    const updated = await propertyService.updateProperty(
+      req.params.id,
+      req.body
+    );
+    res.json(updated);
+  });
 
-      if (!files || files.length === 0) {
-        return res.status(400).json({ error: 'No images uploaded' });
-      }
-
-      const images = await propertyService.addImages(propertyId, files);
-      res.status(201).json({ message: 'Images uploaded successfully', images });
-    } catch (error) {
-      console.error('Error uploading images:', error);
-      res.status(500).json({ error: 'Failed to upload images' });
+  deleteProperty = catchAsync(async (req, res, next) => {
+    const property = await propertyModel.findById(req.params.id);
+    if (!property) {
+      return next(new AppError('Property not found', 404));
     }
-  }
-
-  async getPropertyTypes(req, res) {
-    try {
-      const types = await propertyService.getPropertyTypes();
-      res.json(types);
-    } catch (error) {
-      res.status(500).json({ error: error.message });
+    if (
+      req.user.role === 'owner' &&
+      String(property.ownerId) !== String(req.user.id)
+    ) {
+      return next(new AppError('You do not own this property', 403));
     }
-  }
 
-  async getLeaseTermsByPropertyId(req, res) {
-    try {
-      const property = await propertyModel.findById(req.params.id);
-      if (!property) {
-        return res.status(404).json({ error: 'Property not found' });
-      }
-      const terms = await leaseTermModel.findAllByOwner(property.ownerId);
-      res.json(terms);
-    } catch (error) {
-      res.status(500).json({ error: error.message });
+    await propertyService.deleteProperty(req.params.id);
+    res.json({ message: 'Property deleted successfully' });
+  });
+
+  uploadImages = catchAsync(async (req, res, next) => {
+    const propertyId = req.params.id;
+    const files = req.files;
+
+    if (!files || files.length === 0) {
+      return next(new AppError('No images uploaded', 400));
     }
-  }
+
+    const images = await propertyService.addImages(propertyId, files);
+    res.status(201).json({ message: 'Images uploaded successfully', images });
+  });
+
+  getPropertyTypes = catchAsync(async (req, res, next) => {
+    const types = await propertyService.getPropertyTypes();
+    res.json(types);
+  });
+
+  getLeaseTermsByPropertyId = catchAsync(async (req, res, next) => {
+    const property = await propertyModel.findById(req.params.id);
+    if (!property) {
+      return next(new AppError('Property not found', 404));
+    }
+    const terms = await leaseTermModel.findAllByOwner(property.ownerId);
+    res.json(terms);
+  });
 }
 
 export default new PropertyController();
