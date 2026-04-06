@@ -11,7 +11,9 @@
     "migrate:make": "knex migrate:make",
     "migrate:latest": "knex migrate:latest",
     "migrate:rollback": "knex migrate:rollback",
-    "migrate:status": "knex migrate:status"
+    "migrate:status": "knex migrate:status",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -36,6 +38,8 @@
   },
   "devDependencies": {
     "nodemon": "^3.0.2",
-    "prettier": "^3.8.1"
+    "prettier": "^3.8.1",
+    "supertest": "^7.2.2",
+    "vitest": "^4.1.2"
   }
 }

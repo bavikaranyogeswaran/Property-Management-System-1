@@ -13,6 +13,7 @@ import rateLimit from 'express-rate-limit'; // Controls how many requests someon
 import 'dotenv/config';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import db from './config/db.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -107,8 +108,25 @@ import guestPaymentRoutes from './routes/guestPaymentRoutes.js';
 // ... (rest of imports)
 app.use('/api/lead-portal', leadPortalRoutes);
 
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', message: 'PMS Backend is running' });
+app.get('/api/health', async (req, res) => {
+  try {
+    // Attempt to query the database to verify connectivity
+    await db.query('SELECT 1');
+    res.json({ 
+      status: 'ok', 
+      app: 'up', 
+      database: 'connected',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('[Health Check] Database connection failed:', error.message);
+    res.status(503).json({ 
+      status: 'error', 
+      app: 'up', 
+      database: 'disconnected', 
+      error: error.message 
+    });
+  }
 });
 
 app.use('/api/public/invoice', guestPaymentRoutes);
@@ -182,8 +200,13 @@ app.use((err, req, res, next) => {
 
 // Cron Jobs (Automated Tasks)
 import initCronJobs from './utils/cronJobs.js';
-initCronJobs();
 
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
+// Only start the server and cron jobs if not running in a test environment
+if (process.env.NODE_ENV !== 'test') {
+  initCronJobs();
+  app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+  });
+}
+
+export default app;
