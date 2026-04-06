@@ -30,7 +30,9 @@ const emailKeyGenerator = (req) => {
 export const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 1000,
-  message: { error: 'Too many requests from this IP, please try again after 15 minutes' },
+  message: {
+    error: 'Too many requests from this IP, please try again after 15 minutes',
+  },
   handler: limitHandler,
 });
 
@@ -40,8 +42,10 @@ export const apiLimiter = rateLimit({
  */
 export const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 15, 
-  message: { error: 'Too many login attempts. Please try again after 15 minutes.' },
+  max: 15,
+  message: {
+    error: 'Too many login attempts. Please try again after 15 minutes.',
+  },
   handler: limitHandler,
 });
 
@@ -52,9 +56,11 @@ export const loginLimiter = rateLimit({
  */
 export const sensitiveActionLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
-  max: 5, 
+  max: 5,
   keyGenerator: emailKeyGenerator,
-  message: { error: 'Too many requests for this action. Please try again after 1 hour.' },
+  message: {
+    error: 'Too many requests for this action. Please try again after 1 hour.',
+  },
   handler: limitHandler,
 });
 
@@ -64,8 +70,10 @@ export const sensitiveActionLimiter = rateLimit({
  */
 export const publicPortalLimiter = rateLimit({
   windowMs: 30 * 60 * 1000, // 30 minutes
-  max: 20, 
-  message: { error: 'Public portal access threshold reached. Please try again later.' },
+  max: 20,
+  message: {
+    error: 'Public portal access threshold reached. Please try again later.',
+  },
   handler: limitHandler,
 });
 

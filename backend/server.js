@@ -10,7 +10,7 @@ import express, { json } from 'express';
 import cors from 'cors';
 import logger from './utils/logger.js';
 import helmet from 'helmet';
-import { apiLimiter, publicPortalLimiter } from './utils/rateLimiters.js'; 
+import { apiLimiter, publicPortalLimiter } from './utils/rateLimiters.js';
 import { config, validateConfig } from './config/config.js';
 import initCronJobs from './utils/cronJobs.js';
 import path from 'path';
