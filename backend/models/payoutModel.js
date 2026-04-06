@@ -111,7 +111,7 @@ class PayoutModel {
     // 1. Snapshot Income IDs and Total
     let incomeQuery = `
             SELECT p.payment_id as paymentId, p.amount, prop.management_fee_percentage as fee, ri.invoice_type as invoiceType,
-                   u.unit_number, prop.name as property_name, p.payment_date, ri.month, ri.year, ri.description as invoice_description
+                   ri.lease_id as leaseId, u.unit_number, prop.name as property_name, p.payment_date, ri.month, ri.year, ri.description as invoice_description
             FROM payments p
             JOIN rent_invoices ri ON p.invoice_id = ri.invoice_id
             JOIN leases l ON ri.lease_id = l.lease_id
@@ -134,10 +134,17 @@ class PayoutModel {
 
     const incomeIds = incomeRows.map((r) => r.paymentId);
     const totalGross = incomeRows.reduce((sum, r) => sum + Number(r.amount), 0);
+
+    // Calculate commissions and group by lease for ledger consistency
+    const leaseCommissions = {};
     const totalCommission = incomeRows.reduce((sum, r) => {
       if (['rent', 'late_fee'].includes(r.invoiceType)) {
         const fee = Number(r.fee || 0);
         const comm = Math.round(Number(r.amount) * (fee / 100));
+
+        const lid = r.leaseId;
+        leaseCommissions[lid] = (leaseCommissions[lid] || 0) + comm;
+
         return sum + comm;
       }
       return sum;
@@ -179,6 +186,7 @@ class PayoutModel {
       netPayout: totalGross - totalCommission - totalExpenses,
       incomeIds,
       expenseIds,
+      leaseCommissions, // New: for ledger integration
       // Pass back full details for the frontend preview list
       details: {
         income: incomeRows,

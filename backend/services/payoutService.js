@@ -1,4 +1,5 @@
 import payoutModel from '../models/payoutModel.js';
+import ledgerModel from '../models/ledgerModel.js';
 import { fromCents } from '../utils/moneyUtils.js';
 
 class PayoutService {
@@ -48,6 +49,7 @@ class PayoutService {
         netPayout,
         incomeIds,
         expenseIds,
+        leaseCommissions,
       } = await payoutModel.calculateNetPayout(
         ownerId,
         startDate,
@@ -79,6 +81,27 @@ class PayoutService {
         expenseIds,
         connection
       );
+
+      // [NEW] Accounting Integration: Record Management Fee Revenue in Ledger
+      // We process each lease's portion of the commission to maintain ledger granularity.
+      if (leaseCommissions && Object.keys(leaseCommissions).length > 0) {
+        for (const [leaseId, amount] of Object.entries(leaseCommissions)) {
+          if (amount <= 0) continue;
+
+          await ledgerModel.create(
+            {
+              leaseId,
+              accountType: 'revenue',
+              category: 'management_fee',
+              credit: amount,
+              debit: 0,
+              description: `Management fee revenue from Payout #${payoutId}`,
+              entryDate: new Date().toISOString().split('T')[0],
+            },
+            connection
+          );
+        }
+      }
 
       await connection.commit();
       return { payoutId, netPayout };
