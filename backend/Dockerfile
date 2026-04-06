@@ -7,7 +7,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install production and build dependencies
-RUN npm install
+RUN npm ci
 
 # Copy source code
 COPY . .
@@ -17,10 +17,16 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Copy node_modules and built assets from builder
-COPY --from=builder /app/package*.json ./
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app ./
+# Ensure required storage directories exist with correct permissions for 'node' user
+RUN mkdir -p logs uploads && chown -R node:node /app
+
+# Copy dependency manifests and source from builder with correct ownership
+COPY --from=builder --chown=node:node /app/package*.json ./
+COPY --from=builder --chown=node:node /app/node_modules ./node_modules
+COPY --from=builder --chown=node:node /app ./
+
+# Switch to non-privileged user
+USER node
 
 # Expose the application port
 EXPOSE 3000

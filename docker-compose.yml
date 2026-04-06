@@ -81,7 +81,7 @@ services:
     depends_on:
       - backend
     ports:
-      - "5173:80" # Map 5173 to standard Nginx 80
+      - "5173:8080" # Map 5173 to Nginx 8080 (Listening as non-root)
     networks:
       - pms-network
 
