@@ -11,7 +11,7 @@ import maintenanceCostModel from '../models/maintenanceCostModel.js';
 import ledgerModel from '../models/ledgerModel.js';
 import pool from '../config/db.js';
 import { getCurrentDateString, getLocalTime, today, now } from '../utils/dateUtils.js';
-import { toCentsFromMajor } from '../utils/moneyUtils.js';
+import { toCentsFromMajor, fromCents } from '../utils/moneyUtils.js';
 import authorizationService from './authorizationService.js';
 import paymentService from './paymentService.js';
 import { ROLES } from '../utils/roleUtils.js';
@@ -258,7 +258,7 @@ class MaintenanceService {
 
             await connection.commit();
 
-            const displayAmountMajor = aggregatedTotalCents / 100;
+            const displayAmountMajor = fromCents(aggregatedTotalCents);
             const finalInvoice = await invoiceModel.findById(invoiceId);
 
             await notificationModel.create({

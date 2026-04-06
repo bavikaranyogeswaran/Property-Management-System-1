@@ -4,6 +4,7 @@
  */
 import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
+import { fromCents } from './moneyUtils.js';
 dotenv.config();
 
 class EmailService {
@@ -216,7 +217,7 @@ class EmailService {
     const formattedAmount = new Intl.NumberFormat('en-LK', {
       style: 'currency',
       currency: 'LKR',
-    }).format(amount / 100);
+    }).format(fromCents(amount));
 
     if (!this.transporter) {
       console.log('==================================================');
@@ -324,7 +325,7 @@ class EmailService {
     const formattedAmount = new Intl.NumberFormat('en-LK', {
       style: 'currency',
       currency: 'LKR',
-    }).format(amount / 100);
+    }).format(fromCents(amount));
     const isLateFee =
       invoiceId === 'LATE-FEE' ||
       (invoiceDetails.description &&
