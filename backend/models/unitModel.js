@@ -197,11 +197,39 @@ class UnitModel {
 
   async delete(id, connection = null) {
     const dbConn = connection || db;
+
+    // 1. Fetch all associated image URLs before archival/deletion
+    const [images] = await dbConn.query(
+      'SELECT image_url FROM unit_images WHERE unit_id = ?',
+      [id]
+    );
+
+    // 2. Perform the soft-delete
     const [result] = await dbConn.query(
       "UPDATE units SET archived_at = NOW(), is_archived = TRUE, status = 'inactive' WHERE unit_id = ?",
       [id]
     );
-    return result.affectedRows > 0;
+
+    const success = result.affectedRows > 0;
+
+    // 3. Enqueue Cloudinary cleanup if archival was successful
+    if (success && images.length > 0) {
+      const { mainQueue } = await import('../config/queue.js');
+      const { extractPublicId } = await import('../utils/cronJobs.js');
+
+      for (const img of images) {
+        const publicId = extractPublicId(img.image_url);
+        if (publicId) {
+          mainQueue.add(
+            'cleanup_cloudinary_asset_task',
+            { publicId },
+            { attempts: 3, backoff: 30000 }
+          );
+        }
+      }
+    }
+
+    return success;
   }
 
   async archiveByPropertyId(propertyId, connection = null) {

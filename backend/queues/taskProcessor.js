@@ -9,6 +9,8 @@ const taskMap = {
   nightly_payload_task: jobs.executeNightlyPayload,
   visit_reminders_task: jobs.sendVisitReminders,
   rent_reminders_task: jobs.sendRentReminders,
+  cleanup_cloudinary_asset_task: jobs.cleanupCloudinaryAsset,
+  reconcile_cloudinary_assets_task: jobs.reconcileCloudinaryAssets,
 };
 
 /**

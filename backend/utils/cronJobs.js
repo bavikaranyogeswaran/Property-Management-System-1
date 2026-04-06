@@ -19,6 +19,24 @@ import {
   formatToLocalDate,
 } from './dateUtils.js';
 import { moneyMath, fromCents } from './moneyUtils.js';
+import { v2 as cloudinary } from 'cloudinary';
+
+// Configure Cloudinary for background cleanup
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+// Helper to extract Cloudinary public_id from URL (duplicated for isolation)
+const extractPublicId = (url) => {
+  if (!url || !url.includes('cloudinary.com')) return null;
+  const parts = url.split('/');
+  const uploadIndex = parts.indexOf('upload');
+  if (uploadIndex === -1) return null;
+  const publicIdWithExt = parts.slice(uploadIndex + 2).join('/');
+  return publicIdWithExt.split('.')[0];
+};
 
 // --- CONFIGURATION ---
 const LATE_FEE_PERCENTAGE = 0.03;
@@ -1113,8 +1131,113 @@ export const executeNightlyPayload = async () => {
 import { mainQueue } from '../config/queue.js';
 
 /**
+ * Execute Cloudinary Asset Deletion (Called by BullMQ Worker)
+ */
+export const cleanupCloudinaryAsset = async (job) => {
+  const { publicId } = job.data;
+  if (!publicId) return;
+
+  try {
+    const result = await cloudinary.uploader.destroy(publicId);
+    if (result.result === 'ok' || result.result === 'not_found') {
+      logger.info(`[Queue] Successfully removed Cloudinary asset: ${publicId}`);
+    } else {
+      throw new Error(`Cloudinary deletion failed: ${result.result}`);
+    }
+  } catch (err) {
+    logger.error(`[Queue] Failed to delete Cloudinary asset ${publicId}:`, err);
+    throw err; // Allow BullMQ retry
+  }
+};
+
+/**
+ * Audit Cloudinary assets against Database records (Nightly Reconciliation)
+ */
+export const reconcileCloudinaryAssets = async () => {
+  logger.info('[Sync] Starting Cloudinary asset reconciliation...');
+
+  try {
+    // 1. Fetch all unique Image URLs from Database
+    const [propertyImages] = await db.query(
+      'SELECT DISTINCT image_url FROM property_images'
+    );
+    const [unitImages] = await db.query(
+      'SELECT DISTINCT image_url FROM unit_images'
+    );
+    const [propertyMainImages] = await db.query(
+      'SELECT DISTINCT image_url FROM properties WHERE image_url IS NOT NULL'
+    );
+    const [unitMainImages] = await db.query(
+      'SELECT DISTINCT image_url FROM units WHERE image_url IS NOT NULL'
+    );
+
+    const dbUrls = new Set([
+      ...propertyImages.map((r) => r.image_url),
+      ...unitImages.map((r) => r.image_url),
+      ...propertyMainImages.map((r) => r.image_url),
+      ...unitMainImages.map((r) => r.image_url),
+    ]);
+
+    const activePublicIds = new Set();
+    dbUrls.forEach((url) => {
+      const pid = extractPublicId(url);
+      if (pid) activePublicIds.add(pid);
+    });
+
+    logger.info(
+      `[Sync] Found ${activePublicIds.size} active asset references in Database.`
+    );
+
+    // 2. Fetch all assets from Cloudinary (pms_uploads folder)
+    let nextCursor = null;
+    let orphanedCount = 0;
+    const safetyBufferMs = 1000 * 60 * 60 * 4; // 4 hours safety buffer
+    const nowThreshold = Date.now() - safetyBufferMs;
+
+    do {
+      const resources = await cloudinary.api.resources({
+        type: 'upload',
+        prefix: 'pms_uploads/',
+        max_results: 500,
+        next_cursor: nextCursor,
+      });
+
+      for (const resource of resources.resources) {
+        const createdDate = new Date(resource.created_at).getTime();
+
+        // Skip newly uploaded files (avoid race conditions with active requests)
+        if (createdDate > nowThreshold) continue;
+
+        if (!activePublicIds.has(resource.public_id)) {
+          logger.warn(
+            `[Sync] Orphan found: ${resource.public_id}. Enqueueing for deletion.`
+          );
+          await mainQueue.add(
+            'cleanup_cloudinary_asset_task',
+            { publicId: resource.public_id },
+            { attempts: 3, backoff: 30000 }
+          );
+          orphanedCount++;
+        }
+      }
+
+      nextCursor = resources.next_cursor;
+    } while (nextCursor);
+
+    logger.info(
+      `[Sync] Reconciliation complete. ${orphanedCount} orphans identified.`
+    );
+  } catch (error) {
+    logger.error(
+      '[Sync] Critical error during Cloudinary reconciliation:',
+      error
+    );
+    throw error;
+  }
+};
+
+/**
  * Registers repeatable jobs with the BullMQ scheduler.
- * This replaces the in-memory node-cron scheduling.
  */
 export const registerRepeatableJobs = async () => {
   logger.info('[Queue] Registering repeatable background tasks...');
@@ -1125,29 +1248,34 @@ export const registerRepeatableJobs = async () => {
     {},
     {
       repeat: { pattern: '0 1 * * *' },
-      jobId: 'nightly_payload', // Unique ID to prevent duplicates
+      jobId: 'nightly_payload',
     }
   );
 
-  // 2. Visit Reminders (7:00 AM)
+  // 2. Asset Reconciliation (4:00 AM)
+  await mainQueue.add(
+    'reconcile_cloudinary_assets_task',
+    {},
+    {
+      repeat: { pattern: '0 4 * * *' },
+      jobId: 'reconcile_assets',
+    }
+  );
+
+  // ... (Other reminders kept in taskProcessor.js)
+  // visit_reminders_task: jobs.sendVisitReminders,
+  // rent_reminders_task: jobs.sendRentReminders,
+
   await mainQueue.add(
     'visit_reminders_task',
     {},
-    {
-      repeat: { pattern: '0 7 * * *' },
-      jobId: 'visit_reminders',
-    }
+    { repeat: { pattern: '0 7 * * *' }, jobId: 'visit_reminders' }
   );
-
-  // 3. Rent Reminders (8:00 AM)
   await mainQueue.add(
     'rent_reminders_task',
     {},
-    {
-      repeat: { pattern: '0 8 * * *' },
-      jobId: 'rent_reminders',
-    }
+    { repeat: { pattern: '0 8 * * *' }, jobId: 'rent_reminders' }
   );
 
-  logger.info('[Queue] All repeatable jobs have been synchronized with Redis.');
+  logger.info('[Queue] All repeatable jobs have been synchronized.');
 };

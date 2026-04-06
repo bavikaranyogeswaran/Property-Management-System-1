@@ -1,4 +1,5 @@
 import { v2 as cloudinary } from 'cloudinary';
+import { mainQueue } from '../config/queue.js';
 import logger from '../utils/logger.js';
 import { config } from '../config/config.js';
 
@@ -40,34 +41,26 @@ export const cleanupRequestAssets = async (req) => {
     if (assetsToDelete.length === 0) return;
 
     logger.info(
-      `[Asset Cleanup] Identified ${assetsToDelete.length} orphaned assets to remove.`,
+      `[Asset Cleanup] Enqueueing ${assetsToDelete.length} orphaned assets for removal.`,
       {
         path: req.originalUrl,
         public_ids: assetsToDelete,
       }
     );
 
-    // Fire-and-forget deletion to not block the error response
-    // But still log the outcome for auditability
-    Promise.all(
+    // Enqueue each publicId for deletion with separate jobs for independent retries
+    await Promise.all(
       assetsToDelete.map((publicId) =>
-        cloudinary.uploader.destroy(publicId).then((result) => {
-          if (result.result === 'ok') {
-            logger.info(`[Asset Cleanup] Successfully deleted: ${publicId}`);
-          } else {
-            logger.warn(
-              `[Asset Cleanup] Deletion result NOT 'ok' for ${publicId}:`,
-              result
-            );
+        mainQueue.add(
+          'cleanup_cloudinary_asset_task',
+          { publicId },
+          {
+            retryLimit: 5,
+            backoff: { type: 'exponential', delay: 10000 },
           }
-        })
+        )
       )
-    ).catch((err) => {
-      logger.error(
-        '[Asset Cleanup] Fatal error during batch deletion:',
-        err.message
-      );
-    });
+    );
   } catch (error) {
     logger.error(
       '[Asset Cleanup] Critical failure in cleanup logic:',
