@@ -3,10 +3,9 @@
  * Logs emails to the console instead of sending them.
  */
 import nodemailer from 'nodemailer';
-import dotenv from 'dotenv';
+import { config } from '../config/config.js';
 import logger from './logger.js';
 import { fromCents } from './moneyUtils.js';
-dotenv.config();
 
 class EmailService {
   constructor() {
@@ -15,12 +14,12 @@ class EmailService {
   }
 
   initTransporter() {
-    if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+    if (config.smtp.user && config.smtp.pass) {
       this.transporter = nodemailer.createTransport({
         service: 'gmail',
         auth: {
-          user: process.env.SMTP_USER,
-          pass: process.env.SMTP_PASS,
+          user: config.smtp.user,
+          pass: config.smtp.pass,
         },
       });
     }
@@ -33,7 +32,7 @@ class EmailService {
     portalToken = null
   ) {
     const portalUrl = portalToken
-      ? `${process.env.FRONTEND_URL || 'http://localhost:5173'}/lead/portal?token=${portalToken}`
+      ? `${config.frontendUrl}/lead/portal?token=${portalToken}`
       : null;
 
     if (!this.transporter) {
@@ -102,7 +101,7 @@ class EmailService {
                     <p>Congratulations! Your tenant application has been approved.</p>
                     <p>We are thrilled to welcome you to your new home. You can now log in to your dashboard to view your lease details and manage your payments.</p>
                     <div style="text-align: center; margin: 32px 0;">
-                        <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/login" style="background-color: #2563eb; color: white; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px; display: inline-block;">Access Dashboard</a>
+                        <a href="${config.frontendUrl}/login" style="background-color: #2563eb; color: white; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px; display: inline-block;">Access Dashboard</a>
                     </div>
                 `
         ),
@@ -117,14 +116,14 @@ class EmailService {
       console.log(`[EMAIL MOCK] Password Reset for ${email}`);
       console.log(`Token: ${resetToken}`);
       console.log(
-        `Link: ${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${resetToken}`
+        `Link: ${config.frontendUrl}/reset-password?token=${resetToken}`
       );
       console.log('==================================================');
       return true;
     }
 
     try {
-      const resetLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${resetToken}`;
+      const resetLink = `${config.frontendUrl}/reset-password?token=${resetToken}`;
 
       await this.transporter.sendMail({
         from: `"Property Management System" <${process.env.SMTP_USER}>`,
@@ -150,7 +149,7 @@ class EmailService {
   }
 
   async sendVerificationEmail(email, token) {
-    const link = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/verify-email?token=${token}`;
+    const link = `${config.frontendUrl}/verify-email?token=${token}`;
 
     if (!this.transporter) {
       console.log(`[EMAIL MOCK] Verification Email for ${email}`);
@@ -181,7 +180,7 @@ class EmailService {
   }
 
   async sendInvitationEmail(email, role, token) {
-    const link = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/setup-password?token=${token}`;
+    const link = `${config.frontendUrl}/setup-password?token=${token}`;
     const subject =
       role === 'treasurer'
         ? 'Treasurer Invitation'
@@ -226,7 +225,7 @@ class EmailService {
     amount,
     magicToken
   ) {
-    const link = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/pay/${magicToken}`;
+    const link = `${config.frontendUrl}/pay/${magicToken}`;
     const formattedAmount = new Intl.NumberFormat('en-LK', {
       style: 'currency',
       currency: 'LKR',
@@ -318,7 +317,7 @@ class EmailService {
                     </div>
 
                     <div style="text-align: center; margin-top: 32px;">
-                        <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/owner/leads" style="background-color: #2563eb; color: white; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px; display: inline-block;">View in Dashboard</a>
+                        <a href="${config.frontendUrl}/owner/leads" style="background-color: #2563eb; color: white; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px; display: inline-block;">View in Dashboard</a>
                     </div>
                 `
         ),
@@ -374,7 +373,7 @@ class EmailService {
                          <p style="margin: 4px 0; color: #475569;"><strong>Due Date:</strong> ${dueDate}</p>
                     </div>
                      <div style="text-align: center; margin-top: 32px;">
-                        <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/tenant/payments" style="background-color: #2563eb; color: white; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px; display: inline-block;">View & Pay</a>
+                        <a href="${config.frontendUrl}/tenant/payments" style="background-color: #2563eb; color: white; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px; display: inline-block;">View & Pay</a>
                     </div>
                 `
         ),
@@ -478,7 +477,7 @@ class EmailService {
                     <p>Log in to your dashboard to view full details.</p>
                     
                     <div style="text-align: center; margin-top: 32px;">
-                        <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/tenant/maintenance" style="background-color: #2563eb; color: white; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px; display: inline-block;">View Maintenance Request</a>
+                        <a href="${config.frontendUrl}/tenant/maintenance" style="background-color: #2563eb; color: white; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px; display: inline-block;">View Maintenance Request</a>
                     </div>
                 `
         ),
@@ -527,7 +526,7 @@ class EmailService {
                     <p>You can download your official receipt from the tenant portal.</p>
                     
                     <div style="text-align: center; margin-top: 32px;">
-                        <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/tenant/payments" style="background-color: #2563eb; color: white; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px; display: inline-block;">Go to Payments</a>
+                        <a href="${config.frontendUrl}/tenant/payments" style="background-color: #2563eb; color: white; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px; display: inline-block;">Go to Payments</a>
                     </div>
                 `
         ),
@@ -573,7 +572,7 @@ class EmailService {
                     <p>Please log in to your portal and re-submit your proof of payment to avoid any potential late fees.</p>
                     
                     <div style="text-align: center; margin-top: 32px;">
-                         <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/tenant/payments" style="background-color: #dc2626; color: white; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px; display: inline-block;">Resubmit Payment Evidence</a>
+                         <a href="${config.frontendUrl}/tenant/payments" style="background-color: #dc2626; color: white; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px; display: inline-block;">Resubmit Payment Evidence</a>
                     </div>
                 `
         ),
@@ -635,7 +634,7 @@ class EmailService {
                     <p>${actionText}</p>
                     
                     <div style="text-align: center; margin-top: 32px;">
-                        <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/${role === 'tenant' ? 'tenant' : 'owner'}/dashboard" style="background-color: #2563eb; color: white; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px; display: inline-block;">Go to Dashboard</a>
+                        <a href="${config.frontendUrl}/${role === 'tenant' ? 'tenant' : 'owner'}/dashboard" style="background-color: #2563eb; color: white; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px; display: inline-block;">Go to Dashboard</a>
                     </div>
                 `
         ),
@@ -681,7 +680,7 @@ class EmailService {
                     <p>You can pay your rent directly through the tenant portal using your preferred payment method.</p>
                     
                     <div style="text-align: center; margin-top: 32px;">
-                        <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/tenant/payments" style="background-color: #2563eb; color: white; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px; display: inline-block;">Pay Now</a>
+                        <a href="${config.frontendUrl}/tenant/payments" style="background-color: #2563eb; color: white; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px; display: inline-block;">Pay Now</a>
                     </div>
                 `
         ),
@@ -698,7 +697,7 @@ class EmailService {
       visitDetails;
 
     const dateStr = new Date(scheduledDate).toLocaleString();
-    const cancelLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/cancel-visit?id=${visitId}`;
+    const cancelLink = `${config.frontendUrl}/cancel-visit?id=${visitId}`;
 
     if (!this.transporter) {
       console.log('==================================================');
@@ -810,7 +809,7 @@ class EmailService {
           <p>Great news! Your lease renewal request for <strong>${propertyName}</strong> has been approved.</p>
           <p>A new draft lease has been generated and is ready. The property owner will activate it shortly, or you can log in to your tenant portal to review the proposed terms.</p>
           <div style="text-align: center; margin: 32px 0;">
-            <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/login" style="background-color: #2563eb; color: white; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px; display: inline-block;">View Portal</a>
+            <a href="${config.frontendUrl}/login" style="background-color: #2563eb; color: white; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px; display: inline-block;">View Portal</a>
           </div>
           `
         ),

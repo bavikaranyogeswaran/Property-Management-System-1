@@ -1,28 +1,25 @@
 import { createPool } from 'mysql2';
-import dotenv from 'dotenv';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-dotenv.config({ path: path.join(__dirname, '..', '.env') });
+import { config } from './config.js';
+import logger from '../utils/logger.js';
 
 const dbConfig = {
-  host: process.env.DB_HOST || 'localhost',
-  user: process.env.DB_USER || 'root',
-  password:
-    process.env.DB_PASSWORD !== undefined
-      ? process.env.DB_PASSWORD
-      : 'password',
-  database: process.env.DB_NAME || 'pms_database',
+  host: config.db.host,
+  user: config.db.user,
+  password: config.db.password,
+  database: config.db.name,
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
   timezone: '+05:30',
+  ssl: config.db.ssl ? { rejectUnauthorized: false } : undefined,
 };
 
-console.log('[DEBUG] DB Config:', { ...dbConfig, password: '***' });
+// Use logger instead of console.log for better observability
+logger.info('[DB] Connecting to database', { 
+  host: dbConfig.host, 
+  database: dbConfig.database, 
+  user: dbConfig.user 
+});
 
 const pool = createPool(dbConfig);
 

@@ -8,9 +8,12 @@
  * ============================================================================
  */
 
-import 'dotenv/config';
+import { config, validateConfig } from './config/config.js';
 import initCronJobs from './utils/cronJobs.js';
 import logger from './utils/logger.js';
+
+// Validate Configuration on Startup (Fail Fast)
+validateConfig();
 
 logger.info('---------------------------------------------------------');
 logger.info('PMS BACKGROUND WORKER: Initializing...');

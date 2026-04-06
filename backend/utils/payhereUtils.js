@@ -1,9 +1,8 @@
 import crypto from 'crypto';
-import dotenv from 'dotenv';
-dotenv.config();
+import { config } from '../config/config.js';
 
-const MERCHANT_ID = (process.env.PAYHERE_MERCHANT_ID || '').trim();
-const MERCHANT_SECRET = (process.env.PAYHERE_SECRET || '').trim();
+const MERCHANT_ID = (config.payhere.merchantId || '').trim();
+const MERCHANT_SECRET = (config.payhere.secret || '').trim();
 
 /**
  * Generates the hash required for the PayHere checkout form.

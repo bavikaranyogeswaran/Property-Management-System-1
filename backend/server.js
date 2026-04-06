@@ -11,7 +11,7 @@ import cors from 'cors';
 import logger from './utils/logger.js';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit'; // Controls how many requests someone can make (Security)
-import 'dotenv/config';
+import { config, validateConfig } from './config/config.js';
 import initCronJobs from './utils/cronJobs.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -20,9 +20,12 @@ import db from './config/db.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Validate Configuration on Startup (Fail Fast)
+validateConfig();
+
 // Initialize the application "Building"
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = config.port;
 
 // ============================================================================
 //  MIDDLEWARE (The Security & Translators)
@@ -34,7 +37,7 @@ const PORT = process.env.PORT || 3000;
 // ============================================================================
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+    origin: config.frontendUrl,
     credentials: true,
   })
 );
@@ -49,8 +52,9 @@ app.use(
         'img-src': [
           "'self'",
           'data:',
-          'http://localhost:3000',
+          'blob:',
           'https://res.cloudinary.com',
+          '*.payhere.lk',
         ],
         'connect-src': [
           "'self'",

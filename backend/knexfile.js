@@ -1,4 +1,4 @@
-import 'dotenv/config';
+import { config } from './config/config.js';
 
 /**
  * @type { Object.<string, import("knex").Knex.Config> }
@@ -7,13 +7,10 @@ export default {
   development: {
     client: 'mysql2',
     connection: {
-      host: process.env.DB_HOST || 'localhost',
-      user: process.env.DB_USER || 'root',
-      password:
-        process.env.DB_PASSWORD !== undefined
-          ? process.env.DB_PASSWORD
-          : 'password',
-      database: process.env.DB_NAME || 'pms_database',
+      host: config.db.host,
+      user: config.db.user,
+      password: config.db.password,
+      database: config.db.name,
       timezone: '+05:30',
       multipleStatements: true,
     },
@@ -29,12 +26,11 @@ export default {
   production: {
     client: 'mysql2',
     connection: {
-      host: process.env.DB_HOST,
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-      database: process.env.DB_NAME,
-      ssl:
-        process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
+      host: config.db.host,
+      user: config.db.user,
+      password: config.db.password,
+      database: config.db.name,
+      ssl: config.db.ssl ? { rejectUnauthorized: false } : false,
       timezone: '+05:30',
       multipleStatements: true,
     },
