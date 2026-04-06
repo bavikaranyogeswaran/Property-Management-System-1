@@ -1,4 +1,5 @@
 import payoutService from '../services/payoutService.js';
+import authorizationService from '../services/authorizationService.js';
 
 class PayoutController {
   // 1. Preview (Calculate but don't save)
@@ -16,6 +17,11 @@ class PayoutController {
         return res
           .status(400)
           .json({ error: 'Owner ID and End date are required' });
+      }
+
+      // [HARDENED] Verify Staff Assignment
+      if (!await authorizationService.canAccessOwner(req.user.id, req.user.role, ownerId)) {
+        return res.status(403).json({ error: 'Access denied: You are not assigned to any properties for this owner' });
       }
 
       const selection = {
@@ -49,6 +55,11 @@ class PayoutController {
           return res.status(400).json({ error: 'Owner ID is required' });
       }
 
+      // [HARDENED] Verify Staff Assignment
+      if (!await authorizationService.canAccessOwner(req.user.id, req.user.role, ownerId)) {
+        return res.status(403).json({ error: 'Access denied: You are not assigned to any properties for this owner' });
+      }
+
       const { payoutId, netPayout } = await payoutService.createPayout(
         ownerId,
         startDate,
@@ -69,9 +80,9 @@ class PayoutController {
     try {
       const ownerId = req.query.ownerId || req.user.id;
       
-      // If owner, they can only see their own. If treasurer, they can see anyone's.
-      if (req.user.role === 'owner' && String(ownerId) !== String(req.user.id)) {
-          return res.status(403).json({ error: 'Access denied: You cannot view this history' });
+      // [HARDENED] Assignment Check
+      if (!await authorizationService.canAccessOwner(req.user.id, req.user.role, ownerId)) {
+          return res.status(403).json({ error: 'Access denied: You do not have permission to view this owner\'s data' });
       }
 
       const payouts = await payoutService.getHistory(ownerId);
@@ -84,12 +95,20 @@ class PayoutController {
 
   async markAsPaid(req, res) {
     try {
+      const { id } = req.params;
+      const { bankReference, proofUrl } = req.body;
+
       if (req.user.role !== 'treasurer') {
         return res.status(403).json({ error: 'Access denied: Only treasurers can process payments' });
       }
 
-      const { id } = req.params;
-      const { bankReference, proofUrl } = req.body;
+      // [HARDENED] Verify Access to Payout Resource
+      const fullPayout = await payoutService.getPayoutById(id);
+      if (!fullPayout) return res.status(404).json({ error: 'Payout not found' });
+
+      if (!await authorizationService.canAccessOwner(req.user.id, req.user.role, fullPayout.owner_id)) {
+          return res.status(403).json({ error: 'Access denied: You are not assigned to this property owner' });
+      }
 
       if (!bankReference) {
           return res.status(400).json({ error: 'Bank reference is required for payment verification' });
@@ -110,9 +129,9 @@ class PayoutController {
       const fullPayout = await payoutService.getPayoutById(id);
       if (!fullPayout) return res.status(404).json({ error: 'Payout not found' });
 
-      // RBAC
-      if (req.user.role === 'owner' && String(fullPayout.owner_id) !== String(req.user.id)) {
-          return res.status(403).json({ error: 'Access denied' });
+      // [HARDENED] RBAC & Assignment check
+      if (!await authorizationService.canAccessOwner(req.user.id, req.user.role, fullPayout.owner_id)) {
+          return res.status(403).json({ error: 'Access denied: You are not authorized to view these details' });
       }
 
       const details = await payoutService.getPayoutDetails(fullPayout.owner_id, id);
@@ -153,8 +172,9 @@ class PayoutController {
       const fullPayout = await payoutService.getPayoutById(id);
       if (!fullPayout) return res.status(404).json({ error: 'Payout not found' });
 
-      if (req.user.role === 'owner' && String(fullPayout.owner_id) !== String(req.user.id)) {
-        return res.status(403).json({ error: 'Access denied' });
+      // [HARDENED] Assignment Check
+      if (!await authorizationService.canAccessOwner(req.user.id, req.user.role, fullPayout.owner_id)) {
+          return res.status(403).json({ error: 'Access denied: You are not authorized to export this data' });
       }
 
       const csv = await payoutService.exportPayoutCSV(fullPayout.owner_id, id);

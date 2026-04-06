@@ -102,6 +102,30 @@ class AuthorizationService {
 
     return await this.canAccessUnit(userId, role, request.unitId);
   }
+
+  /**
+   * Checks if a staff member (Treasurer) or System can access an owner's portfolio.
+   * [STAFF ASSIGNMENT AWARE]: Staff can only access an owner if they are assigned to AT LEAST ONE property of that owner.
+   */
+  async canAccessOwner(userId, role, ownerId) {
+    if (role === ROLES.SYSTEM) return true;
+    
+    // 1. Ownership check: If you are the owner, you can access your own portfolio
+    if (userId.toString() === ownerId.toString()) return true;
+
+    // 2. Staff check: Treasurers can only access owners whose properties they are assigned to manage
+    if (isAtLeast(role, ROLES.TREASURER)) {
+      const assigned = await staffModel.getAssignedProperties(userId);
+      // Get all properties belonging to this owner
+      const properties = await propertyModel.findByOwnerId(ownerId);
+      const ownerPropertyIds = properties.map(p => p.id.toString());
+      
+      // Check if any assigned property matches any of the owner's properties
+      return assigned.some(assignedProp => ownerPropertyIds.includes(assignedProp.property_id.toString()));
+    }
+
+    return false;
+  }
 }
 
 export default new AuthorizationService();
