@@ -1,4 +1,5 @@
 import payoutModel from '../models/payoutModel.js';
+import { fromCents } from '../utils/moneyUtils.js';
 
 class PayoutService {
   async previewPayout(ownerId, startDate, endDate, selection = null) {
@@ -121,8 +122,15 @@ class PayoutService {
   async exportPayoutCSV(ownerId, payoutId) {
     const details = await this.getPayoutDetails(ownerId, payoutId);
     
+    // Helper to escape CSV values (prevents injection and formatting breaks)
+    const escapeCSV = (val) => {
+      if (val === null || val === undefined) return '""';
+      const str = String(val).replace(/"/g, '""');
+      return `"${str}"`;
+    };
+
     const rows = [
-      ['Property', 'Unit', 'Type', 'Description', 'Date', 'Income (LKR)', 'Expense (LKR)'],
+      ['Property', 'Unit', 'Type', 'Description', 'Date', 'Income (LKR)', 'Expense (LKR)'].map(escapeCSV),
     ];
 
     // Income Rows
@@ -134,36 +142,36 @@ class PayoutService {
       const description = item.invoice_description || `${type} for ${item.month}/${item.year}`;
       
       rows.push([
-        item.property_name,
-        item.unit_number,
-        type,
-        description,
-        item.payment_date,
-        (item.amount / 100).toFixed(2),
-        '0.00'
+        escapeCSV(item.property_name),
+        escapeCSV(item.unit_number),
+        escapeCSV(type),
+        escapeCSV(description),
+        escapeCSV(item.payment_date),
+        escapeCSV(fromCents(item.amount).toFixed(2)),
+        escapeCSV('0.00')
       ]);
     });
 
     // Expense Rows
     details.expenses.forEach(item => {
       rows.push([
-        item.property_name,
-        item.unit_number,
-        'Maintenance',
-        item.description || item.request_title,
-        item.recorded_date,
-        '0.00',
-        (item.amount / 100).toFixed(2)
+        escapeCSV(item.property_name),
+        escapeCSV(item.unit_number),
+        escapeCSV('Maintenance'),
+        escapeCSV(item.description || item.request_title),
+        escapeCSV(item.recorded_date),
+        escapeCSV('0.00'),
+        escapeCSV(fromCents(item.amount).toFixed(2))
       ]);
     });
 
-    // Summary Row
+    // Summary Rows
     rows.push([]);
-    rows.push(['TOTAL RENT COLLECTED', '', '', '', '', (details.summary.totalGross / 100).toFixed(2), '']);
-    rows.push(['AGENCY MANAGEMENT FEE', '', '', '', '', '', (details.summary.totalCommission / 100).toFixed(2)]);
-    rows.push(['TOTAL EXPENSES (MAINTENANCE)', '', '', '', '', '', (details.summary.totalExpenses / 100).toFixed(2)]);
+    rows.push(['TOTAL RENT COLLECTED', '', '', '', '', fromCents(details.summary.totalGross).toFixed(2), ''].map(escapeCSV));
+    rows.push(['AGENCY MANAGEMENT FEE', '', '', '', '', '', fromCents(details.summary.totalCommission).toFixed(2)].map(escapeCSV));
+    rows.push(['TOTAL EXPENSES (MAINTENANCE)', '', '', '', '', '', fromCents(details.summary.totalExpenses).toFixed(2)].map(escapeCSV));
     rows.push([]);
-    rows.push(['NET PAYOUT TO OWNER', '', '', '', '', (details.summary.netPayout / 100).toFixed(2), '']);
+    rows.push(['NET PAYOUT TO OWNER', '', '', '', '', fromCents(details.summary.netPayout).toFixed(2), ''].map(escapeCSV));
 
     return rows.map(r => r.join(',')).join('\n');
   }
