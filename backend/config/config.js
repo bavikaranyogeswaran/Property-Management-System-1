@@ -22,7 +22,8 @@ export const config = {
   db: {
     host: process.env.DB_HOST || (isProduction ? undefined : 'localhost'),
     user: process.env.DB_USER || (isProduction ? undefined : 'root'),
-    password: process.env.DB_PASSWORD || (isProduction ? undefined : 'password'),
+    password:
+      process.env.DB_PASSWORD || (isProduction ? undefined : 'password'),
     name: process.env.DB_NAME || (isProduction ? undefined : 'pms_database'),
     ssl: process.env.DB_SSL === 'true',
   },
@@ -64,14 +65,17 @@ export const validateConfig = () => {
     if (!config.db.user) errors.push('DB_USER is missing');
     if (!config.db.password) errors.push('DB_PASSWORD is missing');
     if (!config.db.name) errors.push('DB_NAME is missing');
-    
+
     // Cloudinary is required for image uploads in production
-    if (!config.cloudinary.cloudName) errors.push('CLOUDINARY_CLOUD_NAME is missing');
+    if (!config.cloudinary.cloudName)
+      errors.push('CLOUDINARY_CLOUD_NAME is missing');
     if (!config.cloudinary.apiKey) errors.push('CLOUDINARY_API_KEY is missing');
-    if (!config.cloudinary.apiSecret) errors.push('CLOUDINARY_API_SECRET is missing');
+    if (!config.cloudinary.apiSecret)
+      errors.push('CLOUDINARY_API_SECRET is missing');
 
     // Payment Gateway is required in production
-    if (!config.payhere.merchantId) errors.push('PAYHERE_MERCHANT_ID is missing');
+    if (!config.payhere.merchantId)
+      errors.push('PAYHERE_MERCHANT_ID is missing');
     if (!config.payhere.secret) errors.push('PAYHERE_SECRET is missing');
   }
 
@@ -80,7 +84,9 @@ export const validateConfig = () => {
     console.error('FATAL ERROR: CONFIGURATION VALIDATION FAILED');
     errors.forEach((err) => console.error(` - ${err}`));
     console.error('==================================================');
-    console.error('The application refuses to start with insecure or missing secrets.');
+    console.error(
+      'The application refuses to start with insecure or missing secrets.'
+    );
     process.exit(1);
   }
 };

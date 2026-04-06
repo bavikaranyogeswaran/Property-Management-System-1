@@ -15,10 +15,10 @@ const dbConfig = {
 };
 
 // Use logger instead of console.log for better observability
-logger.info('[DB] Connecting to database', { 
-  host: dbConfig.host, 
-  database: dbConfig.database, 
-  user: dbConfig.user 
+logger.info('[DB] Connecting to database', {
+  host: dbConfig.host,
+  database: dbConfig.database,
+  user: dbConfig.user,
 });
 
 const pool = createPool(dbConfig);
