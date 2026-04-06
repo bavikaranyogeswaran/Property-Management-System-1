@@ -40,6 +40,15 @@ jobs:
       - name: Check formatting (Prettier)
         run: npm run lint:check
 
+      - name: Wait for Database
+        run: |
+          echo "Waiting for MySQL to be ready..."
+          until nc -z 127.0.0.1 3306; do
+            echo "MySQL not ready yet, retrying in 2 seconds..."
+            sleep 2
+          done
+          echo "MySQL is up and running!"
+
       - name: Run migrations
         run: npx knex migrate:latest
         env:

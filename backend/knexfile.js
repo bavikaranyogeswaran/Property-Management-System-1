@@ -22,6 +22,24 @@ export default {
     },
     useNullAsDefault: true,
   },
+  test: {
+    client: 'mysql2',
+    connection: {
+      host: process.env.DB_HOST || '127.0.0.1',
+      user: process.env.DB_USER || 'root',
+      password: process.env.DB_PASSWORD || 'rootpassword',
+      database: process.env.DB_NAME || 'pms_test_db',
+      timezone: '+05:30',
+      multipleStatements: true,
+    },
+    migrations: {
+      directory: './migrations',
+      tableName: 'knex_migrations',
+      extension: 'js',
+      loadExtensions: ['.js', '.mjs'],
+    },
+    useNullAsDefault: true,
+  },
 
   production: {
     client: 'mysql2',
