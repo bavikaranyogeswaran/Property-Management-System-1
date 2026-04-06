@@ -37,6 +37,9 @@ validateConfig();
 const app = express();
 const PORT = config.port;
 
+// 2. Defense-in-Depth: Explicitly disable server signature
+app.disable('x-powered-by');
+
 // ============================================================================
 //  MIDDLEWARE (The Security & Translators)
 // ============================================================================
@@ -52,13 +55,27 @@ app.use(
   })
 );
 app.set('trust proxy', 1);
+
+// Configure Environment-Aware Security Headers
+const allowedOrigins = [config.frontendUrl];
+if (!config.isProduction) {
+  allowedOrigins.push('http://localhost:5173');
+}
+
 app.use(
   helmet({
-    crossOriginResourcePolicy: { policy: 'cross-origin' }, // Allow images/files to be accessed by frontend
+    // Standard Hardening
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+    hsts: {
+      maxAge: 31536000,
+      includeSubDomains: true,
+      preload: true,
+    },
+    // Comprehensive Content Security Policy
     contentSecurityPolicy: {
+      useDefaults: true,
       directives: {
-        ...helmet.contentSecurityPolicy.getDefaultDirectives(),
-        'frame-ancestors': ["'self'", 'http://localhost:5173'], // Allow frontend to frame backend content
+        'frame-ancestors': ["'self'", ...allowedOrigins],
         'img-src': [
           "'self'",
           'data:',
@@ -68,14 +85,34 @@ app.use(
         ],
         'connect-src': [
           "'self'",
-          'http://localhost:3000',
+          ...allowedOrigins,
           'https://api.cloudinary.com',
-          'https://res.cloudinary.com',
         ],
+        'script-src': [
+          "'self'",
+          'https://www.payhere.lk',
+          'https://www.googletagmanager.com',
+        ],
+        'style-src': [
+          "'self'",
+          "'unsafe-inline'",
+          'https://fonts.googleapis.com',
+        ],
+        'font-src': ["'self'", 'https://fonts.gstatic.com'],
       },
     },
   })
 );
+
+// Explicitly restrict browser hardware/capabilities (Zero-Trust)
+app.use((req, res, next) => {
+  res.setHeader(
+    'Permissions-Policy',
+    'camera=(), microphone=(), geolocation=(), usb=(), bluetooth=()'
+  );
+  next();
+});
+
 app.use(json());
 app.use(express.urlencoded({ extended: true })); // Added for PayHere form data
 // Apply Global API Limiter
