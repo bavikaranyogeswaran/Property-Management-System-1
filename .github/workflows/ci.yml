@@ -14,6 +14,16 @@ jobs:
       run:
         working-directory: ./backend
 
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: rootpassword
+          MYSQL_DATABASE: pms_test_db
+        ports:
+          - 3306:3306
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
+
     steps:
       - uses: actions/checkout@v4
 
@@ -30,6 +40,15 @@ jobs:
       - name: Check formatting (Prettier)
         run: npm run lint:check
 
+      - name: Run migrations
+        run: npx knex migrate:latest
+        env:
+          NODE_ENV: test
+          DB_NAME: pms_test_db
+          DB_USER: root
+          DB_PASSWORD: rootpassword
+          DB_HOST: 127.0.0.1
+
       - name: Run Stability Tests (Vitest)
         run: npm test
         env:
@@ -38,7 +57,7 @@ jobs:
           DB_NAME: pms_test_db
           DB_USER: root
           DB_PASSWORD: rootpassword
-          DB_HOST: localhost
+          DB_HOST: 127.0.0.1
 
   frontend-ci:
     name: Frontend CI
