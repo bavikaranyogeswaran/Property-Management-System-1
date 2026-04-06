@@ -1,4 +1,4 @@
-import rateLimit from 'express-rate-limit';
+import { rateLimit, ipKeyGenerator } from 'express-rate-limit';
 import logger from './logger.js';
 
 /**
@@ -19,8 +19,8 @@ const limitHandler = (req, res, next, options) => {
  * Key Generator targeting individual emails if available.
  * Falls back to IP.
  */
-const emailKeyGenerator = (req) => {
-  return req.body?.email || req.ip;
+const emailKeyGenerator = (req, res) => {
+  return req.body?.email || ipKeyGenerator(req, res);
 };
 
 /**

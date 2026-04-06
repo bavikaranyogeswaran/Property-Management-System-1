@@ -9,8 +9,7 @@ const forgotPasswordLimiter = rateLimit({
   standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
   legacyHeaders: false, // Disable the `X-RateLimit-*` headers
   keyGenerator: (req, res) => {
-    // Limit by email if available, otherwise by IP
-    return req.body.email || ipKeyGenerator(req.ip);
+    return req.body?.email || ipKeyGenerator(req, res);
   },
 });
 
