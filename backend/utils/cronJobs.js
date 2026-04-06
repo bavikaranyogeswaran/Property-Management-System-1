@@ -1,4 +1,4 @@
-import cron from 'node-cron';
+// Removed node-cron in favor of BullMQ Persistence
 import logger from './logger.js';
 import db from '../config/db.js';
 import leaseModel from '../models/leaseModel.js';
@@ -1110,13 +1110,44 @@ export const executeNightlyPayload = async () => {
   });
 };
 
-const initCronJobs = () => {
-  // Main Nightly Cron (Run at 1:00 AM)
-  cron.schedule('0 1 * * *', executeNightlyPayload);
+import { mainQueue } from '../config/queue.js';
 
-  // Reminders (Non-critical, don't need full locking/backfill for now)
-  cron.schedule('0 7 * * *', sendVisitReminders);
-  cron.schedule('0 8 * * *', sendRentReminders);
+/**
+ * Registers repeatable jobs with the BullMQ scheduler.
+ * This replaces the in-memory node-cron scheduling.
+ */
+export const registerRepeatableJobs = async () => {
+  logger.info('[Queue] Registering repeatable background tasks...');
+
+  // 1. Nightly Payload (1:00 AM)
+  await mainQueue.add(
+    'nightly_payload_task',
+    {},
+    {
+      repeat: { pattern: '0 1 * * *' },
+      jobId: 'nightly_payload', // Unique ID to prevent duplicates
+    }
+  );
+
+  // 2. Visit Reminders (7:00 AM)
+  await mainQueue.add(
+    'visit_reminders_task',
+    {},
+    {
+      repeat: { pattern: '0 7 * * *' },
+      jobId: 'visit_reminders',
+    }
+  );
+
+  // 3. Rent Reminders (8:00 AM)
+  await mainQueue.add(
+    'rent_reminders_task',
+    {},
+    {
+      repeat: { pattern: '0 8 * * *' },
+      jobId: 'rent_reminders',
+    }
+  );
+
+  logger.info('[Queue] All repeatable jobs have been synchronized with Redis.');
 };
-
-export default initCronJobs;

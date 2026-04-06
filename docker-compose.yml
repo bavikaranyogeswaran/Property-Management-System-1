@@ -1,4 +1,3 @@
-version: '3.8'
 
 services:
   # Database Service (MySQL 8.0)
@@ -24,6 +23,23 @@ services:
       retries: 5
       start_period: 30s
 
+  # Cache & Queue Service (Redis)
+  redis:
+    image: redis:alpine
+    container_name: pms-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - pms_redis_data:/data
+    networks:
+      - pms-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   # Backend Service (Node.js Express)
   backend:
     build: 
@@ -33,6 +49,8 @@ services:
     restart: always
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     environment:
       - DB_HOST=db
@@ -61,6 +79,8 @@ services:
     restart: always
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     environment:
       - DB_HOST=db
@@ -101,3 +121,4 @@ volumes:
   pms_db_data:
   pms_uploads_data:
   pms_logs_data:
+  pms_redis_data:

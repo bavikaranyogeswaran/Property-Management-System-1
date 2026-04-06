@@ -12,7 +12,6 @@ import logger from './utils/logger.js';
 import helmet from 'helmet';
 import { apiLimiter, publicPortalLimiter } from './utils/rateLimiters.js';
 import { config, validateConfig } from './config/config.js';
-import initCronJobs from './utils/cronJobs.js';
 import globalErrorHandler from './controllers/errorController.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -223,7 +222,7 @@ if (config.env !== 'test') {
     server.close(async () => {
       logger.info('HTTP server closed.');
       try {
-        await db.destroy();
+        await db.end();
         logger.info('Database connections closed.');
         process.exit(0);
       } catch (err) {
