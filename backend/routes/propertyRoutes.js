@@ -39,7 +39,7 @@ router.put(
   '/:id',
   authenticateToken,
   authorizeRoles('owner'),
-  authorizeResource('property'),
+  authorizeResource('property', 'id', 'params'),
   propertyController.updateProperty
 );
 
@@ -48,7 +48,7 @@ router.delete(
   '/:id',
   authenticateToken,
   authorizeRoles('owner'),
-  authorizeResource('property'),
+  authorizeResource('property', 'id', 'params'),
   propertyController.deleteProperty
 );
 
@@ -57,7 +57,7 @@ router.post(
   '/:id/images',
   authenticateToken,
   authorizeRoles('owner'),
-  authorizeResource('property'),
+  authorizeResource('property', 'id', 'params'),
   upload.array('images', 10),
   propertyController.uploadImages
 );

@@ -17,7 +17,7 @@ router.post(
 router.patch(
   '/:id/status',
   authenticateToken,
-  authorizeResource('invoice'),
+  authorizeResource('invoice', 'id', 'params'),
   invoiceController.updateStatus
 );
 

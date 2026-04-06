@@ -30,7 +30,7 @@ router.put(
   '/:id/verify',
   authenticateToken,
   authorizeRoles('treasurer'),
-  authorizeResource('payment'),
+  authorizeResource('payment', 'id', 'params'),
   validateRequest(verifyPaymentSchema),
   paymentController.verifyPayment
 );

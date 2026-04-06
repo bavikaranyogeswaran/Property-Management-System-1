@@ -19,7 +19,7 @@ router.get('/', authenticateToken, maintenanceRequestController.getRequests);
 router.put(
   '/:id/status',
   authenticateToken,
-  authorizeResource('maintenance_request'),
+  authorizeResource('maintenance_request', 'id', 'params'),
   maintenanceRequestController.updateStatus
 );
 router.post(

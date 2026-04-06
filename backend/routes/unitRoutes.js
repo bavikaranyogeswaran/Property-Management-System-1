@@ -23,14 +23,14 @@ router.put(
   '/:id',
   authenticateToken,
   authorizeRoles('owner'),
-  authorizeResource('unit'),
+  authorizeResource('unit', 'id', 'params'),
   unitController.updateUnit
 );
 router.delete(
   '/:id',
   authenticateToken,
   authorizeRoles('owner'),
-  authorizeResource('unit'),
+  authorizeResource('unit', 'id', 'params'),
   unitController.deleteUnit
 );
 
@@ -39,7 +39,7 @@ router.patch(
   '/:id/mark-available',
   authenticateToken,
   authorizeRoles('owner', 'treasurer'),
-  authorizeResource('unit'),
+  authorizeResource('unit', 'id', 'params'),
   unitController.markAvailable
 );
 
