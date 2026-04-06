@@ -1,31 +1,36 @@
-# Stage 1: Build
-FROM node:20-alpine AS builder
-
+# Stage 1: Build Dependencies (Production Only)
+FROM node:20-alpine AS deps
 WORKDIR /app
-
-# Copy dependency manifests
 COPY package*.json ./
-
-# Install production and build dependencies
-RUN npm ci
-
-# Copy source code
-COPY . .
+# Install only production dependencies for the final lean image
+RUN npm ci --omit=dev
 
 # Stage 2: Final Production Image
-FROM node:20-alpine
-
+FROM node:20-alpine AS runner
 WORKDIR /app
 
 # Ensure required storage directories exist with correct permissions for 'node' user
 RUN mkdir -p logs uploads && chown -R node:node /app
 
-# Copy dependency manifests and source from builder with correct ownership
-COPY --from=builder --chown=node:node /app/package*.json ./
-COPY --from=builder --chown=node:node /app/node_modules ./node_modules
-COPY --from=builder --chown=node:node /app ./
+# Copy production dependencies from deps stage
+COPY --from=deps --chown=node:node /app/node_modules ./node_modules
+COPY --from=deps --chown=node:node /app/package*.json ./
 
-# Switch to non-privileged user
+# Selective Whitelisting: Copy only required application directories and entry points
+# This eliminates redundant Stage 1 source copies and prunes non-production files (tests, docs)
+COPY --chown=node:node server.js ./
+COPY --chown=node:node worker.js ./
+COPY --chown=node:node config/ ./config/
+COPY --chown=node:node controllers/ ./controllers/
+COPY --chown=node:node middleware/ ./middleware/
+COPY --chown=node:node migrations/ ./migrations/
+COPY --chown=node:node models/ ./models/
+COPY --chown=node:node routes/ ./routes/
+COPY --chown=node:node services/ ./services/
+COPY --chown=node:node utils/ ./utils/
+COPY --chown=node:node knexfile.js ./
+
+# Switch to non-privileged user for security (Zero-Trust)
 USER node
 
 # Expose the application port
@@ -35,4 +40,5 @@ EXPOSE 3000
 ENV NODE_ENV=production
 
 # Start the application
+# Now includes automatic migrations on start for environment parity
 CMD ["npm", "run", "start"]
