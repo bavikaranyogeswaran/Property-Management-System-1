@@ -17,6 +17,12 @@ services:
       - pms_db_data:/var/lib/mysql
     networks:
       - pms-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$MYSQL_ROOT_PASSWORD"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   # Backend Service (Node.js Express)
   backend:
@@ -26,7 +32,8 @@ services:
     container_name: pms-backend
     restart: always
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     environment:
       - DB_HOST=db
       - DB_USER=${DB_USER:-pms_user}
@@ -53,7 +60,8 @@ services:
     container_name: pms-worker
     restart: always
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     environment:
       - DB_HOST=db
       - DB_USER=${DB_USER:-pms_user}
