@@ -121,9 +121,9 @@ class PayoutModel {
             AND p.status = 'verified'
             AND ri.invoice_type NOT IN ('deposit')
             AND p.payout_id IS NULL
-            AND p.payment_date <= ?
+            AND p.payment_date >= ? AND p.payment_date <= ?
         `;
-    const incomeParams = [ownerId, endDate];
+    const incomeParams = [ownerId, startDate, endDate];
 
     if (selection?.incomeIds && selection.incomeIds.length > 0) {
       incomeQuery += ` AND p.payment_id IN (?)`;
@@ -162,9 +162,9 @@ class PayoutModel {
             AND mc.status = 'active'
             AND (mc.bill_to = 'owner' OR mc.bill_to IS NULL)
             AND mc.payout_id IS NULL
-            AND mc.recorded_date <= ?
+            AND mc.recorded_date >= ? AND mc.recorded_date <= ?
         `;
-    const expenseParams = [ownerId, endDate];
+    const expenseParams = [ownerId, startDate, endDate];
 
     if (selection?.expenseIds && selection.expenseIds.length > 0) {
       expenseQuery += ` AND mc.cost_id IN (?)`;
