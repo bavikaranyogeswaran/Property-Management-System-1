@@ -24,7 +24,7 @@ const LATE_FEE_PERCENTAGE = 0.03;
 
 /**
  * Distributed Lock for Cron Jobs using Database Transactions
- * 
+ *
  * Instead of an in-memory Set(), we use 'SELECT ... FOR UPDATE' on the cron_checkpoints table.
  * This prevents two separate containers from starting the same job simultaneously.
  */
@@ -40,16 +40,18 @@ const runWithDistributedLock = async (jobName, taskFn) => {
     );
 
     const now = new Date();
-    
+
     if (rows.length > 0) {
       const lock = rows[0];
       const lastUpdate = new Date(lock.updated_at);
       const diffMinutes = (now.getTime() - lastUpdate.getTime()) / (1000 * 60);
 
-      // 2. Safety Check: If a job is 'running' but has been silent for > 60 minutes, 
+      // 2. Safety Check: If a job is 'running' but has been silent for > 60 minutes,
       // assume the container crashed and allow this process to reclaim it.
       if (lock.status === 'running' && diffMinutes < 60) {
-        console.warn(`[Worker] Job "${jobName}" is currently locked by another process. Skipping.`);
+        console.warn(
+          `[Worker] Job "${jobName}" is currently locked by another process. Skipping.`
+        );
         await connection.rollback();
         return;
       }
@@ -76,7 +78,6 @@ const runWithDistributedLock = async (jobName, taskFn) => {
       [jobName]
     );
     console.log(`[Worker] Job "${jobName}" completed and unlocked.`);
-
   } catch (err) {
     console.error(`[Worker] Error in job "${jobName}":`, err);
     // 6. Mark the job as 'failed' so it can be retried or debugged
