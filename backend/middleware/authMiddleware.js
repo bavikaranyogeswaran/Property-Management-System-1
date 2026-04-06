@@ -39,7 +39,10 @@ export const authenticateToken = async (req, res, next) => {
       });
     }
 
-    req.user = decoded;
+    // [HARDENED] Real-time Role Synchronization
+    // We overwrite the role from the JWT with the fresh role from the database.
+    // This ensures that demotions or promotions are instant, even with a long-lived token.
+    req.user = { ...decoded, role: user.role };
     next();
   } catch (err) {
     console.log('[Auth] Token verification failed:', err.message);
