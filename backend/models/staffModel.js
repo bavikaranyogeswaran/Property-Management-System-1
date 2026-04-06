@@ -101,6 +101,18 @@ class StaffModel {
       assignedAt: row.assigned_at,
     }));
   }
+
+  /**
+   * [HIGH-PERFORMANCE] Point-check for staff assignment.
+   * Replaces fetching of the entire portfolio with a single row 'EXISTS' check.
+   */
+  async isAssignedToProperty(userId, propertyId) {
+    const [rows] = await pool.query(
+      'SELECT 1 FROM staff_property_assignments WHERE user_id = ? AND property_id = ? LIMIT 1',
+      [userId, propertyId]
+    );
+    return rows.length > 0;
+  }
 }
 
 export default new StaffModel();

@@ -318,6 +318,23 @@ class PropertyModel {
     );
     return true;
   }
+
+  /**
+   * [HIGH-PERFORMANCE] Checks if a staff member is assigned to ANY property owned by a specific owner.
+   * Replaces dual-model fetching and in-memory comparisons with a single JOIN check.
+   */
+  async isStaffAssignedToOwner(staffId, ownerId) {
+    const [rows] = await db.query(
+      `
+            SELECT 1 FROM staff_property_assignments spa
+            JOIN properties p ON spa.property_id = p.property_id
+            WHERE spa.user_id = ? AND p.owner_id = ? AND p.is_archived = FALSE
+            LIMIT 1
+        `,
+      [staffId, ownerId]
+    );
+    return rows.length > 0;
+  }
 }
 
 export default new PropertyModel();
