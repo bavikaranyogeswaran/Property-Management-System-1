@@ -10,23 +10,23 @@
 
 import 'dotenv/config';
 import initCronJobs from './utils/cronJobs.js';
+import logger from './utils/logger.js';
 
-console.log('---------------------------------------------------------');
-console.log('PMS BACKGROUND WORKER: Initializing...');
-console.log(`Time: ${new Date().toISOString()}`);
-console.log('---------------------------------------------------------');
+logger.info('---------------------------------------------------------');
+logger.info('PMS BACKGROUND WORKER: Initializing...');
+logger.info('---------------------------------------------------------');
 
 // Start the scheduled tasks (The "Heartbeat" of the system)
 try {
   initCronJobs();
-  console.log('[Worker] All scheduled tasks have been initialized.');
+  logger.info('[Worker] All scheduled tasks have been initialized.');
 } catch (error) {
-  console.error('[Worker] Fatal Error during initialization:', error);
+  logger.error('[Worker] Fatal Error during initialization:', error);
   process.exit(1);
 }
 
 // Keep the process alive
 process.on('SIGTERM', () => {
-  console.log('[Worker] Received SIGTERM. Shutting down gracefully...');
+  logger.info('[Worker] Received SIGTERM. Shutting down gracefully...');
   process.exit(0);
 });

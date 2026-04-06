@@ -8,9 +8,11 @@
 
 import express, { json } from 'express';
 import cors from 'cors';
+import logger from './utils/logger.js';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit'; // Controls how many requests someone can make (Security)
 import 'dotenv/config';
+import initCronJobs from './utils/cronJobs.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import db from './config/db.js';
@@ -134,7 +136,7 @@ app.get('/api/health', async (req, res) => {
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    console.error('[Health Check] Database connection failed:', error.message);
+    logger.error('[Health Check] Database connection failed:', error.message);
     res.status(503).json({
       status: 'error',
       app: 'up',
@@ -143,6 +145,7 @@ app.get('/api/health', async (req, res) => {
     });
   }
 });
+
 
 app.use('/api/public/invoice', guestPaymentRoutes);
 
@@ -216,7 +219,7 @@ app.use((err, req, res, next) => {
 // Only start the server if not running in a test environment
 if (process.env.NODE_ENV !== 'test') {
   app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
+    logger.info(`Server is running on port ${PORT}`, { port: PORT, env: process.env.NODE_ENV || 'development' });
   });
 }
 

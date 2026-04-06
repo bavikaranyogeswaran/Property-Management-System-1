@@ -4,6 +4,7 @@
  */
 import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
+import logger from './logger.js';
 import { fromCents } from './moneyUtils.js';
 dotenv.config();
 
@@ -36,14 +37,14 @@ class EmailService {
       : null;
 
     if (!this.transporter) {
-      console.log('==================================================');
-      console.log(`[EMAIL MOCK] Welcome/Interest Confirmation: ${email}`);
-      console.log(`Name: ${name}`);
-      console.log(`Property: ${propertyName}`);
+      logger.info('==================================================');
+      logger.info(`[EMAIL MOCK] Welcome/Interest Confirmation: ${email}`);
+      logger.info(`Name: ${name}`);
+      logger.info(`Property: ${propertyName}`);
       if (portalUrl) {
-        console.log(`Portal Link: ${portalUrl}`);
+        logger.info(`Portal Link: ${portalUrl}`);
       }
-      console.log('==================================================');
+      logger.info('==================================================');
       return true;
     }
     try {
@@ -80,7 +81,7 @@ class EmailService {
         ),
       });
     } catch (e) {
-      console.error('Error sending welcome lead email:', e);
+      logger.error('Error sending welcome lead email:', e);
     }
   }
 
@@ -143,7 +144,7 @@ class EmailService {
       });
       return true;
     } catch (error) {
-      console.error('Error sending password reset email:', error);
+      logger.error('Error sending password reset email:', error);
       return false;
     }
   }
@@ -284,9 +285,6 @@ class EmailService {
     const dateStr = new Date(scheduledDate).toLocaleString();
 
     if (!this.transporter) {
-      console.log('==================================================');
-      console.log(`[EMAIL MOCK] Visit Notification to Owner: ${ownerEmail}`);
-      console.log(`Visitor: ${visitorName} (${visitorPhone})`);
       console.log(
         `Property: ${propertyName} ${unitNumber ? '(Unit ' + unitNumber + ')' : ''}`
       );
@@ -595,13 +593,13 @@ class EmailService {
         : `Urgent: Lease for Unit ${unitNumber} Expiring in ${daysCount} Days`;
 
     if (!this.transporter) {
-      console.log('==================================================');
-      console.log(
+      logger.info('==================================================');
+      logger.info(
         `[EMAIL MOCK] Lease Expiry (${daysCount} days) to ${email} (${role})`
       );
-      console.log(`Property: ${propertyName}, Unit: ${unitNumber}`);
-      console.log(`End Date: ${endDate}`);
-      console.log('==================================================');
+      logger.info(`Property: ${propertyName}, Unit: ${unitNumber}`);
+      logger.info(`End Date: ${endDate}`);
+      logger.info('==================================================');
       return true;
     }
 

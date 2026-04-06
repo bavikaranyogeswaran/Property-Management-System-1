@@ -1,4 +1,5 @@
 import cron from 'node-cron';
+import logger from './logger.js';
 import db from '../config/db.js';
 import leaseModel from '../models/leaseModel.js';
 import invoiceModel from '../models/invoiceModel.js';
@@ -49,7 +50,7 @@ const runWithDistributedLock = async (jobName, taskFn) => {
       // 2. Safety Check: If a job is 'running' but has been silent for > 60 minutes,
       // assume the container crashed and allow this process to reclaim it.
       if (lock.status === 'running' && diffMinutes < 60) {
-        console.warn(
+        logger.warn(
           `[Worker] Job "${jobName}" is currently locked by another process. Skipping.`
         );
         await connection.rollback();
@@ -67,7 +68,7 @@ const runWithDistributedLock = async (jobName, taskFn) => {
 
     // Commit the lock status
     await connection.commit();
-    console.log(`[Worker] Acquired lock for job: ${jobName}`);
+    logger.info(`[Worker] Acquired lock for job: ${jobName}`);
 
     // 4. Execute the Actual Task
     await taskFn();
@@ -77,7 +78,7 @@ const runWithDistributedLock = async (jobName, taskFn) => {
       "UPDATE cron_checkpoints SET status = 'success', message = 'Completed successfully', updated_at = NOW(), last_success_date = CURDATE() WHERE job_name = ?",
       [jobName]
     );
-    console.log(`[Worker] Job "${jobName}" completed and unlocked.`);
+    logger.info(`[Worker] Job "${jobName}" completed and unlocked.`);
   } catch (err) {
     console.error(`[Worker] Error in job "${jobName}":`, err);
     // 6. Mark the job as 'failed' so it can be retried or debugged
@@ -1042,7 +1043,7 @@ export const escalateOverdueMaintenance = async () => {
  */
 export const runNightlyCron = async (targetDate = null) => {
   const executionDate = targetDate || today();
-  console.log(`--- Starting Nightly Cron Activities for ${executionDate} ---`);
+  logger.info(`--- Starting Nightly Cron Activities for ${executionDate} ---`);
 
   try {
     // 1. Warnings & Expiries
