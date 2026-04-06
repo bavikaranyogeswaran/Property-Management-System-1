@@ -67,9 +67,9 @@ class PayoutModel {
     return true;
   }
 
-  async checkOverlap(ownerId, startDate, endDate) {
+  async checkOverlap(ownerId, startDate, endDate, skipIfSelective = false) {
+    if (skipIfSelective) return false; // Records themselves ensure uniqueness in selective mode
     // Check if any existing payout overlaps with the requested range
-    // Overlap logic: (StartA <= EndB) and (EndA >= StartB)
     const [rows] = await pool.query(
       `
             SELECT 1 FROM owner_payouts 
@@ -77,18 +77,19 @@ class PayoutModel {
             AND period_end >= ?
             LIMIT 1
         `,
-      [ownerId, startDate] // If new payout starts before an old one ends, it's an overlap
+      [ownerId, startDate]
     );
     return rows.length > 0;
   }
 
   // Core Logic: Rent - Expenses (Captures snapshot of IDs to prevent race conditions)
-  async calculateNetPayout(ownerId, startDate, endDate, connection) {
+  async calculateNetPayout(ownerId, startDate, endDate, connection, selection = null) {
     const db = connection || pool;
-    // 1. Snapshot Income IDs and Total (incl. per-property fees)
-    const [incomeRows] = await db.query(
-      `
-            SELECT p.payment_id as paymentId, p.amount, prop.management_fee_percentage as fee, ri.invoice_type as invoiceType
+    
+    // 1. Snapshot Income IDs and Total
+    let incomeQuery = `
+            SELECT p.payment_id as paymentId, p.amount, prop.management_fee_percentage as fee, ri.invoice_type as invoiceType,
+                   u.unit_number, prop.name as property_name, p.payment_date, ri.month, ri.year, ri.description as invoice_description
             FROM payments p
             JOIN rent_invoices ri ON p.invoice_id = ri.invoice_id
             JOIN leases l ON ri.lease_id = l.lease_id
@@ -99,15 +100,19 @@ class PayoutModel {
             AND ri.invoice_type NOT IN ('deposit')
             AND p.payout_id IS NULL
             AND p.payment_date <= ?
-        `,
-      [ownerId, endDate]
-    );
+        `;
+    const incomeParams = [ownerId, endDate];
+
+    if (selection?.incomeIds && selection.incomeIds.length > 0) {
+        incomeQuery += ` AND p.payment_id IN (?)`;
+        incomeParams.push(selection.incomeIds);
+    }
+
+    const [incomeRows] = await db.query(incomeQuery, incomeParams);
 
     const incomeIds = incomeRows.map(r => r.paymentId);
     const totalGross = incomeRows.reduce((sum, r) => sum + Number(r.amount), 0);
     const totalCommission = incomeRows.reduce((sum, r) => {
-        // [HARDENED] Only apply commission to Rent and Late Fees.
-        // Reimbursements (Maintenance) and Deposits should be 0% commission.
         if (['rent', 'late_fee'].includes(r.invoiceType)) {
             const fee = Number(r.fee || 0);
             const comm = Math.round(Number(r.amount) * (fee / 100));
@@ -117,9 +122,9 @@ class PayoutModel {
     }, 0);
 
     // 2. Snapshot Expense IDs and Total
-    const [expenseRows] = await db.query(
-      `
-            SELECT mc.cost_id as costId, mc.amount
+    let expenseQuery = `
+            SELECT mc.cost_id as costId, mc.amount, mc.recorded_date, mc.description, mc.bill_to,
+                   u.unit_number, prop.name as property_name, mr.title as request_title
             FROM maintenance_costs mc
             JOIN maintenance_requests mr ON mc.request_id = mr.request_id
             JOIN units u ON mr.unit_id = u.unit_id
@@ -129,9 +134,15 @@ class PayoutModel {
             AND (mc.bill_to = 'owner' OR mc.bill_to IS NULL)
             AND mc.payout_id IS NULL
             AND mc.recorded_date <= ?
-        `,
-      [ownerId, endDate]
-    );
+        `;
+    const expenseParams = [ownerId, endDate];
+
+    if (selection?.expenseIds && selection.expenseIds.length > 0) {
+        expenseQuery += ` AND mc.cost_id IN (?)`;
+        expenseParams.push(selection.expenseIds);
+    }
+
+    const [expenseRows] = await db.query(expenseQuery, expenseParams);
 
     const expenseIds = expenseRows.map(r => r.costId);
     const totalExpenses = expenseRows.reduce((sum, r) => sum + Number(r.amount), 0);
@@ -143,6 +154,11 @@ class PayoutModel {
       netPayout: totalGross - totalCommission - totalExpenses,
       incomeIds,
       expenseIds,
+      // Pass back full details for the frontend preview list
+      details: {
+          income: incomeRows,
+          expenses: expenseRows
+      }
     };
   }
 

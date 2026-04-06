@@ -1,19 +1,20 @@
 import payoutModel from '../models/payoutModel.js';
 
 class PayoutService {
-  async previewPayout(ownerId, startDate, endDate) {
+  async previewPayout(ownerId, startDate, endDate, selection = null) {
     if (!endDate) {
       throw new Error('End date is required');
     }
-    return await payoutModel.calculateNetPayout(ownerId, startDate, endDate);
+    return await payoutModel.calculateNetPayout(ownerId, startDate, endDate, null, selection);
   }
 
-  async createPayout(ownerId, startDate, endDate) {
+  async createPayout(ownerId, startDate, endDate, selection = null) {
     if (!endDate) {
       throw new Error('End date is required');
     }
 
-    const hasOverlap = await payoutModel.checkOverlap(ownerId, startDate, endDate);
+    const isSelective = !!(selection?.incomeIds?.length || selection?.expenseIds?.length);
+    const hasOverlap = await payoutModel.checkOverlap(ownerId, startDate, endDate, isSelective);
     if (hasOverlap) {
       throw new Error('A payout record already exists that covers part of this period.');
     }
@@ -23,7 +24,7 @@ class PayoutService {
       await connection.beginTransaction();
 
       const { totalGross, totalCommission, totalExpenses, netPayout, incomeIds, expenseIds } = 
-        await payoutModel.calculateNetPayout(ownerId, startDate, endDate, connection);
+        await payoutModel.calculateNetPayout(ownerId, startDate, endDate, connection, selection);
 
       if (incomeIds.length === 0 && expenseIds.length === 0) {
           throw new Error('No eligible records found for this payout period.');

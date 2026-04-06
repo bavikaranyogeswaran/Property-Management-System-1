@@ -103,9 +103,17 @@ export const invoiceApi = {
 };
 
 export const payoutApi = {
-  preview: (ownerId: string, startDate: string, endDate: string) =>
-    apiClient.get(`/payouts/preview?ownerId=${ownerId}&startDate=${startDate}&endDate=${endDate}`),
-  create: (data: { ownerId: string; startDate: string; endDate: string }) =>
+  preview: (ownerId: string, startDate: string, endDate: string, selection?: { incomeIds?: string[]; expenseIds?: string[] }) => {
+    let url = `/payouts/preview?ownerId=${ownerId}&startDate=${startDate}&endDate=${endDate}`;
+    if (selection?.incomeIds?.length) {
+      selection.incomeIds.forEach(id => url += `&incomeIds=${id}`);
+    }
+    if (selection?.expenseIds?.length) {
+      selection.expenseIds.forEach(id => url += `&expenseIds=${id}`);
+    }
+    return apiClient.get(url);
+  },
+  create: (data: { ownerId: string; startDate: string; endDate: string; selection?: { incomeIds?: string[]; expenseIds?: string[] } }) =>
     apiClient.post('/payouts/create', data),
   getHistory: (ownerId?: string) => 
     apiClient.get(`/payouts/history${ownerId ? `?ownerId=${ownerId}` : ''}`),

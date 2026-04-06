@@ -30,6 +30,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
+import { AlertCircle, AlertTriangle } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const TreasurerPayoutsPage: React.FC = () => {
   const { user } = useAuth();
@@ -46,6 +51,10 @@ const TreasurerPayoutsPage: React.FC = () => {
   const [previewData, setPreviewData] = useState<any | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   
+  // Selection State (Partial Payouts)
+  const [selectedIncomeIds, setSelectedIncomeIds] = useState<string[]>([]);
+  const [selectedExpenseIds, setSelectedExpenseIds] = useState<string[]>([]);
+
   // Action state
   const [selectedPayoutId, setSelectedPayoutId] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -80,6 +89,9 @@ const TreasurerPayoutsPage: React.FC = () => {
     try {
       const res = await payoutApi.preview(selectedOwnerId, startDate, endDate);
       setPreviewData(res.data);
+      // Initialize with all IDs selected
+      setSelectedIncomeIds(res.data.incomeIds || []);
+      setSelectedExpenseIds(res.data.expenseIds || []);
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Failed to preview payout');
     } finally {
@@ -87,13 +99,48 @@ const TreasurerPayoutsPage: React.FC = () => {
     }
   };
 
+  const calculateLiveTotals = () => {
+    if (!previewData) return { gross: 0, commission: 0, expenses: 0, net: 0 };
+    
+    const income = previewData.details?.income?.filter((i: any) => selectedIncomeIds.includes(i.paymentId)) || [];
+    const expenses = previewData.details?.expenses?.filter((e: any) => selectedExpenseIds.includes(e.costId)) || [];
+
+    const gross = income.reduce((sum: number, r: any) => sum + Number(r.amount), 0);
+    const commission = income.reduce((sum: number, r: any) => {
+        if (['rent', 'late_fee'].includes(r.invoiceType)) {
+            const fee = Number(r.fee || 0);
+            return sum + Math.round(Number(r.amount) * (fee / 100));
+        }
+        return sum;
+    }, 0);
+    const totalExp = expenses.reduce((sum: number, r: any) => sum + Number(r.amount), 0);
+
+    return { gross, commission, expenses: totalExp, net: gross - commission - totalExp };
+  };
+
+  const liveTotals = calculateLiveTotals();
+
   const handleCreate = async () => {
     if (!selectedOwnerId || !endDate) return;
+    
+    if (selectedIncomeIds.length === 0 && selectedExpenseIds.length === 0) {
+        toast.error('You must select at least one transaction to create a payout');
+        return;
+    }
+
     if (!confirm('Proceed with recording this payout in the system?')) return;
 
     try {
       setActionLoading('creating');
-      await payoutApi.create({ ownerId: selectedOwnerId, startDate, endDate });
+      await payoutApi.create({ 
+        ownerId: selectedOwnerId, 
+        startDate, 
+        endDate,
+        selection: {
+            incomeIds: selectedIncomeIds,
+            expenseIds: selectedExpenseIds
+        }
+      });
       toast.success('Payout record created successfully!');
       setPreviewData(null);
       fetchHistory();
@@ -207,32 +254,123 @@ const TreasurerPayoutsPage: React.FC = () => {
           </Card>
 
           {previewData && (
-             <Card className="bg-blue-50/50 border-blue-200 animate-in fade-in slide-in-from-top-2 duration-300">
+             <Card className="bg-blue-50/50 border-blue-200 animate-in fade-in slide-in-from-top-2 duration-300 xl:sticky xl:top-8">
                 <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-bold uppercase tracking-wider text-blue-600">Calculated Preview</CardTitle>
+                    <div className="flex justify-between items-center">
+                        <CardTitle className="text-sm font-bold uppercase tracking-wider text-blue-600">Calculated Payout</CardTitle>
+                        { (selectedIncomeIds.length < (previewData.incomeIds?.length || 0) || 
+                           selectedExpenseIds.length < (previewData.expenseIds?.length || 0)) && (
+                            <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200 text-[10px]">Partial</Badge>
+                        )}
+                    </div>
+                    <CardDescription className="text-[10px]">Select/Deselect transactions to exclude disputed items.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="bg-white p-3 rounded border shadow-sm">
-                            <span className="text-[10px] text-muted-foreground uppercase font-bold">Gross Rent</span>
-                            <p className="text-lg font-bold text-gray-900">{formatLKR(previewData.totalGross)}</p>
+                    {/* Financial Summary */}
+                    <div className="grid grid-cols-2 gap-3">
+                        <div className="bg-white p-2 rounded border shadow-sm">
+                            <span className="text-[9px] text-muted-foreground uppercase font-bold block">Gross Rent</span>
+                            <p className="text-sm font-bold text-gray-900">{formatLKR(liveTotals.gross)}</p>
                         </div>
-                        <div className="bg-white p-3 rounded border shadow-sm">
-                            <span className="text-[10px] text-red-500 uppercase font-bold">Agency Fee</span>
-                            <p className="text-lg font-bold text-red-600">-{formatLKR(previewData.totalCommission)}</p>
+                        <div className="bg-white p-2 rounded border shadow-sm">
+                            <span className="text-[9px] text-red-500 uppercase font-bold block">Agency Fee</span>
+                            <p className="text-sm font-bold text-red-600">-{formatLKR(liveTotals.commission)}</p>
                         </div>
-                        <div className="bg-white p-3 rounded border shadow-sm">
-                            <span className="text-[10px] text-red-500 uppercase font-bold">Maintenance</span>
-                            <p className="text-lg font-bold text-red-600">-{formatLKR(previewData.totalExpenses)}</p>
+                        <div className="bg-white p-2 rounded border shadow-sm">
+                            <span className="text-[9px] text-red-500 uppercase font-bold block">Maintenance</span>
+                            <p className="text-sm font-bold text-red-600">-{formatLKR(liveTotals.expenses)}</p>
                         </div>
-                        <div className="bg-blue-600 p-3 rounded border shadow-md text-white">
-                            <span className="text-[10px] opacity-80 uppercase font-bold">Net Net Payout</span>
-                            <p className="text-xl font-black">{formatLKR(previewData.netPayout)}</p>
+                        <div className="bg-blue-600 p-2 rounded border shadow-md text-white">
+                            <span className="text-[9px] opacity-80 uppercase font-bold block">Net Payout</span>
+                            <p className="text-base font-black">{formatLKR(liveTotals.net)}</p>
                         </div>
                     </div>
+
+                    <Separator />
+
+                    {/* Transaction Selection List */}
+                    <div className="space-y-3">
+                        <h4 className="text-[10px] font-bold text-gray-500 uppercase flex items-center justify-between">
+                            Eligible Transactions
+                            <span className="text-blue-600 lowercase bg-blue-100 px-1.5 rounded-full">{selectedIncomeIds.length + selectedExpenseIds.length} items</span>
+                        </h4>
+                        
+                        <ScrollArea className="h-[300px] pr-4">
+                            <div className="space-y-4">
+                                {/* Income Section */}
+                                {previewData.details?.income?.length > 0 && (
+                                    <div className="space-y-2">
+                                        <p className="text-[10px] font-bold text-green-700 bg-green-50 px-2 py-0.5 rounded inline-block">Revenue</p>
+                                        {previewData.details.income.map((item: any) => (
+                                            <div key={item.paymentId} className="flex items-start gap-2 p-2 rounded hover:bg-white/80 border border-transparent hover:border-gray-100 transition-all">
+                                                <Checkbox 
+                                                    checked={selectedIncomeIds.includes(item.paymentId)}
+                                                    onCheckedChange={(checked) => {
+                                                        if (checked) setSelectedIncomeIds([...selectedIncomeIds, item.paymentId]);
+                                                        else setSelectedIncomeIds(selectedIncomeIds.filter(id => id !== item.paymentId));
+                                                    }}
+                                                    className="mt-0.5"
+                                                />
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex justify-between items-start">
+                                                        <p className="text-[11px] font-bold text-gray-900 truncate">Unit {item.unit_number}</p>
+                                                        <p className="text-[11px] font-black text-gray-900">{formatLKR(item.amount)}</p>
+                                                    </div>
+                                                    <p className="text-[9px] text-gray-500 truncate leading-tight">
+                                                        {item.invoice_description || `${item.invoiceType} for ${item.month}/${item.year}`}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {/* Expenses Section */}
+                                {previewData.details?.expenses?.length > 0 && (
+                                    <div className="space-y-2">
+                                        <p className="text-[10px] font-bold text-red-700 bg-red-50 px-2 py-0.5 rounded inline-block">Expenses</p>
+                                        {previewData.details.expenses.map((item: any) => (
+                                            <div key={item.costId} className="flex items-start gap-2 p-2 rounded hover:bg-white/80 border border-transparent hover:border-gray-100 transition-all">
+                                                <Checkbox 
+                                                    checked={selectedExpenseIds.includes(item.costId)}
+                                                    onCheckedChange={(checked) => {
+                                                        if (checked) setSelectedExpenseIds([...selectedExpenseIds, item.costId]);
+                                                        else setSelectedExpenseIds(selectedExpenseIds.filter(id => id !== item.costId));
+                                                    }}
+                                                    className="mt-0.5"
+                                                />
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex justify-between items-start">
+                                                        <p className="text-[11px] font-bold text-gray-900 truncate">Unit {item.unit_number}</p>
+                                                        <p className="text-[11px] font-black text-red-600">-{formatLKR(item.amount)}</p>
+                                                    </div>
+                                                    <div className="flex items-center gap-1.5 overflow-hidden">
+                                                        <Badge variant="outline" className="text-[8px] h-3.5 border-red-100 text-red-400 font-normal px-1">Maintenance</Badge>
+                                                        <p className="text-[9px] text-gray-500 truncate leading-tight">
+                                                            {item.description || item.request_title}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </ScrollArea>
+                    </div>
+
+                    {liveTotals.net < 0 && (
+                        <Alert variant="destructive" className="py-2 px-3 border-red-200 bg-red-50/50">
+                            <AlertCircle className="size-3.5 text-red-600" />
+                            <AlertDescription className="text-[10px] text-red-800 leading-tight">
+                                Warning: Expenses exceed Revenue. Creating this payout will record a negative balance for the owner.
+                            </AlertDescription>
+                        </Alert>
+                    )}
+
                     <Button 
                         onClick={handleCreate} 
-                        className="w-full bg-green-600 hover:bg-green-700 font-bold"
+                        className="w-full bg-green-600 hover:bg-green-700 font-bold shadow-sm"
                         disabled={actionLoading === 'creating'}
                     >
                         {actionLoading === 'creating' ? 'Recording...' : 'Generate Payout Record'}

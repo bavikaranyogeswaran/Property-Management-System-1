@@ -18,10 +18,16 @@ class PayoutController {
           .json({ error: 'Owner ID and End date are required' });
       }
 
+      const selection = {
+        incomeIds: req.query.incomeIds ? (Array.isArray(req.query.incomeIds) ? req.query.incomeIds : [req.query.incomeIds]) : null,
+        expenseIds: req.query.expenseIds ? (Array.isArray(req.query.expenseIds) ? req.query.expenseIds : [req.query.expenseIds]) : null
+      };
+
       const calculation = await payoutService.previewPayout(
         ownerId,
         startDate,
-        endDate
+        endDate,
+        selection
       );
       res.json(calculation);
     } catch (error) {
@@ -33,7 +39,7 @@ class PayoutController {
   // 2. Create (Calculate and Save)
   async createPayout(req, res) {
     try {
-      const { ownerId, startDate, endDate } = req.body;
+      const { ownerId, startDate, endDate, selection } = req.body;
 
       if (req.user.role !== 'treasurer') {
         return res.status(403).json({ error: 'Access denied: Only treasurers can generate payouts' });
@@ -46,7 +52,8 @@ class PayoutController {
       const { payoutId, netPayout } = await payoutService.createPayout(
         ownerId,
         startDate,
-        endDate
+        endDate,
+        selection
       );
 
       res
