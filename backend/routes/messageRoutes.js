@@ -1,24 +1,29 @@
 import { Router } from 'express';
 import messageController from '../controllers/messageController.js';
-import { authenticateToken } from '../middleware/authMiddleware.js';
+import {
+  authenticateToken,
+  authorizeRoles,
+} from '../middleware/authMiddleware.js';
 
 const router = Router();
 
-// --- TENANT ROUTES ---
 // Tenant viewing their own thread
 router.get(
   '/tenant/thread',
   authenticateToken,
+  authorizeRoles('tenant'),
   messageController.getTenantMessages
 );
 router.post(
   '/tenant/thread',
   authenticateToken,
+  authorizeRoles('tenant'),
   messageController.sendTenantMessage
 );
 router.put(
   '/tenant/thread/read',
   authenticateToken,
+  authorizeRoles('tenant'),
   messageController.markTenantRead
 );
 
@@ -26,27 +31,40 @@ router.put(
 router.get(
   '/owner/tenant/:tenantId',
   authenticateToken,
+  authorizeRoles('owner', 'admin'),
   messageController.getTenantMessages
 );
 router.post(
   '/owner/tenant/:tenantId',
   authenticateToken,
+  authorizeRoles('owner', 'admin'),
   messageController.sendTenantMessage
 );
 router.put(
   '/owner/tenant/:tenantId/read',
   authenticateToken,
+  authorizeRoles('owner', 'admin'),
   messageController.markTenantRead
 );
 
-// --- LEAD ROUTES ---
-// Send a message to a lead (owner/admin only)
-router.post('/:leadId', authenticateToken, messageController.sendMessage);
-
-// Get all messages for a lead
-router.get('/:leadId', authenticateToken, messageController.getMessages);
-
-// Mark messages as read
-router.put('/:leadId/read', authenticateToken, messageController.markRead);
+// Lead Communication (Owner/Admin only)
+router.post(
+  '/:leadId',
+  authenticateToken,
+  authorizeRoles('owner', 'admin'),
+  messageController.sendMessage
+);
+router.get(
+  '/:leadId',
+  authenticateToken,
+  authorizeRoles('owner', 'admin', 'tenant'),
+  messageController.getMessages
+);
+router.put(
+  '/:leadId/read',
+  authenticateToken,
+  authorizeRoles('owner', 'admin', 'tenant'),
+  messageController.markRead
+);
 
 export default router;

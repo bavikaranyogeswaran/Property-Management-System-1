@@ -56,11 +56,21 @@ router.get(
   userController.getTreasurers
 );
 
-// Get all tenants (Owner only)
-router.get('/tenants', authenticateToken, userController.getTenants);
+// Get all tenants (Owner and Treasurer)
+router.get(
+  '/tenants',
+  authenticateToken,
+  authorizeRoles('owner', 'treasurer'),
+  userController.getTenants
+);
 
 // Get all owners (Owner and Treasurer)
-router.get('/owners', authenticateToken, userController.getOwners);
+router.get(
+  '/owners',
+  authenticateToken,
+  authorizeRoles('owner', 'treasurer'),
+  userController.getOwners
+);
 
 // Get user by ID (Generic)
 router.get('/:id', authenticateToken, userController.getUserById);
@@ -69,16 +79,19 @@ router.get('/:id', authenticateToken, userController.getUserById);
 router.post(
   '/assign-property',
   authenticateToken,
+  authorizeRoles('owner'),
   userController.assignProperty
 );
 router.delete(
   '/:userId/assign-property/:propertyId',
   authenticateToken,
+  authorizeRoles('owner'),
   userController.removeProperty
 );
 router.get(
   '/:userId/assigned-properties',
   authenticateToken,
+  authorizeRoles('owner', 'treasurer'),
   userController.getAssignedProperties
 );
 

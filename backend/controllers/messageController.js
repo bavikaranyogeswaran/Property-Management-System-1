@@ -18,11 +18,6 @@ class MessageController {
         return res.status(404).json({ error: 'Lead not found' });
       }
 
-      // Authorization: Only owners and admins can send messages via JWT-protected route
-      if (req.user.role !== 'owner' && req.user.role !== 'admin') {
-        return res.status(403).json({ error: 'Access denied' });
-      }
-
       const messageId = await messageModel.create({
         leadId,
         senderId,
@@ -55,14 +50,6 @@ class MessageController {
       const { leadId } = req.params;
       const lead = await leadModel.findById(leadId);
       if (!lead) return res.status(404).json({ error: 'Lead not found' });
-
-      if (
-        req.user.role !== 'owner' &&
-        req.user.role !== 'admin' &&
-        req.user.role !== 'tenant'
-      ) {
-        return res.status(403).json({ error: 'Access denied' });
-      }
 
       const messages = await messageModel.findByLeadId(leadId);
       res.json(messages);

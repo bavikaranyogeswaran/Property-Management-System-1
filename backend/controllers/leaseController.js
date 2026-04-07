@@ -33,10 +33,6 @@ class LeaseController {
   //  CREATE LEASE
   async createLease(req, res) {
     try {
-      if (req.user.role !== 'owner' && req.user.role !== 'treasurer') {
-        return res.status(403).json({ error: 'Access denied.' });
-      }
-
       const leaseId = await leaseService.createLease(req.body, null, req.user);
       res
         .status(201)
@@ -155,10 +151,6 @@ class LeaseController {
 
   async instantRenew(req, res) {
     try {
-      if (req.user.role !== 'owner' && req.user.role !== 'treasurer') {
-        return res.status(403).json({ error: 'Access denied.' });
-      }
-
       const { id } = req.params;
       const { newEndDate, newMonthlyRent } = req.body;
 
@@ -182,9 +174,6 @@ class LeaseController {
 
   async refundDeposit(req, res) {
     try {
-      if (req.user.role !== 'owner' && req.user.role !== 'treasurer') {
-        return res.status(403).json({ error: 'Access denied.' });
-      }
       const { id } = req.params;
       const { amount, notes } = req.body;
 
@@ -209,11 +198,6 @@ class LeaseController {
 
   async approveRefund(req, res) {
     try {
-      if (req.user.role !== 'owner') {
-        return res
-          .status(403)
-          .json({ error: 'Only owners can approve refunds.' });
-      }
       const { id } = req.params;
       const result = await leaseService.approveRefund(id, req.user);
       res.json({
@@ -229,9 +213,6 @@ class LeaseController {
 
   async disputeRefund(req, res) {
     try {
-      if (req.user.role !== 'owner' && req.user.role !== 'treasurer') {
-        return res.status(403).json({ error: 'Access denied.' });
-      }
       const { id } = req.params;
       const { notes } = req.body;
       const result = await leaseService.disputeRefund(id, notes, req.user);
@@ -245,9 +226,6 @@ class LeaseController {
 
   async terminateLease(req, res) {
     try {
-      if (req.user.role !== 'owner' && req.user.role !== 'treasurer') {
-        return res.status(403).json({ error: 'Access denied.' });
-      }
       const { id } = req.params;
       const { terminationDate, terminationFee } = req.body; // Fee optional
 
@@ -267,9 +245,6 @@ class LeaseController {
 
   async updateLeaseDocument(req, res) {
     try {
-      if (req.user.role !== 'owner' && req.user.role !== 'treasurer') {
-        return res.status(403).json({ error: 'Access denied.' });
-      }
       const { id } = req.params;
       const { documentUrl } = req.body;
 
@@ -352,9 +327,6 @@ class LeaseController {
 
   async finalizeCheckout(req, res) {
     try {
-      if (req.user.role !== 'owner' && req.user.role !== 'treasurer') {
-        return res.status(403).json({ error: 'Access denied.' });
-      }
       const { id } = req.params;
       const result = await leaseService.finalizeLeaseCheckout(id, req.user);
       res.json({ message: 'Lease checkout finalized successfully', ...result });
@@ -423,9 +395,6 @@ class LeaseController {
 
   async cancelLease(req, res) {
     try {
-      if (req.user.role !== 'owner' && req.user.role !== 'treasurer') {
-        return res.status(403).json({ error: 'Access denied.' });
-      }
       const { id } = req.params;
       await leaseService.cancelLease(id, req.user);
       res.json({
@@ -438,9 +407,6 @@ class LeaseController {
 
   async regenerateMagicToken(req, res) {
     try {
-      if (req.user.role !== 'owner' && req.user.role !== 'treasurer') {
-        return res.status(403).json({ error: 'Access denied.' });
-      }
       const { id } = req.params;
       await leaseService.regenerateMagicLink(id, req.user);
       res.json({

@@ -14,11 +14,6 @@ class MaintenanceCostController {
       } = req.body;
       const isBillableToTenant = billTo === 'tenant' || billToTenant === true;
 
-      // RBAC: Owner and Treasurer can add costs
-      if (req.user.role !== 'owner' && req.user.role !== 'treasurer') {
-        return res.status(403).json({ error: 'Access denied' });
-      }
-
       const maintenanceService = (
         await import('../services/maintenanceService.js')
       ).default;
@@ -138,7 +133,6 @@ class MaintenanceCostController {
           );
           return res.json(costs);
         }
-        return res.status(403).json({ error: 'Access denied' });
       }
 
       const costs = await maintenanceCostModel.findByRequestId(requestId);
@@ -152,11 +146,6 @@ class MaintenanceCostController {
   async deleteCost(req, res) {
     try {
       const { id } = req.params;
-
-      // RBAC: Owner and Treasurer can delete costs
-      if (req.user.role !== 'owner' && req.user.role !== 'treasurer') {
-        return res.status(403).json({ error: 'Access denied' });
-      }
 
       if (req.user.role === 'treasurer') {
         const cost = await maintenanceCostModel.findByIdWithDetails(id);

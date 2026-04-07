@@ -13,7 +13,7 @@ class UnitController {
   async createUnit(req, res) {
     try {
       // Ownership check: verify the property belongs to the requesting owner
-      if (req.user.role === 'owner' && req.body.propertyId) {
+      if (req.body.propertyId) {
         const property = await propertyModel.findById(req.body.propertyId);
         if (!property) {
           return res.status(404).json({ error: 'Property not found' });
@@ -141,10 +141,6 @@ class UnitController {
   // Mark a maintenance unit as available so leads can submit interest
   async markAvailable(req, res) {
     try {
-      if (req.user.role !== 'owner') {
-        return res.status(403).json({ error: 'Access denied.' });
-      }
-
       const unit = await unitModel.findById(req.params.id);
       if (!unit) {
         return res.status(404).json({ error: 'Unit not found' });

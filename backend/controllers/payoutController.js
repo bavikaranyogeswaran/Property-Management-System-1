@@ -7,12 +7,6 @@ class PayoutController {
     try {
       const { ownerId, startDate, endDate } = req.query;
 
-      if (req.user.role !== 'treasurer') {
-        return res.status(403).json({
-          error: 'Access denied: Only treasurers can generate payouts',
-        });
-      }
-
       if (!ownerId || !endDate) {
         return res
           .status(400)
@@ -63,12 +57,6 @@ class PayoutController {
   async createPayout(req, res) {
     try {
       const { ownerId, startDate, endDate, selection } = req.body;
-
-      if (req.user.role !== 'treasurer') {
-        return res.status(403).json({
-          error: 'Access denied: Only treasurers can generate payouts',
-        });
-      }
 
       if (!ownerId) {
         return res.status(400).json({ error: 'Owner ID is required' });
@@ -134,12 +122,6 @@ class PayoutController {
     try {
       const { id } = req.params;
       const { bankReference, proofUrl } = req.body;
-
-      if (req.user.role !== 'treasurer') {
-        return res.status(403).json({
-          error: 'Access denied: Only treasurers can process payments',
-        });
-      }
 
       // [HARDENED] Verify Access to Payout Resource
       const fullPayout = await payoutService.getPayoutById(id);
@@ -208,8 +190,6 @@ class PayoutController {
 
   async acknowledgePayout(req, res) {
     try {
-      if (req.user.role !== 'owner')
-        return res.status(403).json({ error: 'Access denied' });
       const { id } = req.params;
       await payoutService.acknowledgePayout(req.user.id, id);
       res.json({ message: 'Payout acknowledged successfully' });
@@ -220,8 +200,6 @@ class PayoutController {
 
   async disputePayout(req, res) {
     try {
-      if (req.user.role !== 'owner')
-        return res.status(403).json({ error: 'Access denied' });
       const { id } = req.params;
       const { reason } = req.body;
       if (!reason)

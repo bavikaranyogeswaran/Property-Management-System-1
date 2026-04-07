@@ -2,13 +2,24 @@ import { Router } from 'express';
 import leaseController from '../controllers/leaseController.js';
 import {
   authenticateToken,
+  authorizeRoles,
   authorizeResource,
 } from '../middleware/authMiddleware.js';
 
 const router = Router();
 
-router.get('/', authenticateToken, leaseController.getLeases);
-router.post('/', authenticateToken, leaseController.createLease);
+router.get(
+  '/',
+  authenticateToken,
+  authorizeRoles('owner', 'treasurer'),
+  leaseController.getLeases
+);
+router.post(
+  '/',
+  authenticateToken,
+  authorizeRoles('owner', 'treasurer'),
+  leaseController.createLease
+);
 
 // All routes below this line require lease-level authorization
 router.get(
@@ -20,24 +31,28 @@ router.get(
 router.post(
   '/:id/instant-renew',
   authenticateToken,
+  authorizeRoles('owner', 'treasurer'),
   authorizeResource('lease', 'id', 'params'),
   leaseController.instantRenew
 );
 router.post(
   '/:id/refund',
   authenticateToken,
+  authorizeRoles('owner', 'treasurer'),
   authorizeResource('lease', 'id', 'params'),
   leaseController.refundDeposit
 );
 router.post(
   '/:id/refund/approve',
   authenticateToken,
+  authorizeRoles('owner'),
   authorizeResource('lease', 'id', 'params'),
   leaseController.approveRefund
 );
 router.post(
   '/:id/refund/dispute',
   authenticateToken,
+  authorizeRoles('owner', 'treasurer'),
   authorizeResource('lease', 'id', 'params'),
   leaseController.disputeRefund
 );
@@ -56,12 +71,14 @@ router.post(
 router.patch(
   '/:id/document',
   authenticateToken,
+  authorizeRoles('owner', 'treasurer'),
   authorizeResource('lease', 'id', 'params'),
   leaseController.updateLeaseDocument
 );
 router.post(
   '/:id/terminate',
   authenticateToken,
+  authorizeRoles('owner', 'treasurer'),
   authorizeResource('lease', 'id', 'params'),
   leaseController.terminateLease
 );
@@ -86,6 +103,7 @@ router.post(
 router.post(
   '/:id/finalize-checkout',
   authenticateToken,
+  authorizeRoles('owner', 'treasurer'),
   authorizeResource('lease', 'id', 'params'),
   leaseController.finalizeCheckout
 );
@@ -122,6 +140,7 @@ router.post(
 router.delete(
   '/:id',
   authenticateToken,
+  authorizeRoles('owner', 'treasurer'),
   authorizeResource('lease', 'id', 'params'),
   leaseController.cancelLease
 );
@@ -134,6 +153,7 @@ router.post(
 router.post(
   '/:id/regenerate-token',
   authenticateToken,
+  authorizeRoles('owner', 'treasurer'),
   authorizeResource('lease'),
   leaseController.regenerateMagicToken
 );

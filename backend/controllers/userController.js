@@ -13,14 +13,6 @@ class UserController {
   //  HIRE TREASURER: Owner adds a new staff member to handle money.
   async createTreasurer(req, res) {
     try {
-      // RBAC Check: Only owner can create treasurer
-      // Req.user is populated by authenticateToken middleware
-      if (req.user.role !== 'owner') {
-        return res
-          .status(403)
-          .json({ error: 'Access denied. Only Owners can create Treasurers.' });
-      }
-
       const {
         name,
         email,
@@ -61,12 +53,6 @@ class UserController {
 
   async updateTreasurer(req, res) {
     try {
-      if (req.user.role !== 'owner') {
-        return res
-          .status(403)
-          .json({ error: 'Access denied. Only Owners can update Treasurers.' });
-      }
-
       const { id } = req.params;
       const { name, email, phone, status } = req.body;
 
@@ -144,12 +130,6 @@ class UserController {
 
   async deleteTreasurer(req, res) {
     try {
-      if (req.user.role !== 'owner') {
-        return res
-          .status(403)
-          .json({ error: 'Access denied. Only Owners can delete Treasurers.' });
-      }
-
       const { id } = req.params;
       const result = await userService.deleteTreasurer(id);
       res.json(result);
@@ -160,9 +140,6 @@ class UserController {
 
   async getTreasurers(req, res) {
     try {
-      if (req.user.role !== 'owner') {
-        return res.status(403).json({ error: 'Access denied.' });
-      }
       const result = await userService.getTreasurers();
       res.json(result);
     } catch (error) {
@@ -172,11 +149,6 @@ class UserController {
 
   async getOwners(req, res) {
     try {
-      // Treasurers need to see owners to pick one for payout.
-      // Owners can see owners (self mainly, but for listing in settings etc).
-      if (req.user.role !== 'owner' && req.user.role !== 'treasurer') {
-        return res.status(403).json({ error: 'Access denied.' });
-      }
       const result = await userService.getOwners();
       res.json(result);
     } catch (error) {
@@ -189,10 +161,6 @@ class UserController {
   //  - Treasurer sees only tenants in properties assigned to them.
   async getTenants(req, res) {
     try {
-      if (req.user.role !== 'owner' && req.user.role !== 'treasurer') {
-        return res.status(403).json({ error: 'Access denied.' });
-      }
-
       let result;
       if (req.user.role === 'owner') {
         result = await userService.getTenants(req.user.id);
@@ -228,11 +196,6 @@ class UserController {
   //  ASSIGN PROPERTY: Owner tells a Treasurer "You are responsible for this Building".
   async assignProperty(req, res) {
     try {
-      if (req.user.role !== 'owner') {
-        return res
-          .status(403)
-          .json({ error: 'Access denied. Only Owners can assign properties.' });
-      }
       const { userId, propertyId } = req.body;
       await staffModel.assignProperty(userId, propertyId);
 
@@ -258,11 +221,6 @@ class UserController {
 
   async removeProperty(req, res) {
     try {
-      if (req.user.role !== 'owner') {
-        return res.status(403).json({
-          error: 'Access denied. Only Owners can remove property assignments.',
-        });
-      }
       const { userId, propertyId } = req.params;
       await staffModel.removePropertyAssignment(userId, propertyId);
 
@@ -305,12 +263,6 @@ class UserController {
 
   async forceLogout(req, res) {
     try {
-      if (req.user.role !== 'owner') {
-        return res.status(403).json({
-          error: 'Access denied. Only Owners can force logout users.',
-        });
-      }
-
       const { id } = req.params;
       const success = await userService.incrementTokenVersion(id);
 
