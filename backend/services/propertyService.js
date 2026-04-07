@@ -94,7 +94,7 @@ class PropertyService {
     }));
 
     // If any new image is primary, we MUST unset existing primary images for this property
-    const hasNewPrimary = imagesData.some((img) => img.is_primary === 1);
+    const hasNewPrimary = imagesData.some((img) => img.isPrimary === 1);
     if (hasNewPrimary) {
       await propertyModel.clearPrimaryImages(propertyId);
     }
@@ -103,10 +103,10 @@ class PropertyService {
 
     // Update main property table with primary image if exists
     const primaryImage =
-      imagesData.find((img) => img.is_primary === 1) || imagesData[0];
+      imagesData.find((img) => img.isPrimary === 1) || imagesData[0];
     if (primaryImage) {
       await propertyModel.update(propertyId, {
-        imageUrl: primaryImage.image_url,
+        imageUrl: primaryImage.imageUrl,
       });
     }
 

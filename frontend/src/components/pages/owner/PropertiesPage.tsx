@@ -61,7 +61,8 @@ export function PropertiesPage() {
     propertyTypes,
     units,
     unitTypes,
-    addUnit, // Added addUnit
+    addUnit,
+    updateUnit,
     addLead,
     uploadPropertyImages,
     getPropertyImages,
@@ -232,20 +233,36 @@ export function PropertiesPage() {
         if (isSingleUnit && singleUnitRent > 0) {
           // Single Unit Mode
           try {
-            const defaultType =
-              unitTypes && unitTypes.length > 0 ? unitTypes[0] : null;
-            await addUnit({
-              propertyId: savedPropertyId,
-              unitNumber: 'Main',
-              unitTypeId: defaultType ? defaultType.id : 1,
-              monthlyRent: singleUnitRent,
-              status: 'available',
-              type: defaultType ? defaultType.name : 'Standard',
-            });
-            toast.success('Single unit created successfully');
+            // Check if "Main" unit already exists for this property
+            const existingMainUnit = units.find(
+              (u) => u.propertyId === savedPropertyId && u.unitNumber === 'Main'
+            );
+
+            if (existingMainUnit) {
+              // Only update if rent changed
+              if (existingMainUnit.monthlyRent !== singleUnitRent) {
+                await updateUnit(existingMainUnit.id, {
+                  monthlyRent: singleUnitRent,
+                });
+                toast.success('Unit rent updated');
+              }
+            } else {
+              // Create new Main unit
+              const defaultType =
+                unitTypes && unitTypes.length > 0 ? unitTypes[0] : null;
+              await addUnit({
+                propertyId: savedPropertyId,
+                unitNumber: 'Main',
+                unitTypeId: defaultType ? defaultType.id : 1,
+                monthlyRent: singleUnitRent,
+                status: 'available',
+                type: defaultType ? defaultType.name : 'Standard',
+              });
+              toast.success('Single unit created successfully');
+            }
           } catch (unitError) {
-            console.error('Failed to add single unit:', unitError);
-            toast.error('Property saved, but failed to add unit.');
+            console.error('Failed to manage single unit:', unitError);
+            toast.error('Property saved, but failed to update unit details.');
           }
         } else if (quickUnits.length > 0) {
           // Multiple Units Mode
@@ -341,8 +358,18 @@ export function PropertiesPage() {
     setNewUnitNumber('');
     setNewUnitType(0);
     setNewUnitRent(0);
-    setIsSingleUnit(false);
-    setSingleUnitRent(0);
+
+    // Detect if this is a single unit property (convention: 1 unit named "Main")
+    const propertyUnits = units.filter((u) => u.propertyId === property.id);
+    const mainUnit = propertyUnits.find((u) => u.unitNumber === 'Main');
+
+    if (propertyUnits.length === 1 && mainUnit) {
+      setIsSingleUnit(true);
+      setSingleUnitRent(mainUnit.monthlyRent);
+    } else {
+      setIsSingleUnit(false);
+      setSingleUnitRent(0);
+    }
 
     setIsAddDialogOpen(true);
 

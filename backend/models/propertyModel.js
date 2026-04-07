@@ -269,10 +269,10 @@ class PropertyModel {
     if (!imagesData || imagesData.length === 0) return [];
 
     const values = imagesData.map((img) => [
-      img.property_id,
-      img.image_url,
-      img.is_primary,
-      img.display_order,
+      img.propertyId,
+      img.imageUrl,
+      img.isPrimary,
+      img.displayOrder,
     ]);
 
     // Bulk insert
