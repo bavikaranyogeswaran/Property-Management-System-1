@@ -25,9 +25,12 @@ COPY --chown=node:node controllers/ ./controllers/
 COPY --chown=node:node middleware/ ./middleware/
 COPY --chown=node:node migrations/ ./migrations/
 COPY --chown=node:node models/ ./models/
+COPY --chown=node:node queues/ ./queues/
 COPY --chown=node:node routes/ ./routes/
+COPY --chown=node:node schemas/ ./schemas/
 COPY --chown=node:node services/ ./services/
 COPY --chown=node:node utils/ ./utils/
+COPY --chown=node:node database/ ./database/
 COPY --chown=node:node knexfile.js ./
 
 # Switch to non-privileged user for security (Zero-Trust)
@@ -38,6 +41,10 @@ EXPOSE 3000
 
 # Set environment to production
 ENV NODE_ENV=production
+
+# Healthcheck: Verify the server is accepting traffic
+HEALTHCHECK --interval=10s --timeout=5s --start-period=15s --retries=5 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1
 
 # Start the application
 # Now includes automatic migrations on start for environment parity

@@ -17,7 +17,7 @@ services:
     networks:
       - pms-network
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$MYSQL_ROOT_PASSWORD"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$$MYSQL_ROOT_PASSWORD"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -61,8 +61,13 @@ services:
       - CLOUDINARY_CLOUD_NAME=${CLOUDINARY_CLOUD_NAME}
       - CLOUDINARY_API_KEY=${CLOUDINARY_API_KEY}
       - CLOUDINARY_API_SECRET=${CLOUDINARY_API_SECRET}
+      - PAYHERE_MERCHANT_ID=${PAYHERE_MERCHANT_ID}
+      - PAYHERE_SECRET=${PAYHERE_SECRET}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
+      - REDIS_HOST=redis
       - PORT=3000
-      - FRONTEND_URL=http://localhost:5173
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:5173}
     ports:
       - "3000:3000"
     volumes:
@@ -70,6 +75,12 @@ services:
       - pms_logs_data:/app/logs
     networks:
       - pms-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
 
   worker:
     build: 
@@ -91,6 +102,11 @@ services:
       - CLOUDINARY_CLOUD_NAME=${CLOUDINARY_CLOUD_NAME}
       - CLOUDINARY_API_KEY=${CLOUDINARY_API_KEY}
       - CLOUDINARY_API_SECRET=${CLOUDINARY_API_SECRET}
+      - PAYHERE_MERCHANT_ID=${PAYHERE_MERCHANT_ID}
+      - PAYHERE_SECRET=${PAYHERE_SECRET}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
+      - REDIS_HOST=redis
       - PORT=3000
     command: node worker.js
     volumes:
