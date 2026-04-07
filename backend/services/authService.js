@@ -6,6 +6,7 @@ import userModel from '../models/userModel.js';
 import tenantModel from '../models/tenantModel.js';
 
 import { config } from '../config/config.js';
+import AppError from '../utils/AppError.js';
 
 const JWT_SECRET = config.jwt.secret;
 
@@ -14,13 +15,13 @@ class AuthService {
     const user = await userModel.findByEmail(email);
 
     if (!user || user.status !== 'active') {
-      throw new Error('Invalid credentials');
+      throw new AppError('Invalid credentials', 401);
     }
 
     const isValid = await compare(password, user.passwordHash);
 
     if (!isValid) {
-      throw new Error('Invalid credentials');
+      throw new AppError('Invalid credentials', 401);
     }
 
     const token = sign(
