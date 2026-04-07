@@ -29,7 +29,7 @@ class UnitTypeController {
         return res.status(400).json({ error: 'Name is required' });
       }
       const typeId = await unitTypeModel.create({ name, description });
-      res.status(201).json({ type_id: typeId, name, description });
+      res.status(201).json({ id: typeId, name, description });
     } catch (error) {
       if (error.code === 'ER_DUP_ENTRY') {
         return res

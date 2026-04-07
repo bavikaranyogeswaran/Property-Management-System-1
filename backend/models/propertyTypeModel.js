@@ -4,7 +4,7 @@ class PropertyTypeModel {
   async findAll() {
     const [rows] = await db.query(`
             SELECT 
-                type_id,
+                type_id AS id,
                 name,
                 description
             FROM property_types 
@@ -17,7 +17,7 @@ class PropertyTypeModel {
     const [rows] = await db.query(
       `
             SELECT 
-                type_id,
+                type_id AS id,
                 name,
                 description
             FROM property_types 

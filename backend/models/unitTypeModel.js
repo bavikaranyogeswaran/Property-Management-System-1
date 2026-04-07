@@ -4,7 +4,7 @@ class UnitTypeModel {
   async findAll() {
     const [rows] = await db.query(`
             SELECT 
-                type_id,
+                type_id AS id,
                 name,
                 description
             FROM unit_types 
@@ -17,7 +17,7 @@ class UnitTypeModel {
     const [rows] = await db.query(
       `
             SELECT 
-                type_id,
+                type_id AS id,
                 name,
                 description
             FROM unit_types 
