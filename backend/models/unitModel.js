@@ -39,23 +39,15 @@ class UnitModel {
             SELECT u.*, 
                    p.name as property_name, 
                    ut.name as type_name,
-                   (SELECT COUNT(*) FROM leases l 
-                    WHERE l.unit_id = u.unit_id 
-                    AND l.status = 'active' 
-                    AND l.start_date <= CURRENT_DATE() 
-                    AND (l.end_date IS NULL OR l.end_date >= CURRENT_DATE())) as active_lease_count,
-                   (SELECT COUNT(*) FROM leases l 
-                    WHERE l.unit_id = u.unit_id 
-                    AND l.status IN ('active', 'pending')
-                    AND l.start_date > CURRENT_DATE()) as future_lease_count,
-                   (SELECT COUNT(*) FROM leases l 
-                    WHERE l.unit_id = u.unit_id 
-                    AND l.status IN ('draft', 'pending')
-                    AND (l.reservation_expires_at IS NULL OR l.reservation_expires_at >= CURRENT_DATE())) as pending_application_count
+                   COUNT(DISTINCT CASE WHEN l.status = 'active' AND l.start_date <= CURRENT_DATE() AND (l.end_date IS NULL OR l.end_date >= CURRENT_DATE()) THEN l.lease_id END) as active_lease_count,
+                   COUNT(DISTINCT CASE WHEN l.status IN ('active', 'pending') AND l.start_date > CURRENT_DATE() THEN l.lease_id END) as future_lease_count,
+                   COUNT(DISTINCT CASE WHEN l.status IN ('draft', 'pending') AND (l.reservation_expires_at IS NULL OR l.reservation_expires_at >= CURRENT_DATE()) THEN l.lease_id END) as pending_application_count
             FROM units u
             JOIN properties p ON u.property_id = p.property_id
             JOIN unit_types ut ON u.unit_type_id = ut.type_id
+            LEFT JOIN leases l ON u.unit_id = l.unit_id
             WHERE u.is_archived = FALSE
+            GROUP BY u.unit_id
             ORDER BY u.created_at DESC
         `);
     return this.mapRows(rows);
@@ -68,23 +60,15 @@ class UnitModel {
             SELECT u.*, 
                    p.name as property_name, 
                    ut.name as type_name,
-                   (SELECT COUNT(*) FROM leases l 
-                    WHERE l.unit_id = u.unit_id 
-                    AND l.status = 'active' 
-                    AND l.start_date <= CURRENT_DATE() 
-                    AND (l.end_date IS NULL OR l.end_date >= CURRENT_DATE())) as active_lease_count,
-                   (SELECT COUNT(*) FROM leases l 
-                    WHERE l.unit_id = u.unit_id 
-                    AND l.status IN ('active', 'pending')
-                    AND l.start_date > CURRENT_DATE()) as future_lease_count,
-                   (SELECT COUNT(*) FROM leases l 
-                    WHERE l.unit_id = u.unit_id 
-                    AND l.status IN ('draft', 'pending')
-                    AND (l.reservation_expires_at IS NULL OR l.reservation_expires_at >= CURRENT_DATE())) as pending_application_count
+                   COUNT(DISTINCT CASE WHEN l.status = 'active' AND l.start_date <= CURRENT_DATE() AND (l.end_date IS NULL OR l.end_date >= CURRENT_DATE()) THEN l.lease_id END) as active_lease_count,
+                   COUNT(DISTINCT CASE WHEN l.status IN ('active', 'pending') AND l.start_date > CURRENT_DATE() THEN l.lease_id END) as future_lease_count,
+                   COUNT(DISTINCT CASE WHEN l.status IN ('draft', 'pending') AND (l.reservation_expires_at IS NULL OR l.reservation_expires_at >= CURRENT_DATE()) THEN l.lease_id END) as pending_application_count
             FROM units u
             JOIN properties p ON u.property_id = p.property_id
             JOIN unit_types ut ON u.unit_type_id = ut.type_id
+            LEFT JOIN leases l ON u.unit_id = l.unit_id
             WHERE u.unit_id = ? AND u.is_archived = FALSE
+            GROUP BY u.unit_id
         `,
       [id]
     );
@@ -99,23 +83,15 @@ class UnitModel {
             SELECT u.*, 
                    p.name as property_name, 
                    ut.name as type_name,
-                   (SELECT COUNT(*) FROM leases l 
-                    WHERE l.unit_id = u.unit_id 
-                    AND l.status = 'active' 
-                    AND l.start_date <= CURRENT_DATE() 
-                    AND (l.end_date IS NULL OR l.end_date >= CURRENT_DATE())) as active_lease_count,
-                   (SELECT COUNT(*) FROM leases l 
-                    WHERE l.unit_id = u.unit_id 
-                    AND l.status IN ('active', 'pending')
-                    AND l.start_date > CURRENT_DATE()) as future_lease_count,
-                   (SELECT COUNT(*) FROM leases l 
-                    WHERE l.unit_id = u.unit_id 
-                    AND l.status IN ('draft', 'pending')
-                    AND (l.reservation_expires_at IS NULL OR l.reservation_expires_at >= CURRENT_DATE())) as pending_application_count
+                   COUNT(DISTINCT CASE WHEN l.status = 'active' AND l.start_date <= CURRENT_DATE() AND (l.end_date IS NULL OR l.end_date >= CURRENT_DATE()) THEN l.lease_id END) as active_lease_count,
+                   COUNT(DISTINCT CASE WHEN l.status IN ('active', 'pending') AND l.start_date > CURRENT_DATE() THEN l.lease_id END) as future_lease_count,
+                   COUNT(DISTINCT CASE WHEN l.status IN ('draft', 'pending') AND (l.reservation_expires_at IS NULL OR l.reservation_expires_at >= CURRENT_DATE()) THEN l.lease_id END) as pending_application_count
             FROM units u
             JOIN properties p ON u.property_id = p.property_id
             JOIN unit_types ut ON u.unit_type_id = ut.type_id
+            LEFT JOIN leases l ON u.unit_id = l.unit_id
             WHERE u.unit_id = ? AND u.is_archived = FALSE
+            GROUP BY u.unit_id
             FOR UPDATE
         `,
       [id]
@@ -130,23 +106,15 @@ class UnitModel {
             SELECT u.*, 
                    p.name as property_name, 
                    ut.name as type_name,
-                   (SELECT COUNT(*) FROM leases l 
-                    WHERE l.unit_id = u.unit_id 
-                    AND l.status = 'active' 
-                    AND l.start_date <= CURRENT_DATE() 
-                    AND (l.end_date IS NULL OR l.end_date >= CURRENT_DATE())) as active_lease_count,
-                   (SELECT COUNT(*) FROM leases l 
-                    WHERE l.unit_id = u.unit_id 
-                    AND l.status IN ('active', 'pending')
-                    AND l.start_date > CURRENT_DATE()) as future_lease_count,
-                   (SELECT COUNT(*) FROM leases l 
-                    WHERE l.unit_id = u.unit_id 
-                    AND l.status IN ('draft', 'pending')
-                    AND (l.reservation_expires_at IS NULL OR l.reservation_expires_at >= CURRENT_DATE())) as pending_application_count
+                   COUNT(DISTINCT CASE WHEN l.status = 'active' AND l.start_date <= CURRENT_DATE() AND (l.end_date IS NULL OR l.end_date >= CURRENT_DATE()) THEN l.lease_id END) as active_lease_count,
+                   COUNT(DISTINCT CASE WHEN l.status IN ('active', 'pending') AND l.start_date > CURRENT_DATE() THEN l.lease_id END) as future_lease_count,
+                   COUNT(DISTINCT CASE WHEN l.status IN ('draft', 'pending') AND (l.reservation_expires_at IS NULL OR l.reservation_expires_at >= CURRENT_DATE()) THEN l.lease_id END) as pending_application_count
             FROM units u
             JOIN properties p ON u.property_id = p.property_id
             JOIN unit_types ut ON u.unit_type_id = ut.type_id
+            LEFT JOIN leases l ON u.unit_id = l.unit_id
             WHERE u.property_id = ? AND u.is_archived = FALSE
+            GROUP BY u.unit_id
             ORDER BY u.unit_number ASC
         `,
       [propertyId]
@@ -288,26 +256,16 @@ class UnitModel {
 
   async countOccupied(propertyId) {
     const [rows] = await db.query(
-      `SELECT COUNT(u.unit_id) as count 
+      `SELECT COUNT(DISTINCT u.unit_id) as count 
        FROM units u
+       LEFT JOIN leases l ON u.unit_id = l.unit_id
        WHERE u.property_id = ? AND u.is_archived = FALSE 
        AND (
          u.status = 'maintenance' OR
          u.status = 'reserved' OR
-          EXISTS (
-            SELECT 1 FROM leases l 
-            WHERE l.unit_id = u.unit_id 
-            AND l.status = 'active'
-            AND l.start_date <= CURRENT_DATE() 
-            AND (l.end_date IS NULL OR l.end_date >= CURRENT_DATE())
-          ) OR
-          EXISTS (
-            SELECT 1 FROM leases l 
-            WHERE l.unit_id = u.unit_id 
-            AND l.status IN ('active', 'pending', 'draft')
-            AND (l.start_date > CURRENT_DATE() OR (l.status = 'draft' AND (l.reservation_expires_at IS NULL OR l.reservation_expires_at >= CURRENT_DATE())))
-          )
-        )`,
+         (l.status = 'active' AND l.start_date <= CURRENT_DATE() AND (l.end_date IS NULL OR l.end_date >= CURRENT_DATE())) OR
+         (l.status IN ('active', 'pending', 'draft') AND (l.start_date > CURRENT_DATE() OR (l.status = 'draft' AND (l.reservation_expires_at IS NULL OR l.reservation_expires_at >= CURRENT_DATE()))))
+       )`,
       [propertyId]
     );
     return rows[0].count;
@@ -321,34 +279,22 @@ class UnitModel {
       `
       SELECT 
         COALESCE(p.name, CONCAT('Property ', u.property_id)) AS propertyName,
-        COUNT(u.unit_id) AS total,
-        SUM(CASE 
-          WHEN u.status = 'maintenance' THEN 1
-          WHEN u.status = 'reserved' THEN 1
-          WHEN EXISTS (
-            SELECT 1 FROM leases l 
-            WHERE l.unit_id = u.unit_id 
-            AND (
-              (l.status = 'active' AND l.start_date <= CURRENT_DATE() AND (l.end_date IS NULL OR l.end_date >= CURRENT_DATE()))
-              OR (l.status IN ('active', 'pending', 'draft') AND (l.start_date > CURRENT_DATE() OR (l.status = 'draft' AND (l.reservation_expires_at IS NULL OR l.reservation_expires_at >= CURRENT_DATE()))))
-            )
-          ) THEN 1 
-          ELSE 0 
+        COUNT(DISTINCT u.unit_id) AS total,
+        COUNT(DISTINCT CASE 
+          WHEN u.status IN ('maintenance', 'reserved') THEN u.unit_id
+          WHEN (l.status = 'active' AND l.start_date <= CURRENT_DATE() AND (l.end_date IS NULL OR l.end_date >= CURRENT_DATE())) THEN u.unit_id
+          WHEN (l.status IN ('active', 'pending', 'draft') AND (l.start_date > CURRENT_DATE() OR (l.status = 'draft' AND (l.reservation_expires_at IS NULL OR l.reservation_expires_at >= CURRENT_DATE())))) THEN u.unit_id
+          ELSE NULL 
         END) AS occupied,
-        GROUP_CONCAT(CASE 
-          WHEN u.status = 'maintenance' THEN NULL
-          WHEN EXISTS (
-            SELECT 1 FROM leases l 
-            WHERE l.unit_id = u.unit_id 
-            AND (
-              (l.status = 'active' AND l.start_date <= CURRENT_DATE() AND (l.end_date IS NULL OR l.end_date >= CURRENT_DATE()))
-              OR (l.status IN ('active', 'pending', 'draft') AND (l.start_date > CURRENT_DATE() OR (l.status = 'draft' AND (l.reservation_expires_at IS NULL OR l.reservation_expires_at >= CURRENT_DATE()))))
-            )
-          ) THEN NULL 
+        GROUP_CONCAT(DISTINCT CASE 
+          WHEN u.status IN ('maintenance', 'reserved') THEN NULL
+          WHEN (l.status = 'active' AND l.start_date <= CURRENT_DATE() AND (l.end_date IS NULL OR l.end_date >= CURRENT_DATE())) THEN NULL
+          WHEN (l.status IN ('active', 'pending', 'draft') AND (l.start_date > CURRENT_DATE() OR (l.status = 'draft' AND (l.reservation_expires_at IS NULL OR l.reservation_expires_at >= CURRENT_DATE())))) THEN NULL
           ELSE u.unit_number 
         END) AS vacancies
       FROM units u
       LEFT JOIN properties p ON u.property_id = p.property_id
+      LEFT JOIN leases l ON u.unit_id = l.unit_id
       WHERE u.property_id IN (?) AND u.is_archived = FALSE
       GROUP BY u.property_id
       `,
