@@ -39,9 +39,10 @@ class ReportService {
     );
     const hasLedgerData = Object.keys(ledgerSummary).length > 0;
 
+    const propertyStats = {};
+
     if (hasLedgerData) {
       // Ledger-based: accurate revenue vs liability vs expense
-      const propertyStats = {};
       for (const [name, data] of Object.entries(ledgerSummary)) {
         propertyStats[name] = {
           income: data.revenue, // Only real revenue (rent + late fees)
@@ -69,40 +70,120 @@ class ReportService {
           .add(cost.amount)
           .value();
       });
+    } else {
+      // Fallback: Optimized invoice-based approach
+      const invoiceStats = await invoiceModel.getFinancialStatsByYear(year);
+      const costStats =
+        await maintenanceCostModel.getFinancialStatsByYear(year);
 
-      return propertyStats;
+      // Filter by accessible properties
+      invoiceStats
+        .filter((s) => propertyIds.includes(Number(s.property_id)))
+        .forEach((s) => {
+          const name = s.property_name || 'Unknown Property';
+          if (!propertyStats[name])
+            propertyStats[name] = { income: 0, expense: 0, depositsHeld: 0 };
+          propertyStats[name].income = moneyMath(propertyStats[name].income)
+            .add(s.total_income)
+            .value();
+        });
+
+      costStats
+        .filter((s) => propertyIds.includes(Number(s.property_id)))
+        .forEach((s) => {
+          const name = s.property_name || 'Unknown Property';
+          if (!propertyStats[name])
+            propertyStats[name] = { income: 0, expense: 0, depositsHeld: 0 };
+          propertyStats[name].expense = moneyMath(propertyStats[name].expense)
+            .add(s.total_expense)
+            .value();
+        });
     }
 
-    // Fallback: Optimized invoice-based approach
-    const invoiceStats = await invoiceModel.getFinancialStatsByYear(year);
-    const costStats = await maintenanceCostModel.getFinancialStatsByYear(year);
-
-    const propertyStats = {};
-
-    // Filter by accessible properties
-    invoiceStats
-      .filter((s) => propertyIds.includes(Number(s.property_id)))
-      .forEach((s) => {
-        const name = s.property_name || 'Unknown Property';
-        if (!propertyStats[name])
-          propertyStats[name] = { income: 0, expense: 0, depositsHeld: 0 };
-        propertyStats[name].income = moneyMath(propertyStats[name].income)
-          .add(s.total_income)
-          .value();
-      });
-
-    costStats
-      .filter((s) => propertyIds.includes(Number(s.property_id)))
-      .forEach((s) => {
-        const name = s.property_name || 'Unknown Property';
-        if (!propertyStats[name])
-          propertyStats[name] = { income: 0, expense: 0, depositsHeld: 0 };
-        propertyStats[name].expense = moneyMath(propertyStats[name].expense)
-          .add(s.total_expense)
-          .value();
-      });
-
     return propertyStats;
+  }
+
+  /**
+   * Analytics: Financial Review
+   * Combines raw stats with business insights/recommendations.
+   */
+  async getFinancialReportData(year, user) {
+    const stats = await this.getFinancialStats(year, user);
+    const entries = Object.entries(stats);
+    let totalIncome = 0;
+    let totalExpense = 0;
+
+    const propertyMetrics = entries.map(([name, s]) => {
+      const net = s.income - s.expense;
+      const margin = s.income > 0 ? ((net / s.income) * 100).toFixed(1) : '0.0';
+      totalIncome += s.income;
+      totalExpense += s.expense;
+      return {
+        name,
+        income: s.income,
+        expense: s.expense,
+        net,
+        margin: Number(margin),
+      };
+    });
+
+    const totalNet = totalIncome - totalExpense;
+    const totalMargin =
+      totalIncome > 0 ? ((totalNet / totalIncome) * 100).toFixed(1) : '0.0';
+
+    // Generate Insights
+    const insights = [];
+    if (entries.length === 0) {
+      insights.push({
+        message:
+          'No financial data available for this year. Ensure invoices are being generated and payments recorded.',
+        urgency: 'warning',
+      });
+    } else {
+      const lossProperties = propertyMetrics.filter((p) => p.net < 0);
+      const best = propertyMetrics.reduce((a, b) =>
+        a.margin > b.margin ? a : b
+      );
+      const worst = propertyMetrics.reduce((a, b) =>
+        a.margin < b.margin ? a : b
+      );
+
+      if (lossProperties.length > 0) {
+        insights.push({
+          message: `${lossProperties.length} propert${lossProperties.length > 1 ? 'ies are' : 'y is'} running at a loss: ${lossProperties.map((p) => p.name).join(', ')}. Review expense allocation and consider rent adjustments.`,
+          urgency: 'critical',
+        });
+      } else {
+        insights.push({
+          message: `All properties are profitable. Best performer: "${best.name}" at ${best.margin}% margin.`,
+          urgency: 'success',
+        });
+      }
+
+      if (propertyMetrics.length > 1 && best.name !== worst.name) {
+        insights.push({
+          message: `Lowest margin property: "${worst.name}" at ${worst.margin}%. Consider investigating operational costs or increasing occupancy.`,
+          urgency: worst.margin < 10 ? 'warning' : 'info',
+        });
+      }
+
+      if (Number(totalMargin) < 15) {
+        insights.push({
+          message: `Overall profit margin (${totalMargin}%) is below the healthy 15% threshold.`,
+          urgency: 'warning',
+        });
+      }
+    }
+
+    return {
+      stats,
+      totalIncome,
+      totalExpense,
+      totalNet,
+      totalMargin,
+      propertyMetrics,
+      insights,
+    };
   }
 
   /**
@@ -121,6 +202,82 @@ class ReportService {
     // Fetch pre-aggregated occupancy data from DB, scoped to accessible properties
     const propertyStats = await unitModel.getOccupancyStats(propertyIds);
     return propertyStats;
+  }
+
+  /**
+   * Analytics: Occupancy Review
+   */
+  async getOccupancyReportData(user) {
+    const propertyStats = await this.getOccupancyStats(user);
+    const entries = Object.entries(propertyStats);
+    let totalUnits = 0;
+    let totalOccupied = 0;
+    let totalVacant = 0;
+
+    const propertyMetrics = entries.map(([name, stats]) => {
+      const rate =
+        stats.total > 0 ? Math.round((stats.occupied / stats.total) * 100) : 0;
+      totalUnits += stats.total;
+      totalOccupied += stats.occupied;
+      totalVacant += stats.vacancies.length;
+
+      const rateColor =
+        rate >= 90 ? '#22c55e' : rate >= 70 ? '#f59e0b' : '#ef4444';
+      const urgencyLabel =
+        rate >= 90 ? 'Healthy' : rate >= 70 ? 'Needs Attention' : 'Critical';
+
+      return {
+        name,
+        total: stats.total,
+        occupied: stats.occupied,
+        vacancies: stats.vacancies,
+        rate,
+        rateColor,
+        urgencyLabel,
+      };
+    });
+
+    const portfolioRate =
+      totalUnits > 0 ? Math.round((totalOccupied / totalUnits) * 100) : 0;
+
+    // Insights for Occupancy
+    const insights = [];
+    if (entries.length === 0) {
+      insights.push({
+        message:
+          'No property data available. Ensure properties and units are registered.',
+        urgency: 'warning',
+      });
+    } else if (totalVacant === 0) {
+      insights.push({
+        message:
+          'Excellent — all units across your portfolio are fully occupied.',
+        urgency: 'success',
+      });
+    } else {
+      const worst = propertyMetrics.reduce((a, b) => (a.rate < b.rate ? a : b));
+      insights.push({
+        message: `${totalVacant} vacant unit(s) across your portfolio. Prioritize filling vacancies at "${worst.name}" (${worst.rate}% occupancy).`,
+        urgency: 'critical',
+      });
+
+      const lowProperties = propertyMetrics.filter((p) => p.rate < 70);
+      if (lowProperties.length > 0) {
+        insights.push({
+          message: `${lowProperties.length} propert${lowProperties.length > 1 ? 'ies have' : 'y has'} occupancy below 70%.`,
+          urgency: 'warning',
+        });
+      }
+    }
+
+    return {
+      totalUnits,
+      totalOccupied,
+      totalVacant,
+      portfolioRate,
+      propertyMetrics,
+      insights,
+    };
   }
 
   async getTenantRiskStats(user) {
@@ -146,20 +303,55 @@ class ReportService {
       [propertyIds]
     );
 
-    return tenants.map((tenant) => {
+    const data = tenants.map((tenant) => {
       let riskLevel = 'Low';
-      let color = 'green';
+      let color = '#22c55e'; // standardized hex for PDF
 
       if (tenant.behavior_score < 70 || tenant.overdue_count > 1) {
         riskLevel = 'Medium';
-        color = 'orange';
+        color = '#f59e0b';
       }
       if (tenant.behavior_score < 50 || tenant.overdue_count > 3) {
         riskLevel = 'High';
-        color = 'red';
+        color = '#ef4444';
       }
       return { ...tenant, riskLevel, color };
     });
+
+    // Insights for Risk
+    const highRisk = data.filter((t) => t.riskLevel === 'High');
+    const medRisk = data.filter((t) => t.riskLevel === 'Medium');
+    const avgScore =
+      data.length > 0
+        ? Math.round(
+            data.reduce((s, t) => s + t.behavior_score, 0) / data.length
+          )
+        : 0;
+
+    const insights = [];
+    if (data.length === 0) {
+      insights.push({
+        message: 'No active tenants found. Ensure leases are active.',
+        urgency: 'warning',
+      });
+    } else if (highRisk.length > 0) {
+      insights.push({
+        message: `${highRisk.length} tenant(s) require immediate attention: ${highRisk.map((t) => t.name).join(', ')}.`,
+        urgency: 'critical',
+      });
+    } else if (medRisk.length > 0) {
+      insights.push({
+        message: `${medRisk.length} tenant(s) are at medium risk. Monitor payment patterns.`,
+        urgency: 'warning',
+      });
+    } else {
+      insights.push({
+        message: `Portfolio risk is minimal. Average behavior score: ${avgScore}/100.`,
+        urgency: 'success',
+      });
+    }
+
+    return { tenants: data, highRisk, medRisk, avgScore, insights };
   }
 
   async getMaintenanceCategoryStats(user) {
@@ -227,6 +419,55 @@ class ReportService {
     return { categories, totalCost };
   }
 
+  /**
+   * Analytics: Maintenance Review
+   */
+  async getMaintenanceReportData(user) {
+    const { categories, totalCost } =
+      await this.getMaintenanceCategoryStats(user);
+    const sorted = Object.entries(categories).sort((a, b) => b[1] - a[1]);
+    const topCategory = sorted.length > 0 ? sorted[0] : null;
+    const topPct =
+      topCategory && totalCost > 0
+        ? ((topCategory[1] / totalCost) * 100).toFixed(1)
+        : '0';
+
+    const insights = [];
+    if (totalCost === 0) {
+      insights.push({
+        message: 'No maintenance costs recorded yet.',
+        urgency: 'info',
+      });
+    } else {
+      if (Number(topPct) > 50) {
+        insights.push({
+          message: `"${topCategory[0]}" accounts for ${topPct}% of total spend. Consider preventive measures.`,
+          urgency: 'critical',
+        });
+      } else if (Number(topPct) > 30) {
+        insights.push({
+          message: `"${topCategory[0]}" is your largest expense. Monitor quarterly.`,
+          urgency: 'warning',
+        });
+      } else {
+        insights.push({
+          message: `Maintenance costs are well-distributed. No single category dominates spending.`,
+          urgency: 'success',
+        });
+      }
+
+      if (Object.keys(categories).length === 1) {
+        insights.push({
+          message:
+            'Only one category detected. Use more detailed descriptions for better auto-categorization.',
+          urgency: 'info',
+        });
+      }
+    }
+
+    return { categories, sorted, totalCost, topCategory, topPct, insights };
+  }
+
   async getLeaseExpirationStats(user) {
     const propertyIds = await this._getAccessiblePropertyIds(user);
     if (propertyIds.length === 0) return [];
@@ -243,11 +484,80 @@ class ReportService {
     });
   }
 
-  async getLeadConversionStats(user) {
-    // Retrieve explicit owner context
-    const ownerId = user?.role === 'owner' ? user.id : null;
+  /**
+   * Analytics: Lease Expiration Forecast
+   */
+  async getLeaseExpirationReportData(user) {
+    const expiringLeases = await this.getLeaseExpirationStats(user);
+    const nowTime = getLocalTime();
 
-    // Fetch pre-aggregated values from DB to avoid O(N) memory allocation and processing
+    const leasesWithDays = expiringLeases
+      .map((lease) => {
+        const endDate = parseLocalDate(lease.endDate);
+        const diffTime = endDate.getTime() - nowTime.getTime();
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        let urgency = 'upcoming',
+          urgencyColor = '#334155';
+        if (diffDays <= 14) {
+          urgency = 'critical';
+          urgencyColor = '#ef4444';
+        } else if (diffDays <= 30) {
+          urgency = 'urgent';
+          urgencyColor = '#f59e0b';
+        }
+        return { ...lease, diffDays, urgency, urgencyColor };
+      })
+      .sort((a, b) => a.diffDays - b.diffDays);
+
+    const critical = leasesWithDays.filter((l) => l.urgency === 'critical');
+    const urgent = leasesWithDays.filter((l) => l.urgency === 'urgent');
+    const upcoming = leasesWithDays.filter((l) => l.urgency === 'upcoming');
+    const revenueAtRisk = leasesWithDays.reduce(
+      (sum, l) => sum + (l.monthlyRent || 0),
+      0
+    );
+
+    const insights = [];
+    if (leasesWithDays.length === 0) {
+      insights.push({
+        message:
+          'No leases expiring in next 90 days. Portfolio stability is excellent.',
+        urgency: 'success',
+      });
+    } else {
+      if (critical.length > 0) {
+        const critRent = critical.reduce((s, l) => s + (l.monthlyRent || 0), 0);
+        insights.push({
+          message: `${critical.length} lease(s) expire within 14 days (LKR ${critRent.toLocaleString()}/mo risk). contact tenants immediately.`,
+          urgency: 'critical',
+        });
+      }
+      if (urgent.length > 0) {
+        insights.push({
+          message: `${urgent.length} lease(s) expire within 15–30 days. Send formal renewal notices.`,
+          urgency: 'warning',
+        });
+      }
+      if (upcoming.length > 0 && critical.length === 0 && urgent.length === 0) {
+        insights.push({
+          message: `${upcoming.length} lease(s) expiring in 31–90 days. Begin proactive conversations.`,
+          urgency: 'info',
+        });
+      }
+    }
+
+    return {
+      leasesWithDays,
+      critical,
+      urgent,
+      upcoming,
+      revenueAtRisk,
+      insights,
+    };
+  }
+
+  async getLeadConversionStats(user) {
+    const ownerId = user?.role === 'owner' ? user.id : null;
     const stats = await leadModel.getLeadConversionStats(ownerId);
     return {
       Total: Number(stats.Total || 0),
@@ -255,6 +565,59 @@ class ReportService {
       Converted: Number(stats.Converted || 0),
       Dropped: Number(stats.Dropped || 0),
     };
+  }
+
+  /**
+   * Analytics: Lead Conversion
+   */
+  async getLeadConversionReportData(user) {
+    const stats = await this.getLeadConversionStats(user);
+    const convRate =
+      stats.Total > 0
+        ? ((stats.Converted / stats.Total) * 100).toFixed(1)
+        : '0.0';
+    const dropRate =
+      stats.Total > 0
+        ? ((stats.Dropped / stats.Total) * 100).toFixed(1)
+        : '0.0';
+
+    const insights = [];
+    if (stats.Total === 0) {
+      insights.push({
+        message:
+          'No leads captured yet. Track inquiries to measure marketing performance.',
+        urgency: 'warning',
+      });
+    } else {
+      if (Number(convRate) >= 30)
+        insights.push({
+          message: `Strong conversion rate at ${convRate}%. Pipeline is performing well.`,
+          urgency: 'success',
+        });
+      else if (Number(convRate) >= 15)
+        insights.push({
+          message: `Conversion rate (${convRate}%) is moderate. Review follow-up timing.`,
+          urgency: 'warning',
+        });
+      else
+        insights.push({
+          message: `Low conversion rate (${convRate}%). Improve property listings or response times.`,
+          urgency: 'critical',
+        });
+
+      if (Number(dropRate) > 40)
+        insights.push({
+          message: `High drop-off rate (${dropRate}%). investigate leak in the pipeline.`,
+          urgency: 'critical',
+        });
+      if (stats.Interested > 0)
+        insights.push({
+          message: `${stats.Interested} lead(s) in active pipeline.`,
+          urgency: 'info',
+        });
+    }
+
+    return { stats, convRate, dropRate, insights };
   }
 
   async getMonthlyCashFlow(user) {
