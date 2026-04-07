@@ -35,17 +35,6 @@ router.post(
 router.post(
   '/setup-password',
   upload.single('nicDoc'),
-  (req, res, next) => {
-    // Parse tenantData if it's sent as a string (FormData case)
-    if (typeof req.body.tenantData === 'string') {
-      try {
-        req.body.tenantData = JSON.parse(req.body.tenantData);
-      } catch (e) {
-        console.error('Failed to parse tenantData JSON in middleware:', e);
-      }
-    }
-    next();
-  },
   validateRequest(setupPasswordSchema),
   authController.setupPassword
 );

@@ -80,6 +80,12 @@ export default async (err, req, res, next) => {
     if (err.name === 'JsonWebTokenError') error = handleJWTError();
     if (err.name === 'TokenExpiredError') error = handleJWTExpiredError();
 
+    // Joi Validation Errors
+    if (err.isJoi || err.name === 'ValidationError') {
+      error.statusCode = 400;
+      error.isOperational = true;
+    }
+
     sendErrorProd(error, req, res);
   } else {
     sendErrorDev(err, req, res);

@@ -9,6 +9,12 @@ import {
 
 import upload from '../middleware/upload.js';
 
+import validateRequest from '../middleware/validateRequest.js';
+import {
+  propertySchema,
+  updatePropertySchema,
+} from '../schemas/propertySchemas.js';
+
 const router = Router();
 
 // Types (Public)
@@ -23,6 +29,7 @@ router.post(
   '/',
   authenticateToken,
   authorizeRoles('owner'),
+  validateRequest(propertySchema),
   propertyController.createProperty
 );
 
@@ -40,6 +47,7 @@ router.put(
   authenticateToken,
   authorizeRoles('owner'),
   authorizeResource('property', 'id', 'params'),
+  validateRequest(updatePropertySchema),
   propertyController.updateProperty
 );
 

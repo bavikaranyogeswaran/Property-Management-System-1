@@ -1,13 +1,14 @@
 import AppError from '../utils/AppError.js';
 
 /**
- * Standardized Joi Validation Middleware
+ * Validation Middleware Factory
  * @param {Object} schema - Joi schema object
- * @param {String} source - Data source: 'body', 'query', or 'params' (default: 'body')
+ * @param {String} source - Source of data ('body', 'query', 'params')
  */
-const validateRequest = (schema, source = 'body') => {
+const validate = (schema, source = 'body') => {
   return (req, res, next) => {
-    // Handling FormData Edge Case: If sub-objects (like tenantData) are sent as strings
+    // Edge Case: setupPassword sends nested tenantData as a string in some multipart forms
+    // We try to parse it if it's a string to allow Joi to validate the object structure
     if (
       source === 'body' &&
       req.body.tenantData &&
@@ -16,14 +17,14 @@ const validateRequest = (schema, source = 'body') => {
       try {
         req.body.tenantData = JSON.parse(req.body.tenantData);
       } catch (e) {
-        // Silently fail here; Joi will catch it as an invalid object type later
+        // If it's not valid JSON, Joi will Catch it anyway
       }
     }
 
     const { value, error } = schema.validate(req[source], {
       abortEarly: false,
-      stripUnknown: true, // Crucial for security: prevents mass-assignment
-      allowUnknown: true, // Allow fields NOT defined in schema to pass (safe if stripUnknown is true)
+      stripUnknown: true,
+      allowUnknown: true,
     });
 
     if (error) {
@@ -31,10 +32,10 @@ const validateRequest = (schema, source = 'body') => {
       return next(new AppError(message, 400));
     }
 
-    // Replace the request data with the cleaned, validated value
+    // Replace the request data with the validated/sanitized value (strips unknown fields)
     req[source] = value;
     next();
   };
 };
 
-export default validateRequest;
+export default validate;
