@@ -38,7 +38,10 @@ class VisitModel {
                 v.*,
                 p.name as property_name,
                 u.unit_number as unit_number,
-                l.status as lead_status
+                l.status as lead_status,
+                l.name as lead_name,
+                l.email as lead_email,
+                l.phone as lead_phone
             FROM property_visits v
             JOIN properties p ON v.property_id = p.property_id
             LEFT JOIN units u ON v.unit_id = u.unit_id
@@ -70,9 +73,9 @@ class VisitModel {
       propertyId: row.property_id.toString(),
       unitId: row.unit_id ? row.unit_id.toString() : null,
       leadId: row.lead_id ? row.lead_id.toString() : null,
-      visitorName: row.visitor_name,
-      visitorEmail: row.visitor_email,
-      visitorPhone: row.visitor_phone,
+      visitorName: row.lead_name || row.visitor_name,
+      visitorEmail: row.lead_email || row.visitor_email,
+      visitorPhone: row.lead_phone || row.visitor_phone,
       scheduledDate: row.scheduled_date,
       status: row.status,
       notes: row.notes,
@@ -94,7 +97,14 @@ class VisitModel {
 
   async findById(visitId) {
     const [rows] = await db.query(
-      `SELECT * FROM property_visits WHERE visit_id = ?`,
+      `SELECT 
+        v.*,
+        l.name as lead_name,
+        l.email as lead_email,
+        l.phone as lead_phone
+       FROM property_visits v
+       LEFT JOIN leads l ON v.lead_id = l.lead_id
+       WHERE v.visit_id = ?`,
       [visitId]
     );
     if (rows.length === 0) return null;
@@ -104,9 +114,9 @@ class VisitModel {
       propertyId: row.property_id.toString(),
       unitId: row.unit_id ? row.unit_id.toString() : null,
       leadId: row.lead_id ? row.lead_id.toString() : null,
-      visitorName: row.visitor_name,
-      visitorEmail: row.visitor_email,
-      visitorPhone: row.visitor_phone,
+      visitorName: row.lead_name || row.visitor_name,
+      visitorEmail: row.lead_email || row.visitor_email,
+      visitorPhone: row.lead_phone || row.visitor_phone,
       scheduledDate: row.scheduled_date,
       status: row.status,
       notes: row.notes,

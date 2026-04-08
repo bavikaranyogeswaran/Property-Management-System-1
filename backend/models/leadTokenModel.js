@@ -20,27 +20,29 @@ class LeadTokenModel {
   }
 
   /**
-   * Find a valid (non-expired) token record.
+   * Find a valid (non-expired, non-revoked) token record.
    * Returns { leadId, expiresAt } or null.
    */
   async findByToken(token) {
     const [rows] = await db.query(
       `SELECT lead_id AS leadId, expires_at AS expiresAt
        FROM lead_access_tokens
-       WHERE token = ? AND expires_at > NOW()`,
+       WHERE token = ? AND expires_at > NOW() AND is_revoked = FALSE`,
       [token]
     );
     return rows[0] || null;
   }
 
   /**
-   * Delete all tokens for a given lead (e.g. on conversion or drop).
+   * Soft-invalidate all tokens for a given lead.
+   * Preserves audit trail compared to hard deletion (C15 fix).
    */
   async invalidateForLead(leadId, connection = null) {
     const dbConn = connection || db;
-    await dbConn.query('DELETE FROM lead_access_tokens WHERE lead_id = ?', [
-      leadId,
-    ]);
+    await dbConn.query(
+      'UPDATE lead_access_tokens SET is_revoked = TRUE, revoked_at = NOW() WHERE lead_id = ? AND is_revoked = FALSE',
+      [leadId]
+    );
   }
 
   /**
@@ -49,7 +51,7 @@ class LeadTokenModel {
   async findByLeadId(leadId) {
     const [rows] = await db.query(
       `SELECT token FROM lead_access_tokens
-       WHERE lead_id = ? AND expires_at > NOW()
+       WHERE lead_id = ? AND expires_at > NOW() AND is_revoked = FALSE
        ORDER BY created_at DESC LIMIT 1`,
       [leadId]
     );

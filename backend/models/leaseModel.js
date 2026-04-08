@@ -384,12 +384,23 @@ class LeaseModel {
   async createAdjustment(data, connection = null) {
     const { leaseId, effectiveDate, newMonthlyRent, notes } = data;
     const dbConn = connection || db;
-    const [result] = await dbConn.query(
-      `INSERT INTO lease_rent_adjustments (lease_id, effective_date, new_monthly_rent, notes)
-       VALUES (?, ?, ?, ?)`,
-      [leaseId, effectiveDate, newMonthlyRent, notes]
-    );
-    return result.insertId;
+    try {
+      const [result] = await dbConn.query(
+        `INSERT INTO lease_rent_adjustments (lease_id, effective_date, new_monthly_rent, notes)
+         VALUES (?, ?, ?, ?)`,
+        [leaseId, effectiveDate, newMonthlyRent, notes]
+      );
+      return result.insertId;
+    } catch (err) {
+      if (err.code === 'ER_DUP_ENTRY') {
+        const error = new Error(
+          `A rent adjustment for this lease already exists on ${effectiveDate}. Please edit the existing adjustment instead.`
+        );
+        error.statusCode = 400;
+        throw error;
+      }
+      throw err;
+    }
   }
 
   async findAdjustmentsByLeaseId(leaseId) {
