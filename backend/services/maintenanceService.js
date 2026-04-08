@@ -418,9 +418,10 @@ class MaintenanceService {
       const auditLogger = (await import('../utils/auditLogger.js')).default;
       await auditLogger.log(
         {
-          userId: user.id,
+          userId: user.user_id || user.id,
           actionType: 'MAINTENANCE_COST_RECORDED',
           entityId: requestId,
+          entityType: 'maintenance_request',
           details: { amount, description, costId },
         },
         null,

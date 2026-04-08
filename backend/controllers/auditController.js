@@ -11,6 +11,7 @@ class AuditController {
           sal.user_id as userId, 
           sal.action_type as actionType, 
           sal.entity_id as entityId, 
+          sal.entity_type as entityType,
           sal.details, 
           sal.ip_address as ipAddress, 
           sal.created_at as createdAt,

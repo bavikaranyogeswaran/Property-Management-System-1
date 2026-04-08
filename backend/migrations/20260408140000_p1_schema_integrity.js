@@ -54,13 +54,26 @@ export const up = async (knex) => {
     );
   }
   await knex.raw(
-    'ALTER TABLE rent_invoices ADD UNIQUE KEY unique_periodic_invoice (lease_id, year, month, invoice_type, due_date)'
+    'ALTER TABLE rent_invoices ADD UNIQUE KEY unique_periodic_invoice (lease_id, year, month, invoice_type, due_date, description(64))'
   );
 
   // H5: CRON_CHECKPOINTS STATUS ENUM
-  await knex.raw(
-    "ALTER TABLE cron_checkpoints MODIFY COLUMN status ENUM('success', 'failed', 'running') DEFAULT 'success'"
-  );
+  const hasCronCheckpoints = await knex.schema.hasTable('cron_checkpoints');
+  if (!hasCronCheckpoints) {
+    await knex.schema.createTable('cron_checkpoints', (table) => {
+      table.string('job_name', 50).primary();
+      table.date('last_success_date').notNullable();
+      table
+        .enum('status', ['success', 'failed', 'running'])
+        .defaultTo('success');
+      table.text('message');
+      table.datetime('updated_at').defaultTo(knex.fn.now());
+    });
+  } else {
+    await knex.raw(
+      "ALTER TABLE cron_checkpoints MODIFY COLUMN status ENUM('success', 'failed', 'running') DEFAULT 'success'"
+    );
+  }
 
   // H6: RENEWAL_REQUESTS STATUS ENUM
   await knex.raw(

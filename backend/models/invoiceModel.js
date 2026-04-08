@@ -169,9 +169,15 @@ class InvoiceModel {
     const [rows] = await db.query(
       `
             SELECT ri.*, l.tenant_id,
-                   COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id = ri.invoice_id AND status = 'verified'), 0) AS amount_paid
+                   COALESCE(p.total_paid, 0) AS amount_paid
             FROM rent_invoices ri 
             JOIN leases l ON ri.lease_id = l.lease_id 
+            LEFT JOIN (
+                SELECT invoice_id, SUM(amount) as total_paid 
+                FROM payments 
+                WHERE status = 'verified' 
+                GROUP BY invoice_id
+            ) p ON ri.invoice_id = p.invoice_id
             WHERE ri.invoice_id = ?
         `,
       [id]
@@ -187,11 +193,17 @@ class InvoiceModel {
       `
              SELECT ri.*, l.tenant_id, l.unit_id,
                     p.name as property_name, un.unit_number, un.status as unit_status,
-                    COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id = ri.invoice_id AND status = 'verified'), 0) AS amount_paid
+                    COALESCE(pay.total_paid, 0) AS amount_paid
              FROM rent_invoices ri 
              JOIN leases l ON ri.lease_id = l.lease_id 
              JOIN units un ON l.unit_id = un.unit_id
              JOIN properties p ON un.property_id = p.property_id
+             LEFT JOIN (
+                 SELECT invoice_id, SUM(amount) as total_paid 
+                 FROM payments 
+                 WHERE status = 'verified' 
+                 GROUP BY invoice_id
+             ) pay ON ri.invoice_id = pay.invoice_id
              WHERE ri.magic_token_hash = ? AND (ri.magic_token_expires_at IS NULL OR ri.magic_token_expires_at > NOW())
          `,
       [hash]
@@ -221,11 +233,17 @@ class InvoiceModel {
       `
               SELECT ri.*, l.tenant_id, l.unit_id,
                      p.name as property_name, un.unit_number, un.status as unit_status,
-                     COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id = ri.invoice_id AND status = 'verified'), 0) AS amount_paid
+                     COALESCE(pay.total_paid, 0) AS amount_paid
               FROM rent_invoices ri 
               JOIN leases l ON ri.lease_id = l.lease_id 
               JOIN units un ON l.unit_id = un.unit_id
               JOIN properties p ON un.property_id = p.property_id
+              LEFT JOIN (
+                  SELECT invoice_id, SUM(amount) as total_paid 
+                  FROM payments 
+                  WHERE status = 'verified' 
+                  GROUP BY invoice_id
+              ) pay ON ri.invoice_id = pay.invoice_id
               WHERE ri.last_order_id = ?
           `,
       [orderId]
@@ -237,9 +255,15 @@ class InvoiceModel {
     const [rows] = await pool.query(
       `
             SELECT ri.*, l.tenant_id, l.unit_id,
-                   COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id = ri.invoice_id AND status = 'verified'), 0) AS amount_paid
+                   COALESCE(p.total_paid, 0) AS amount_paid
             FROM rent_invoices ri
             JOIN leases l ON ri.lease_id = l.lease_id
+            LEFT JOIN (
+                SELECT invoice_id, SUM(amount) as total_paid 
+                FROM payments 
+                WHERE status = 'verified' 
+                GROUP BY invoice_id
+            ) p ON ri.invoice_id = p.invoice_id
             WHERE l.tenant_id = ? 
             ORDER BY ri.due_date ASC
         `,
@@ -251,12 +275,18 @@ class InvoiceModel {
   async findAll() {
     const [rows] = await pool.query(`
             SELECT ri.*, l.tenant_id, l.unit_id, u.name as tenant_name, p.name as property_name, un.unit_number,
-                   COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id = ri.invoice_id AND status = 'verified'), 0) AS amount_paid
+                   COALESCE(pay.total_paid, 0) AS amount_paid
             FROM rent_invoices ri
             JOIN leases l ON ri.lease_id = l.lease_id
             JOIN users u ON l.tenant_id = u.user_id
             JOIN units un ON l.unit_id = un.unit_id
             JOIN properties p ON un.property_id = p.property_id
+            LEFT JOIN (
+                SELECT invoice_id, SUM(amount) as total_paid 
+                FROM payments 
+                WHERE status = 'verified' 
+                GROUP BY invoice_id
+            ) pay ON ri.invoice_id = pay.invoice_id
             ORDER BY ri.due_date DESC
         `);
     return rows.map((row) => this.mapRow(row));
@@ -266,12 +296,18 @@ class InvoiceModel {
     const [rows] = await pool.query(
       `
             SELECT ri.*, l.tenant_id, l.unit_id, u.name as tenant_name, p.name as property_name, un.unit_number,
-                   COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id = ri.invoice_id AND status = 'verified'), 0) AS amount_paid
+                   COALESCE(pay.total_paid, 0) AS amount_paid
             FROM rent_invoices ri
             JOIN leases l ON ri.lease_id = l.lease_id
             JOIN users u ON l.tenant_id = u.user_id
             JOIN units un ON l.unit_id = un.unit_id
             JOIN properties p ON un.property_id = p.property_id
+            LEFT JOIN (
+                SELECT invoice_id, SUM(amount) as total_paid 
+                FROM payments 
+                WHERE status = 'verified' 
+                GROUP BY invoice_id
+            ) pay ON ri.invoice_id = pay.invoice_id
             WHERE p.owner_id = ?
             ORDER BY ri.due_date DESC
         `,
@@ -284,13 +320,19 @@ class InvoiceModel {
     const [rows] = await pool.query(
       `
             SELECT ri.*, l.tenant_id, l.unit_id, u.name as tenant_name, p.name as property_name, un.unit_number,
-                   COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id = ri.invoice_id AND status = 'verified'), 0) AS amount_paid
+                   COALESCE(pay.total_paid, 0) AS amount_paid
             FROM rent_invoices ri
             JOIN leases l ON ri.lease_id = l.lease_id
             JOIN users u ON l.tenant_id = u.user_id
             JOIN units un ON l.unit_id = un.unit_id
             JOIN properties p ON un.property_id = p.property_id
             JOIN staff_property_assignments spa ON p.property_id = spa.property_id
+            LEFT JOIN (
+                SELECT invoice_id, SUM(amount) as total_paid 
+                FROM payments 
+                WHERE status = 'verified' 
+                GROUP BY invoice_id
+            ) pay ON ri.invoice_id = pay.invoice_id
             WHERE spa.user_id = ?
             ORDER BY ri.due_date DESC
         `,
@@ -322,11 +364,17 @@ class InvoiceModel {
     const [rows] = await pool.query(
       `
             SELECT ri.*, l.tenant_id, p.late_fee_percentage, p.late_fee_type, p.late_fee_amount, p.late_fee_grace_period,
-                   COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id = ri.invoice_id AND status = 'verified'), 0) AS amount_paid
+                   COALESCE(pay.total_paid, 0) AS amount_paid
             FROM rent_invoices ri
             JOIN leases l ON ri.lease_id = l.lease_id
             JOIN units un ON l.unit_id = un.unit_id
             JOIN properties p ON un.property_id = p.property_id
+            LEFT JOIN (
+                SELECT invoice_id, SUM(amount) as total_paid 
+                FROM payments 
+                WHERE status = 'verified' 
+                GROUP BY invoice_id
+            ) pay ON ri.invoice_id = pay.invoice_id
             WHERE ri.status IN ('pending', 'partially_paid')
             AND ri.due_date < DATE_SUB(CURDATE(), INTERVAL p.late_fee_grace_period DAY)
         `
@@ -376,7 +424,15 @@ class InvoiceModel {
   async findPendingDebts(leaseId, connection = null) {
     const db = connection || pool;
     const [rows] = await db.query(
-      `SELECT *, COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id = rent_invoices.invoice_id AND status = 'verified'), 0) AS amount_paid FROM rent_invoices WHERE lease_id = ? AND status IN ('pending', 'partially_paid') ORDER BY due_date ASC`,
+      `SELECT ri.*, COALESCE(p.total_paid, 0) AS amount_paid 
+       FROM rent_invoices ri
+       LEFT JOIN (
+           SELECT invoice_id, SUM(amount) as total_paid 
+           FROM payments 
+           WHERE status = 'verified' 
+           GROUP BY invoice_id
+       ) p ON ri.invoice_id = p.invoice_id
+       WHERE ri.lease_id = ? AND ri.status IN ('pending', 'partially_paid') ORDER BY ri.due_date ASC`,
       [leaseId]
     );
     return rows.map((row) => this.mapRow(row));

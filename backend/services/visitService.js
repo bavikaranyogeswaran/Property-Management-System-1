@@ -161,9 +161,10 @@ class VisitService {
     if (success) {
       await auditLogger.log(
         {
-          userId: user ? user.id : null,
+          userId: user ? user.user_id : user ? user.id : null,
           actionType: 'VISIT_CANCELLED',
           entityId: visitId,
+          entityType: 'visit',
           details: { cancelledBy: user ? 'user' : 'visitor' },
         },
         { user }
@@ -234,9 +235,10 @@ class VisitService {
     // Audit
     await auditLogger.log(
       {
-        userId: user ? user.id : null,
+        userId: user ? user.user_id : user ? user.id : null,
         actionType: 'VISIT_STATUS_UPDATED',
         entityId: id,
+        entityType: 'visit',
         details: { newStatus: status },
       },
       { user }

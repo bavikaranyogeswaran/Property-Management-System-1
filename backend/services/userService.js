@@ -82,6 +82,7 @@ class UserService {
           userId: user?.id || null,
           actionType: 'STAFF_ACCOUNT_CREATED',
           entityId: userId,
+          entityType: 'user',
           details: { name, email, role: 'treasurer' },
         },
         null,
@@ -182,6 +183,7 @@ class UserService {
             userId: id,
             actionType: 'PROFILE_UPDATED',
             entityId: id,
+            entityType: 'user',
             details: { name, phone },
           },
           null,
@@ -563,6 +565,7 @@ class UserService {
           userId: null, // System action
           actionType: 'TENANT_ONBOARDING_TRIGGERED',
           entityId: userId,
+          entityType: 'user',
           details: { email: user.email },
         },
         null,

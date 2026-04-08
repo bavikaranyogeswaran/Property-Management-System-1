@@ -202,9 +202,10 @@ class UserController {
       const auditLogger = (await import('../utils/auditLogger.js')).default;
       await auditLogger.log(
         {
-          userId: req.user.id,
+          userId: req.user.id || req.user.user_id,
           actionType: 'PROPERTY_ASSIGNED_TO_STAFF',
           entityId: propertyId,
+          entityType: 'property',
           details: { staffUserId: userId },
         },
         req
@@ -227,9 +228,10 @@ class UserController {
       const auditLogger = (await import('../utils/auditLogger.js')).default;
       await auditLogger.log(
         {
-          userId: req.user.id,
+          userId: req.user.id || req.user.user_id,
           actionType: 'PROPERTY_REMOVED_FROM_STAFF',
           entityId: propertyId,
+          entityType: 'property',
           details: { staffUserId: userId },
         },
         req
@@ -273,9 +275,10 @@ class UserController {
       const auditLogger = (await import('../utils/auditLogger.js')).default;
       await auditLogger.log(
         {
-          userId: req.user.id,
+          userId: req.user.id || req.user.user_id,
           actionType: 'SECURITY_FORCE_LOGOUT',
           entityId: id,
+          entityType: 'user',
           details: {
             targetUserId: id,
             reason: req.body.reason || 'Administrative action',

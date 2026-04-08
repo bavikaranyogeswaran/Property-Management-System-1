@@ -63,7 +63,7 @@ CREATE TABLE tenant_behavior_logs (
 -- OWNERS
 CREATE TABLE owners (
     user_id INT PRIMARY KEY,
-    nic VARCHAR(20),
+    nic VARCHAR(20) UNIQUE,
     tin VARCHAR(50),                     -- Taxpayer Identification Number
     tin_url VARCHAR(500),                -- [ADDED] URL to uploaded TIN document
     bank_name VARCHAR(100),
@@ -296,7 +296,6 @@ CREATE TABLE leases (
     refunded_amount BIGINT DEFAULT 0,
     target_deposit BIGINT DEFAULT 0,                  -- Security deposit target amount in Cents
     document_url VARCHAR(500), -- [ADDED] Lease document URL
-    is_documents_verified BOOLEAN DEFAULT FALSE, -- [NEW] Manual verification step
     verification_status ENUM('pending', 'verified', 'rejected') DEFAULT 'pending', -- [NEW] Explicit verification state
     verification_rejection_reason TEXT, -- [NEW] Reason if documents are rejected
     actual_checkout_at DATETIME, -- [ADDED] Actual checkout time
@@ -338,7 +337,8 @@ CREATE TABLE lease_rent_adjustments (
     new_monthly_rent BIGINT NOT NULL,
     notes TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (lease_id) REFERENCES leases(lease_id) ON DELETE CASCADE
+    FOREIGN KEY (lease_id) REFERENCES leases(lease_id) ON DELETE CASCADE,
+    UNIQUE KEY unique_lease_adjustment (lease_id, effective_date)
 );
 
 -- =========================
@@ -482,6 +482,7 @@ CREATE TABLE system_audit_logs (
     user_id INT, -- Who performed the action (nullable for system)
     action_type VARCHAR(50) NOT NULL, -- e.g., 'LEASE_TERMINATION', 'PAYMENT_REJECTION'
     entity_id INT, -- ID of the affected entity (lease_id, invoice_id, etc.)
+    entity_type VARCHAR(30), -- [H17] Discriminator (e.g., 'invoice', 'lease')
     details TEXT, -- JSON or text description of changes
     ip_address VARCHAR(45),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -561,6 +562,17 @@ CREATE INDEX idx_properties_city_district ON properties(city, district);
 CREATE INDEX idx_units_rent ON units(monthly_rent);
 CREATE INDEX idx_leases_status_end_date ON leases(status, end_date);
 CREATE INDEX idx_invoices_status_due_date ON rent_invoices(status, due_date);
+
+-- =========================
+-- ADDITIONAL PERFORMANCE INDEXES (PRIORITY 2)
+-- =========================
+CREATE INDEX idx_notification_user_read ON notifications(user_id, is_read, created_at);
+CREATE INDEX idx_audit_action ON system_audit_logs(action_type, created_at);
+CREATE INDEX idx_audit_entity ON system_audit_logs(entity_id);
+CREATE INDEX idx_payment_invoice_status ON payments(invoice_id, status);
+CREATE INDEX idx_ledger_lease_category ON accounting_ledger(lease_id, category);
+CREATE INDEX idx_leases_tenant_status ON leases(tenant_id, status);
+CREATE INDEX idx_leases_unit_status ON leases(unit_id, status);
 
 
 -- =========================

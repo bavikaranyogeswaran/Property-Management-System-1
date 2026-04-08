@@ -103,6 +103,7 @@ class AuthService {
           userId: user.id,
           actionType: 'PASSWORD_RESET_REQUESTED',
           entityId: user.id,
+          entityType: 'user',
           details: { email },
         });
       } catch (e) {
@@ -142,6 +143,7 @@ class AuthService {
           userId: decoded.id,
           actionType: 'PASSWORD_RESET_COMPLETED',
           entityId: decoded.id,
+          entityType: 'user',
         });
       } catch (e) {
         console.error('Audit log failed for password reset completion:', e);

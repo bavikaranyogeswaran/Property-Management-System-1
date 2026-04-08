@@ -167,9 +167,10 @@ class LeaseService {
       const auditLogger = (await import('../utils/auditLogger.js')).default;
       await auditLogger.log(
         {
-          userId: user?.id || null,
+          userId: user?.id || user?.user_id || null,
           actionType: 'LEASE_CREATED_DRAFT',
           entityId: leaseId,
+          entityType: 'lease',
           details: {
             tenantId,
             unitId,
@@ -234,9 +235,10 @@ class LeaseService {
       const auditLogger = (await import('../utils/auditLogger.js')).default;
       await auditLogger.log(
         {
-          userId: user.id,
+          userId: user.id || user.user_id,
           actionType: 'LEASE_DOCUMENTS_VERIFIED',
           entityId: leaseId,
+          entityType: 'lease',
           details: {},
         },
         null,
@@ -300,9 +302,10 @@ class LeaseService {
       const auditLogger = (await import('../utils/auditLogger.js')).default;
       await auditLogger.log(
         {
-          userId: user.id,
+          userId: user.id || user.user_id,
           actionType: 'LEASE_DOCUMENTS_REJECTED',
           entityId: leaseId,
+          entityType: 'lease',
           details: { reason },
         },
         null,
@@ -530,9 +533,10 @@ class LeaseService {
       const auditLogger = (await import('../utils/auditLogger.js')).default;
       await auditLogger.log(
         {
-          userId: user?.id || null,
+          userId: user?.id || user?.user_id || null,
           actionType: 'LEASE_SIGNED_ACTIVATED',
           entityId: leaseId,
+          entityType: 'lease',
           details: {},
         },
         null,
@@ -592,9 +596,10 @@ class LeaseService {
 
     const auditLogger = (await import('../utils/auditLogger.js')).default;
     await auditLogger.log({
-      userId: user.id,
+      userId: user.id || user.user_id,
       actionType: 'DEPOSIT_REFUND_REQUESTED',
       entityId: leaseId,
+      entityType: 'lease',
       details: { amount, notes },
     });
 
@@ -832,9 +837,10 @@ class LeaseService {
       const auditLogger = (await import('../utils/auditLogger.js')).default;
       await auditLogger.log(
         {
-          userId: user.id,
+          userId: user.id || user.user_id,
           actionType: 'DEPOSIT_REFUND_APPROVED',
           entityId: leaseId,
+          entityType: 'lease',
           details: { status },
         },
         null,
@@ -907,9 +913,10 @@ class LeaseService {
       const auditLogger = (await import('../utils/auditLogger.js')).default;
       await auditLogger.log(
         {
-          userId: user.id,
+          userId: user.id || user.user_id,
           actionType: 'DEPOSIT_DISBURSED',
           entityId: leaseId,
+          entityType: 'lease',
           details: { amount, bankReferenceId },
         },
         null,
@@ -942,9 +949,10 @@ class LeaseService {
 
     const auditLogger = (await import('../utils/auditLogger.js')).default;
     await auditLogger.log({
-      userId: user.id,
+      userId: user.id || user.user_id,
       actionType: 'DEPOSIT_REFUND_DISPUTED',
       entityId: leaseId,
+      entityType: 'lease',
       details: { notes },
     });
 
@@ -997,6 +1005,7 @@ class LeaseService {
           userId: tenantId,
           actionType: 'DEPOSIT_REFUND_ACKNOWLEDGED',
           entityId: leaseId,
+          entityType: 'lease',
           details: { status: finalStatus, amount: lease.proposedRefundAmount },
         },
         null,
@@ -1039,9 +1048,10 @@ class LeaseService {
 
     const auditLogger = (await import('../utils/auditLogger.js')).default;
     await auditLogger.log({
-      userId: user.id,
+      userId: user.id || user.user_id,
       actionType: 'DEPOSIT_REFUND_RESOLVED',
       entityId: leaseId,
+      entityType: 'lease',
       details: {
         previousStatus: 'disputed',
         newProposedAmount: adjustedAmount,
@@ -1147,9 +1157,10 @@ class LeaseService {
       const auditLogger = (await import('../utils/auditLogger.js')).default;
       await auditLogger.log(
         {
-          userId: user?.id || null,
+          userId: user?.id || user?.user_id || null,
           actionType: 'LEASE_TERMINATION',
           entityId: leaseId,
+          entityType: 'lease',
           details: { terminationDate, status: lease.status },
         },
         null,
@@ -1241,9 +1252,10 @@ class LeaseService {
       const auditLogger = (await import('../utils/auditLogger.js')).default;
       await auditLogger.log(
         {
-          userId: user.id,
+          userId: user.id || user.user_id,
           actionType: 'LEASE_CHECKOUT_FINALIZED',
           entityId: leaseId,
+          entityType: 'lease',
           details: { actualCheckoutAt, unitId: lease.unitId },
         },
         null,
@@ -1318,9 +1330,10 @@ class LeaseService {
 
     const auditLogger = (await import('../utils/auditLogger.js')).default;
     await auditLogger.log({
-      userId: user?.id || null,
+      userId: user?.id || user?.user_id || null,
       actionType: 'LEASE_DOCUMENT_UPDATED',
       entityId: id,
+      entityType: 'lease',
       details: { documentUrl },
     });
 
@@ -1356,9 +1369,10 @@ class LeaseService {
 
     const auditLogger = (await import('../utils/auditLogger.js')).default;
     await auditLogger.log({
-      userId: user.id,
+      userId: user.id || user.user_id,
       actionType: 'LEASE_RENT_ADJUSTED',
       entityId: leaseId,
+      entityType: 'lease',
       details: { adjustmentId, newMonthlyRent, effectiveDate },
     });
 
@@ -1409,9 +1423,10 @@ class LeaseService {
       const auditLogger = (await import('../utils/auditLogger.js')).default;
       await auditLogger.log(
         {
-          userId: user.id,
+          userId: user.id || user.user_id,
           actionType: 'LEASE_CANCELLED_BY_STAFF',
           entityId: leaseId,
+          entityType: 'lease',
           details: { unitId: lease.unitId },
         },
         null,
@@ -1475,9 +1490,10 @@ class LeaseService {
       const auditLogger = (await import('../utils/auditLogger.js')).default;
       await auditLogger.log(
         {
-          userId: user.id,
+          userId: user.id || user.user_id,
           actionType: 'LEASE_WITHDRAWN_BY_TENANT',
           entityId: leaseId,
+          entityType: 'lease',
           details: { unitId: lease.unitId },
         },
         null,
@@ -1552,9 +1568,10 @@ class LeaseService {
       const auditLogger = (await import('../utils/auditLogger.js')).default;
       await auditLogger.log(
         {
-          userId: user.id || null,
+          userId: user.id || user.user_id || null,
           actionType: 'MAGIC_LINK_REGENERATED',
           entityId: leaseId,
+          entityType: 'lease',
           details: { invoiceId: invoice.invoice_id },
         },
         null,
@@ -1640,6 +1657,7 @@ class LeaseService {
             userId: null, // System action
             actionType: 'RENT_ESCALATED_AUTOMATED',
             entityId: lease.lease_id,
+            entityType: 'lease',
             details: { oldRent: currentRent, newRent, percentage },
           },
           null,

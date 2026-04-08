@@ -35,6 +35,7 @@ class RenewalService {
       userId: user?.id || null,
       actionType: 'RENEWAL_REQUEST_CREATED',
       entityId: requestId,
+      entityType: 'renewal_request',
       details: { leaseId, unitId: lease.unitId },
     });
 
@@ -69,9 +70,10 @@ class RenewalService {
 
     const auditLogger = (await import('../utils/auditLogger.js')).default;
     await auditLogger.log({
-      userId: user.id,
+      userId: user.id || user.user_id,
       actionType: 'RENEWAL_TERMS_PROPOSED',
       entityId: requestId,
+      entityType: 'renewal_request',
       details: data,
     });
   }
@@ -141,9 +143,10 @@ class RenewalService {
       const auditLogger = (await import('../utils/auditLogger.js')).default;
       await auditLogger.log(
         {
-          userId: user.id,
+          userId: user.id || user.user_id,
           actionType: 'RENEWAL_APPROVED',
           entityId: requestId,
+          entityType: 'renewal_request',
           details: { newLeaseId, proposedRent: request.proposed_monthly_rent },
         },
         null,
@@ -203,9 +206,10 @@ class RenewalService {
 
     const auditLogger = (await import('../utils/auditLogger.js')).default;
     await auditLogger.log({
-      userId: user.id,
+      userId: user.id || user.user_id,
       actionType: 'RENEWAL_REJECTED',
       entityId: requestId,
+      entityType: 'renewal_request',
     });
 
     // Send Email Notification (non-blocking)

@@ -588,9 +588,10 @@ class PaymentService {
 
           await auditLogger.log(
             {
-              userId: user.id,
+              userId: user.user_id || user.id,
               actionType: 'PAYMENT_REJECTED',
               entityId: paymentId,
+              entityType: 'payment',
               details: {
                 invoiceId: payment.invoiceId,
                 amount: payment.amount,
@@ -774,6 +775,7 @@ class PaymentService {
             userId: null,
             actionType: 'RESERVATION_EXTENDED',
             entityId: invoice.leaseId,
+            entityType: 'lease',
             details: {
               newExpiry: extendedExpiry,
               reason: 'Deposit payment received',
@@ -882,9 +884,10 @@ class PaymentService {
 
       await auditLogger.log(
         {
-          userId: user?.id || null,
+          userId: user?.user_id || user?.id || null,
           actionType: 'PAYMENT_VERIFIED',
           entityId: paymentId,
+          entityType: 'payment',
           details: {
             invoiceId: payment.invoiceId,
             amount: payment.amount,

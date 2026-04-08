@@ -911,6 +911,7 @@ export const deactivateFormerTenants = async (targetDate = null) => {
             userId: null, // System action
             actionType: 'TENANT_ACCESS_REVOKED',
             entityId: tenant.user_id,
+            entityType: 'user',
             details: {
               reason: 'Lease ended past property-specific deactivation period',
               referenceDate,
@@ -983,6 +984,7 @@ export const autoAcknowledgeRefunds = async () => {
             userId: null,
             actionType: 'DEPOSIT_REFUND_ACKNOWLEDGED',
             entityId: lease.lease_id,
+            entityType: 'lease',
             details: {
               status: finalStatus,
               amount: proposedAmount,
