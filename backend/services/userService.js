@@ -24,6 +24,7 @@ import {
 import pool from '../config/db.js';
 import unitLockService from '../services/unitLockService.js';
 import leadTokenModel from '../models/leadTokenModel.js';
+import leadStageHistoryModel from '../models/leadStageHistoryModel.js';
 import { toCentsFromMajor, fromCents } from '../utils/moneyUtils.js';
 
 const SALT_ROUNDS = 10;
