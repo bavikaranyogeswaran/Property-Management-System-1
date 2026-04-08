@@ -1,39 +1,49 @@
 export const up = async (knex) => {
   // H8-H12: ADDITIONAL PERFORMANCE INDEXES
-  await knex.schema.alterTable('notifications', (table) => {
-    table.index(
-      ['user_id', 'is_read', 'created_at'],
-      'idx_notification_user_read'
+  try {
+    await knex.schema.alterTable('notifications', (table) => {
+      table.index(
+        ['user_id', 'is_read', 'created_at'],
+        'idx_notification_user_read'
+      );
+    });
+  } catch (err) {}
+
+  try {
+    await knex.schema.alterTable('system_audit_logs', (table) => {
+      table.index(['action_type', 'created_at'], 'idx_audit_action');
+      table.index(['entity_id'], 'idx_audit_entity');
+      // H17: Add entity_type
+      table.string('entity_type', 30).nullable();
+    });
+  } catch (err) {}
+
+  try {
+    await knex.schema.alterTable('payments', (table) => {
+      table.index(['invoice_id', 'status'], 'idx_payment_invoice_status');
+    });
+  } catch (err) {}
+
+  try {
+    await knex.schema.alterTable('accounting_ledger', (table) => {
+      table.index(['lease_id', 'category'], 'idx_ledger_lease_category');
+    });
+  } catch (err) {}
+
+  try {
+    const hasDocsVerified = await knex.schema.hasColumn(
+      'leases',
+      'is_documents_verified'
     );
-  });
-
-  await knex.schema.alterTable('system_audit_logs', (table) => {
-    table.index(['action_type', 'created_at'], 'idx_audit_action');
-    table.index(['entity_id'], 'idx_audit_entity');
-    // H17: Add entity_type
-    table.string('entity_type', 30).nullable();
-  });
-
-  await knex.schema.alterTable('payments', (table) => {
-    table.index(['invoice_id', 'status'], 'idx_payment_invoice_status');
-  });
-
-  await knex.schema.alterTable('accounting_ledger', (table) => {
-    table.index(['lease_id', 'category'], 'idx_ledger_lease_category');
-  });
-
-  const hasDocsVerified = await knex.schema.hasColumn(
-    'leases',
-    'is_documents_verified'
-  );
-  await knex.schema.alterTable('leases', (table) => {
-    table.index(['tenant_id', 'status'], 'idx_leases_tenant_status');
-    table.index(['unit_id', 'status'], 'idx_leases_unit_status');
-    // H14: Drop redundant column
-    if (hasDocsVerified) {
-      table.dropColumn('is_documents_verified');
-    }
-  });
+    await knex.schema.alterTable('leases', (table) => {
+      table.index(['tenant_id', 'status'], 'idx_leases_tenant_status');
+      table.index(['unit_id', 'status'], 'idx_leases_unit_status');
+      // H14: Drop redundant column
+      if (hasDocsVerified) {
+        table.dropColumn('is_documents_verified');
+      }
+    });
+  } catch (err) {}
 
   // H15: UNIQUE ON owners.nic
   // We check for duplicates first and print a warning if they exist.

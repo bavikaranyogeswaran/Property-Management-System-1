@@ -154,9 +154,15 @@ export const up = async (knex) => {
   // Remove UNIQUE(property_id) and add UNIQUE(user_id, property_id)
   // =============================================
   try {
-    // Drop the restrictive unique key on property_id alone
+    // 1. Add a non-unique index to support the foreign key on property_id
+    // This prevents "Needed in a foreign key constraint" errors when we drop the unique key.
+    await knex.raw(
+      'ALTER TABLE staff_property_assignments ADD INDEX idx_staff_assignment_property (property_id)'
+    );
+
+    // 2. Drop the restrictive unique key on property_id alone
     const [existingKeys] = await knex.raw(
-      "SELECT CONSTRAINT_NAME FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'staff_property_assignments' AND CONSTRAINT_NAME = 'unique_property'"
+      "SELECT INDEX_NAME FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'staff_property_assignments' AND INDEX_NAME = 'unique_property'"
     );
     if (existingKeys.length > 0) {
       await knex.raw(

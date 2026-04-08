@@ -11,20 +11,37 @@ export const up = async (knex) => {
       table.integer('notice_period_months').defaultTo(1);
       table.boolean('is_default').defaultTo(false);
       table.datetime('created_at').defaultTo(knex.fn.now());
-      table.foreign('owner_id').references('users.user_id').onDelete('CASCADE');
+      table
+        .foreign('owner_id')
+        .references('user_id')
+        .inTable('users')
+        .onDelete('CASCADE');
       table.index('owner_id', 'idx_lease_terms_owner');
     });
   }
 
   // H2: RENT_INVOICES MISSING COLUMNS
+  const hasMagicHash = await knex.schema.hasColumn(
+    'rent_invoices',
+    'magic_token_hash'
+  );
+  const hasMagicExpiry = await knex.schema.hasColumn(
+    'rent_invoices',
+    'magic_token_expires_at'
+  );
+  const hasLastOrder = await knex.schema.hasColumn(
+    'rent_invoices',
+    'last_order_id'
+  );
+
   await knex.schema.alterTable('rent_invoices', (table) => {
-    if (!knex.schema.hasColumn('rent_invoices', 'magic_token_hash')) {
+    if (!hasMagicHash) {
       table.string('magic_token_hash', 255).nullable();
     }
-    if (!knex.schema.hasColumn('rent_invoices', 'magic_token_expires_at')) {
+    if (!hasMagicExpiry) {
       table.datetime('magic_token_expires_at').nullable();
     }
-    if (!knex.schema.hasColumn('rent_invoices', 'last_order_id')) {
+    if (!hasLastOrder) {
       table.string('last_order_id', 100).nullable();
     }
   });
@@ -41,21 +58,24 @@ export const up = async (knex) => {
   }
 
   // H1: RENT_INVOICES UNIQUE KEY UPDATE
-  // We drop the old one and add the new one.
-  // Knex doesn't have an easy "hasUnique" so we use raw to be safe or try-catch.
+  // We use a single ALTER TABLE statement to avoid temporary foreign key index violations.
   try {
     await knex.raw(
-      'ALTER TABLE rent_invoices DROP INDEX unique_periodic_invoice'
+      'ALTER TABLE rent_invoices DROP INDEX unique_periodic_invoice, ADD UNIQUE KEY unique_periodic_invoice (lease_id, year, month, invoice_type, due_date, description(64))'
     );
   } catch (err) {
-    // Index might not exist or have a different name in some environments
-    console.warn(
-      '[Migration] Could not drop unique_periodic_invoice index, it might not exist.'
-    );
+    // If the index doesn't exist yet (fresh DB without initial schema), just add it.
+    try {
+      await knex.raw(
+        'ALTER TABLE rent_invoices ADD UNIQUE KEY unique_periodic_invoice (lease_id, year, month, invoice_type, due_date, description(64))'
+      );
+    } catch (innerErr) {
+      console.warn(
+        '[Migration] Warning updating unique_periodic_invoice:',
+        innerErr.message
+      );
+    }
   }
-  await knex.raw(
-    'ALTER TABLE rent_invoices ADD UNIQUE KEY unique_periodic_invoice (lease_id, year, month, invoice_type, due_date, description(64))'
-  );
 
   // H5: CRON_CHECKPOINTS STATUS ENUM
   const hasCronCheckpoints = await knex.schema.hasTable('cron_checkpoints');
