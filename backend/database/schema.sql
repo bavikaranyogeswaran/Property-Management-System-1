@@ -247,7 +247,11 @@ CREATE TABLE messages (
     FOREIGN KEY (lead_id) REFERENCES leads(lead_id) ON DELETE CASCADE,
     FOREIGN KEY (tenant_id) REFERENCES users(user_id) ON DELETE CASCADE,
     FOREIGN KEY (sender_id) REFERENCES users(user_id) ON DELETE CASCADE,
-    FOREIGN KEY (sender_lead_id) REFERENCES leads(lead_id) ON DELETE CASCADE
+    FOREIGN KEY (sender_lead_id) REFERENCES leads(lead_id) ON DELETE CASCADE,
+    CONSTRAINT chk_sender_consistency CHECK (
+        (sender_type = 'user' AND sender_id IS NOT NULL) OR
+        (sender_type = 'lead' AND sender_lead_id IS NOT NULL)
+    )
 );
 
 -- =========================
@@ -290,6 +294,7 @@ CREATE TABLE leases (
     proposed_refund_amount BIGINT DEFAULT 0,
     refund_notes TEXT,
     refunded_amount BIGINT DEFAULT 0,
+    target_deposit BIGINT DEFAULT 0,                  -- Security deposit target amount in Cents
     document_url VARCHAR(500), -- [ADDED] Lease document URL
     is_documents_verified BOOLEAN DEFAULT FALSE, -- [NEW] Manual verification step
     verification_status ENUM('pending', 'verified', 'rejected') DEFAULT 'pending', -- [NEW] Explicit verification state
@@ -306,6 +311,22 @@ CREATE TABLE leases (
     FOREIGN KEY (tenant_id) REFERENCES users(user_id) ON DELETE RESTRICT,
     FOREIGN KEY (unit_id) REFERENCES units(unit_id) ON DELETE RESTRICT
 );
+
+-- =========================
+-- LEASE TERMS (Templates)
+-- =========================
+CREATE TABLE lease_terms (
+    lease_term_id INT AUTO_INCREMENT PRIMARY KEY,
+    owner_id INT NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    type VARCHAR(50),                               -- e.g., 'fixed', 'month-to-month'
+    duration_months INT,
+    notice_period_months INT DEFAULT 1,
+    is_default BOOLEAN DEFAULT FALSE,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (owner_id) REFERENCES users(user_id) ON DELETE CASCADE
+);
+CREATE INDEX idx_lease_terms_owner ON lease_terms(owner_id);
 
 -- =========================
 -- LEASE RENT ADJUSTMENTS (Addendums)
@@ -333,9 +354,12 @@ CREATE TABLE rent_invoices (
     status ENUM('pending','partially_paid','paid','overdue','void') DEFAULT 'pending',
     invoice_type ENUM('rent', 'maintenance', 'late_fee', 'deposit', 'other') DEFAULT 'rent',
     description VARCHAR(255),
+    magic_token_hash VARCHAR(255) DEFAULT NULL,       -- SHA-256 hash for guest payment links
+    magic_token_expires_at DATETIME DEFAULT NULL,     -- Expiry for magic token
+    last_order_id VARCHAR(100) DEFAULT NULL,           -- PayHere order tracking
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (lease_id) REFERENCES leases(lease_id) ON DELETE RESTRICT,
-    UNIQUE KEY unique_periodic_invoice (lease_id, year, month, invoice_type)
+    UNIQUE KEY unique_periodic_invoice (lease_id, year, month, invoice_type, due_date)
 );
 
 -- =========================
@@ -548,7 +572,7 @@ CREATE TABLE IF NOT EXISTS renewal_requests (
     current_monthly_rent BIGINT NOT NULL,
     proposed_monthly_rent BIGINT NULL,
     proposed_end_date DATE NULL,
-    status ENUM('pending', 'negotiating', 'approved', 'rejected', 'cancelled') DEFAULT 'pending',
+    status ENUM('pending', 'negotiating', 'approved', 'rejected', 'cancelled', 'expired') DEFAULT 'pending',
     negotiation_notes TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -562,7 +586,7 @@ CREATE TABLE IF NOT EXISTS renewal_requests (
 CREATE TABLE cron_checkpoints (
     job_name VARCHAR(50) PRIMARY KEY,
     last_success_date DATE NOT NULL,
-    status ENUM('success', 'failed') DEFAULT 'success',
+    status ENUM('success', 'failed', 'running') DEFAULT 'success',
     message TEXT,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
