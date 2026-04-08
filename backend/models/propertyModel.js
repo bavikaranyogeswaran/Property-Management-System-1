@@ -24,7 +24,7 @@ class PropertyModel {
       managementFeePercentage,
     } = propertyData;
 
-    // Ensure features is a JSON string if it's an array/object, or null if empty
+    // [LEGACY] Keep features JSON column populated for backward compat
     const featuresJson = features ? JSON.stringify(features) : null;
 
     const [result] = await db.query(
@@ -54,7 +54,15 @@ class PropertyModel {
         managementFeePercentage || 0.0,
       ]
     );
-    return result.insertId;
+
+    const propertyId = result.insertId;
+
+    // [1NF FIX] Write features to the normalized amenities table
+    if (Array.isArray(features) && features.length > 0) {
+      await this._syncAmenities(propertyId, features);
+    }
+
+    return propertyId;
   }
 
   async findAll(ownerId = null) {
@@ -67,9 +75,11 @@ class PropertyModel {
                 p.street,
                 p.city,
                 p.district,
-                p.image_url, 
+                COALESCE(
+                  (SELECT pi.image_url FROM property_images pi WHERE pi.property_id = p.property_id AND pi.is_primary = TRUE LIMIT 1),
+                  p.image_url
+                ) AS image_url,
                 p.description,
-                p.features,
                 p.status, 
                 p.created_at,
                 p.property_type_id,
@@ -94,6 +104,10 @@ class PropertyModel {
 
     const [rows] = await db.query(query, params);
 
+    // Batch fetch amenities for all property IDs
+    const propertyIds = rows.map((r) => r.property_id);
+    const amenitiesMap = await this._getAmenitiesBatch(propertyIds);
+
     return rows.map((row) => ({
       id: row.property_id.toString(),
       ownerId: row.owner_id.toString(),
@@ -106,7 +120,7 @@ class PropertyModel {
       typeName: row.type_name,
       imageUrl: row.image_url,
       description: row.description,
-      features: row.features || [],
+      features: amenitiesMap[row.property_id] || [],
       status: row.status,
       createdAt: row.created_at,
       lateFeePercentage: parseFloat(row.late_fee_percentage),
@@ -129,9 +143,11 @@ class PropertyModel {
                 p.street,
                 p.city,
                 p.district,
-                p.image_url, 
+                COALESCE(
+                  (SELECT pi.image_url FROM property_images pi WHERE pi.property_id = p.property_id AND pi.is_primary = TRUE LIMIT 1),
+                  p.image_url
+                ) AS image_url,
                 p.description,
-                p.features,
                 p.status, 
                 p.created_at,
                 p.property_type_id,
@@ -152,6 +168,9 @@ class PropertyModel {
 
     if (!rows[0]) return null;
 
+    // Fetch amenities for this property
+    const amenities = await this._getAmenities(id);
+
     return {
       id: rows[0].property_id.toString(),
       ownerId: rows[0].owner_id.toString(),
@@ -164,7 +183,7 @@ class PropertyModel {
       typeName: rows[0].type_name,
       imageUrl: rows[0].image_url,
       description: rows[0].description,
-      features: rows[0].features || [],
+      features: amenities,
       status: rows[0].status,
       createdAt: rows[0].created_at,
       lateFeePercentage: parseFloat(rows[0].late_fee_percentage),
@@ -199,6 +218,9 @@ class PropertyModel {
     const fields = [];
     const values = [];
 
+    // Extract features for separate amenity table processing
+    const featuresToSync = updates.features;
+
     Object.keys(updates).forEach((key) => {
       const column = PropertyModel.UPDATE_KEY_MAP[key];
       if (column && updates[key] !== undefined) {
@@ -209,14 +231,23 @@ class PropertyModel {
       }
     });
 
-    if (fields.length === 0) return false;
+    if (fields.length === 0 && !featuresToSync) return false;
 
-    values.push(id);
-    const [result] = await db.query(
-      `UPDATE properties SET ${fields.join(', ')} WHERE property_id = ? AND is_archived = FALSE`,
-      values
-    );
-    return result.affectedRows > 0;
+    if (fields.length > 0) {
+      values.push(id);
+      const [result] = await db.query(
+        `UPDATE properties SET ${fields.join(', ')} WHERE property_id = ? AND is_archived = FALSE`,
+        values
+      );
+      if (result.affectedRows === 0) return false;
+    }
+
+    // [1NF FIX] Sync amenities table whenever features are updated
+    if (Array.isArray(featuresToSync)) {
+      await this._syncAmenities(id, featuresToSync);
+    }
+
+    return true;
   }
 
   async delete(id, connection = null) {
@@ -334,6 +365,64 @@ class PropertyModel {
       [staffId, ownerId]
     );
     return rows.length > 0;
+  }
+
+  // ============================================================================
+  //  AMENITY HELPERS (1NF Normalization)
+  // ============================================================================
+
+  /**
+   * Syncs the property_amenities table with the provided feature list.
+   * Replaces all existing amenities with the new set (delete + re-insert).
+   */
+  async _syncAmenities(propertyId, features) {
+    await db.query('DELETE FROM property_amenities WHERE property_id = ?', [
+      propertyId,
+    ]);
+
+    if (!features || features.length === 0) return;
+
+    const uniqueFeatures = [
+      ...new Set(features.filter((f) => f && typeof f === 'string')),
+    ];
+    if (uniqueFeatures.length === 0) return;
+
+    const values = uniqueFeatures.map((name) => [propertyId, name]);
+    await db.query(
+      'INSERT IGNORE INTO property_amenities (property_id, name) VALUES ?',
+      [values]
+    );
+  }
+
+  /**
+   * Fetches amenities for a single property as an array of strings.
+   */
+  async _getAmenities(propertyId) {
+    const [rows] = await db.query(
+      'SELECT name FROM property_amenities WHERE property_id = ? ORDER BY name ASC',
+      [propertyId]
+    );
+    return rows.map((r) => r.name);
+  }
+
+  /**
+   * Batch fetches amenities for multiple property IDs.
+   * Returns a map: { propertyId: [featureName, ...] }
+   */
+  async _getAmenitiesBatch(propertyIds) {
+    if (!propertyIds || propertyIds.length === 0) return {};
+
+    const [rows] = await db.query(
+      'SELECT property_id, name FROM property_amenities WHERE property_id IN (?) ORDER BY name ASC',
+      [propertyIds]
+    );
+
+    const map = {};
+    for (const row of rows) {
+      if (!map[row.property_id]) map[row.property_id] = [];
+      map[row.property_id].push(row.name);
+    }
+    return map;
   }
 }
 

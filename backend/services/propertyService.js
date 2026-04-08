@@ -101,7 +101,7 @@ class PropertyService {
 
     const addedImages = await propertyModel.addImages(propertyId, imagesData);
 
-    // Update main property table with primary image if exists
+    // [LEGACY SYNC] Keep properties.image_url in sync for backward compat
     const primaryImage =
       imagesData.find((img) => img.isPrimary === 1) || imagesData[0];
     if (primaryImage) {

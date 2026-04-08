@@ -39,6 +39,10 @@ class UnitModel {
             SELECT u.*, 
                    p.name as property_name, 
                    ut.name as type_name,
+                   COALESCE(
+                     (SELECT ui.image_url FROM unit_images ui WHERE ui.unit_id = u.unit_id AND ui.is_primary = TRUE LIMIT 1),
+                     u.image_url
+                   ) AS resolved_image_url,
                    COUNT(DISTINCT CASE WHEN l.status = 'active' AND l.start_date <= CURRENT_DATE() AND (l.end_date IS NULL OR l.end_date >= CURRENT_DATE()) THEN l.lease_id END) as active_lease_count,
                    COUNT(DISTINCT CASE WHEN l.status IN ('active', 'pending') AND l.start_date > CURRENT_DATE() THEN l.lease_id END) as future_lease_count,
                    COUNT(DISTINCT CASE WHEN l.status IN ('draft', 'pending') AND (l.reservation_expires_at IS NULL OR l.reservation_expires_at >= CURRENT_DATE()) THEN l.lease_id END) as pending_application_count
@@ -60,6 +64,10 @@ class UnitModel {
             SELECT u.*, 
                    p.name as property_name, 
                    ut.name as type_name,
+                   COALESCE(
+                     (SELECT ui.image_url FROM unit_images ui WHERE ui.unit_id = u.unit_id AND ui.is_primary = TRUE LIMIT 1),
+                     u.image_url
+                   ) AS resolved_image_url,
                    COUNT(DISTINCT CASE WHEN l.status = 'active' AND l.start_date <= CURRENT_DATE() AND (l.end_date IS NULL OR l.end_date >= CURRENT_DATE()) THEN l.lease_id END) as active_lease_count,
                    COUNT(DISTINCT CASE WHEN l.status IN ('active', 'pending') AND l.start_date > CURRENT_DATE() THEN l.lease_id END) as future_lease_count,
                    COUNT(DISTINCT CASE WHEN l.status IN ('draft', 'pending') AND (l.reservation_expires_at IS NULL OR l.reservation_expires_at >= CURRENT_DATE()) THEN l.lease_id END) as pending_application_count
@@ -83,6 +91,10 @@ class UnitModel {
             SELECT u.*, 
                    p.name as property_name, 
                    ut.name as type_name,
+                   COALESCE(
+                     (SELECT ui.image_url FROM unit_images ui WHERE ui.unit_id = u.unit_id AND ui.is_primary = TRUE LIMIT 1),
+                     u.image_url
+                   ) AS resolved_image_url,
                    COUNT(DISTINCT CASE WHEN l.status = 'active' AND l.start_date <= CURRENT_DATE() AND (l.end_date IS NULL OR l.end_date >= CURRENT_DATE()) THEN l.lease_id END) as active_lease_count,
                    COUNT(DISTINCT CASE WHEN l.status IN ('active', 'pending') AND l.start_date > CURRENT_DATE() THEN l.lease_id END) as future_lease_count,
                    COUNT(DISTINCT CASE WHEN l.status IN ('draft', 'pending') AND (l.reservation_expires_at IS NULL OR l.reservation_expires_at >= CURRENT_DATE()) THEN l.lease_id END) as pending_application_count
@@ -106,6 +118,10 @@ class UnitModel {
             SELECT u.*, 
                    p.name as property_name, 
                    ut.name as type_name,
+                   COALESCE(
+                     (SELECT ui.image_url FROM unit_images ui WHERE ui.unit_id = u.unit_id AND ui.is_primary = TRUE LIMIT 1),
+                     u.image_url
+                   ) AS resolved_image_url,
                    COUNT(DISTINCT CASE WHEN l.status = 'active' AND l.start_date <= CURRENT_DATE() AND (l.end_date IS NULL OR l.end_date >= CURRENT_DATE()) THEN l.lease_id END) as active_lease_count,
                    COUNT(DISTINCT CASE WHEN l.status IN ('active', 'pending') AND l.start_date > CURRENT_DATE() THEN l.lease_id END) as future_lease_count,
                    COUNT(DISTINCT CASE WHEN l.status IN ('draft', 'pending') AND (l.reservation_expires_at IS NULL OR l.reservation_expires_at >= CURRENT_DATE()) THEN l.lease_id END) as pending_application_count
@@ -152,6 +168,27 @@ class UnitModel {
     }
 
     if (fields.length === 0) return false;
+
+    // [AUDIT] If rent is changing, log the change before applying
+    if (updates.monthlyRent !== undefined) {
+      const dbConnForHistory = connection || db;
+      const [currentUnit] = await dbConnForHistory.query(
+        'SELECT monthly_rent FROM units WHERE unit_id = ? AND is_archived = FALSE',
+        [id]
+      );
+      if (
+        currentUnit[0] &&
+        Number(currentUnit[0].monthly_rent) !== Number(updates.monthlyRent)
+      ) {
+        await this._logRentChange(
+          id,
+          Number(currentUnit[0].monthly_rent),
+          Number(updates.monthlyRent),
+          updates._changedBy || null,
+          connection
+        );
+      }
+    }
 
     values.push(id);
 
@@ -236,7 +273,7 @@ class UnitModel {
         type: row.type_name,
         monthlyRent: Number(row.monthly_rent),
         status: status,
-        imageUrl: row.image_url,
+        imageUrl: row.resolved_image_url || row.image_url,
         isTurnoverCleared: Boolean(row.is_turnover_cleared),
         createdAt: row.created_at,
         propertyName: row.property_name,
@@ -252,6 +289,31 @@ class UnitModel {
       [imageUrl, unitId]
     );
     return result.affectedRows > 0;
+  }
+
+  /**
+   * Logs a rent change to the unit_rent_history table for auditing.
+   */
+  async _logRentChange(
+    unitId,
+    previousRent,
+    newRent,
+    changedBy = null,
+    connection = null
+  ) {
+    const dbConn = connection || db;
+    try {
+      await dbConn.query(
+        'INSERT INTO unit_rent_history (unit_id, previous_rent, new_rent, changed_by) VALUES (?, ?, ?, ?)',
+        [unitId, previousRent, newRent, changedBy]
+      );
+    } catch (err) {
+      // Non-critical: don't break the update if history logging fails
+      console.error(
+        `[RentHistory] Failed to log rent change for unit ${unitId}:`,
+        err.message
+      );
+    }
   }
 
   async countOccupied(propertyId) {

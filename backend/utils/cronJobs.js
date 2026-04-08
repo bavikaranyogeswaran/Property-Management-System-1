@@ -1157,25 +1157,21 @@ export const reconcileCloudinaryAssets = async () => {
   logger.info('[Sync] Starting Cloudinary asset reconciliation...');
 
   try {
-    // 1. Fetch all unique Image URLs from Database
+    // 1. Fetch all unique Image URLs from Database (association tables are source of truth)
     const [propertyImages] = await db.query(
       'SELECT DISTINCT image_url FROM property_images'
     );
     const [unitImages] = await db.query(
       'SELECT DISTINCT image_url FROM unit_images'
     );
-    const [propertyMainImages] = await db.query(
-      'SELECT DISTINCT image_url FROM properties WHERE image_url IS NOT NULL'
-    );
-    const [unitMainImages] = await db.query(
-      'SELECT DISTINCT image_url FROM units WHERE image_url IS NOT NULL'
+    const [maintenanceImgs] = await db.query(
+      'SELECT DISTINCT image_url FROM maintenance_images'
     );
 
     const dbUrls = new Set([
       ...propertyImages.map((r) => r.image_url),
       ...unitImages.map((r) => r.image_url),
-      ...propertyMainImages.map((r) => r.image_url),
-      ...unitMainImages.map((r) => r.image_url),
+      ...maintenanceImgs.map((r) => r.image_url),
     ]);
 
     const activePublicIds = new Set();

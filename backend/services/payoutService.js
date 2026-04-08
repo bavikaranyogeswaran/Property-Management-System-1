@@ -68,7 +68,6 @@ class PayoutService {
           grossAmount: totalGross,
           commissionAmount: totalCommission,
           expensesAmount: totalExpenses,
-          netAmount: netPayout,
           periodStart: startDate,
           periodEnd: endDate,
         },

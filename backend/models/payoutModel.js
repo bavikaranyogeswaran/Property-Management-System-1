@@ -7,20 +7,20 @@ class PayoutModel {
       grossAmount,
       commissionAmount,
       expensesAmount,
-      netAmount,
       periodStart,
       periodEnd,
     } = data;
     const db = connection || pool;
     try {
+      // NOTE: `amount` column is a STORED GENERATED column (gross - commission - expenses)
+      // It is computed automatically by MySQL and must NOT be included in INSERT/UPDATE.
       const [result] = await db.query(
-        'INSERT INTO owner_payouts (owner_id, gross_amount, commission_amount, expenses_amount, amount, period_start, period_end) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO owner_payouts (owner_id, gross_amount, commission_amount, expenses_amount, period_start, period_end) VALUES (?, ?, ?, ?, ?, ?)',
         [
           ownerId,
           grossAmount,
           commissionAmount,
           expensesAmount,
-          netAmount,
           periodStart,
           periodEnd,
         ]

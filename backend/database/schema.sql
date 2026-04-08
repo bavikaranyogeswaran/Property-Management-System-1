@@ -112,14 +112,14 @@ CREATE TABLE properties (
     property_id INT AUTO_INCREMENT PRIMARY KEY,
     owner_id INT NOT NULL,
     name VARCHAR(100) NOT NULL,
-    property_type_id INT NOT NULL,           -- [MODIFIED] FK to property_types
-    property_no VARCHAR(50),             -- [ADDED] Property Number
-    street VARCHAR(255) NOT NULL,        -- [ADDED] Street Name
-    city VARCHAR(100) NOT NULL,          -- [ADDED] City
-    district VARCHAR(100) NOT NULL,      -- [ADDED] District
-    image_url VARCHAR(500),              -- [ADDED] For primary property image
-    description TEXT,                    -- [ADDED] Property details
-    features JSON,                       -- [ADDED] Stored list of features (Pool, AC, etc)
+    property_type_id INT NOT NULL,           -- FK to property_types
+    property_no VARCHAR(50),
+    street VARCHAR(255) NOT NULL,
+    city VARCHAR(100) NOT NULL,
+    district VARCHAR(100) NOT NULL,
+    image_url VARCHAR(500),              -- [LEGACY] Kept for backward compat, source of truth is property_images
+    description TEXT,
+    features JSON,                       -- [LEGACY] Kept for backward compat, source of truth is property_amenities
     status ENUM('active','inactive') DEFAULT 'active',
     is_archived BOOLEAN DEFAULT FALSE,
     archived_at DATETIME,
@@ -127,12 +127,24 @@ CREATE TABLE properties (
     late_fee_percentage DECIMAL(5,2) DEFAULT 3.00,
     late_fee_type ENUM('flat_percentage', 'daily_fixed') DEFAULT 'flat_percentage',
     late_fee_amount BIGINT DEFAULT 0,
-    late_fee_grace_period INT DEFAULT 5,       -- Days after due date before late fee applies
-    tenant_deactivation_days INT DEFAULT 30,   -- [B6 FIX] Days after lease end to deactivate tenant account
-    management_fee_percentage DECIMAL(5,2) DEFAULT 0.00, -- [NEW] Agency commission %
+    late_fee_grace_period INT DEFAULT 5,
+    tenant_deactivation_days INT DEFAULT 30,
+    management_fee_percentage DECIMAL(5,2) DEFAULT 0.00,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (owner_id) REFERENCES users(user_id) ON DELETE CASCADE,
     FOREIGN KEY (property_type_id) REFERENCES property_types(type_id)
+);
+
+-- =========================
+-- PROPERTY AMENITIES (1NF FIX - Normalized from JSON)
+-- =========================
+CREATE TABLE property_amenities (
+    amenity_id INT AUTO_INCREMENT PRIMARY KEY,
+    property_id INT NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (property_id) REFERENCES properties(property_id) ON DELETE CASCADE,
+    UNIQUE KEY unique_property_amenity (property_id, name)
 );
 
 CREATE TABLE units (
@@ -422,7 +434,7 @@ CREATE TABLE owner_payouts (
     gross_amount BIGINT NOT NULL DEFAULT 0, -- Total rent in Cents
     commission_amount BIGINT NOT NULL DEFAULT 0, -- Agency fee in Cents
     expenses_amount BIGINT NOT NULL DEFAULT 0, -- Maintenance in Cents
-    amount BIGINT NOT NULL, -- Final Net in Cents
+    amount BIGINT AS (gross_amount - commission_amount - expenses_amount) STORED, -- [GENERATED] Final Net in Cents
     period_start DATE NOT NULL,
     period_end DATE NOT NULL,
     status ENUM('pending', 'paid', 'acknowledged', 'disputed') DEFAULT 'pending',
@@ -483,7 +495,7 @@ CREATE TABLE IF NOT EXISTS staff_property_assignments (
     assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
     FOREIGN KEY (property_id) REFERENCES properties(property_id) ON DELETE CASCADE,
-    UNIQUE KEY unique_property (property_id)
+    UNIQUE KEY unique_staff_property (user_id, property_id)
 );
 
 -- =========================
@@ -554,3 +566,20 @@ CREATE TABLE cron_checkpoints (
     message TEXT,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
+
+-- =========================
+-- UNIT RENT HISTORY (Auditability)
+-- =========================
+CREATE TABLE unit_rent_history (
+    history_id INT AUTO_INCREMENT PRIMARY KEY,
+    unit_id INT NOT NULL,
+    previous_rent BIGINT NOT NULL,
+    new_rent BIGINT NOT NULL,
+    changed_by INT,
+    changed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (unit_id) REFERENCES units(unit_id) ON DELETE CASCADE,
+    FOREIGN KEY (changed_by) REFERENCES users(user_id) ON DELETE SET NULL
+);
+
+CREATE INDEX idx_rent_history_unit ON unit_rent_history(unit_id);
+CREATE INDEX idx_amenity_property ON property_amenities(property_id);

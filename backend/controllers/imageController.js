@@ -81,7 +81,7 @@ class ImageController {
 
     const allImages = await propertyImageModel.findByPropertyId(propertyId);
 
-    // Sync primary image to properties table
+    // [LEGACY SYNC] Keep properties.image_url in sync for backward compat
     const currentPrimary = allImages.find((img) => img.is_primary);
     if (currentPrimary) {
       await propertyModel.update(propertyId, {
@@ -106,7 +106,7 @@ class ImageController {
       return next(new AppError('Image not found', 404));
     }
 
-    // Sync with properties table
+    // [LEGACY SYNC] Keep properties.image_url in sync for backward compat
     const images = await propertyImageModel.findByPropertyId(propertyId);
     const primary = images.find((img) => img.is_primary);
     if (primary) {
@@ -195,7 +195,7 @@ class ImageController {
     await unitImageModel.createMultiple(unitId, images);
     const allImages = await unitImageModel.findByUnitId(unitId);
 
-    // Sync with units table
+    // [LEGACY SYNC] Keep units.image_url in sync for backward compat
     const currentPrimary =
       allImages.find((img) => img.is_primary) || allImages[0];
     if (currentPrimary) {
@@ -219,7 +219,7 @@ class ImageController {
       return next(new AppError('Image not found', 404));
     }
 
-    // Sync with units table
+    // [LEGACY SYNC] Keep units.image_url in sync for backward compat
     const images = await unitImageModel.findByUnitId(unitId);
     const primary = images.find((img) => img.is_primary);
     if (primary) {
