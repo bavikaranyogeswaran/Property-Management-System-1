@@ -106,6 +106,8 @@ class PaymentService {
             userId: t.user_id,
             message: `New Payment submitted for Invoice #${invoiceId} (Amount: ${fromCents(centsAmount).toFixed(2)}).`,
             type: 'payment',
+            entityType: 'payment',
+            entityId: paymentId,
           },
           connection
         );
@@ -269,6 +271,8 @@ class PaymentService {
             userId: t.user_id,
             message: `GUEST PAYMENT: New Deposit submitted via Magic Link for Unit ${invoice.unitNumber} (Amount: ${fromCents(amount).toFixed(2)}).`,
             type: 'payment',
+            entityType: 'payment',
+            entityId: paymentId,
           },
           connection
         );
@@ -582,6 +586,8 @@ class PaymentService {
               message: rejectMessage,
               type: 'payment',
               severity: 'urgent',
+              entityType: 'payment',
+              entityId: paymentId,
             },
             conn
           );
@@ -704,6 +710,8 @@ class PaymentService {
             userId: invoice.tenantId,
             message: `Overpayment of ${fromCents(incrementalOverpayment).toFixed(2)} has been credited to your account balance.`,
             type: 'payment',
+            entityType: 'payment',
+            entityId: paymentId,
           },
           connection
         );
@@ -792,6 +800,8 @@ class PaymentService {
           userId: invoice.tenantId || invoice.tenant_id,
           message: `Payment of ${fromCents(payment.amount).toFixed(2)} for Invoice #${payment.invoiceId} has been verified.`,
           type: 'payment',
+          entityType: 'payment',
+          entityId: paymentId,
         },
         connection
       );
@@ -845,6 +855,8 @@ class PaymentService {
                     message: `URGENT: Deposit Paid for Lease #${lease.id} (Unit ${lease.unitNumber}), but AUTO-ACTIVATION was BLOCKED by Unit Status (${activationErr.message}). Manual check required.`,
                     type: 'lease',
                     severity: 'urgent',
+                    entityType: 'lease',
+                    entityId: lease.id,
                   },
                   connection
                 );
@@ -1033,6 +1045,8 @@ class PaymentService {
           userId: invoice.tenantId,
           message: `LKR ${fromCents(amountToApply).toFixed(2)} from your account balance was automatically applied to Invoice #${invoiceId}.`,
           type: 'payment',
+          entityType: 'payment',
+          entityId: payId,
         },
         conn
       );

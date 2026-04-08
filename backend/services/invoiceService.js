@@ -209,6 +209,8 @@ class InvoiceService {
               month: m,
               year: y,
               invoiceId: invoiceId,
+              entityType: 'invoice',
+              entityId: invoiceId,
             });
           }
         } catch (err) {

@@ -133,6 +133,8 @@ class VisitService {
             message: `New Visit Scheduled: ${name} for ${property_name} on ${scheduledDate.toLocaleDateString()}`,
             type: 'visit',
             severity: 'info',
+            entityType: 'visit',
+            entityId: visitId,
           });
         }
       }

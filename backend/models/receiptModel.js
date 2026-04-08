@@ -16,10 +16,9 @@ class ReceiptModel {
       ? parseLocalDate(generatedDate)
       : getLocalTime();
 
-    const db = connection || pool;
     const [result] = await db.query(
-      'INSERT INTO receipts (payment_id, amount, receipt_date, receipt_number) VALUES (?, ?, ?, ?)',
-      [paymentId, amount, dateValue, receiptNumber]
+      'INSERT INTO receipts (payment_id, receipt_date, receipt_number) VALUES (?, ?, ?)',
+      [paymentId, dateValue, receiptNumber]
     );
     return result.insertId;
   }
@@ -27,12 +26,12 @@ class ReceiptModel {
   async findById(id) {
     const [rows] = await pool.query(
       `
-            SELECT r.*, p.invoice_id, l.tenant_id, 
+            SELECT r.*, p.amount, p.invoice_id, l.tenant_id, 
                    pr.name as property_name, u.unit_number,
                    tu.name as tenant_name, tu.email as tenant_email,
                    p.payment_method, p.payment_date, i.description
             FROM receipts r 
-            LEFT JOIN payments p ON r.payment_id = p.payment_id 
+            JOIN payments p ON r.payment_id = p.payment_id 
             LEFT JOIN rent_invoices i ON p.invoice_id = i.invoice_id
             LEFT JOIN leases l ON i.lease_id = l.lease_id
             LEFT JOIN units u ON l.unit_id = u.unit_id
@@ -47,12 +46,12 @@ class ReceiptModel {
 
   async findAll() {
     const [rows] = await pool.query(`
-            SELECT r.*, p.invoice_id, l.tenant_id, 
+            SELECT r.*, p.amount, p.invoice_id, l.tenant_id, 
                    pr.name as property_name, u.unit_number,
                    tu.name as tenant_name, tu.email as tenant_email,
                    p.payment_method, p.payment_date, i.description
             FROM receipts r 
-            LEFT JOIN payments p ON r.payment_id = p.payment_id 
+            JOIN payments p ON r.payment_id = p.payment_id 
             LEFT JOIN rent_invoices i ON p.invoice_id = i.invoice_id
             LEFT JOIN leases l ON i.lease_id = l.lease_id
             LEFT JOIN units u ON l.unit_id = u.unit_id
@@ -66,12 +65,12 @@ class ReceiptModel {
   async findByOwnerId(ownerId) {
     const [rows] = await pool.query(
       `
-            SELECT r.*, p.invoice_id, l.tenant_id, 
+            SELECT r.*, p.amount, p.invoice_id, l.tenant_id, 
                    pr.name as property_name, u.unit_number,
                    tu.name as tenant_name, tu.email as tenant_email,
                    p.payment_method, p.payment_date, i.description
             FROM receipts r 
-            LEFT JOIN payments p ON r.payment_id = p.payment_id 
+            JOIN payments p ON r.payment_id = p.payment_id 
             LEFT JOIN rent_invoices i ON p.invoice_id = i.invoice_id
             LEFT JOIN leases l ON i.lease_id = l.lease_id
             LEFT JOIN units u ON l.unit_id = u.unit_id
@@ -88,12 +87,12 @@ class ReceiptModel {
   async findByTreasurerId(treasurerId) {
     const [rows] = await pool.query(
       `
-            SELECT r.*, p.invoice_id, l.tenant_id, 
+            SELECT r.*, p.amount, p.invoice_id, l.tenant_id, 
                    pr.name as property_name, u.unit_number,
                    tu.name as tenant_name, tu.email as tenant_email,
                    p.payment_method, p.payment_date, i.description
             FROM receipts r 
-            LEFT JOIN payments p ON r.payment_id = p.payment_id 
+            JOIN payments p ON r.payment_id = p.payment_id 
             LEFT JOIN rent_invoices i ON p.invoice_id = i.invoice_id
             LEFT JOIN leases l ON i.lease_id = l.lease_id
             LEFT JOIN units u ON l.unit_id = u.unit_id
@@ -132,7 +131,7 @@ class ReceiptModel {
   async findByPaymentId(paymentId, connection = null) {
     const db = connection || pool;
     const [rows] = await db.query(
-      'SELECT * FROM receipts WHERE payment_id = ?',
+      'SELECT r.*, p.amount FROM receipts r JOIN payments p ON r.payment_id = p.payment_id WHERE r.payment_id = ?',
       [paymentId]
     );
     return rows.length > 0 ? this.mapRow(rows[0]) : null;

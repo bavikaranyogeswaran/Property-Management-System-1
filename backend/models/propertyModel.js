@@ -24,13 +24,10 @@ class PropertyModel {
       managementFeePercentage,
     } = propertyData;
 
-    // [LEGACY] Keep features JSON column populated for backward compat
-    const featuresJson = features ? JSON.stringify(features) : null;
-
     const [result] = await db.query(
       `INSERT INTO properties 
-              (owner_id, name, property_type_id, property_no, street, city, district, image_url, description, features, late_fee_percentage, late_fee_type, late_fee_amount, late_fee_grace_period, tenant_deactivation_days, management_fee_percentage) 
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              (owner_id, name, property_type_id, property_no, street, city, district, image_url, description, late_fee_percentage, late_fee_type, late_fee_amount, late_fee_grace_period, tenant_deactivation_days, management_fee_percentage) 
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         ownerId,
         name,
@@ -39,9 +36,8 @@ class PropertyModel {
         street,
         city,
         district,
-        imageUrl,
+        imageUrl, // [DEPRECATED] source of truth is property_images
         description,
-        featuresJson,
         propertyData.lateFeePercentage !== undefined
           ? propertyData.lateFeePercentage
           : 3.0,
@@ -202,10 +198,10 @@ class PropertyModel {
     street: 'street',
     city: 'city',
     district: 'district',
-    imageUrl: 'image_url',
+    imageUrl: 'image_url', // [DEPRECATED]
     status: 'status',
     description: 'description',
-    features: 'features',
+    // features: 'features', // [REMOVED] Sync via _syncAmenities
     lateFeePercentage: 'late_fee_percentage',
     lateFeeType: 'late_fee_type',
     lateFeeAmount: 'late_fee_amount',
@@ -223,11 +219,9 @@ class PropertyModel {
 
     Object.keys(updates).forEach((key) => {
       const column = PropertyModel.UPDATE_KEY_MAP[key];
-      if (column && updates[key] !== undefined) {
+      if (column && updates[key] !== undefined && key !== 'features') {
         fields.push(`${column} = ?`);
-        const val =
-          key === 'features' ? JSON.stringify(updates[key]) : updates[key];
-        values.push(val);
+        values.push(updates[key]);
       }
     });
 

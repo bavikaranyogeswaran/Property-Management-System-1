@@ -1175,6 +1175,8 @@ class LeaseService {
           message: `Your lease for Unit has been terminated effective ${terminationDate}.`,
           type: 'lease',
           severity: 'warning',
+          entityType: 'lease',
+          entityId: leaseId,
         },
         connection
       );
@@ -1188,6 +1190,8 @@ class LeaseService {
             message: `Lease #${leaseId} terminated. Process Security Deposit Refund.`,
             type: 'lease',
             severity: 'warning',
+            entityType: 'lease',
+            entityId: leaseId,
           },
           connection
         );
@@ -1647,6 +1651,8 @@ class LeaseService {
             userId: lease.tenant_id,
             message: `Scheduled Rent Adjustment: Your monthly rent has been adjusted to LKR ${fromCents(newRent).toLocaleString()} effective today.`,
             type: 'lease_update',
+            entityType: 'lease',
+            entityId: lease.lease_id,
           },
           conn
         );

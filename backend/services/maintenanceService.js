@@ -78,6 +78,8 @@ class MaintenanceService {
             message: `New Maintenance Request for Unit ${unit.unitNumber}: ${title}`,
             type: 'maintenance',
             severity: 'warning',
+            entityType: 'maintenance_request',
+            entityId: requestId,
           });
         }
       }
@@ -137,6 +139,14 @@ class MaintenanceService {
 
       const updated = await maintenanceRequestModel.updateStatus(id, status);
 
+      // [NEW] Record resolution timestamp for performance tracking
+      if (status === 'completed' || status === 'closed') {
+        const [rows] = await connection.query(
+          'UPDATE maintenance_requests SET resolved_at = NOW() WHERE request_id = ? AND resolved_at IS NULL',
+          [id]
+        );
+      }
+
       // [HARDENED] Deterministic Locking Order
       // Lock the Unit record first before synchronizing its availability status
       if (status === 'completed' || status === 'closed') {
@@ -194,6 +204,8 @@ class MaintenanceService {
                   ? `Maintenance Request '${request.title}' has been marked as completed.`
                   : `Maintenance Request '${request.title}' is now In Progress. Technician assigned.`,
               type: 'maintenance',
+              entityType: 'maintenance_request',
+              entityId: id,
             });
 
             // Email Notification
@@ -220,6 +232,8 @@ class MaintenanceService {
                 userId: treasurer.user_id,
                 message: `Maintenance Request '${request.title}' has been completed. Please record final costs.`,
                 type: 'maintenance',
+                entityType: 'maintenance_request',
+                entityId: id,
               });
             }
           }
@@ -329,6 +343,8 @@ class MaintenanceService {
         userId: request.tenantId,
         message: `You have been billed ${displayAmountMajor} for maintenance: ${request.title}${finalInvoice.status === 'paid' ? ' (Paid via Credit)' : ''}`,
         type: 'invoice',
+        entityType: 'invoice',
+        entityId: invoiceId,
       });
 
       // Notify Tenant via Email

@@ -20,6 +20,7 @@ class LeaseModel {
       status,
       securityDeposit,
       depositStatus,
+      leaseTermId,
       reservationExpiresInDays, // [NEW] Pass days to use DB-native math
     } = data;
     const dbConn = connection || db;
@@ -34,11 +35,12 @@ class LeaseModel {
     }
 
     const [result] = await dbConn.query(
-      `INSERT INTO leases (tenant_id, unit_id, start_date, end_date, monthly_rent, status, deposit_status, document_url, target_deposit, reservation_expires_at, escalation_percentage, escalation_period_months, last_escalation_date)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ${expiryExpr}, ?, ?, ?)`,
+      `INSERT INTO leases (tenant_id, unit_id, lease_term_id, start_date, end_date, monthly_rent, status, deposit_status, document_url, target_deposit, reservation_expires_at, escalation_percentage, escalation_period_months, last_escalation_date)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         tenantId,
         unitId,
+        leaseTermId || null,
         startDate,
         endDate,
         monthlyRent,
@@ -58,6 +60,7 @@ class LeaseModel {
   static UPDATE_KEY_MAP = {
     tenantId: 'tenant_id',
     unitId: 'unit_id',
+    leaseTermId: 'lease_term_id',
     startDate: 'start_date',
     endDate: 'end_date',
     monthlyRent: 'monthly_rent',
@@ -340,6 +343,7 @@ class LeaseModel {
       verificationRejectionReason: row.verification_rejection_reason,
       reservationExpiresAt: row.reservation_expires_at,
       actualCheckoutAt: row.actual_checkout_at,
+      leaseTermId: row.lease_term_id ? row.lease_term_id.toString() : null,
       createdAt: row.created_at,
       // Extra info useful for frontend listing
       unitNumber: row.unit_number,
