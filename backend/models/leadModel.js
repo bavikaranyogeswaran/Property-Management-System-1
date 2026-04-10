@@ -24,6 +24,12 @@ class LeadModel {
       finalUnitId = null;
     }
 
+    if (!email) {
+      const error = new Error('Email is required for creating a lead.');
+      error.status = 400; // Bad Request
+      throw error;
+    }
+
     const [result] = await db.query(
       `INSERT INTO leads (property_id, unit_id, name, phone, email, notes, move_in_date, occupants_count, preferred_term_months, lease_term_id, status) 
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,

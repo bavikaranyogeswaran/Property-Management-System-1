@@ -13,6 +13,12 @@ class OwnerModel {
       tin_url,
     } = ownerData;
 
+    if (!nic) {
+      const error = new Error('NIC is required for creating an owner profile.');
+      error.status = 400; // Bad Request
+      throw error;
+    }
+
     // Uses the provided connection for transaction support
     const query = `
             INSERT INTO owners 
