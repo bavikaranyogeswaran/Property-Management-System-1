@@ -13,6 +13,12 @@ class VisitModel {
       notes,
     } = data;
 
+    // C28 Resolve: Single Source of Truth
+    // If a lead is linked, we do NOT store redundant name/email/phone in local columns.
+    const finalName = leadId ? null : visitorName;
+    const finalEmail = leadId ? null : visitorEmail;
+    const finalPhone = leadId ? null : visitorPhone;
+
     const [result] = await db.query(
       `INSERT INTO property_visits 
             (property_id, unit_id, lead_id, visitor_name, visitor_email, visitor_phone, scheduled_date, notes) 
@@ -21,9 +27,9 @@ class VisitModel {
         propertyId,
         unitId || null,
         leadId,
-        visitorName,
-        visitorEmail,
-        visitorPhone,
+        finalName,
+        finalEmail,
+        finalPhone,
         scheduledDate,
         notes,
       ]
@@ -39,9 +45,9 @@ class VisitModel {
                 p.name as property_name,
                 u.unit_number as unit_number,
                 l.status as lead_status,
-                l.name as lead_name,
-                l.email as lead_email,
-                l.phone as lead_phone
+                COALESCE(l.name, v.visitor_name) as resolved_name,
+                COALESCE(l.email, v.visitor_email) as resolved_email,
+                COALESCE(l.phone, v.visitor_phone) as resolved_phone
             FROM property_visits v
             JOIN properties p ON v.property_id = p.property_id
             LEFT JOIN units u ON v.unit_id = u.unit_id
@@ -73,9 +79,9 @@ class VisitModel {
       propertyId: row.property_id.toString(),
       unitId: row.unit_id ? row.unit_id.toString() : null,
       leadId: row.lead_id ? row.lead_id.toString() : null,
-      visitorName: row.lead_name || row.visitor_name,
-      visitorEmail: row.lead_email || row.visitor_email,
-      visitorPhone: row.lead_phone || row.visitor_phone,
+      visitorName: row.resolved_name,
+      visitorEmail: row.resolved_email,
+      visitorPhone: row.resolved_phone,
       scheduledDate: row.scheduled_date,
       status: row.status,
       notes: row.notes,
@@ -99,9 +105,9 @@ class VisitModel {
     const [rows] = await db.query(
       `SELECT 
         v.*,
-        l.name as lead_name,
-        l.email as lead_email,
-        l.phone as lead_phone
+        COALESCE(l.name, v.visitor_name) as resolved_name,
+        COALESCE(l.email, v.visitor_email) as resolved_email,
+        COALESCE(l.phone, v.visitor_phone) as resolved_phone
        FROM property_visits v
        LEFT JOIN leads l ON v.lead_id = l.lead_id
        WHERE v.visit_id = ?`,
@@ -114,9 +120,9 @@ class VisitModel {
       propertyId: row.property_id.toString(),
       unitId: row.unit_id ? row.unit_id.toString() : null,
       leadId: row.lead_id ? row.lead_id.toString() : null,
-      visitorName: row.lead_name || row.visitor_name,
-      visitorEmail: row.lead_email || row.visitor_email,
-      visitorPhone: row.lead_phone || row.visitor_phone,
+      visitorName: row.resolved_name,
+      visitorEmail: row.resolved_email,
+      visitorPhone: row.resolved_phone,
       scheduledDate: row.scheduled_date,
       status: row.status,
       notes: row.notes,

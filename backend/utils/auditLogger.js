@@ -17,14 +17,25 @@ class AuditLogger {
     connection = null
   ) {
     try {
+      // C27 Resolve: Enforce entity_type discriminator for programmatic lookups
+      if (entityId && !entityType) {
+        console.warn(
+          `[AUDIT WARNING] Entity ID ${entityId} provided for action ${actionType} without entityType discriminator.`
+        );
+      }
+
       const ipAddress =
         req && req.headers
           ? req.headers['x-forwarded-for'] ||
             (req.socket && req.socket.remoteAddress) ||
             'UNKNOWN'
           : 'SYSTEM';
+
+      // C27 Resolve: Enforce valid JSON structure for details column
       const detailsStr =
-        typeof details === 'object' ? JSON.stringify(details) : details;
+        typeof details === 'object'
+          ? JSON.stringify(details)
+          : JSON.stringify({ message: details });
 
       const db = connection || pool;
       await db.query(
