@@ -10,9 +10,10 @@ import pool from '../config/db.js';
 class UserModel {
   async findByEmail(email, connection = null) {
     const db = connection || pool;
+    const normalizedEmail = email ? email.toLowerCase().trim() : null;
     const [rows] = await db.query(
       'SELECT user_id as id, name, email, phone, role, password_hash as passwordHash, is_email_verified as isEmailVerified, status, token_version as tokenVersion, created_at as createdAt FROM users WHERE email = ? AND is_archived = FALSE',
-      [email]
+      [normalizedEmail]
     );
     return rows[0];
   }
@@ -150,13 +151,23 @@ class UserModel {
       status = 'active',
     } = userData;
 
+    const normalizedEmail = email ? email.toLowerCase().trim() : null;
+
     // Use provided connection or default pool (for non-transactional calls)
     const db = connection || pool;
 
     try {
       const [result] = await db.query(
         'INSERT INTO users (name, email, phone, password_hash, role, is_email_verified, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        [name, email, phone, passwordHash, role, is_email_verified, status]
+        [
+          name,
+          normalizedEmail,
+          phone,
+          passwordHash,
+          role,
+          is_email_verified,
+          status,
+        ]
       );
       return result.insertId;
     } catch (error) {
@@ -178,12 +189,13 @@ class UserModel {
   async update(id, updateData, connection = null) {
     const db = connection || pool;
     const { name, email, phone, status } = updateData;
+    const normalizedEmail = email ? email.toLowerCase().trim() : null;
     // Build query dynamically based on provided fields?
     // For simplicity now, we assume these specific fields are passed.
     // If password update is needed later, separate method is better.
     const [result] = await db.query(
       'UPDATE users SET name = ?, email = ?, phone = ?, status = ?, token_version = CASE WHEN status != ? THEN token_version + 1 ELSE token_version END WHERE user_id = ? AND is_archived = FALSE',
-      [name, email, phone, status, status, id]
+      [name, normalizedEmail, phone, status, status, id]
     );
     return result.affectedRows > 0;
   }

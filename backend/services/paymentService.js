@@ -41,10 +41,10 @@ class PaymentService {
     let evidenceUrl = data.evidenceUrl;
 
     if (file) {
-      if (!file.path && !file.secure_url) {
+      if (!file.url) {
         throw new Error('Payment evidence file is corrupted or missing path.');
       }
-      evidenceUrl = file.path || file.secure_url;
+      evidenceUrl = file.url;
     }
 
     const connection = await pool.getConnection();
@@ -226,12 +226,12 @@ class PaymentService {
       }
 
       if (file) {
-        if (!file.path && !file.secure_url) {
+        if (!file.url) {
           throw new Error(
             'Payment evidence file is corrupted or missing path.'
           );
         }
-        evidenceUrl = file.path || file.secure_url;
+        evidenceUrl = file.url;
       }
 
       // 2. Concurrency Control: One pending payment at a time (for this specific invoice)

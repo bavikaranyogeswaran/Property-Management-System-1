@@ -36,7 +36,7 @@ class ImageController {
     if (!req.file) {
       return next(new AppError('No file uploaded', 400));
     }
-    res.status(201).json({ url: req.file.path || req.file.secure_url });
+    res.status(201).json({ url: req.file.url });
   });
 
   // Property Images
@@ -60,7 +60,7 @@ class ImageController {
 
     // Create image records with uploaded file paths
     const images = req.files.map((file, index) => ({
-      imageUrl: file.path || file.secure_url,
+      imageUrl: file.url,
       isPrimary: existing.length === 0 && index === 0, // First image of first batch is primary
       displayOrder: existing.length + index,
     }));
@@ -190,7 +190,7 @@ class ImageController {
 
     // Create image records with uploaded file paths
     const images = req.files.map((file, index) => ({
-      imageUrl: file.path || file.secure_url,
+      imageUrl: file.url,
       isPrimary: existing.length === 0 && index === 0,
       displayOrder: existing.length + index,
     }));

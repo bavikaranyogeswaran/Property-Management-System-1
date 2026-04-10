@@ -103,7 +103,7 @@ const wrapCloudinaryUpload = (multerMiddleware, cloudOptions = {}) => {
           const result = await streamUpload(file.buffer, finalOptions);
 
           // Map Cloudinary results back to Multer-style objects to ensure backward compatibility
-          file.path = result.secure_url;
+          file.url = result.secure_url;
           file.filename = result.public_id; // public_id is stored in .filename by multer-storage-cloudinary
           return file;
         };

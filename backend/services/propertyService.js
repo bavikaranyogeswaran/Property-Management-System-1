@@ -88,7 +88,7 @@ class PropertyService {
     // Construct image URLs
     const imagesData = files.map((file, index) => ({
       propertyId: propertyId,
-      imageUrl: file.path || file.secure_url,
+      imageUrl: file.url,
       isPrimary: index === 0 ? 1 : 0,
       displayOrder: index,
     }));

@@ -14,7 +14,7 @@ class MaintenanceRequestController {
   createRequest = catchAsync(async (req, res, next) => {
     const data = { ...req.body };
     if (req.files) {
-      data.images = req.files.map((file) => file.path || file.secure_url);
+      data.images = req.files.map((file) => file.url);
     }
     const requestId = await maintenanceService.createRequest(data, req.user.id);
     res.status(201).json({ message: 'Maintenance request created', requestId });

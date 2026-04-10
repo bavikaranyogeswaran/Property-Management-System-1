@@ -18,13 +18,14 @@ class LeadModel {
       status = 'interested',
     } = data;
 
-    // Handle alias and empty string
     let finalUnitId = unitId || interestedUnit;
     if (finalUnitId === '' || finalUnitId === 'null') {
       finalUnitId = null;
     }
 
-    if (!email) {
+    const normalizedEmail = email ? email.toLowerCase().trim() : null;
+
+    if (!normalizedEmail) {
       const error = new Error('Email is required for creating a lead.');
       error.status = 400; // Bad Request
       throw error;
@@ -38,7 +39,7 @@ class LeadModel {
         finalUnitId,
         name,
         phone,
-        email,
+        normalizedEmail,
         notes,
         move_in_date || null,
         occupants_count || 1,
@@ -227,9 +228,10 @@ class LeadModel {
     return rows;
   }
   async findIdByEmailAndProperty(email, propertyId) {
+    const normalizedEmail = email ? email.toLowerCase().trim() : null;
     const [rows] = await db.query(
       `SELECT lead_id FROM leads WHERE email = ? AND property_id = ? AND status NOT IN ('dropped', 'converted') LIMIT 1`,
-      [email, propertyId]
+      [normalizedEmail, propertyId]
     );
     return rows.length > 0 ? rows[0].lead_id : null;
   }
@@ -262,6 +264,7 @@ class LeadModel {
     }
   }
   async findByEmail(email) {
+    const normalizedEmail = email ? email.toLowerCase().trim() : null;
     const [rows] = await db.query(
       `SELECT 
         lead_id as id,
@@ -280,7 +283,7 @@ class LeadModel {
         created_at as createdAt,
         last_contacted_at as lastContactedAt
        FROM leads WHERE email = ? AND status != 'dropped' ORDER BY created_at DESC LIMIT 1`,
-      [email]
+      [normalizedEmail]
     );
     return rows[0];
   }

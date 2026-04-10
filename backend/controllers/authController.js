@@ -14,7 +14,8 @@ class AuthController {
   //  LOGIN: Checks email & password. If correct, gives a digital "Key" (Token).
   login = catchAsync(async (req, res, next) => {
     const { email, password } = req.body;
-    const result = await authService.login(email, password);
+    const normalizedEmail = email ? email.toLowerCase().trim() : '';
+    const result = await authService.login(normalizedEmail, password);
     res.json(result);
   });
 
@@ -31,7 +32,7 @@ class AuthController {
     // If a file was uploaded, add its path to tenantData
     if (req.file) {
       tenantData = tenantData || {};
-      tenantData.nicUrl = req.file.path || req.file.secure_url;
+      tenantData.nicUrl = req.file.url;
     }
 
     const result = await authService.setupPassword(token, password, tenantData);

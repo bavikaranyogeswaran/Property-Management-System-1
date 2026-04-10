@@ -20,7 +20,7 @@ export const cleanupRequestAssets = async (req) => {
     const assetsToDelete = [];
 
     // 1. Single File case (req.file)
-    if (req.file && req.file.path) {
+    if (req.file && req.file.url) {
       // For multer-storage-cloudinary, .filename is the public_id
       assetsToDelete.push(req.file.filename);
     }
