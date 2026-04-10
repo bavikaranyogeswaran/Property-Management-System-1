@@ -440,37 +440,55 @@ export const applyLateFees = async () => {
       const isDaily = inv.lateFeeType === 'daily_fixed';
 
       if (isDaily) {
-        // DAILY ACCRUAL LOGIC
-        // Check if a late fee for "Today" already exists for this specific base invoice
-        const [todayFeeExists] = await db.query(
-          "SELECT 1 FROM rent_invoices WHERE lease_id = ? AND description LIKE ? AND invoice_type = 'late_fee' AND DATE(created_at) = CURDATE() LIMIT 1",
-          [
-            inv.lease_id,
-            `%Daily Late Fee for ${todayStr}%Invoice #${inv.invoice_id}%`,
-          ]
+        // DAILY ACCRUAL LOGIC (Cumulative Upsert)
+        // Find existing cumulative late fee invoice for this specific base invoice
+        const [existingFee] = await db.query(
+          "SELECT invoice_id, amount, description FROM rent_invoices WHERE lease_id = ? AND description LIKE ? AND invoice_type = 'late_fee' LIMIT 1",
+          [inv.lease_id, `%Late Fee for Invoice #${inv.invoice_id}%`]
         );
-
-        if (todayFeeExists.length > 0) {
-          console.log(
-            `Daily fee already applied for Invoice #${inv.invoice_id} on ${todayStr}. Skipping.`
-          );
-          continue;
-        }
 
         const dailyAmount = inv.lateFeeAmount || 0;
         if (dailyAmount <= 0) continue;
 
-        // Create Daily Late Fee Invoice
-        const lateFeeInvoiceId = await invoiceModel.createLateFeeInvoice({
-          leaseId: inv.lease_id,
-          amount: dailyAmount,
-          dueDate: formatToLocalDate(addDays(now(), 1)), // Due tomorrow
-          description: `Daily Late Fee for ${todayStr} (Invoice #${inv.invoice_id})`,
-        });
+        if (existingFee.length > 0) {
+          const feeInv = existingFee[0];
 
-        if (lateFeeInvoiceId) {
-          await paymentService.applyTenantCredit(lateFeeInvoiceId);
+          // Prevent running twice on the same day by checking description text
+          if (feeInv.description.includes(todayStr)) {
+            console.log(
+              `Daily fee already applied for Invoice #${inv.invoice_id} on ${todayStr}. Skipping.`
+            );
+            continue;
+          }
+
+          // Accumulate the fee
+          const newAmount = Number(feeInv.amount) + dailyAmount;
+          const newDescription = feeInv.description + `, ${todayStr}`;
+
+          await db.query(
+            'UPDATE rent_invoices SET amount = ?, description = ? WHERE invoice_id = ?',
+            [newAmount, newDescription, feeInv.invoice_id]
+          );
+
+          // Re-apply credit towards new balance
+          await paymentService.applyTenantCredit(feeInv.invoice_id);
           appliedCount++;
+        } else {
+          // Create the initial cumulative Late Fee Invoice for this base invoice
+          // Explicitly pass year/month of the base invoice to avoid period drift
+          const lateFeeInvoiceId = await invoiceModel.createLateFeeInvoice({
+            leaseId: inv.lease_id,
+            amount: dailyAmount,
+            dueDate: formatToLocalDate(addDays(now(), 1)), // Due tomorrow
+            description: `Accumulated Late Fee for Invoice #${inv.invoice_id} starting ${todayStr}`,
+            year: inv.year,
+            month: inv.month,
+          });
+
+          if (lateFeeInvoiceId) {
+            await paymentService.applyTenantCredit(lateFeeInvoiceId);
+            appliedCount++;
+          }
         }
       } else {
         // FLAT PERCENTAGE LOGIC (Once every 30 days)
@@ -1085,6 +1103,9 @@ export const runNightlyCron = async (targetDate = null) => {
     await expireDraftLeases();
     await deactivateFormerTenants(executionDate);
     await escalateOverdueMaintenance();
+
+    // 4.1 Automated Score Healing (Scenario 2 Fix)
+    await tenantModel.recalculateAllBehaviorScores();
 
     // 5. Refund Operations
     await autoAcknowledgeRefunds();

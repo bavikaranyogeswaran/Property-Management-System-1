@@ -82,11 +82,18 @@ class ImageController {
     const allImages = await propertyImageModel.findByPropertyId(propertyId);
 
     // [LEGACY SYNC] Keep properties.image_url in sync for backward compat
-    const currentPrimary = allImages.find((img) => img.is_primary);
-    if (currentPrimary) {
-      await propertyModel.update(propertyId, {
-        imageUrl: currentPrimary.image_url,
-      });
+    try {
+      const currentPrimary = allImages.find((img) => img.is_primary);
+      if (currentPrimary) {
+        await propertyModel.update(propertyId, {
+          imageUrl: currentPrimary.image_url,
+        });
+      }
+    } catch (syncErr) {
+      logger.warn(
+        `Legacy property image sync failed for property ${propertyId}:`,
+        syncErr.message
+      );
     }
 
     res.status(201).json({ images: allImages });
@@ -107,10 +114,17 @@ class ImageController {
     }
 
     // [LEGACY SYNC] Keep properties.image_url in sync for backward compat
-    const images = await propertyImageModel.findByPropertyId(propertyId);
-    const primary = images.find((img) => img.is_primary);
-    if (primary) {
-      await propertyModel.update(propertyId, { imageUrl: primary.image_url });
+    try {
+      const images = await propertyImageModel.findByPropertyId(propertyId);
+      const primary = images.find((img) => img.is_primary);
+      if (primary) {
+        await propertyModel.update(propertyId, { imageUrl: primary.image_url });
+      }
+    } catch (syncErr) {
+      logger.warn(
+        `Legacy property image sync failed for property ${propertyId}:`,
+        syncErr.message
+      );
     }
 
     res.json({ message: 'Primary image updated' });
@@ -196,10 +210,17 @@ class ImageController {
     const allImages = await unitImageModel.findByUnitId(unitId);
 
     // [LEGACY SYNC] Keep units.image_url in sync for backward compat
-    const currentPrimary =
-      allImages.find((img) => img.is_primary) || allImages[0];
-    if (currentPrimary) {
-      await unitModel.updateImageUrl(unitId, currentPrimary.image_url);
+    try {
+      const currentPrimary =
+        allImages.find((img) => img.is_primary) || allImages[0];
+      if (currentPrimary) {
+        await unitModel.updateImageUrl(unitId, currentPrimary.image_url);
+      }
+    } catch (syncErr) {
+      logger.warn(
+        `Legacy unit image sync failed for unit ${unitId}:`,
+        syncErr.message
+      );
     }
 
     res.status(201).json({ images: allImages });
@@ -220,10 +241,17 @@ class ImageController {
     }
 
     // [LEGACY SYNC] Keep units.image_url in sync for backward compat
-    const images = await unitImageModel.findByUnitId(unitId);
-    const primary = images.find((img) => img.is_primary);
-    if (primary) {
-      await unitModel.updateImageUrl(unitId, primary.image_url);
+    try {
+      const images = await unitImageModel.findByUnitId(unitId);
+      const primary = images.find((img) => img.is_primary);
+      if (primary) {
+        await unitModel.updateImageUrl(unitId, primary.image_url);
+      }
+    } catch (syncErr) {
+      logger.warn(
+        `Legacy unit image sync failed for unit ${unitId}:`,
+        syncErr.message
+      );
     }
 
     res.json({ message: 'Primary image updated' });

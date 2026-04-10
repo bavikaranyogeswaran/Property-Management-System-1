@@ -188,6 +188,23 @@ class TenantModel {
   }
 
   /**
+   * Recalculates and synchronizes the behavior score for ALL active tenants.
+   * Runs nightly to prevent any possibility of long-term score drift.
+   */
+  async recalculateAllBehaviorScores(connection = null) {
+    const db = connection || pool;
+    const [rows] = await db.query(`
+      UPDATE tenants t
+      SET behavior_score = (
+        SELECT LEAST(100, GREATEST(0, 100 + COALESCE(SUM(score_change), 0)))
+        FROM tenant_behavior_logs
+        WHERE tenant_id = t.user_id
+      )
+    `);
+    return rows.affectedRows;
+  }
+
+  /**
    * Reconciliation for credit balance (C2 fix).
    * Ensures cached balance matches verified overpayments minus usage.
    * This is a placeholder for future complex ledger-based reconciliation.

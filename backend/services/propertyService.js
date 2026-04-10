@@ -102,12 +102,19 @@ class PropertyService {
     const addedImages = await propertyModel.addImages(propertyId, imagesData);
 
     // [LEGACY SYNC] Keep properties.image_url in sync for backward compat
-    const primaryImage =
-      imagesData.find((img) => img.isPrimary === 1) || imagesData[0];
-    if (primaryImage) {
-      await propertyModel.update(propertyId, {
-        imageUrl: primaryImage.imageUrl,
-      });
+    try {
+      const primaryImage =
+        imagesData.find((img) => img.isPrimary === 1) || imagesData[0];
+      if (primaryImage) {
+        await propertyModel.update(propertyId, {
+          imageUrl: primaryImage.imageUrl,
+        });
+      }
+    } catch (syncErr) {
+      console.warn(
+        `Legacy property image sync failed for property ${propertyId}:`,
+        syncErr.message
+      );
     }
 
     return addedImages;

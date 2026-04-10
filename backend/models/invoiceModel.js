@@ -22,10 +22,10 @@ class InvoiceModel {
       magicTokenHash,
       magicTokenExpiresAt,
     } = data;
-    // Need to determine year/month from dueDate
+    // Need to determine year/month from dueDate if not explicitly provided
     const date = parseLocalDate(dueDate);
-    const year = date.getFullYear();
-    const month = date.getMonth() + 1; // 1-12
+    const year = data.year || date.getFullYear();
+    const month = data.month || date.getMonth() + 1; // 1-12
 
     const db = connection || pool;
     try {
