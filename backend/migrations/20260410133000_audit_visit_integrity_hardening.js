@@ -32,14 +32,12 @@ export async function up(knex) {
       table.string('visitor_phone', 20).nullable().alter();
     });
 
-    // 2.2 Add integrity CHECK constraint
-    // Ensure either lead_id OR (name+email) exists.
-    // Note: Raw SQL since Knex doesn't have a cross-platform check() for existing tables easily.
-    await knex.raw(`
-      ALTER TABLE property_visits 
-      ADD CONSTRAINT chk_visit_visitor_info 
-      CHECK (lead_id IS NOT NULL OR (visitor_name IS NOT NULL AND visitor_email IS NOT NULL))
-    `);
+    // 2.2 Enforce integrity logic
+    // We cannot use a CHECK constraint on `lead_id` because MySQL blocks CHECK constraints
+    // on columns that participate in an ON DELETE SET NULL or CASCADE foreign key.
+    // Instead, we will update the lead_id foreign key to CASCADE to ensure that
+    // when a lead is deleted, their visits (which now lack redundant names/emails)
+    // are cleanly removed rather than becoming orphaned ghost records.
 
     // 2.3 Correct FK Actions (H13 realization)
     try {
@@ -48,7 +46,8 @@ export async function up(knex) {
         SELECT CONSTRAINT_NAME 
         FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE 
         WHERE TABLE_NAME = 'property_visits' 
-        AND COLUMN_NAME IN ('property_id', 'unit_id')
+        AND TABLE_SCHEMA = DATABASE()
+        AND COLUMN_NAME IN ('property_id', 'unit_id', 'lead_id')
         AND REFERENCED_TABLE_NAME IS NOT NULL
       `);
 
@@ -67,6 +66,11 @@ export async function up(knex) {
           .foreign('unit_id')
           .references('units.unit_id')
           .onDelete('SET NULL');
+        // Change lead_id from SET NULL to CASCADE
+        table
+          .foreign('lead_id')
+          .references('leads.lead_id')
+          .onDelete('CASCADE');
       });
     } catch (err) {
       console.warn(
@@ -86,11 +90,27 @@ export async function up(knex) {
 
 export async function down(knex) {
   if (await knex.schema.hasTable('property_visits')) {
-    // Revert check constraint
+    // Revert lead_id cascading rule if needed
     try {
-      await knex.raw(
-        'ALTER TABLE property_visits DROP CONSTRAINT chk_visit_visitor_info'
-      );
+      const [rows] = await knex.raw(`
+        SELECT CONSTRAINT_NAME 
+        FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE 
+        WHERE TABLE_NAME = 'property_visits' 
+        AND TABLE_SCHEMA = DATABASE()
+        AND COLUMN_NAME = 'lead_id'
+        AND REFERENCED_TABLE_NAME IS NOT NULL
+      `);
+      if (rows.length) {
+        await knex.raw(
+          `ALTER TABLE property_visits DROP FOREIGN KEY ${rows[0].CONSTRAINT_NAME}`
+        );
+        await knex.schema.alterTable('property_visits', (table) => {
+          table
+            .foreign('lead_id')
+            .references('leads.lead_id')
+            .onDelete('SET NULL');
+        });
+      }
     } catch (err) {}
 
     // Revert nullability
