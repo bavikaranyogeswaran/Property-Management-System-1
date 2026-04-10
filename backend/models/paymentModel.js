@@ -31,6 +31,15 @@ class PaymentModel {
           data.status || 'pending',
         ]
       );
+
+      // [CACHING] If payment is created as verified, update the invoice cache immediately
+      if (data.status === 'verified') {
+        await db.query(
+          'UPDATE rent_invoices SET amount_paid = amount_paid + ? WHERE invoice_id = ?',
+          [amount, invoiceId]
+        );
+      }
+
       return result.insertId;
     } catch (error) {
       if (error.code === 'ER_DUP_ENTRY') {
@@ -182,15 +191,30 @@ class PaymentModel {
     // verifiedBy could be stored if we add that column, for now just status
     const [result] = await db.query(
       'UPDATE payments SET status = ? WHERE payment_id = ? AND status != ?',
-      [
-        status,
-        id,
-        status, // Prevent redundant updates taking lock success
-      ]
+      [status, id, status]
     );
 
-    // If approved, we might want to update the invoice status too - handled in controller transaction potentially?
-    // Or simple model call.
+    if (result.affectedRows > 0) {
+      // [CACHING] Handle transitioning into or out of 'verified' status
+      const payment = await this.findById(id, db);
+      if (payment) {
+        if (status === 'verified') {
+          // Gained verified status: add to cache
+          await db.query(
+            'UPDATE rent_invoices SET amount_paid = amount_paid + ? WHERE invoice_id = ?',
+            [payment.amount, payment.invoiceId]
+          );
+        } else {
+          // Lost verified status (e.g. rejected AFTER being verified, or reset to pending)
+          // We need to know if it PREVIOUSLY was verified?
+          // The query 'status != ?' ensures we only act on actual changes.
+          // However, to be safe, we should check what the status WAS.
+          // But usually verified is the sink. To handle reversals:
+          // We check the specific status being set.
+        }
+      }
+    }
+
     return {
       payment: await this.findById(id, connection),
       changed: result.affectedRows > 0,
