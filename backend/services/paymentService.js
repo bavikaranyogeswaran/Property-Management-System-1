@@ -703,7 +703,9 @@ class PaymentService {
         await tenantModel.addCredit(
           invoice.tenantId,
           incrementalOverpayment,
-          connection
+          connection,
+          'overpayment',
+          paymentId
         );
         await notificationModel.create(
           {
@@ -1007,7 +1009,13 @@ class PaymentService {
       await paymentModel.updateStatus(payId, 'verified', null, conn);
 
       // 5. Update Tenant Balance
-      await tenantModel.deductCredit(invoice.tenantId, amountToApply, conn);
+      await tenantModel.deductCredit(
+        invoice.tenantId,
+        amountToApply,
+        conn,
+        'invoice_payment',
+        invoiceId
+      );
 
       // 6. Update Invoice Status
       const newTotalVerified = totalVerified + amountToApply;

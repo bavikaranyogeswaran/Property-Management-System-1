@@ -60,6 +60,16 @@ CREATE TABLE tenant_behavior_logs (
     UNIQUE KEY unique_daily_behavior (tenant_id, category, created_at)
 );
 
+CREATE TABLE tenant_credit_logs (
+    log_id INT AUTO_INCREMENT PRIMARY KEY,
+    tenant_id INT NOT NULL,
+    amount_change BIGINT NOT NULL,
+    reason VARCHAR(100) NOT NULL,
+    reference_id INT, -- Can be payment_id or invoice_id
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (tenant_id) REFERENCES tenants(user_id) ON DELETE CASCADE
+);
+
 -- OWNERS
 CREATE TABLE owners (
     user_id INT PRIMARY KEY,

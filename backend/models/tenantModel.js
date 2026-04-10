@@ -131,19 +131,39 @@ class TenantModel {
     return result.affectedRows > 0;
   }
 
-  async addCredit(userId, amount, connection = null) {
+  async addCredit(
+    userId,
+    amount,
+    connection = null,
+    reason = 'manual_adjustment',
+    referenceId = null
+  ) {
     const db = connection || pool;
     await db.query(
       'UPDATE tenants SET credit_balance = credit_balance + ? WHERE user_id = ?',
       [amount, userId]
     );
+    await db.query(
+      'INSERT INTO tenant_credit_logs (tenant_id, amount_change, reason, reference_id) VALUES (?, ?, ?, ?)',
+      [userId, amount, reason, referenceId]
+    );
   }
 
-  async deductCredit(userId, amount, connection = null) {
+  async deductCredit(
+    userId,
+    amount,
+    connection = null,
+    reason = 'manual_adjustment',
+    referenceId = null
+  ) {
     const db = connection || pool;
     await db.query(
       'UPDATE tenants SET credit_balance = credit_balance - ? WHERE user_id = ?',
       [amount, userId]
+    );
+    await db.query(
+      'INSERT INTO tenant_credit_logs (tenant_id, amount_change, reason, reference_id) VALUES (?, ?, ?, ?)',
+      [userId, -amount, reason, referenceId]
     );
   }
   async incrementBehaviorScore(userId, scoreChange, connection = null) {

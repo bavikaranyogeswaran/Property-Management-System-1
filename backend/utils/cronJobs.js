@@ -859,6 +859,13 @@ export const expireDraftLeases = async () => {
         // Void their pending security deposit invoices
         for (const leaseId of ids) {
           await invoiceModel.voidPendingByLeaseId(leaseId, connection);
+
+          // [NEW] Log to Audit trail for compliance
+          await connection.query(
+            `INSERT INTO system_audit_logs (action_type, entity_id, entity_type, details)
+             VALUES ('RESERVATION_EXPIRED', ?, 'lease', 'System cron automatically cleared expired reservation')`,
+            [leaseId]
+          );
         }
 
         await connection.commit();
