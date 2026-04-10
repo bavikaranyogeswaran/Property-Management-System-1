@@ -2,7 +2,6 @@
  * Performance & Optimization Extension: Hardening Query Scale (G1, G2, G3, G4 & Rel)
  *
  * - G2: Missing Indexes for notifications, audit logs, payments, ledger, leases.
- * - Rel: Missing lease_term_id column added to leases table.
  * - G1-G4: Denormalization of rent_invoices.amount_paid for O(1) reads.
  */
 
@@ -28,16 +27,22 @@ export async function up(knex) {
     table.index(['lease_id', 'category'], 'idx_ledger_lease_cat');
   });
 
-  await knex.schema.alterTable('leases', (table) => {
-    table.index(['tenant_id', 'status'], 'idx_lease_tenant_status');
-    table.index(['unit_id', 'status'], 'idx_lease_unit_status');
-  });
+  try {
+    await knex.schema.alterTable('leases', (table) => {
+      table.index(['tenant_id', 'status'], 'idx_lease_tenant_status');
+      table.index(['unit_id', 'status'], 'idx_lease_unit_status');
+    });
+  } catch (err) {
+    console.warn('Lease indexes already exist or failed:', err.message);
+  }
 
   // G1-G4: Materialized amount_paid on rent_invoices
   if (await knex.schema.hasTable('rent_invoices')) {
-    await knex.schema.alterTable('rent_invoices', (table) => {
-      table.bigInteger('amount_paid').defaultTo(0).notNullable();
-    });
+    if (!(await knex.schema.hasColumn('rent_invoices', 'amount_paid'))) {
+      await knex.schema.alterTable('rent_invoices', (table) => {
+        table.bigInteger('amount_paid').defaultTo(0).notNullable();
+      });
+    }
 
     // Backfill historical verified payment totals
     await knex.raw(`

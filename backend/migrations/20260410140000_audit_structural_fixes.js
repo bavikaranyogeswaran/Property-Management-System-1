@@ -51,17 +51,44 @@ export async function up(knex) {
   // C24: Maintenance Costs unique constraint refinement
   if (await knex.schema.hasTable('maintenance_costs')) {
     try {
-      // Raw drop because knex has trouble locating prefix-length index names natively
-      await knex.raw(
-        'ALTER TABLE maintenance_costs DROP INDEX unique_cost_entry'
-      );
+      // 1. Find the foreign key constraint name on request_id
+      const [fkRows] = await knex.raw(`
+        SELECT CONSTRAINT_NAME 
+        FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE 
+        WHERE TABLE_NAME = 'maintenance_costs' 
+        AND TABLE_SCHEMA = DATABASE()
+        AND COLUMN_NAME = 'request_id'
+        AND REFERENCED_TABLE_NAME IS NOT NULL
+      `);
 
-      // Recreate using a safer composite key that avoids VARCHAR prefix hashing
+      if (fkRows && fkRows.length > 0) {
+        for (const row of fkRows) {
+          await knex.raw(
+            `ALTER TABLE maintenance_costs DROP FOREIGN KEY ${row.CONSTRAINT_NAME}`
+          );
+        }
+      }
+
+      // 2. Now we can drop the index that was supporting the FK
+      try {
+        await knex.raw(
+          'ALTER TABLE maintenance_costs DROP INDEX unique_cost_entry'
+        );
+      } catch (e) {
+        console.warn('Index unique_cost_entry already gone or missing');
+      }
+
+      // 3. Recreate using a safer composite key that avoids VARCHAR prefix hashing
       await knex.schema.alterTable('maintenance_costs', (table) => {
         table.unique(
           ['request_id', 'amount', 'recorded_date', 'bill_to'],
           'unique_cost_entry_safe'
         );
+        // 4. Re-add the foreign key
+        table
+          .foreign('request_id')
+          .references('maintenance_requests.request_id')
+          .onDelete('CASCADE');
       });
     } catch (err) {
       console.warn(

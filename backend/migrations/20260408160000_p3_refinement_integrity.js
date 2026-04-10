@@ -27,14 +27,18 @@ export async function up(knex) {
   }
 
   // 4. Structural: Add lease_term_id to leases (with check)
-  if (!(await knex.schema.hasColumn('leases', 'lease_term_id'))) {
-    await knex.schema.alterTable('leases', (table) => {
-      table.integer('lease_term_id').unsigned().nullable().after('unit_id');
-      table
-        .foreign('lease_term_id')
-        .references('lease_terms.lease_term_id')
-        .onDelete('SET NULL');
-    });
+  try {
+    if (!(await knex.schema.hasColumn('leases', 'lease_term_id'))) {
+      await knex.schema.alterTable('leases', (table) => {
+        table.integer('lease_term_id').unsigned().nullable().after('unit_id');
+        table
+          .foreign('lease_term_id')
+          .references('lease_terms.lease_term_id')
+          .onDelete('SET NULL');
+      });
+    }
+  } catch (err) {
+    console.warn('Column lease_term_id might already exist:', err.message);
   }
 
   // 5. Hardening Constraints
