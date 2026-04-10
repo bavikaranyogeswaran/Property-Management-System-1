@@ -46,13 +46,8 @@ class PaymentModel {
         ]
       );
 
-      // [CACHING] If payment is created as verified, update the invoice cache immediately
-      if (data.status === 'verified') {
-        await db.query(
-          'UPDATE rent_invoices SET amount_paid = amount_paid + ? WHERE invoice_id = ?',
-          [amount, invoiceId]
-        );
-      }
+      // [H1 FIX] amount_paid is maintained by DB trigger trg_invoice_amount_paid_insert.
+      // No application-level cache update needed here.
 
       return result.insertId;
     } catch (error) {
@@ -208,26 +203,11 @@ class PaymentModel {
       [status, id, status]
     );
 
-    if (result.affectedRows > 0) {
-      // [CACHING] Handle transitioning into or out of 'verified' status
-      const payment = await this.findById(id, db);
-      if (payment) {
-        if (status === 'verified') {
-          // Gained verified status: add to cache
-          await db.query(
-            'UPDATE rent_invoices SET amount_paid = amount_paid + ? WHERE invoice_id = ?',
-            [payment.amount, payment.invoiceId]
-          );
-        } else {
-          // Lost verified status (e.g. rejected AFTER being verified, or reset to pending)
-          // We need to know if it PREVIOUSLY was verified?
-          // The query 'status != ?' ensures we only act on actual changes.
-          // However, to be safe, we should check what the status WAS.
-          // But usually verified is the sink. To handle reversals:
-          // We check the specific status being set.
-        }
-      }
-    }
+    // [H1 FIX] rent_invoices.amount_paid is now maintained by DB triggers:
+    //   trg_invoice_amount_paid_insert — fires on new payment inserts
+    //   trg_invoice_amount_paid_update — fires on ANY status change, handles
+    //     both gains (pending→verified) AND losses (verified→rejected) of
+    //     verified status atomically. No application code needed here.
 
     return {
       payment: await this.findById(id, connection),

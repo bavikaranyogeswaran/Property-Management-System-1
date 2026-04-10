@@ -28,6 +28,8 @@ class MaintenanceRequestModel {
       description: row.description,
       priority: row.priority,
       status: row.status,
+      assignedTo: row.assigned_to ? row.assigned_to.toString() : null,
+      assignedBy: row.assigned_by ? row.assigned_by.toString() : null,
       createdAt: row.created_at,
       images: row.images, // Already JSON
     }));
@@ -59,6 +61,8 @@ class MaintenanceRequestModel {
       description: row.description,
       priority: row.priority,
       status: row.status,
+      assignedTo: row.assigned_to ? row.assigned_to.toString() : null,
+      assignedBy: row.assigned_by ? row.assigned_by.toString() : null,
       images: row.images,
     }));
   }
@@ -122,6 +126,8 @@ class MaintenanceRequestModel {
       priority: row.priority,
       category: row.category,
       status: row.status,
+      assignedTo: row.assigned_to ? row.assigned_to.toString() : null,
+      assignedBy: row.assigned_by ? row.assigned_by.toString() : null,
       createdAt: row.created_at,
       images: row.images, // Already JSON
     };
@@ -190,15 +196,24 @@ class MaintenanceRequestModel {
 
   //  CREATE REQUEST: Writing down a new complaint card.
   async create(data) {
-    const { unitId, tenantId, title, description, priority, category, images } =
-      data;
+    const {
+      unitId,
+      tenantId,
+      title,
+      description,
+      priority,
+      category,
+      images,
+      assignedTo,
+      assignedBy,
+    } = data;
 
     const connection = await pool.getConnection();
     try {
       await connection.beginTransaction();
 
       const [result] = await connection.query(
-        'INSERT INTO maintenance_requests (unit_id, tenant_id, title, description, priority, category, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO maintenance_requests (unit_id, tenant_id, title, description, priority, category, status, assigned_to, assigned_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [
           unitId,
           tenantId,
@@ -207,6 +222,8 @@ class MaintenanceRequestModel {
           priority || 'medium',
           category || 'general',
           'submitted',
+          assignedTo || null,
+          assignedBy || null,
         ]
       );
       const requestId = result.insertId;

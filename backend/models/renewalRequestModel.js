@@ -9,14 +9,16 @@ class RenewalRequestModel {
       proposedEndDate,
       status,
       notes,
+      requestedBy, // [H19] Who initiated this renewal: 'tenant' | 'staff' | 'system'
     } = data;
     const conn = connection || pool;
     const [result] = await conn.query(
       `INSERT INTO renewal_requests 
-             (lease_id, current_monthly_rent, proposed_monthly_rent, proposed_end_date, status, negotiation_notes)
-             VALUES (?, ?, ?, ?, ?, ?)`,
+             (lease_id, requested_by, current_monthly_rent, proposed_monthly_rent, proposed_end_date, status, negotiation_notes)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [
         leaseId,
+        requestedBy || 'system',
         currentMonthlyRent,
         proposedMonthlyRent || null,
         proposedEndDate || null,
@@ -86,6 +88,7 @@ class RenewalRequestModel {
     return {
       id: row.request_id.toString(),
       leaseId: row.lease_id.toString(),
+      requestedBy: row.requested_by || 'system', // [H19]
       currentMonthlyRent: parseFloat(row.current_monthly_rent),
       proposedMonthlyRent: row.proposed_monthly_rent
         ? parseFloat(row.proposed_monthly_rent)

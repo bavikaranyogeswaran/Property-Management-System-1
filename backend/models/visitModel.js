@@ -11,6 +11,7 @@ class VisitModel {
       visitorPhone,
       scheduledDate,
       notes,
+      assignedStaffId, // [H22] Staff member conducting the visit
     } = data;
 
     // C28 Resolve: Single Source of Truth
@@ -21,8 +22,8 @@ class VisitModel {
 
     const [result] = await db.query(
       `INSERT INTO property_visits 
-            (property_id, unit_id, lead_id, visitor_name, visitor_email, visitor_phone, scheduled_date, notes) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            (property_id, unit_id, lead_id, visitor_name, visitor_email, visitor_phone, scheduled_date, notes, assigned_staff_id) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         propertyId,
         unitId || null,
@@ -32,6 +33,7 @@ class VisitModel {
         finalPhone,
         scheduledDate,
         notes,
+        assignedStaffId || null,
       ]
     );
 
@@ -47,11 +49,13 @@ class VisitModel {
                 l.status as lead_status,
                 COALESCE(l.name, v.visitor_name) as resolved_name,
                 COALESCE(l.email, v.visitor_email) as resolved_email,
-                COALESCE(l.phone, v.visitor_phone) as resolved_phone
+                COALESCE(l.phone, v.visitor_phone) as resolved_phone,
+                s.name as assigned_staff_name
             FROM property_visits v
             JOIN properties p ON v.property_id = p.property_id
             LEFT JOIN units u ON v.unit_id = u.unit_id
             LEFT JOIN leads l ON v.lead_id = l.lead_id
+            LEFT JOIN users s ON v.assigned_staff_id = s.user_id
             WHERE 1=1
         `;
     const params = [];
@@ -90,6 +94,10 @@ class VisitModel {
       propertyName: row.property_name,
       unitNumber: row.unit_number,
       leadStatus: row.lead_status,
+      assignedStaffId: row.assigned_staff_id
+        ? row.assigned_staff_id.toString()
+        : null, // [H22]
+      assignedStaffName: row.assigned_staff_name || null, // [H22]
     }));
   }
 

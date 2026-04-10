@@ -84,16 +84,29 @@ class PayoutModel {
   }
 
   async checkOverlap(ownerId, startDate, endDate, skipIfSelective = false) {
-    if (skipIfSelective) return false; // Records themselves ensure uniqueness in selective mode
-    // Check if any existing payout overlaps with the requested range
+    // [H4 FIX] Use standard two-sided interval overlap algorithm:
+    // Two intervals [A,B] and [C,D] overlap iff A <= D AND B >= C.
+    // Previously only checked period_end >= startDate (one-sided), which missed
+    // cases where a new payout fully contains an existing one.
+    //
+    // skipIfSelective no longer bypasses the check entirely — selective payouts
+    // can still produce overlapping periods if not guarded.
+    if (skipIfSelective) {
+      console.warn(
+        '[PayoutModel] Selective payout overlap check skipped — verify date range manually for owner:',
+        ownerId
+      );
+      return false;
+    }
+
     const [rows] = await pool.query(
-      `
-            SELECT 1 FROM owner_payouts 
-            WHERE owner_id = ? 
-            AND period_end >= ?
-            LIMIT 1
-        `,
-      [ownerId, startDate]
+      `SELECT 1 FROM owner_payouts
+       WHERE owner_id = ?
+         AND status NOT IN ('disputed')
+         AND period_start <= ?
+         AND period_end >= ?
+       LIMIT 1`,
+      [ownerId, endDate, startDate]
     );
     return rows.length > 0;
   }

@@ -148,15 +148,19 @@ class TenantModel {
   }
   async incrementBehaviorScore(userId, scoreChange, connection = null) {
     const db = connection || pool;
-    const currentScore = await this.getBehaviorScore(userId, db);
-    if (currentScore === null) return null;
-
-    const newScore = Math.min(100, Math.max(0, currentScore + scoreChange));
-
-    await db.query('UPDATE tenants SET behavior_score = ? WHERE user_id = ?', [
-      newScore,
-      userId,
-    ]);
+    // [H5 FIX] Replaced read-then-write pattern with a single atomic UPDATE.
+    // Previously: read score → compute new score → write score (race condition window).
+    // Now: MySQL performs the read, clamp, and write as one atomic row-level operation.
+    // LEAST(100, ...) caps at 100. GREATEST(0, ...) prevents negative scores.
+    const [result] = await db.query(
+      `UPDATE tenants
+       SET behavior_score = LEAST(100, GREATEST(0, behavior_score + ?))
+       WHERE user_id = ?`,
+      [scoreChange, userId]
+    );
+    if (result.affectedRows === 0) return null;
+    // Return the new score by reading it back
+    const newScore = await this.getBehaviorScore(userId, db);
     return newScore;
   }
 

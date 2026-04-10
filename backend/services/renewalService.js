@@ -38,6 +38,12 @@ class RenewalService {
       leaseId: leaseId,
       currentMonthlyRent: lease.monthlyRent,
       status: 'pending',
+      requestedBy:
+        user?.role === 'tenant'
+          ? 'tenant'
+          : user?.role === 'treasurer'
+            ? 'staff'
+            : 'system', // [H19]
     });
 
     const auditLogger = (await import('../utils/auditLogger.js')).default;
