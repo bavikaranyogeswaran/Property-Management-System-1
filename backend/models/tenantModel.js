@@ -211,9 +211,81 @@ class TenantModel {
    */
   async recalculateCreditBalance(userId, connection = null) {
     const db = connection || pool;
-    // For now, we assume current balance is the truth unless we have a separate ledger for credits.
-    // In a full implementation, this would aggregate from a 'credit_ledger' table.
-    return true;
+
+    // Calculate Total Overpayments directly from invoices vs cash payments
+    const [[{ total_additions }]] = await db.query(
+      `
+      SELECT COALESCE(SUM(GREATEST(0, cash_paid - invoice_amount)), 0) as total_additions
+      FROM (
+        SELECT 
+          ri.invoice_id, 
+          ri.amount as invoice_amount,
+          COALESCE(SUM(p.amount), 0) as cash_paid
+        FROM rent_invoices ri
+        JOIN leases l ON ri.lease_id = l.lease_id
+        LEFT JOIN payments p ON p.invoice_id = ri.invoice_id AND p.status = 'verified' AND p.payment_method != 'credit'
+        WHERE l.tenant_id = ?
+        GROUP BY ri.invoice_id, ri.amount
+      ) base
+    `,
+      [userId]
+    );
+
+    // Calculate Total Credits Used
+    const [[{ total_deductions }]] = await db.query(
+      `
+      SELECT COALESCE(SUM(p.amount), 0) as total_deductions
+      FROM payments p
+      JOIN rent_invoices ri ON p.invoice_id = ri.invoice_id
+      JOIN leases l ON ri.lease_id = l.lease_id
+      WHERE p.payment_method = 'credit' AND p.status = 'verified' AND l.tenant_id = ?
+    `,
+      [userId]
+    );
+
+    const actualBalance = Number(total_additions) - Number(total_deductions);
+    const safeBalance = Math.max(0, actualBalance); // Prevent negative credits
+
+    const [rows] = await db.query(
+      'UPDATE tenants SET credit_balance = ? WHERE user_id = ?',
+      [safeBalance, userId]
+    );
+    return rows.affectedRows > 0;
+  }
+
+  /**
+   * Recalculates credit balances for all tenants.
+   */
+  async recalculateAllCreditBalances(connection = null) {
+    const db = connection || pool;
+    // For mass recalculation, we update everyone via a derived table
+    const [rows] = await db.query(`
+      UPDATE tenants t
+      LEFT JOIN (
+        SELECT 
+          tenant_id,
+          GREATEST(0, COALESCE(SUM(GREATEST(0, cash_paid - invoice_amount)), 0) - COALESCE(MAX(total_deductions), 0)) as safe_balance
+        FROM (
+          SELECT 
+            l.tenant_id,
+            ri.invoice_id, 
+            ri.amount as invoice_amount,
+            COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id = ri.invoice_id AND status = 'verified' AND payment_method != 'credit'), 0) as cash_paid,
+            COALESCE((
+              SELECT SUM(p2.amount) 
+              FROM payments p2 
+              JOIN rent_invoices ri2 ON p2.invoice_id = ri2.invoice_id
+              JOIN leases l2 ON ri2.lease_id = l2.lease_id
+              WHERE p2.payment_method = 'credit' AND p2.status = 'verified' AND l2.tenant_id = l.tenant_id
+            ), 0) as total_deductions
+          FROM rent_invoices ri
+          JOIN leases l ON ri.lease_id = l.lease_id
+        ) base
+        GROUP BY tenant_id
+      ) calc ON t.user_id = calc.tenant_id
+      SET t.credit_balance = COALESCE(calc.safe_balance, 0)
+    `);
+    return rows.affectedRows;
   }
 }
 

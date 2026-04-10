@@ -1104,8 +1104,9 @@ export const runNightlyCron = async (targetDate = null) => {
     await deactivateFormerTenants(executionDate);
     await escalateOverdueMaintenance();
 
-    // 4.1 Automated Score Healing (Scenario 2 Fix)
+    // 4.1 Automated Health Checks (Healing Drifts)
     await tenantModel.recalculateAllBehaviorScores();
+    await tenantModel.recalculateAllCreditBalances();
 
     // 5. Refund Operations
     await autoAcknowledgeRefunds();

@@ -8,6 +8,15 @@
 import db from '../config/db.js';
 import { getCurrentDateString, formatToLocalDate } from '../utils/dateUtils.js';
 
+/**
+ * [ARCHITECTURAL SEMANTICS]
+ * leases.monthly_rent strictly represents the legally binding CONTRACTUAL RENT
+ * agreed upon by the tenant and owner.
+ *
+ * This is the ONLY value that should ever be used for automated invoicing,
+ * late fee calculations, or financial forecasting tied to active tenants.
+ * It is fully decoupled from the baseline listing price (`units.monthly_rent`).
+ */
 class LeaseModel {
   //  CREATE LEASE: Filing a new contract.
   async create(data, connection = null) {

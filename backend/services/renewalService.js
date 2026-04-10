@@ -13,6 +13,16 @@ import {
 } from '../utils/dateUtils.js';
 import { toCentsFromMajor } from '../utils/moneyUtils.js';
 
+/**
+ * [ARCHITECTURAL SEMANTICS]
+ * Note on 3NF constraints regarding `renewal_requests.current_monthly_rent`:
+ * This column is a DELIBERATE HISTORICAL SNAPSHOT of the lease's contractual
+ * rent at the exact moment the renewal was initiated.
+ *
+ * It must NOT be dynamically synced or joined to `leases.monthly_rent` after
+ * creation, as this would fraudulently alter the historical context of past
+ * negotiations and audit trails.
+ */
 class RenewalService {
   async createFromNotice(leaseId, user = null) {
     const lease = await leaseModel.findById(leaseId);
