@@ -5,6 +5,7 @@
 //  It tracks Cash, Bank Transfers, and checks if payments are Verified.
 // ============================================================================
 
+import crypto from 'crypto';
 import pool from '../config/db.js';
 
 class PaymentModel {
@@ -18,6 +19,19 @@ class PaymentModel {
       evidenceUrl,
     } = data;
     const db = connection || pool;
+
+    // [INTEGRITY HARDENING] Ensure referenceNumber is never null to satisfy DB constraints
+    // This provides a traceable ID for manual (cash/cheque) payments.
+    let finalReference = referenceNumber;
+    if (!finalReference) {
+      const timestamp = new Date()
+        .toISOString()
+        .replace(/[-:T]/g, '')
+        .slice(0, 14); // YYYYMMDDHHmmss
+      const randomStr = crypto.randomBytes(4).toString('hex').toUpperCase();
+      finalReference = `SYS-PAY-${timestamp}-${randomStr}`;
+    }
+
     try {
       const [result] = await db.query(
         'INSERT INTO payments (invoice_id, amount, payment_date, payment_method, reference_number, proof_url, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
@@ -26,7 +40,7 @@ class PaymentModel {
           amount,
           paymentDate,
           paymentMethod,
-          referenceNumber,
+          finalReference,
           evidenceUrl,
           data.status || 'pending',
         ]
