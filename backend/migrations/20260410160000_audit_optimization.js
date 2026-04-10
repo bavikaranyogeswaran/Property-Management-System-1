@@ -33,17 +33,6 @@ export async function up(knex) {
     table.index(['unit_id', 'status'], 'idx_lease_unit_status');
   });
 
-  // Rel: Missing lease_term_id in leases
-  if (await knex.schema.hasTable('leases')) {
-    await knex.schema.alterTable('leases', (table) => {
-      table.integer('lease_term_id').unsigned().nullable();
-      table
-        .foreign('lease_term_id')
-        .references('lease_terms.lease_term_id')
-        .onDelete('SET NULL');
-    });
-  }
-
   // G1-G4: Materialized amount_paid on rent_invoices
   if (await knex.schema.hasTable('rent_invoices')) {
     await knex.schema.alterTable('rent_invoices', (table) => {
@@ -68,13 +57,6 @@ export async function down(knex) {
   if (await knex.schema.hasTable('rent_invoices')) {
     await knex.schema.alterTable('rent_invoices', (table) => {
       table.dropColumn('amount_paid');
-    });
-  }
-
-  if (await knex.schema.hasTable('leases')) {
-    await knex.schema.alterTable('leases', (table) => {
-      table.dropForeign('lease_term_id');
-      table.dropColumn('lease_term_id');
     });
   }
 
