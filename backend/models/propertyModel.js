@@ -24,32 +24,47 @@ class PropertyModel {
       managementFeePercentage,
     } = propertyData;
 
-    const [result] = await db.query(
-      `INSERT INTO properties 
-              (owner_id, name, property_type_id, property_no, street, city, district, image_url, description, late_fee_percentage, late_fee_type, late_fee_amount, late_fee_grace_period, tenant_deactivation_days, management_fee_percentage) 
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        ownerId,
-        name,
-        propertyTypeId,
-        propertyNo,
-        street,
-        city,
-        district,
-        imageUrl, // [DEPRECATED] source of truth is property_images
-        description,
-        propertyData.lateFeePercentage !== undefined
-          ? propertyData.lateFeePercentage
-          : 3.0,
-        propertyData.lateFeeType || 'flat_percentage',
-        propertyData.lateFeeAmount || 0,
-        propertyData.lateFeeGracePeriod !== undefined
-          ? propertyData.lateFeeGracePeriod
-          : 5,
-        propertyData.tenantDeactivationDays || 30,
-        managementFeePercentage || 0.0,
-      ]
-    );
+    let result;
+    try {
+      [result] = await db.query(
+        `INSERT INTO properties 
+                (owner_id, name, property_type_id, property_no, street, city, district, image_url, description, late_fee_percentage, late_fee_type, late_fee_amount, late_fee_grace_period, tenant_deactivation_days, management_fee_percentage) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          ownerId,
+          name,
+          propertyTypeId,
+          propertyNo,
+          street,
+          city,
+          district,
+          imageUrl, // [DEPRECATED] source of truth is property_images
+          description,
+          propertyData.lateFeePercentage !== undefined
+            ? propertyData.lateFeePercentage
+            : 3.0,
+          propertyData.lateFeeType || 'flat_percentage',
+          propertyData.lateFeeAmount || 0,
+          propertyData.lateFeeGracePeriod !== undefined
+            ? propertyData.lateFeeGracePeriod
+            : 5,
+          propertyData.tenantDeactivationDays || 30,
+          managementFeePercentage || 0.0,
+        ]
+      );
+    } catch (err) {
+      if (
+        err.code === 'ER_DUP_ENTRY' &&
+        err.message.includes('unique_property_no')
+      ) {
+        const error = new Error(
+          'A property with this Property Number already exists in your portfolio.'
+        );
+        error.status = 400;
+        throw error;
+      }
+      throw err;
+    }
 
     const propertyId = result.insertId;
 
@@ -229,11 +244,25 @@ class PropertyModel {
 
     if (fields.length > 0) {
       values.push(id);
-      const [result] = await db.query(
-        `UPDATE properties SET ${fields.join(', ')} WHERE property_id = ? AND is_archived = FALSE`,
-        values
-      );
-      if (result.affectedRows === 0) return false;
+      try {
+        const [result] = await db.query(
+          `UPDATE properties SET ${fields.join(', ')} WHERE property_id = ? AND is_archived = FALSE`,
+          values
+        );
+        if (result.affectedRows === 0) return false;
+      } catch (err) {
+        if (
+          err.code === 'ER_DUP_ENTRY' &&
+          err.message.includes('unique_property_no')
+        ) {
+          const error = new Error(
+            'A property with this Property Number already exists in your portfolio.'
+          );
+          error.status = 400;
+          throw error;
+        }
+        throw err;
+      }
     }
 
     // [1NF FIX] Sync amenities table whenever features are updated

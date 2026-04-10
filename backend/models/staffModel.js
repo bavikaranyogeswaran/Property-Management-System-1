@@ -19,14 +19,26 @@ class StaffModel {
             VALUES (?, ?, ?, ?, ?, ?)
         `;
 
-    await connection.query(query, [
-      userId,
-      nic,
-      employeeId,
-      jobTitle,
-      shiftStart,
-      shiftEnd,
-    ]);
+    try {
+      await connection.query(query, [
+        userId,
+        nic,
+        employeeId,
+        jobTitle,
+        shiftStart,
+        shiftEnd,
+      ]);
+    } catch (err) {
+      if (
+        err.code === 'ER_DUP_ENTRY' &&
+        err.message.includes('unique_staff_nic')
+      ) {
+        const error = new Error('A staff member with this NIC already exists.');
+        error.status = 400;
+        throw error;
+      }
+      throw err;
+    }
 
     return userId;
   }
