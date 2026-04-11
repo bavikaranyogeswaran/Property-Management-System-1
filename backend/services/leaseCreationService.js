@@ -339,6 +339,21 @@ class LeaseCreationService {
       // 3. Lock Child (Lease) second
       const lease = await leaseModel.findByIdForUpdate(leaseId, conn);
       if (!lease) throw new Error('Lease not found');
+
+      // [FIX B] Allow idempotent re-entry — lease may have been activated in a previous
+      // crashed transaction that the gateway is retrying.
+      if (lease.status === 'active') {
+        console.log(
+          `[LeaseService] Idempotent signLease: Lease #${leaseId} is already active. Skipping.`
+        );
+        if (isOwnTransaction) await conn.commit();
+        return {
+          status: 'active',
+          signedAt: lease.signedAt || getLocalTime(),
+          alreadyActivated: true,
+        };
+      }
+
       if (lease.status !== 'draft')
         throw new Error('Only draft leases can be signed');
 

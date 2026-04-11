@@ -193,8 +193,11 @@ class PaymentService {
       );
 
       if (overlappingPayments.length > 0) {
-        throw new Error(
-          `Concurrency Alert: Unit ${invoice.unitNumber} already has a pending or confirmed payment from another applicant for these overlapping dates. Proceeding with this payment would cause a double-lease risk.`
+        throw Object.assign(
+          new Error(
+            `This unit already has a pending or confirmed deposit from another applicant. Please contact the property manager.`
+          ),
+          { statusCode: 409 }
         );
       }
 
@@ -574,6 +577,27 @@ class PaymentService {
               },
               conn
             );
+
+            // [FIX A] Release unit only if no verified funds remain for this deposit
+            if (totalVerified === 0) {
+              const [otherClaims] = await conn.query(
+                `SELECT lease_id FROM leases 
+                 WHERE unit_id = ? AND lease_id != ? 
+                 AND status IN ('active', 'draft', 'pending')`,
+                [lease.unitId || lease.unit_id, invoice.lease_id]
+              );
+              if (otherClaims.length === 0) {
+                await conn.query(
+                  `UPDATE units SET status = 'available' WHERE unit_id = ? AND status = 'reserved'`,
+                  [lease.unitId || lease.unit_id]
+                );
+                // Collapse the expiry window to allow cron cleanup
+                await conn.query(
+                  `UPDATE leases SET reservation_expires_at = NOW() WHERE lease_id = ?`,
+                  [invoice.lease_id]
+                );
+              }
+            }
           }
 
           const rejectMessage = reason

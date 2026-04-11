@@ -321,6 +321,29 @@ CREATE TABLE leases (
     FOREIGN KEY (unit_id) REFERENCES units(unit_id) ON DELETE RESTRICT
 );
 
+-- [FIX C] Trigger to prevent double-leasing race conditions at the DB level
+-- MySQL doesn't support partial unique indexes natively
+DELIMITER //
+CREATE TRIGGER prevent_duplicate_active_lease
+BEFORE INSERT ON leases
+FOR EACH ROW
+BEGIN
+  DECLARE overlap_count INT;
+  SELECT COUNT(*) INTO overlap_count
+  FROM leases
+  WHERE unit_id = NEW.unit_id
+    AND status IN ('active', 'draft', 'pending')
+    AND start_date <= IFNULL(NEW.end_date, '2099-12-31')
+    AND (end_date IS NULL OR end_date >= NEW.start_date);
+  
+  IF overlap_count > 0 THEN
+    SIGNAL SQLSTATE '45000'
+    SET MESSAGE_TEXT = 'DB_CONSTRAINT: Active or draft lease already exists for this unit and date range.';
+  END IF;
+END;
+//
+DELIMITER ;
+
 -- =========================
 -- LEASE TERMS (Templates)
 -- =========================
