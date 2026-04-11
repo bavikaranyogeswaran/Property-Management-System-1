@@ -37,6 +37,17 @@ class LeaseTerminationService {
       throw new Error('Only active leases can be terminated');
     }
 
+    if (!terminationDate) {
+      throw new Error('Termination date is required.');
+    }
+    const termDate = parseLocalDate(terminationDate);
+    const leaseEnd = parseLocalDate(lease.endDate);
+    if (termDate > leaseEnd) {
+      throw new Error(
+        `Termination date (${terminationDate}) cannot be after the lease's original end date (${lease.endDate}).`
+      );
+    }
+
     const connection = await pool.getConnection();
 
     try {

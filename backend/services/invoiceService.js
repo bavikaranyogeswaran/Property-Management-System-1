@@ -237,6 +237,65 @@ class InvoiceService {
     }
   }
 
+  async correctInvoice(invoiceId, newAmount, reason, user) {
+    if (user.role !== 'treasurer')
+      throw new Error('Only treasurers can correct invoices.');
+
+    const invoice = await invoiceModel.findById(invoiceId);
+    if (!invoice) throw new Error('Invoice not found');
+    if (invoice.status === 'paid')
+      throw new Error('Cannot correct a paid invoice.');
+
+    const connection = await db.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      // 1. Void the original
+      await invoiceModel.updateStatus(invoiceId, 'void', connection);
+
+      const { toCentsFromMajor } = await import('../utils/moneyUtils.js');
+
+      // 2. Create replacement
+      const newInvoiceId = await invoiceModel.create(
+        {
+          leaseId: invoice.leaseId || invoice.lease_id,
+          amount: toCentsFromMajor(newAmount),
+          dueDate: invoice.dueDate || invoice.due_date,
+          description: `[CORRECTED] ${invoice.description}`,
+          type: invoice.invoiceType || invoice.invoice_type,
+        },
+        connection
+      );
+
+      // 3. Audit log
+      const auditLogger = (await import('../utils/auditLogger.js')).default;
+      await auditLogger.log(
+        {
+          userId: user.id || user.user_id,
+          actionType: 'INVOICE_CORRECTED',
+          entityId: invoiceId,
+          entityType: 'invoice',
+          details: {
+            originalAmount: invoice.amount,
+            newAmount: toCentsFromMajor(newAmount),
+            newInvoiceId,
+            reason,
+          },
+        },
+        null,
+        connection
+      );
+
+      await connection.commit();
+      return { voidedInvoiceId: invoiceId, newInvoiceId };
+    } catch (err) {
+      await connection.rollback();
+      throw err;
+    } finally {
+      connection.release();
+    }
+  }
+
   async updateStatus(id, status, user) {
     if (user.role !== 'treasurer') {
       throw new Error(

@@ -213,12 +213,14 @@ class ReportService {
     let totalUnits = 0;
     let totalOccupied = 0;
     let totalVacant = 0;
+    let totalReserved = 0;
 
     const propertyMetrics = entries.map(([name, stats]) => {
       const rate =
         stats.total > 0 ? Math.round((stats.occupied / stats.total) * 100) : 0;
       totalUnits += stats.total;
       totalOccupied += stats.occupied;
+      totalReserved += stats.reserved || 0;
       totalVacant += stats.vacancies.length;
 
       const rateColor =
@@ -230,6 +232,7 @@ class ReportService {
         name,
         total: stats.total,
         occupied: stats.occupied,
+        reserved: stats.reserved || 0,
         vacancies: stats.vacancies,
         rate,
         rateColor,
@@ -274,6 +277,7 @@ class ReportService {
       totalUnits,
       totalOccupied,
       totalVacant,
+      totalReserved,
       portfolioRate,
       propertyMetrics,
       insights,
@@ -285,6 +289,7 @@ class ReportService {
     if (propertyIds.length === 0) return [];
 
     // Fetch tenant risk profiles scoped to the user's properties
+    const placeholders = propertyIds.map(() => '?').join(',');
     const [tenants] = await pool.query(
       `SELECT u.name, t.behavior_score,
                     (SELECT COUNT(*) FROM rent_invoices ri 
@@ -297,10 +302,10 @@ class ReportService {
              JOIN users u ON t.user_id = u.user_id
              JOIN leases l ON t.user_id = l.tenant_id
              JOIN units un ON l.unit_id = un.unit_id
-             WHERE un.property_id IN (?)
+             WHERE un.property_id IN (${placeholders})
              AND l.status = 'active'
              GROUP BY t.user_id, u.name, t.behavior_score`,
-      [propertyIds]
+      propertyIds
     );
 
     const data = tenants.map((tenant) => {
@@ -354,9 +359,12 @@ class ReportService {
     return { tenants: data, highRisk, medRisk, avgScore, insights };
   }
 
-  async getMaintenanceCategoryStats(user) {
+  async getMaintenanceCategoryStats(user, year = null) {
     const propertyIds = await this._getAccessiblePropertyIds(user);
     if (propertyIds.length === 0) return { categories: {}, totalCost: 0 };
+
+    const targetYear = year || new Date().getFullYear();
+    const placeholders = propertyIds.map(() => '?').join(',');
 
     const [costs] = await pool.query(
       `SELECT mc.*, mr.title, p.name as property_name
@@ -364,9 +372,10 @@ class ReportService {
              JOIN maintenance_requests mr ON mc.request_id = mr.request_id
              JOIN units u ON mr.unit_id = u.unit_id
              JOIN properties p ON u.property_id = p.property_id
-             WHERE p.property_id IN (?)
+             WHERE p.property_id IN (${placeholders})
+             AND YEAR(mc.recorded_date) = ?
              ORDER BY mc.recorded_date DESC`,
-      [propertyIds]
+      [...propertyIds, targetYear]
     );
 
     const categories = {};
@@ -422,9 +431,11 @@ class ReportService {
   /**
    * Analytics: Maintenance Review
    */
-  async getMaintenanceReportData(user) {
-    const { categories, totalCost } =
-      await this.getMaintenanceCategoryStats(user);
+  async getMaintenanceReportData(user, year = null) {
+    const { categories, totalCost } = await this.getMaintenanceCategoryStats(
+      user,
+      year
+    );
     const sorted = Object.entries(categories).sort((a, b) => b[1] - a[1]);
     const topCategory = sorted.length > 0 ? sorted[0] : null;
     const topPct =

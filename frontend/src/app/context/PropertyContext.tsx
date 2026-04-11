@@ -28,6 +28,7 @@ export interface Property {
   lateFeeAmount: number;
   lateFeeGracePeriod: number;
   tenantDeactivationDays: number;
+  managementFeePercentage?: number;
 }
 
 export interface PropertyType {

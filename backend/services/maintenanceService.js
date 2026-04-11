@@ -413,6 +413,38 @@ class MaintenanceService {
       const targetLease = await this._getLeaseForRequest(requestId, connection);
 
       if (targetLease) {
+        // [F2.6] Route cost based on billTo field
+        if (billTo === 'tenant') {
+          const { addDays, formatToLocalDate } =
+            await import('../utils/dateUtils.js');
+          const invoiceId = await invoiceModel.create(
+            {
+              leaseId: targetLease.id,
+              amount: toCentsFromMajor(amount),
+              dueDate: formatToLocalDate(addDays(now(), 7)),
+              description: `Maintenance charge: ${request.title}`,
+              type: 'maintenance',
+            },
+            connection
+          );
+
+          await connection.query(
+            'UPDATE maintenance_costs SET invoice_id = ?, is_reimbursable = TRUE WHERE cost_id = ?',
+            [invoiceId, costId]
+          );
+
+          await notificationModel.create(
+            {
+              userId: targetLease.tenantId,
+              message: `A maintenance charge of LKR ${Number(amount).toFixed(2)} has been billed to your account.`,
+              type: 'invoice',
+              entityType: 'invoice',
+              entityId: invoiceId,
+            },
+            connection
+          );
+        }
+
         // 3. Post to Ledger as an Expense
         await ledgerModel.create(
           {

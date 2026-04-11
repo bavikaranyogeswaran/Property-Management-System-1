@@ -24,6 +24,11 @@ export const propertySchema = z.object({
     .number()
     .int()
     .min(0, 'Deactivation days cannot be negative'),
+  managementFeePercentage: z
+    .number()
+    .min(0, 'Management fee cannot be negative')
+    .max(100, 'Management fee cannot exceed 100%')
+    .optional(),
 });
 
 export const unitSchema = z.object({

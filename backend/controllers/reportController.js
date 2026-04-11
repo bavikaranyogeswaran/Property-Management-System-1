@@ -326,7 +326,8 @@ class ReportController {
   //  4. MAINTENANCE COST ANALYSIS REPORT
   // =========================================================================
   generateMaintenanceCategoryReport = catchAsync(async (req, res, next) => {
-    const data = await reportService.getMaintenanceReportData(req.user);
+    const year = req.query.year || new Date().getFullYear();
+    const data = await reportService.getMaintenanceReportData(req.user, year);
 
     const gen = new ReportGenerator(
       res,

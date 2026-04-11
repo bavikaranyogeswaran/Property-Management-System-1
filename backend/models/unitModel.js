@@ -343,11 +343,14 @@ class UnitModel {
         COALESCE(p.name, CONCAT('Property ', u.property_id)) AS propertyName,
         COUNT(DISTINCT u.unit_id) AS total,
         COUNT(DISTINCT CASE 
-          WHEN u.status IN ('maintenance', 'reserved') THEN u.unit_id
           WHEN (l.status = 'active' AND l.start_date <= CURRENT_DATE() AND (l.end_date IS NULL OR l.end_date >= CURRENT_DATE())) THEN u.unit_id
-          WHEN (l.status IN ('active', 'pending', 'draft') AND (l.start_date > CURRENT_DATE() OR (l.status = 'draft' AND (l.reservation_expires_at IS NULL OR l.reservation_expires_at >= CURRENT_DATE())))) THEN u.unit_id
           ELSE NULL 
         END) AS occupied,
+        COUNT(DISTINCT CASE 
+          WHEN u.status IN ('reserved', 'maintenance') THEN u.unit_id
+          WHEN (l.status IN ('active', 'pending', 'draft') AND (l.start_date > CURRENT_DATE() OR (l.status = 'draft' AND (l.reservation_expires_at IS NULL OR l.reservation_expires_at >= CURRENT_DATE())))) THEN u.unit_id
+          ELSE NULL 
+        END) AS reserved,
         GROUP_CONCAT(DISTINCT CASE 
           WHEN u.status IN ('maintenance', 'reserved') THEN NULL
           WHEN (l.status = 'active' AND l.start_date <= CURRENT_DATE() AND (l.end_date IS NULL OR l.end_date >= CURRENT_DATE())) THEN NULL
@@ -369,6 +372,7 @@ class UnitModel {
       propertyStats[row.propertyName] = {
         total: row.total,
         occupied: row.occupied,
+        reserved: row.reserved,
         vacancies: row.vacancies ? row.vacancies.split(',') : [],
       };
     });

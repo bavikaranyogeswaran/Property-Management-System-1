@@ -62,6 +62,22 @@ class RenewalService {
     const request = await renewalRequestModel.findById(requestId);
     if (!request) throw new Error('Renewal request not found');
 
+    // [F2.5] Validate proposed end date is after current lease end date
+    if (!data.proposedEndDate) {
+      throw new Error('Proposed end date is required.');
+    }
+    const leaseForTerm = await leaseModel.findById(
+      request.leaseId || request.lease_id
+    );
+    if (
+      parseLocalDate(data.proposedEndDate) <=
+      parseLocalDate(leaseForTerm.endDate)
+    ) {
+      throw new Error(
+        `Proposed end date (${data.proposedEndDate}) must be after the current lease end date (${leaseForTerm.endDate}).`
+      );
+    }
+
     // RBAC: Treasurer assignment check
     if (user.role === 'treasurer') {
       const staffModel = (await import('../models/staffModel.js')).default;
@@ -138,6 +154,32 @@ class RenewalService {
         );
       }
 
+      // [F2.4] Overlap check before creating renewal lease
+      const proposedEndDate =
+        request.proposedEndDate || request.proposed_end_date;
+      const [overlapping] = await connection.query(
+        `SELECT lease_id FROM leases 
+         WHERE unit_id = ? 
+         AND status IN ('active', 'draft', 'pending')
+         AND start_date <= ?
+         AND end_date >= ?`,
+        [lease.unitId, proposedEndDate, nextStartDateStr]
+      );
+      if (overlapping.length > 0) {
+        throw new Error(
+          `Unit ${lease.unitId} already has an overlapping lease for this period. Renewal cannot proceed.`
+        );
+      }
+
+      // [F2.4] Carry forward deposit status — no new deposit for renewals
+      const carriedDepositStatus = [
+        'paid',
+        'partially_refunded',
+        'refunded',
+      ].includes(lease.depositStatus)
+        ? 'paid'
+        : lease.depositStatus || 'not_applicable';
+
       // [C2 FIX - Problem 1] Auto-activate renewal lease.
       // Renewal tenants are already verified — no deposit or document re-check needed.
       const newLeaseId = await leaseModel.create(
@@ -145,9 +187,11 @@ class RenewalService {
           tenantId: lease.tenantId,
           unitId: lease.unitId,
           startDate: nextStartDateStr,
-          endDate: request.proposed_end_date,
-          monthlyRent: request.proposed_monthly_rent,
+          endDate: request.proposedEndDate || request.proposed_end_date,
+          monthlyRent:
+            request.proposedMonthlyRent || request.proposed_monthly_rent,
           status: 'active',
+          depositStatus: carriedDepositStatus,
           documentUrl: lease.documentUrl, // Carry forward from previous lease
           isDocumentsVerified: true,
           signedAt: getLocalTime(),

@@ -99,6 +99,7 @@ export function PropertiesPage() {
       lateFeeAmount: 0,
       lateFeeGracePeriod: 5,
       tenantDeactivationDays: 30,
+      managementFeePercentage: 0,
     },
   });
 
@@ -344,6 +345,7 @@ export function PropertiesPage() {
       lateFeeAmount: property.lateFeeAmount ?? 0,
       lateFeeGracePeriod: property.lateFeeGracePeriod ?? 5,
       tenantDeactivationDays: property.tenantDeactivationDays ?? 30,
+      managementFeePercentage: property.managementFeePercentage ?? 0,
     });
 
     // Initial state with just the primary image (better than nothing while loading)
@@ -407,6 +409,7 @@ export function PropertiesPage() {
       lateFeeAmount: 0,
       lateFeeGracePeriod: 5,
       tenantDeactivationDays: 30,
+      managementFeePercentage: 0,
     });
     setExistingImages([]);
     setUploadFiles([]);
@@ -746,6 +749,35 @@ export function PropertiesPage() {
                     <div className="border-t pt-6 space-y-4">
                       <h3 className="text-lg font-medium">Business Rules</h3>
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <FormField
+                          control={propertyForm.control}
+                          name="managementFeePercentage"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Management Fee (%)</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  max="100"
+                                  {...field}
+                                  onChange={(e) => {
+                                    const val =
+                                      e.target.value === ''
+                                        ? undefined
+                                        : parseFloat(e.target.value);
+                                    field.onChange(val);
+                                  }}
+                                />
+                              </FormControl>
+                              <p className="text-[0.8rem] text-muted-foreground">
+                                Deducted from owner payouts
+                              </p>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
                         <FormField
                           control={propertyForm.control}
                           name="lateFeeType"

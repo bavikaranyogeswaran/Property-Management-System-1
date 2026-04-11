@@ -448,18 +448,18 @@ class LeaseRefundService {
       );
     }
 
-    // [B1 FIX] Moved connection declaration BEFORE its first use
     const connection = await pool.getConnection();
-    const currentBalance = await leaseModel.getDepositBalance(
-      leaseId,
-      connection
-    );
-    const finalStatus =
-      lease.proposedRefundAmount >= currentBalance
-        ? 'refunded'
-        : 'partially_refunded';
     try {
       await connection.beginTransaction();
+
+      const currentBalance = await leaseModel.getDepositBalance(
+        leaseId,
+        connection
+      );
+      const finalStatus =
+        lease.proposedRefundAmount >= currentBalance
+          ? 'refunded'
+          : 'partially_refunded';
 
       await leaseModel.update(
         leaseId,

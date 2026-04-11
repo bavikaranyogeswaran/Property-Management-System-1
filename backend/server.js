@@ -236,13 +236,26 @@ app.use(globalErrorHandler);
 //  and then open the doors to listen for requests on the specified Port.
 // ============================================================================
 
+import { registerRepeatableJobs } from './utils/cronJobs.js';
+
 // Only start the server if not running in a test environment
 if (config.env !== 'test') {
-  const server = app.listen(PORT, () => {
+  const server = app.listen(PORT, async () => {
     logger.info(`Server is running on port ${PORT}`, {
       port: PORT,
       env: config.env,
     });
+
+    // F2.1: Register BullMQ Repeatable Jobs at Startup
+    try {
+      await registerRepeatableJobs();
+      logger.info('[Startup] BullMQ repeatable jobs registered.');
+    } catch (err) {
+      logger.error(
+        '[Startup] CRITICAL: Failed to register BullMQ jobs:',
+        err.message
+      );
+    }
   });
 
   // 2. Monitor for Unhandled Rejections (e.g., Database connection failures)

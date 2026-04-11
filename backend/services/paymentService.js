@@ -723,6 +723,50 @@ class PaymentService {
     if (totalVerified >= invoice.amount) {
       await invoiceModel.updateStatus(payment.invoiceId, 'paid', connection);
 
+      // [F2.12] Positive behavior scoring for on-time payment
+      try {
+        const invType =
+          invoice.type || invoice.invoiceType || invoice.invoice_type;
+        if (invType === 'rent') {
+          const { parseLocalDate } = await import('../utils/dateUtils.js');
+          const behaviorLogModel = (
+            await import('../models/behaviorLogModel.js')
+          ).default;
+
+          const dueDate = parseLocalDate(invoice.dueDate || invoice.due_date);
+          const paymentDate = parseLocalDate(
+            payment.paymentDate || payment.payment_date
+          );
+          const daysEarly = Math.floor(
+            (dueDate - paymentDate) / (1000 * 60 * 60 * 24)
+          );
+          const scoreChange = daysEarly >= 5 ? 10 : 5;
+
+          await behaviorLogModel.create(
+            {
+              tenantId: invoice.tenantId || invoice.tenant_id,
+              type: 'positive',
+              category: 'Payment',
+              scoreChange,
+              description: `On-time rent payment for invoice #${payment.invoiceId}`,
+              recordedBy: null,
+            },
+            connection
+          );
+
+          await tenantModel.incrementBehaviorScore(
+            invoice.tenantId || invoice.tenant_id,
+            scoreChange,
+            connection
+          );
+        }
+      } catch (scoreErr) {
+        console.warn(
+          'Failed to apply positive behavior score:',
+          scoreErr.message
+        );
+      }
+
       // Overpayment Logic (Bug B5 Fix)
       if (incrementalOverpayment > 0) {
         await tenantModel.addCredit(

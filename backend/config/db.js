@@ -23,4 +23,10 @@ logger.info('[DB] Connecting to database', {
 
 const pool = createPool(dbConfig);
 
+// [F2.16] Force MySQL session timezone to Sri Lanka Standard Time (+05:30)
+// This ensures that CURRENT_DATE() and NOW() in SQL queries match the app server.
+pool.on('connection', (connection) => {
+  connection.query("SET time_zone = '+05:30'");
+});
+
 export default pool.promise();

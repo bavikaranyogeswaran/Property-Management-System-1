@@ -20,6 +20,7 @@ export interface Property {
   typeName?: string;
   totalUnits: number;
   imageUrl?: string;
+  managementFeePercentage?: number;
   createdAt?: string;
 }
 

@@ -105,6 +105,45 @@ class InvoiceController {
       res.status(500).json({ error: 'Failed to update invoice status' });
     }
   }
+  async correctInvoice(req, res) {
+    try {
+      const { id } = req.params;
+      const { newAmount, reason } = req.body;
+
+      if (!newAmount || !reason) {
+        return res
+          .status(400)
+          .json({ error: 'newAmount and reason are required' });
+      }
+
+      const result = await invoiceService.correctInvoice(
+        id,
+        newAmount,
+        reason,
+        req.user
+      );
+
+      res.status(200).json({
+        message: 'Invoice corrected successfully',
+        ...result,
+      });
+    } catch (error) {
+      console.error('Error correcting invoice:', error);
+      if (
+        error.message.includes('Access denied') ||
+        error.message.includes('Only treasurers')
+      ) {
+        return res.status(403).json({ error: error.message });
+      }
+      if (error.message.includes('not found')) {
+        return res.status(404).json({ error: error.message });
+      }
+      if (error.message.includes('Cannot correct')) {
+        return res.status(400).json({ error: error.message });
+      }
+      res.status(500).json({ error: 'Failed to correct invoice' });
+    }
+  }
 }
 
 export default new InvoiceController();

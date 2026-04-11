@@ -20,5 +20,11 @@ router.patch(
   authorizeResource('invoice', 'id', 'params'),
   invoiceController.updateStatus
 );
+router.post(
+  '/:id/correct',
+  authenticateToken,
+  authorizeResource('invoice', 'id', 'params'),
+  invoiceController.correctInvoice
+);
 
 export default router;

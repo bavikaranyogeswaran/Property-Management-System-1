@@ -129,6 +129,20 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <AppLayout>{children}</AppLayout>;
 }
 
+function RoleRoute({
+  children,
+  allowedRoles,
+}: {
+  children: React.ReactNode;
+  allowedRoles: string[];
+}) {
+  const { user } = useAuth();
+  if (!user || !allowedRoles.includes(user.role)) {
+    return <Navigate to="/dashboard" replace />;
+  }
+  return <>{children}</>;
+}
+
 function DashboardRoute() {
   const { user } = useAuth();
   if (user?.role === 'owner') return <OwnerDashboard />;
@@ -261,265 +275,311 @@ function AppContent() {
       {/*  Only users with 'owner' role can see these pages. */}
       {/* ======================================================================= */}
       {/* Owner Routes */}
-      {user?.role === 'owner' && (
-        <>
-          {/* Properties already handled above, but maybe mapped as sub-route? No, it's fine. */}
-          {/* Note: If user is owner, they hit the conditional above. */}
-
-          <Route
-            path="/units"
-            element={
-              <ProtectedRoute>
-                <UnitsPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/visits"
-            element={
-              <ProtectedRoute>
-                <VisitsPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/leads"
-            element={
-              <ProtectedRoute>
-                <LeadsPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/tenants"
-            element={
-              <ProtectedRoute>
-                <TenantsPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/treasurers"
-            element={
-              <ProtectedRoute>
-                <TreasurersPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/leases"
-            element={
-              <ProtectedRoute>
-                <LeasesPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/refund-requests"
-            element={
-              <ProtectedRoute>
-                <RefundRequestsPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/invoices"
-            element={
-              <ProtectedRoute>
-                <OwnerInvoicesPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/maintenance"
-            element={
-              <ProtectedRoute>
-                <OwnerMaintenancePage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/reports"
-            element={
-              <ProtectedRoute>
-                <OwnerReportsPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/analytics"
-            element={
-              <ProtectedRoute>
-                <AnalyticsPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/payouts"
-            element={
-              <ProtectedRoute>
-                <OwnerPayoutsPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/payments"
-            element={
-              <ProtectedRoute>
-                <OwnerPaymentsPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/audit-logs"
-            element={
-              <ProtectedRoute>
-                <AuditLogsPage />
-              </ProtectedRoute>
-            }
-          />
-        </>
-      )}
+      {/* Owner Routes */}
+      <Route
+        path="/units"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allowedRoles={['owner']}>
+              <UnitsPage />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/visits"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allowedRoles={['owner']}>
+              <VisitsPage />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/leads"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allowedRoles={['owner']}>
+              <LeadsPage />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/tenants"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allowedRoles={['owner']}>
+              <TenantsPage />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/treasurers"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allowedRoles={['owner']}>
+              <TreasurersPage />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/leases"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allowedRoles={['owner']}>
+              <LeasesPage />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/refund-requests"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allowedRoles={['owner']}>
+              <RefundRequestsPage />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/invoices"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allowedRoles={['owner', 'tenant', 'treasurer']}>
+              <OwnerInvoicesPage />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/maintenance"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allowedRoles={['owner', 'tenant', 'treasurer']}>
+              <OwnerMaintenancePage />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/reports"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allowedRoles={['owner']}>
+              <OwnerReportsPage />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/analytics"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allowedRoles={['owner', 'treasurer']}>
+              <AnalyticsPage />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/payouts"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allowedRoles={['owner', 'treasurer']}>
+              <OwnerPayoutsPage />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/payments"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allowedRoles={['owner', 'tenant', 'treasurer']}>
+              <OwnerPaymentsPage />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/audit-logs"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allowedRoles={['owner']}>
+              <AuditLogsPage />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
 
       {/* ======================================================================= */}
       {/*  TENANT ROUTES (Renter Area) */}
       {/*  Only users with 'tenant' role can see these pages. */}
       {/* ======================================================================= */}
       {/* Tenant Routes */}
-      {user?.role === 'tenant' && (
-        <>
-          <Route
-            path="/invoices"
-            element={
-              <ProtectedRoute>
-                <TenantInvoicesPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/maintenance"
-            element={
-              <ProtectedRoute>
-                <TenantMaintenancePage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/payments"
-            element={
-              <ProtectedRoute>
-                <TenantPaymentsPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/receipts"
-            element={
-              <ProtectedRoute>
-                <ReceiptsPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/my-lease"
-            element={
-              <ProtectedRoute>
-                <TenantLeasePage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/payment-summary"
-            element={
-              <ProtectedRoute>
-                <TenantPaymentSummaryPage />
-              </ProtectedRoute>
-            }
-          />
-        </>
-      )}
+      {/* Tenant Routes */}
+      <Route
+        path="/invoices"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allowedRoles={['tenant']}>
+              <TenantInvoicesPage />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/maintenance"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allowedRoles={['tenant']}>
+              <TenantMaintenancePage />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/payments"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allowedRoles={['tenant']}>
+              <TenantPaymentsPage />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/receipts"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allowedRoles={['tenant']}>
+              <ReceiptsPage />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/my-lease"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allowedRoles={['tenant']}>
+              <TenantLeasePage />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/payment-summary"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allowedRoles={['tenant']}>
+              <TenantPaymentSummaryPage />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
 
       {/* ======================================================================= */}
       {/*  TREASURER ROUTES (Accountant Area) */}
       {/*  Only users with 'treasurer' role can see these pages. */}
       {/* ======================================================================= */}
       {/* Treasurer Routes */}
-      {user?.role === 'treasurer' && (
-        <>
-          <Route
-            path="/invoices"
-            element={
-              <ProtectedRoute>
-                <OwnerInvoicesPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/payments"
-            element={
-              <ProtectedRoute>
-                <PaymentVerificationPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/leases"
-            element={
-              <ProtectedRoute>
-                <LeasesPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/expenses"
-            element={
-              <ProtectedRoute>
-                <MaintenanceExpensesPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/maintenance"
-            element={
-              <ProtectedRoute>
-                <OwnerMaintenancePage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/analytics"
-            element={
-              <ProtectedRoute>
-                <AnalyticsPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/receipts"
-            element={
-              <ProtectedRoute>
-                <ReceiptsPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/tenants"
-            element={
-              <ProtectedRoute>
-                <TenantsPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/payouts"
-            element={
-              <ProtectedRoute>
-                <TreasurerPayoutsPage />
-              </ProtectedRoute>
-            }
-          />
-        </>
-      )}
+      {/* Treasurer Routes */}
+      <Route
+        path="/invoices"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allowedRoles={['treasurer']}>
+              <OwnerInvoicesPage />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/payments"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allowedRoles={['treasurer']}>
+              <PaymentVerificationPage />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/leases"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allowedRoles={['treasurer']}>
+              <LeasesPage />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/expenses"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allowedRoles={['treasurer']}>
+              <MaintenanceExpensesPage />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/maintenance"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allowedRoles={['treasurer']}>
+              <OwnerMaintenancePage />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/analytics"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allowedRoles={['treasurer']}>
+              <AnalyticsPage />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/receipts"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allowedRoles={['treasurer']}>
+              <ReceiptsPage />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/tenants"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allowedRoles={['treasurer']}>
+              <TenantsPage />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/payouts"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allowedRoles={['treasurer']}>
+              <TreasurerPayoutsPage />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
 
       {/* Catch all */}
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
