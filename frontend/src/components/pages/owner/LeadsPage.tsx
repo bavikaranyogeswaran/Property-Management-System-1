@@ -509,7 +509,25 @@ export function LeadsPage() {
 
             return (
               <TableRow key={lead.id}>
-                <TableCell className="font-medium">{lead.name}</TableCell>
+                <TableCell>
+                  <div className="font-medium text-gray-900">{lead.name}</div>
+                  {(lead.notes || lead.internalNotes) && (
+                    <div className="mt-1 flex flex-col gap-0.5">
+                      {lead.internalNotes && (
+                        <div className="text-[10px] text-blue-600 flex items-center gap-1 bg-blue-50/50 px-1.5 py-0.5 rounded border border-blue-100/50 w-fit max-w-[180px]">
+                          <MessageSquare className="size-2.5 shrink-0" />
+                          <span className="truncate">{lead.internalNotes}</span>
+                        </div>
+                      )}
+                      {lead.notes && (
+                        <div className="text-[10px] text-gray-500 italic flex items-center gap-1 px-1.5 py-0.5 w-fit max-w-[180px]">
+                          <AlertCircle className="size-2.5 shrink-0" />
+                          <span className="truncate">{lead.notes}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </TableCell>
                 <TableCell>
                   <div className="text-sm">
                     <div>{lead.email}</div>
@@ -1121,7 +1139,19 @@ export function LeadsPage() {
               </div>
             </div>
 
-            <div className="space-y-2">
+            {selectedLead?.notes && (
+              <div className="p-4 bg-orange-50/30 rounded-lg border border-orange-100 border-dashed">
+                <Label className="text-[10px] text-orange-600 font-bold uppercase flex items-center gap-1 mb-2">
+                  <MessageSquare className="size-3" />
+                  Initial Inquiry Message
+                </Label>
+                <p className="text-sm text-gray-700 leading-relaxed italic">
+                  "{selectedLead.notes}"
+                </p>
+              </div>
+            )}
+
+            <div className="space-y-4">
               <Label className="text-xs text-gray-500 uppercase">
                 Internal Notes (Staff Only)
               </Label>
