@@ -402,9 +402,18 @@ class LeaseRefundService {
     const lease = await leaseModel.findById(leaseId);
     if (!lease) throw new Error('Lease not found');
 
-    // [B3 FIX] Changed deposit_status → depositStatus (model returns camelCase)
-    if (lease.depositStatus !== 'pending') {
-      throw new Error('Only pending refund requests can be disputed.');
+    // Only the tenant of this specific lease can file a dispute
+    if (user.role !== 'tenant') {
+      throw new Error('Access denied: Only tenants can dispute a refund.');
+    }
+    if (String(lease.tenantId) !== String(user.id)) {
+      throw new Error('Access denied: You are not the tenant of this lease.');
+    }
+    // A dispute is only valid when a settlement is awaiting the tenant's acknowledgment
+    if (lease.depositStatus !== 'awaiting_acknowledgment') {
+      throw new Error(
+        'No refund settlement is currently awaiting your review. A dispute can only be filed after a settlement has been proposed.'
+      );
     }
 
     await leaseModel.update(leaseId, {

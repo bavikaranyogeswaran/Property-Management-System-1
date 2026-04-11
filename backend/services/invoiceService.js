@@ -34,7 +34,7 @@ class InvoiceService {
       throw new Error('Denied. Only Treasurers can create invoices.');
     }
 
-    const connection = await pool.getConnection();
+    const connection = await db.getConnection();
 
     try {
       await connection.beginTransaction();

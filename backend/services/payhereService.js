@@ -53,7 +53,9 @@ class PayHereService {
     );
 
     return {
-      sandbox: true, // Initially using sandbox
+      sandbox:
+        process.env.NODE_ENV !== 'production' ||
+        process.env.PAYHERE_SANDBOX === 'true', // Use environment logic
       merchant_id: MERCHANT_ID,
       return_url: `${RETURN_URL}?token=${magicToken}`,
       cancel_url: CANCEL_URL,

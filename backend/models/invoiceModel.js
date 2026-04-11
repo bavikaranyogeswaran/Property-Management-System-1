@@ -359,8 +359,9 @@ class InvoiceModel {
     );
   }
 
-  async voidFuturePendingByLeaseId(leaseId, date) {
-    await pool.query(
+  async voidFuturePendingByLeaseId(leaseId, date, connection = null) {
+    const db = connection || pool;
+    await db.query(
       "UPDATE rent_invoices SET status='void' WHERE lease_id = ? AND status='pending' AND due_date > ?",
       [leaseId, date]
     );

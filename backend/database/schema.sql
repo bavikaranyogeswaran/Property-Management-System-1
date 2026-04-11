@@ -439,7 +439,7 @@ CREATE TABLE maintenance_requests (
     description TEXT NOT NULL,
     priority ENUM('low','medium','high','urgent') DEFAULT 'medium',
     -- images JSON removed for normalization
-    status ENUM('submitted','in_progress','completed') DEFAULT 'submitted',
+    status ENUM('submitted','in_progress','completed','closed') DEFAULT 'submitted',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (unit_id) REFERENCES units(unit_id) ON DELETE CASCADE,
     FOREIGN KEY (tenant_id) REFERENCES users(user_id) ON DELETE CASCADE

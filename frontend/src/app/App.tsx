@@ -13,7 +13,6 @@ import {
   Route,
   Navigate,
   useNavigate,
-  useLocation,
 } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import { AppProviders } from './providers';
@@ -142,13 +141,6 @@ function DashboardRoute() {
 function AppContent() {
   const { user, isLoading } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
-
-  React.useEffect(() => {
-    // These logs help developers see what's happening in the browser console
-    console.log('DEBUG: Current Path:', location.pathname);
-    console.log('DEBUG: User Auth:', user);
-  }, [location, user]);
 
   const handleNavigate = (page: string) => {
     navigate(page === 'login' ? '/login' : `/${page}`);

@@ -15,6 +15,7 @@ import { today, now, parseLocalDate } from '../utils/dateUtils.js';
 import authorizationService from './authorizationService.js';
 import { ROLES } from '../utils/roleUtils.js';
 import { fromCents, toCentsFromMajor } from '../utils/moneyUtils.js';
+import unitModel from '../models/unitModel.js';
 
 /**
  * Maps an invoice_type to the correct accounting ledger classification.
@@ -147,14 +148,14 @@ class PaymentService {
 
       // 1. Lock Unit first
       const unit = await unitModel.findByIdForUpdate(
-        invoice.unit_id,
+        invoice.unitId,
         connection
       );
       if (!unit) throw new Error('Unit not found.');
 
       // 2. Lock Lease second
       const lease = await leaseModel.findByIdForUpdate(
-        invoice.lease_id,
+        invoice.leaseId,
         connection
       );
       if (!lease) throw new Error('Lease reference not found.');
