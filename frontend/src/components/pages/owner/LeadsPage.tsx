@@ -65,6 +65,12 @@ export function LeadsPage() {
   const [isConvertDialogOpen, setIsConvertDialogOpen] = useState(false);
   const [isNegotiationDialogOpen, setIsNegotiationDialogOpen] = useState(false);
   const [isDropConfirmOpen, setIsDropConfirmOpen] = useState(false);
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [followups, setFollowups] = useState<any[]>([]);
+  const [newFollowupDate, setNewFollowupDate] = useState(
+    new Date().toISOString().split('T')[0]
+  );
+  const [newFollowupNotes, setNewFollowupNotes] = useState('');
 
   const [conversionData, setConversionData] = useState({
     startDate: new Date().toISOString().split('T')[0],
@@ -108,6 +114,39 @@ export function LeadsPage() {
       await updateVisitStatus(visitId, status);
     } catch (e) {
       // Toast handled in context
+    }
+  };
+
+  const handleResendPortal = async (leadId: string) => {
+    try {
+      await apiClient.post(`/leads/${leadId}/resend-portal`);
+      toast.success('Access link resent successfully');
+    } catch (e) {
+      toast.error('Failed to resend access link');
+    }
+  };
+
+  const fetchFollowups = async (leadId: string) => {
+    try {
+      const res = await apiClient.get(`/leads/${leadId}/followups`);
+      setFollowups(res.data);
+    } catch (e) {
+      console.error('Failed to fetch followups');
+    }
+  };
+
+  const handleAddFollowup = async () => {
+    if (!selectedLead) return;
+    try {
+      await apiClient.post(`/leads/${selectedLead.id}/followups`, {
+        followupDate: newFollowupDate,
+        notes: newFollowupNotes,
+      });
+      toast.success('Follow-up scheduled');
+      setNewFollowupNotes('');
+      fetchFollowups(selectedLead.id);
+    } catch (e) {
+      toast.error('Failed to schedule follow-up');
     }
   };
 
@@ -305,6 +344,13 @@ export function LeadsPage() {
     return variants[status];
   };
 
+  const getScoreColor = (score: number) => {
+    if (score >= 80) return 'text-green-600';
+    if (score >= 50) return 'text-blue-600';
+    if (score >= 20) return 'text-amber-600';
+    return 'text-gray-500';
+  };
+
   const stats = [
     {
       label: 'Scheduled Visits',
@@ -450,6 +496,7 @@ export function LeadsPage() {
             <TableHead>Name</TableHead>
             <TableHead>Contact</TableHead>
             <TableHead>Interested Unit</TableHead>
+            <TableHead>Score</TableHead>
             <TableHead>Preferences</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Last Contact</TableHead>
@@ -508,6 +555,13 @@ export function LeadsPage() {
                   })()}
                 </TableCell>
                 <TableCell>
+                  <div
+                    className={`font-bold ${getScoreColor(lead.score || 0)}`}
+                  >
+                    {lead.score || 0}
+                  </div>
+                </TableCell>
+                <TableCell>
                   <div className="text-sm text-gray-600">
                     <div>
                       <span className="font-medium">Move-in:</span>{' '}
@@ -564,6 +618,18 @@ export function LeadsPage() {
                       title="Negotiate / Chat"
                     >
                       <MessageSquare className="size-4 text-blue-600" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        setSelectedLead(lead);
+                        fetchFollowups(lead.id);
+                        setIsDetailsOpen(true);
+                      }}
+                      title="View Details & Notes"
+                    >
+                      <UserPlus className="size-4 text-purple-600" />
                     </Button>
                     {lead.status !== 'converted' &&
                       lead.status !== 'dropped' && (
@@ -1021,6 +1087,157 @@ export function LeadsPage() {
               className="flex-1 min-h-0 border-0 shadow-none"
             />
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Lead Details & Notes Modal */}
+      <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex justify-between items-center pr-6">
+              <span>Lead Details: {selectedLead?.name}</span>
+              <Badge
+                variant="outline"
+                className={
+                  selectedLead ? getScoreColor(selectedLead.score || 0) : ''
+                }
+              >
+                Score: {selectedLead?.score || 0}
+              </Badge>
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-6 pt-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label className="text-xs text-gray-500 uppercase">Email</Label>
+                <p className="text-sm font-medium">{selectedLead?.email}</p>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-gray-500 uppercase">Phone</Label>
+                <p className="text-sm font-medium">
+                  {selectedLead?.phone || 'Not provided'}
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs text-gray-500 uppercase">
+                Internal Notes (Staff Only)
+              </Label>
+              <Textarea
+                placeholder="Add private observations about this lead..."
+                value={selectedLead?.internalNotes || ''}
+                className="min-h-[100px]"
+                onChange={(e) => {
+                  if (selectedLead) {
+                    setSelectedLead({
+                      ...selectedLead,
+                      internalNotes: e.target.value,
+                    });
+                  }
+                }}
+              />
+              <Button
+                size="sm"
+                className="mt-2"
+                onClick={async () => {
+                  if (selectedLead) {
+                    try {
+                      await updateLead(selectedLead.id, {
+                        internalNotes: selectedLead.internalNotes,
+                      });
+                      toast.success('Internal notes updated');
+                    } catch (e) {
+                      toast.error('Failed to update notes');
+                    }
+                  }
+                }}
+              >
+                Save Notes
+              </Button>
+            </div>
+
+            <div className="border-t pt-4">
+              <Label className="text-xs text-gray-500 uppercase mb-4 block">
+                Follow-up Timeline
+              </Label>
+
+              <div className="space-y-4 mb-6 bg-gray-50 p-4 rounded-md border">
+                <p className="text-xs font-semibold">Schedule New Follow-up</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <Input
+                    type="date"
+                    value={newFollowupDate}
+                    onChange={(e) => setNewFollowupDate(e.target.value)}
+                  />
+                  <Input
+                    placeholder="Short reminder note..."
+                    value={newFollowupNotes}
+                    onChange={(e) => setNewFollowupNotes(e.target.value)}
+                  />
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="w-full"
+                  onClick={handleAddFollowup}
+                >
+                  Add Follow-up
+                </Button>
+              </div>
+
+              <div className="space-y-3">
+                {followups.length > 0 ? (
+                  followups.map((f: any) => (
+                    <div
+                      key={f.id}
+                      className="p-3 bg-white border rounded-md flex justify-between items-start"
+                    >
+                      <div>
+                        <div className="text-xs font-bold text-gray-900">
+                          {new Date(f.followupDate).toLocaleDateString()}
+                        </div>
+                        <div className="text-sm text-gray-600 mt-1">
+                          {f.notes}
+                        </div>
+                      </div>
+                      <Badge variant="outline" className="text-[10px]">
+                        {new Date(f.followupDate) < new Date()
+                          ? 'Past'
+                          : 'Upcoming'}
+                      </Badge>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-gray-400 text-center py-4 italic">
+                    No follow-ups recorded.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="border-t pt-4 flex justify-between items-center">
+              <div className="space-y-1">
+                <Label className="text-xs text-gray-500 uppercase">
+                  Portal Access
+                </Label>
+                <p className="text-[10px] text-gray-400">
+                  Manage lead's magic link
+                </p>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-blue-600 border-blue-200 hover:bg-blue-50"
+                onClick={() =>
+                  selectedLead && handleResendPortal(selectedLead.id)
+                }
+              >
+                Resend Portal Link
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

@@ -16,6 +16,7 @@ class LeadModel {
       preferred_term_months,
       lease_term_id,
       status = 'interested',
+      score = 0,
     } = data;
 
     let finalUnitId = unitId || interestedUnit;
@@ -32,8 +33,8 @@ class LeadModel {
     }
 
     const [result] = await db.query(
-      `INSERT INTO leads (property_id, unit_id, name, phone, email, notes, move_in_date, occupants_count, preferred_term_months, lease_term_id, status) 
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO leads (property_id, unit_id, name, phone, email, notes, move_in_date, occupants_count, preferred_term_months, lease_term_id, status, score) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         propertyId,
         finalUnitId,
@@ -46,6 +47,7 @@ class LeadModel {
         preferred_term_months || null,
         lease_term_id || null,
         status,
+        score || 0,
       ]
     );
 
@@ -75,6 +77,7 @@ class LeadModel {
                 preferred_term_months as preferredTermMonths,
                 lease_term_id as leaseTermId,
                 status,
+                score,
                 created_at as createdAt,
                 last_contacted_at as lastContactedAt
             FROM leads WHERE lead_id = ?`,
@@ -145,6 +148,10 @@ class LeadModel {
       fields.push('internal_notes = ?');
       values.push(data.internalNotes);
     }
+    if (data.score !== undefined) {
+      fields.push('score = ?');
+      values.push(data.score);
+    }
     if (data.lastContactedAt !== undefined) {
       fields.push('last_contacted_at = ?');
       values.push(data.lastContactedAt);
@@ -195,6 +202,7 @@ class LeadModel {
                     l.preferred_term_months as preferredTermMonths,
                     l.lease_term_id as leaseTermId,
                     l.status,
+                    l.score,
                     l.created_at as createdAt,
                     l.last_contacted_at as lastContactedAt
                 FROM leads l
@@ -222,6 +230,7 @@ class LeadModel {
                 preferred_term_months as preferredTermMonths,
                 lease_term_id as leaseTermId,
                 status,
+                score,
                 created_at as createdAt,
                 last_contacted_at as lastContactedAt
             FROM leads ORDER BY created_at DESC`);
@@ -280,6 +289,7 @@ class LeadModel {
         preferred_term_months as preferredTermMonths,
         lease_term_id as leaseTermId,
         status,
+        score,
         created_at as createdAt,
         last_contacted_at as lastContactedAt
        FROM leads WHERE email = ? AND status != 'dropped' ORDER BY created_at DESC LIMIT 1`,
@@ -325,7 +335,7 @@ class LeadModel {
              l.name, l.email, l.phone, l.notes, l.internal_notes as internalNotes,
              l.move_in_date as moveInDate, l.occupants_count as occupantsCount,
              l.preferred_term_months as preferredTermMonths, l.lease_term_id as leaseTermId,
-             l.status, l.created_at as createdAt, l.last_contacted_at as lastContactedAt
+             l.status, l.score, l.created_at as createdAt, l.last_contacted_at as lastContactedAt
       FROM leads l
       INNER JOIN properties p ON l.property_id = p.property_id
       INNER JOIN staff_property_assignments spa ON p.property_id = spa.property_id

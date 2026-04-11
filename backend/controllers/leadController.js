@@ -139,6 +139,43 @@ class LeadController {
       res.status(500).json({ error: error.message });
     }
   }
+
+  async resendPortalLink(req, res) {
+    try {
+      const { id } = req.params;
+      const result = await leadService.resendPortalLink(id, req.user);
+      res.json(result);
+    } catch (error) {
+      if (error.message.includes('Access denied')) {
+        return res.status(403).json({ error: error.message });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  }
+
+  async getFollowups(req, res) {
+    try {
+      const { id } = req.params;
+      const followups = await leadService.getFollowups(id, req.user);
+      res.json(followups);
+    } catch (error) {
+      res.status(400).json({ error: error.message });
+    }
+  }
+
+  async createFollowup(req, res) {
+    try {
+      const { id } = req.params;
+      const followupId = await leadService.createFollowup(
+        id,
+        req.body,
+        req.user
+      );
+      res.status(201).json({ id: followupId, message: 'Follow-up created' });
+    } catch (error) {
+      res.status(400).json({ error: error.message });
+    }
+  }
 }
 
 export default new LeadController();

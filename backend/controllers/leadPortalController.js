@@ -122,6 +122,8 @@ class LeadPortalController {
               unitNumber: unit.unitNumber,
               type: unit.type,
               monthlyRent: unit.monthlyRent,
+              status: unit.status,
+              isAvailable: unit.status === 'available',
             }
           : null,
         activeLease,

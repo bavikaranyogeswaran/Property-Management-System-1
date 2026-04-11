@@ -17,6 +17,11 @@ router.get('/stage-history', leadController.getLeadStageHistory);
 router.get('/my-profile', leadController.getMyLead);
 router.put('/:id', leadController.updateLead);
 router.post('/:id/convert', leadController.convertLead);
+router.post('/:id/resend-portal', leadController.resendPortalLink);
+
+// Follow-up Routes
+router.get('/:id/followups', leadController.getFollowups);
+router.post('/:id/followups', leadController.createFollowup);
 
 // Message Routes
 // Note: We use mergeParams implicitly or just passing ID.

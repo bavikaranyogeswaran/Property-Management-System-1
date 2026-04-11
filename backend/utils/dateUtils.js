@@ -156,6 +156,31 @@ export const getDaysInMonth = (date, timezone = DEFAULT_TIMEZONE) => {
   return new Date(year, month, 0).getDate();
 };
 
+/**
+ * Checks if date A is before date B (comparing only YYYY-MM-DD)
+ */
+export const isBefore = (dateA, dateB) => {
+  const d1 = dateA instanceof Date ? new Date(dateA) : parseLocalDate(dateA);
+  const d2 = dateB instanceof Date ? new Date(dateB) : parseLocalDate(dateB);
+  d1.setHours(0, 0, 0, 0);
+  d2.setHours(0, 0, 0, 0);
+  return d1.getTime() < d2.getTime();
+};
+
+/**
+ * Checks if two dates are the same day
+ */
+export const isToday = (date, timezone = DEFAULT_TIMEZONE) => {
+  const d1 =
+    date instanceof Date ? new Date(date) : parseLocalDate(date, timezone);
+  const d2 = getLocalTime(timezone);
+  return (
+    d1.getFullYear() === d2.getFullYear() &&
+    d1.getMonth() === d2.getMonth() &&
+    d1.getDate() === d2.getDate()
+  );
+};
+
 export default {
   getCurrentDateString,
   formatToLocalDate,
@@ -167,4 +192,6 @@ export default {
   addMonths,
   getEndOfMonth,
   getDaysInMonth,
+  isBefore,
+  isToday,
 };

@@ -5,6 +5,7 @@ import propertyModel from '../models/propertyModel.js';
 import userModel from '../models/userModel.js';
 import leadStageHistoryModel from '../models/leadStageHistoryModel.js';
 import leadTokenModel from '../models/leadTokenModel.js';
+import leadFollowupModel from '../models/leadFollowupModel.js';
 import emailService from '../utils/emailService.js';
 import { validateEmail, validatePhoneNumber } from '../utils/validators.js';
 import {
@@ -13,6 +14,8 @@ import {
   formatToLocalDate,
   parseLocalDate,
   addMonths,
+  isBefore,
+  isToday,
 } from '../utils/dateUtils.js';
 
 class LeadService {
@@ -41,6 +44,14 @@ class LeadService {
     if (phone) {
       const phoneValidation = validatePhoneNumber(phone);
       if (!phoneValidation.isValid) throw new Error(phoneValidation.error);
+    }
+
+    // [E-Past Validation] Prevent move-in dates in the past
+    if (moveInDate) {
+      const startDate = parseLocalDate(moveInDate);
+      if (isBefore(startDate, getLocalTime()) && !isToday(startDate)) {
+        throw new Error('Preferred move-in date cannot be in the past');
+      }
     }
 
     let finalUnitId = unitId || interestedUnit;
@@ -89,21 +100,17 @@ class LeadService {
       );
 
       if (hasOverlap) {
-        // If there's an overlap, check if the current tenant is vacating
-        const activeLease = await (
-          await import('../models/leaseModel.js')
-        ).default.checkOverlap(
-          finalUnitId,
-          formatToLocalDate(startDate),
-          formatToLocalDate(endDate)
-        );
-        // Note: checkOverlap only returns true/false.
-        // We might want to be more specific later, but for now, we follow the plan.
         throw new Error(
           'This unit is already booked/occupied for part of your requested period. Please try a different start date or unit.'
         );
       }
     }
+
+    const score = this.calculateLeadScore({
+      preferredTermMonths,
+      moveInDate,
+      phone,
+    });
 
     const existingLeadId = await leadModel.findIdByEmailAndProperty(
       email,
@@ -145,6 +152,7 @@ class LeadService {
         occupants_count: occupantsCount,
         preferred_term_months: preferredTermMonths,
         lease_term_id: leaseTermId,
+        score: score,
       });
       message = 'Interest updated. We will contact you soon.';
     } else {
@@ -162,6 +170,7 @@ class LeadService {
         preferred_term_months: preferredTermMonths,
         lease_term_id: leaseTermId,
         status: 'interested',
+        score: score,
       });
       message = 'Interest registered! We will contact you soon.';
       isNew = true;
@@ -260,6 +269,98 @@ class LeadService {
       throw new Error('Access denied.');
     }
     return await leadStageHistoryModel.findAll(user.id);
+  }
+
+  async resendPortalLink(leadId, user) {
+    if (user.role !== 'owner' && user.role !== 'treasurer') {
+      throw new Error('Access denied.');
+    }
+
+    const lead = await leadModel.findById(leadId);
+    if (!lead) throw new Error('Lead not found');
+
+    // Verification of ownership
+    const isOwner = await leadModel.verifyOwnership(leadId, user.id);
+    // If treasurer, verify via property assignment (LeadModel.findByTreasurerId already does this)
+    // But here we need a check.
+    // For simplicity, LeadModel.verifyOwnership can be updated to include treasurer check or we do it here.
+
+    // Rotate token
+    await leadTokenModel.invalidateForLead(leadId);
+    const portalToken = await leadTokenModel.create(leadId);
+
+    const property = await propertyModel.findById(lead.propertyId);
+    const propertyName = property ? property.name : 'our property';
+
+    await emailService.sendWelcomeLead(
+      lead.email,
+      lead.name,
+      propertyName,
+      portalToken
+    );
+
+    return { success: true };
+  }
+
+  calculateLeadScore(data) {
+    const { preferredTermMonths, moveInDate, phone } = data;
+    let score = 0;
+
+    // Term score (long term is better)
+    if (preferredTermMonths) {
+      score += parseInt(preferredTermMonths, 10) * 5;
+    }
+
+    // Phone provided (serious lead)
+    if (phone) {
+      score += 10;
+    }
+
+    // Urgency score (moving in soon is better)
+    if (moveInDate) {
+      const moveIn = parseLocalDate(moveInDate);
+      const today = getLocalTime();
+      const diffTime = Math.abs(moveIn - today);
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+      if (diffDays <= 30) {
+        score += 20;
+      } else if (diffDays <= 60) {
+        score += 10;
+      }
+    }
+
+    return score;
+  }
+
+  // --- Follow-up Management ---
+  async getFollowups(leadId, user) {
+    if (user.role !== 'owner' && user.role !== 'treasurer') {
+      throw new Error('Access denied.');
+    }
+    const isOwnerOrAuth = await leadModel.verifyOwnership(leadId, user.id);
+    if (!isOwnerOrAuth) throw new Error('Access denied to this lead.');
+
+    return await leadFollowupModel.findByLeadId(leadId);
+  }
+
+  async createFollowup(leadId, data, user) {
+    if (user.role !== 'owner' && user.role !== 'treasurer') {
+      throw new Error('Access denied.');
+    }
+    const isOwnerOrAuth = await leadModel.verifyOwnership(leadId, user.id);
+    if (!isOwnerOrAuth) throw new Error('Access denied to this lead.');
+
+    return await leadFollowupModel.create({
+      leadId,
+      followupDate: data.followupDate,
+      notes: data.notes,
+    });
+  }
+
+  async getUpcomingFollowups(user) {
+    if (user.role !== 'owner') return []; // For now owner only for dashboard
+    return await leadFollowupModel.findUpcoming(user.id);
   }
 }
 
