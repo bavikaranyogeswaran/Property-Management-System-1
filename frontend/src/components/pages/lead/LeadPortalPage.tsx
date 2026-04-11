@@ -34,7 +34,7 @@ interface LeadData {
   name: string;
   email: string;
   phone: string;
-  status: 'interested' | 'converted' | 'dropped';
+  status: 'interested' | 'viewed' | 'converted' | 'dropped';
   propertyId: string;
   interestedUnit?: string;
   createdAt: string;
@@ -303,6 +303,10 @@ export function LeadPortalPage() {
   const getStatusBadge = (status: string) => {
     const variants: Record<string, { label: string; color: string }> = {
       interested: { label: 'Interested', color: 'bg-blue-100 text-blue-700' },
+      viewed: {
+        label: 'Visit Completed',
+        color: 'bg-purple-100 text-purple-700',
+      },
       converted: {
         label: 'Converted to Tenant',
         color: 'bg-green-100 text-green-700',

@@ -55,50 +55,60 @@ export async function up(knex) {
     )
   `);
 
-  // Drop triggers if they already exist (idempotent re-run safety)
-  await knex.raw('DROP TRIGGER IF EXISTS trg_invoice_amount_paid_insert');
-  await knex.raw('DROP TRIGGER IF EXISTS trg_invoice_amount_paid_update');
+  // Trigger 1 & 2: AFTER INSERT/UPDATE on payments
+  try {
+    // Drop triggers if they already exist (idempotent re-run safety)
+    await knex.raw('DROP TRIGGER IF EXISTS trg_invoice_amount_paid_insert');
+    await knex.raw('DROP TRIGGER IF EXISTS trg_invoice_amount_paid_update');
 
-  // Trigger 1: AFTER INSERT on payments
-  await knex.raw(`
-    CREATE TRIGGER trg_invoice_amount_paid_insert
-    AFTER INSERT ON payments
-    FOR EACH ROW
-    BEGIN
-      IF NEW.status = 'verified' THEN
-        UPDATE rent_invoices
-        SET amount_paid = (
-          SELECT COALESCE(SUM(p2.amount), 0)
-          FROM payments p2
-          WHERE p2.invoice_id = NEW.invoice_id
-            AND p2.status = 'verified'
-        )
-        WHERE invoice_id = NEW.invoice_id;
-      END IF;
-    END
-  `);
+    // Trigger 1: AFTER INSERT on payments
+    await knex.raw(`
+      CREATE TRIGGER trg_invoice_amount_paid_insert
+      AFTER INSERT ON payments
+      FOR EACH ROW
+      BEGIN
+        IF NEW.status = 'verified' THEN
+          UPDATE rent_invoices
+          SET amount_paid = (
+            SELECT COALESCE(SUM(p2.amount), 0)
+            FROM payments p2
+            WHERE p2.invoice_id = NEW.invoice_id
+              AND p2.status = 'verified'
+          )
+          WHERE invoice_id = NEW.invoice_id;
+        END IF;
+      END
+    `);
 
-  // Trigger 2: AFTER UPDATE on payments (handles both gains and losses of 'verified' status)
-  await knex.raw(`
-    CREATE TRIGGER trg_invoice_amount_paid_update
-    AFTER UPDATE ON payments
-    FOR EACH ROW
-    BEGIN
-      IF OLD.status != NEW.status AND
-         (OLD.status = 'verified' OR NEW.status = 'verified') THEN
-        UPDATE rent_invoices
-        SET amount_paid = (
-          SELECT COALESCE(SUM(p2.amount), 0)
-          FROM payments p2
-          WHERE p2.invoice_id = NEW.invoice_id
-            AND p2.status = 'verified'
-        )
-        WHERE invoice_id = NEW.invoice_id;
-      END IF;
-    END
-  `);
-
-  console.log('[H1] amount_paid triggers created and backfill complete.');
+    // Trigger 2: AFTER UPDATE on payments
+    await knex.raw(`
+      CREATE TRIGGER trg_invoice_amount_paid_update
+      AFTER UPDATE ON payments
+      FOR EACH ROW
+      BEGIN
+        IF OLD.status != NEW.status AND
+           (OLD.status = 'verified' OR NEW.status = 'verified') THEN
+          UPDATE rent_invoices
+          SET amount_paid = (
+            SELECT COALESCE(SUM(p2.amount), 0)
+            FROM payments p2
+            WHERE p2.invoice_id = NEW.invoice_id
+              AND p2.status = 'verified'
+          )
+          WHERE invoice_id = NEW.invoice_id;
+        END IF;
+      END
+    `);
+    console.log('[H1] amount_paid triggers created and backfill complete.');
+  } catch (triggerErr) {
+    console.warn(
+      '[H1] Could not create triggers (SUPER privilege required):',
+      triggerErr.message
+    );
+    console.info(
+      '[H1] Backfill was still performed, but future updates must be manual or log_bin_trust_function_creators must be enabled.'
+    );
+  }
 
   // ─── H12: Drop duplicate audit index ────────────────────────────────────
   // Migration 20260408150000 added idx_audit_action (action_type, created_at).

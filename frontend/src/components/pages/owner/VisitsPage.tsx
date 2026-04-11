@@ -15,10 +15,15 @@ import {
   Mail,
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { RescheduleVisitDialog } from './RescheduleVisitDialog';
 
 export function VisitsPage() {
-  const { visits, updateVisitStatus } = useApp();
+  const { visits, updateVisitStatus, fetchVisits } = useApp();
   const [filter, setFilter] = useState<Visit['status'] | 'all'>('all');
+  const [rescheduleData, setRescheduleData] = useState<{
+    open: boolean;
+    visit: Visit | null;
+  }>({ open: false, visit: null });
 
   const filteredVisits = visits
     .filter((v) => (filter === 'all' ? true : v.status === filter))
@@ -42,6 +47,8 @@ export function VisitsPage() {
         return 'bg-green-100 text-green-800';
       case 'cancelled':
         return 'bg-red-100 text-red-800';
+      case 'no-show':
+        return 'bg-orange-100 text-orange-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
@@ -58,7 +65,14 @@ export function VisitsPage() {
         </div>
         <div className="flex gap-2">
           {(
-            ['all', 'pending', 'confirmed', 'completed', 'cancelled'] as const
+            [
+              'all',
+              'pending',
+              'confirmed',
+              'completed',
+              'cancelled',
+              'no-show',
+            ] as const
           ).map((status) => (
             <Button
               key={status}
@@ -181,6 +195,21 @@ export function VisitsPage() {
                       <Button
                         size="sm"
                         variant="ghost"
+                        className="text-orange-600 hover:bg-orange-50 border-orange-100 border"
+                        onClick={() => handleStatusUpdate(visit.id, 'no-show')}
+                      >
+                        No-Show
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setRescheduleData({ open: true, visit })}
+                      >
+                        Reschedule
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
                         className="text-red-600 hover:bg-red-50"
                         onClick={() =>
                           handleStatusUpdate(visit.id, 'cancelled')
@@ -202,6 +231,15 @@ export function VisitsPage() {
           ))
         )}
       </div>
+
+      <RescheduleVisitDialog
+        open={rescheduleData.open}
+        onOpenChange={(open) =>
+          setRescheduleData((prev) => ({ ...prev, open }))
+        }
+        visit={rescheduleData.visit}
+        onSuccess={() => fetchVisits()}
+      />
     </div>
   );
 }

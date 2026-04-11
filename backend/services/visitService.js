@@ -200,7 +200,14 @@ class VisitService {
       );
     }
 
-    if (!['pending', 'confirmed', 'cancelled', 'completed'].includes(status)) {
+    const validStatuses = [
+      'pending',
+      'confirmed',
+      'cancelled',
+      'completed',
+      'no-show',
+    ];
+    if (!validStatuses.includes(status)) {
       throw new Error('Invalid status');
     }
 
@@ -208,24 +215,35 @@ class VisitService {
     if (!success) throw new Error('Visit not found');
 
     // Logic Hook: Update Lead
-    if (status === 'completed' || status === 'confirmed') {
-      const visit = await visitModel.findById(id);
-      if (visit && visit.lead_id) {
-        // Update last contacted timestamp (lead stays 'interested' — no 'visited' ENUM value)
-        await leadModel.update(visit.lead_id, { lastContactedAt: new Date() });
+    const visit = await visitModel.findById(id);
+    if (visit && visit.leadId) {
+      if (status === 'completed') {
+        // [Flow 2] Automatically progress lead to 'viewed'
+        try {
+          const leadService = (await import('./leadService.js')).default;
+          await leadService.updateLead(
+            visit.leadId,
+            { status: 'viewed' },
+            user
+          );
+        } catch (leadErr) {
+          console.warn('Failed to auto-progress lead status:', leadErr.message);
+          // Non-blocking for the visit update
+        }
+      } else if (status === 'confirmed') {
+        await leadModel.update(visit.leadId, { lastContactedAt: new Date() });
       }
     }
 
     // Email Visitor
     try {
-      const visit = await visitModel.findById(id);
-      if (visit && visit.visitor_email) {
+      if (visit && visit.visitorEmail) {
         await emailService.sendVisitStatusUpdate(
-          visit.visitor_email,
+          visit.visitorEmail,
           {
-            propertyName: visit.property_name || 'Property',
-            unitNumber: visit.unit_number,
-            scheduledDate: visit.scheduled_date,
+            propertyName: visit.propertyName || 'Property',
+            unitNumber: visit.unitNumber,
+            scheduledDate: visit.scheduledDate,
           },
           status
         );
@@ -247,6 +265,67 @@ class VisitService {
     );
 
     return true;
+  }
+
+  async rescheduleVisit(id, data, user) {
+    const { date, time, notes } = data;
+    if (!date || !time) throw new Error('New date and time are required');
+
+    const visit = await visitModel.findById(id);
+    if (!visit) throw new Error('Visit not found');
+
+    // Security check: Only owner/staff or the visitor themselves (if we had a token)
+    // For now, owner/staff only as per the controller routes
+    if (!user || (user.role !== 'owner' && user.role !== 'treasurer')) {
+      throw new Error('Access denied.');
+    }
+
+    // 1. Time Slot Rounding
+    let scheduledDate = new Date(`${date}T${time}`);
+    const minutes = scheduledDate.getMinutes();
+    if (minutes < 15) scheduledDate.setMinutes(0, 0, 0);
+    else if (minutes < 45) scheduledDate.setMinutes(30, 0, 0);
+    else {
+      scheduledDate.setHours(scheduledDate.getHours() + 1);
+      scheduledDate.setMinutes(0, 0, 0);
+    }
+
+    // 2. Conflict Detection (Relaxed unique key allows this, but we still check logic)
+    if (visit.unitId) {
+      const hasConflict = await visitModel.existsInSlot(
+        visit.unitId,
+        scheduledDate
+      );
+      if (hasConflict) {
+        throw new Error(
+          'The new time slot is already booked for this unit. Please select another time.'
+        );
+      }
+    }
+
+    // 3. Update
+    await visitModel.update(id, {
+      scheduledDate,
+      notes: notes || visit.notes,
+      status: 'pending', // Reset to pending for re-confirmation
+    });
+
+    // 4. Notify
+    try {
+      if (visit.visitorEmail) {
+        await emailService.sendVisitScheduledToVisitor(visit.visitorEmail, {
+          visitorName: visit.visitorName,
+          propertyName: visit.propertyName || 'Property',
+          unitNumber: visit.unitNumber,
+          scheduledDate,
+          visitId: id,
+        });
+      }
+    } catch (e) {
+      console.error('Reschedule notification failed', e);
+    }
+
+    return { scheduledDate };
   }
 }
 

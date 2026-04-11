@@ -101,6 +101,27 @@ class VisitModel {
     }));
   }
 
+  async update(visitId, data) {
+    const fields = [];
+    const params = [];
+
+    Object.keys(data).forEach((key) => {
+      // Map camelCase to snake_case if necessary, or just use keys directly if they match
+      const snakeKey = key.replace(/[A-Z]/g, (m) => `_${m.toLowerCase()}`);
+      fields.push(`${snakeKey} = ?`);
+      params.push(data[key]);
+    });
+
+    if (fields.length === 0) return false;
+
+    params.push(visitId);
+    const [result] = await db.query(
+      `UPDATE property_visits SET ${fields.join(', ')} WHERE visit_id = ?`,
+      params
+    );
+    return result.affectedRows > 0;
+  }
+
   async updateStatus(visitId, status) {
     const [result] = await db.query(
       `UPDATE property_visits SET status = ? WHERE visit_id = ?`,

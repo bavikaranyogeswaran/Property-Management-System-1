@@ -16,7 +16,7 @@ export interface Lead {
   phone: string;
   interestedUnit: string;
   propertyId: string;
-  status: 'interested' | 'converted' | 'dropped';
+  status: 'interested' | 'viewed' | 'converted' | 'dropped';
   createdAt: string;
   notes: string;
   internalNotes?: string;

@@ -71,6 +71,29 @@ class VisitController {
       res.status(500).json({ error: 'Failed to update status' });
     }
   }
+
+  async rescheduleVisit(req, res) {
+    try {
+      const { id } = req.params;
+      const result = await visitService.rescheduleVisit(id, req.body, req.user);
+      res.json({
+        message: 'Visit rescheduled successfully',
+        scheduledDate: result.scheduledDate,
+      });
+    } catch (error) {
+      console.error('Error rescheduling visit:', error);
+      if (
+        error.message.includes('required') ||
+        error.message.includes('booked')
+      ) {
+        return res.status(400).json({ error: error.message });
+      }
+      if (error.message.includes('not found')) {
+        return res.status(404).json({ error: 'Visit not found' });
+      }
+      res.status(500).json({ error: 'Failed to reschedule visit' });
+    }
+  }
 }
 
 export default new VisitController();

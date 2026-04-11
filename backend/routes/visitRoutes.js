@@ -14,6 +14,13 @@ router.get('/', authenticateToken, visitController.getVisits);
 // Update visit status
 router.patch('/:id/status', authenticateToken, visitController.updateStatus);
 
+// Reschedule visit
+router.patch(
+  '/:id/reschedule',
+  authenticateToken,
+  visitController.rescheduleVisit
+);
+
 // Visitor cancellation (Public)
 router.post('/:id/cancel', visitController.cancelVisit);
 

@@ -83,7 +83,7 @@ export interface Lead {
   phone: string;
   propertyId?: string;
   unitType?: string;
-  status: 'interested' | 'converted' | 'dropped';
+  status: 'interested' | 'viewed' | 'converted' | 'dropped';
   source: string;
   notes?: string;
   createdAt?: string;

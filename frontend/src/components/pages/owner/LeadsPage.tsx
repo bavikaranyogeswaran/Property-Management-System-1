@@ -300,6 +300,7 @@ export function LeadsPage() {
   const getStatusLabel = (status: Lead['status']) => {
     const labels: Record<Lead['status'], string> = {
       interested: 'Interested',
+      viewed: 'Visited',
       converted: 'Converted',
       dropped: 'Dropped',
     };
@@ -312,6 +313,7 @@ export function LeadsPage() {
       confirmed: 'bg-blue-100 text-blue-800',
       cancelled: 'bg-red-100 text-red-800',
       completed: 'bg-green-100 text-green-800',
+      'no-show': 'bg-orange-100 text-orange-800',
     };
     return (
       <Badge variant="outline" className={styles[status]}>
@@ -329,6 +331,11 @@ export function LeadsPage() {
         variant: 'default',
         label: 'Interested',
         color: 'bg-blue-100 text-blue-700',
+      },
+      viewed: {
+        variant: 'default',
+        label: 'Visited',
+        color: 'bg-purple-100 text-purple-700',
       },
       converted: {
         variant: 'default',
@@ -369,8 +376,14 @@ export function LeadsPage() {
     {
       label: 'Interested',
       value: leads.filter((l) => l.status === 'interested').length,
-      icon: TrendingUp,
+      icon: MessageSquare,
       color: 'bg-purple-50 text-purple-700',
+    },
+    {
+      label: 'Visited',
+      value: leads.filter((l) => l.status === 'viewed').length,
+      icon: TrendingUp,
+      color: 'bg-indigo-50 text-indigo-700',
     },
     {
       label: 'Converted',
@@ -389,6 +402,8 @@ export function LeadsPage() {
   const activeLeads = leads.filter(
     (l) => !['converted', 'dropped'].includes(l.status)
   );
+  const interestedLeadsList = leads.filter((l) => l.status === 'interested');
+  const visitedLeadsList = leads.filter((l) => l.status === 'viewed');
   const convertedLeadsList = leads.filter((l) => l.status === 'converted');
   const droppedLeads = leads.filter((l) => l.status === 'dropped');
 
@@ -704,7 +719,7 @@ export function LeadsPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         {stats.map((stat, index) => {
           const Icon = stat.icon;
           return (
@@ -752,7 +767,13 @@ export function LeadsPage() {
                   Scheduled Visits ({visits.length})
                 </TabsTrigger>
                 <TabsTrigger value="active">
-                  Active Leads ({activeLeads.length})
+                  Active ({activeLeads.length})
+                </TabsTrigger>
+                <TabsTrigger value="interested">
+                  Interested ({interestedLeadsList.length})
+                </TabsTrigger>
+                <TabsTrigger value="visited">
+                  Visited ({visitedLeadsList.length})
                 </TabsTrigger>
                 <TabsTrigger value="converted">
                   Converted ({convertedLeadsList.length})
@@ -767,6 +788,12 @@ export function LeadsPage() {
             </TabsContent>
             <TabsContent value="active" className="m-0">
               <LeadTable leads={activeLeads} />
+            </TabsContent>
+            <TabsContent value="interested" className="m-0">
+              <LeadTable leads={interestedLeadsList} />
+            </TabsContent>
+            <TabsContent value="visited" className="m-0">
+              <LeadTable leads={visitedLeadsList} />
             </TabsContent>
             <TabsContent value="converted" className="m-0">
               <LeadTable leads={convertedLeadsList} />

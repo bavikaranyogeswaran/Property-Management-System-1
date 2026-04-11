@@ -246,7 +246,7 @@ class LeadService {
       }
 
       // 3. Validate enum
-      const validStatuses = ['interested', 'converted', 'dropped'];
+      const validStatuses = ['interested', 'viewed', 'converted', 'dropped'];
       if (!validStatuses.includes(data.status)) {
         throw new Error('Invalid status value.');
       }
