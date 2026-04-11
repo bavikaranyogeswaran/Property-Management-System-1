@@ -23,6 +23,16 @@ export async function up(knex) {
   // Replace unreliable application-layer cache maintenance with DB triggers.
   // Two triggers: one for INSERT (new payment added), one for UPDATE (status change).
 
+  // Ensure trigger creation is allowed even if binary logging is enabled
+  try {
+    await knex.raw('SET GLOBAL log_bin_trust_function_creators = 1');
+  } catch (err) {
+    console.warn(
+      '[H1] Could not set log_bin_trust_function_creators:',
+      err.message
+    );
+  }
+
   // Backfill: Recompute all existing amount_paid values from scratch
   // so triggers start from a clean state.
   await knex.raw(`

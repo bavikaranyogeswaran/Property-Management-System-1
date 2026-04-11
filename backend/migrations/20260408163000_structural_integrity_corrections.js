@@ -50,12 +50,21 @@ export async function up(knex) {
       "SHOW INDEX FROM tenant_behavior_logs WHERE Key_name = 'unique_daily_behavior'"
     );
     if (indexes.length > 0) {
+      // Add a temporary index to satisfy the foreign key on tenant_id
+      // before dropping the unique constraint that currently supports it.
+      await knex.schema.alterTable('tenant_behavior_logs', (table) => {
+        table.index(['tenant_id'], 'idx_tenant_behavior_fk_temp');
+      });
+
       await knex.schema.alterTable('tenant_behavior_logs', (table) => {
         table.dropUnique(
           ['tenant_id', 'category', 'created_at'],
           'unique_daily_behavior'
         );
       });
+
+      // We can drop the temporary index now because 'idx_tenant_behavior_search'
+      // (added below) will satisfy the FK since it starts with tenant_id.
     }
 
     // Check if the target index 'idx_tenant_behavior_search' already exists before adding
@@ -70,6 +79,15 @@ export async function up(knex) {
         );
       });
     }
+
+    // Drop the temporary index now that 'idx_tenant_behavior_search' exists to support the FK
+    try {
+      await knex.schema.alterTable('tenant_behavior_logs', (table) => {
+        table.dropIndex(['tenant_id'], 'idx_tenant_behavior_fk_temp');
+      });
+    } catch (err) {
+      // Ignore if already dropped or never created
+    }
   }
 }
 
@@ -80,6 +98,12 @@ export async function down(knex) {
       "SHOW INDEX FROM tenant_behavior_logs WHERE Key_name = 'idx_tenant_behavior_search'"
     );
     if (indexes.length > 0) {
+      // Add a temporary index to satisfy the foreign key on tenant_id
+      // before dropping the search index that currently supports it.
+      await knex.schema.alterTable('tenant_behavior_logs', (table) => {
+        table.index(['tenant_id'], 'idx_tenant_behavior_fk_temp_down');
+      });
+
       await knex.schema.alterTable('tenant_behavior_logs', (table) => {
         table.dropIndex([], 'idx_tenant_behavior_search');
       });
@@ -96,6 +120,18 @@ export async function down(knex) {
         );
       });
     }
+
+    // Drop the temporary index now that 'unique_daily_behavior' is back
+    try {
+      const [tempIndexes] = await knex.raw(
+        "SHOW INDEX FROM tenant_behavior_logs WHERE Key_name = 'idx_tenant_behavior_fk_temp_down'"
+      );
+      if (tempIndexes.length > 0) {
+        await knex.schema.alterTable('tenant_behavior_logs', (table) => {
+          table.dropIndex([], 'idx_tenant_behavior_fk_temp_down');
+        });
+      }
+    } catch (err) {}
   }
 
   // Revert followup changes

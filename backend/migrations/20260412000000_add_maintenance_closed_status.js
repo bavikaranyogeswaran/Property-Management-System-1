@@ -1,5 +1,5 @@
 export const up = async (connection) => {
-  await connection.query(`
+  await connection.raw(`
     ALTER TABLE maintenance_requests
     MODIFY COLUMN status 
     ENUM('submitted','in_progress','completed','closed') 
@@ -9,10 +9,10 @@ export const up = async (connection) => {
 
 export const down = async (connection) => {
   // First convert any 'closed' rows to 'completed' before shrinking ENUM
-  await connection.query(`
+  await connection.raw(`
     UPDATE maintenance_requests SET status = 'completed' WHERE status = 'closed'
   `);
-  await connection.query(`
+  await connection.raw(`
     ALTER TABLE maintenance_requests
     MODIFY COLUMN status 
     ENUM('submitted','in_progress','completed') 
