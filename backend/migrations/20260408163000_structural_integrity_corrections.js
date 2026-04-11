@@ -10,20 +10,8 @@
 
 export async function up(knex) {
   // 1. C18: Lease Rent Adjustments UNIQUE Key
-  // Prevents multiple conflicting adjustments on the same date.
-  const hasInAdjustments = await knex.schema.hasTable('lease_rent_adjustments');
-  if (hasInAdjustments) {
-    try {
-      await knex.schema.alterTable('lease_rent_adjustments', (table) => {
-        table.unique(['lease_id', 'effective_date'], 'unique_lease_adjustment');
-      });
-    } catch (err) {
-      console.warn(
-        'Constraint unique_lease_adjustment already exists or failed:',
-        err.message
-      );
-    }
-  }
+  // This was already added in 20260408150000_p2_performance_integrity.js
+  // Removed redundant definition here to prevent Knex transaction poisoning.
 
   // 2. C15: Lead Access Tokens - Soft Invalidation
   if (await knex.schema.hasTable('lead_access_tokens')) {
@@ -56,44 +44,58 @@ export async function up(knex) {
   }
 
   // 4. C3: Tenant Behavior Logs - Collision Prevention
-  // Removing (tenant_id, category, created_at) which uses fragile DATETIME.
-  // We'll replace it with a more robust index or just rely on the primary key for uniqueness.
   if (await knex.schema.hasTable('tenant_behavior_logs')) {
-    try {
-      // Find the existing constraint name if possible, or try common name
+    // Check if the old unique index 'unique_daily_behavior' exists before dropping
+    const [indexes] = await knex.raw(
+      "SHOW INDEX FROM tenant_behavior_logs WHERE Key_name = 'unique_daily_behavior'"
+    );
+    if (indexes.length > 0) {
       await knex.schema.alterTable('tenant_behavior_logs', (table) => {
-        table.dropIndex(
+        table.dropUnique(
           ['tenant_id', 'category', 'created_at'],
-          'unique_behavior_log'
+          'unique_daily_behavior'
         );
       });
-    } catch (err) {
-      // Index might not exist or have a different name
-      console.warn('Could not drop unique_behavior_log index:', err.message);
     }
 
-    // Add a safer index that includes the log_id (Primary Key) to ensure uniqueness at scale
-    await knex.schema.alterTable('tenant_behavior_logs', (table) => {
-      table.index(
-        ['tenant_id', 'category', 'log_id'],
-        'idx_tenant_behavior_search'
-      );
-    });
+    // Check if the target index 'idx_tenant_behavior_search' already exists before adding
+    const [newIndexes] = await knex.raw(
+      "SHOW INDEX FROM tenant_behavior_logs WHERE Key_name = 'idx_tenant_behavior_search'"
+    );
+    if (newIndexes.length === 0) {
+      await knex.schema.alterTable('tenant_behavior_logs', (table) => {
+        table.index(
+          ['tenant_id', 'category', 'log_id'],
+          'idx_tenant_behavior_search'
+        );
+      });
+    }
   }
 }
 
 export async function down(knex) {
   // Revert collisions prevention
   if (await knex.schema.hasTable('tenant_behavior_logs')) {
-    try {
+    const [indexes] = await knex.raw(
+      "SHOW INDEX FROM tenant_behavior_logs WHERE Key_name = 'idx_tenant_behavior_search'"
+    );
+    if (indexes.length > 0) {
       await knex.schema.alterTable('tenant_behavior_logs', (table) => {
         table.dropIndex([], 'idx_tenant_behavior_search');
+      });
+    }
+
+    const [oldIndexes] = await knex.raw(
+      "SHOW INDEX FROM tenant_behavior_logs WHERE Key_name = 'unique_daily_behavior'"
+    );
+    if (oldIndexes.length === 0) {
+      await knex.schema.alterTable('tenant_behavior_logs', (table) => {
         table.unique(
           ['tenant_id', 'category', 'created_at'],
-          'unique_behavior_log'
+          'unique_daily_behavior'
         );
       });
-    } catch (err) {}
+    }
   }
 
   // Revert followup changes
