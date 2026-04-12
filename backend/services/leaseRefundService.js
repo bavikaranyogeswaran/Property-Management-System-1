@@ -22,6 +22,8 @@ import {
 } from '../utils/dateUtils.js';
 import { toCentsFromMajor, moneyMath, fromCents } from '../utils/moneyUtils.js';
 import renewalService from './renewalService.js';
+import notificationModel from '../models/notificationModel.js';
+import userModel from '../models/userModel.js';
 
 class LeaseRefundService {
   constructor(facade) {
@@ -419,6 +421,39 @@ class LeaseRefundService {
       details: { notes },
     });
 
+    // [FLOW 8 FIX] Notify Owner and Treasurers
+    const property = await pool
+      .query(
+        'SELECT owner_id FROM properties WHERE property_id = (SELECT unit_id FROM leases WHERE lease_id = ?)',
+        [leaseId]
+      )
+      .then(([rows]) => rows[0]);
+
+    if (property?.owner_id) {
+      await notificationModel.create({
+        userId: property.owner_id,
+        message: `Tenant has disputed the refund offer for Lease #${leaseId}. Notes: ${notes}`,
+        type: 'lease',
+        severity: 'warning',
+        entityType: 'lease',
+        entityId: leaseId,
+      });
+    }
+
+    const treasurers = await pool
+      .query("SELECT user_id FROM users WHERE role = 'treasurer'")
+      .then(([rows]) => rows);
+    for (const t of treasurers) {
+      await notificationModel.create({
+        userId: t.user_id,
+        message: `Tenant has disputed the refund offer for Lease #${leaseId}. Review required.`,
+        type: 'lease',
+        severity: 'warning',
+        entityType: 'lease',
+        entityId: leaseId,
+      });
+    }
+
     return { status: 'disputed' };
   }
 
@@ -515,10 +550,61 @@ class LeaseRefundService {
       },
     });
 
+    // [FLOW 8 FIX] Notify Tenant of revised offer
+    await notificationModel.create({
+      userId: lease.tenantId,
+      message: `A revised security deposit refund offer has been made for your lease. New proposed amount: LKR ${adjustedAmount.toLocaleString()}.`,
+      type: 'lease',
+      severity: 'info',
+      entityType: 'lease',
+      entityId: leaseId,
+    });
+
+    const tenant = await userModel.findById(lease.tenantId);
+    if (tenant?.email) {
+      try {
+        const emailService = (await import('../utils/emailService.js')).default;
+        await emailService.sendGenericNotification(tenant.email, {
+          subject: 'Revised Refund Offer',
+          message: `Your landlord has updated the security deposit refund offer for your lease. Please log in to acknowledge the new amount: LKR ${adjustedAmount.toLocaleString()}.`,
+        });
+      } catch (err) {
+        console.error('Failed to send refund resolution email:', err);
+      }
+    }
+
     return {
       status: 'awaiting_acknowledgment',
       proposedRefundAmount: adjustedAmount,
     };
+  }
+
+  async updateDisbursementReference(leaseId, newReference, user) {
+    if (user.role !== 'owner' && user.role !== 'treasurer') {
+      throw new Error('Access denied');
+    }
+
+    const lease = await leaseModel.findById(leaseId);
+    if (!lease) throw new Error('Lease not found');
+
+    if (lease.depositStatus !== 'refunded') {
+      throw new Error(
+        'Disbursement reference can only be updated for finalized (refunded) settlements.'
+      );
+    }
+
+    const oldReference = lease.bankReferenceId;
+    await leaseModel.update(leaseId, { bankReferenceId: newReference });
+
+    await auditLogger.log({
+      userId: user.id || user.user_id,
+      actionType: 'DEPOSIT_DISBURSEMENT_REF_UPDATED',
+      entityId: leaseId,
+      entityType: 'lease',
+      details: { oldReference, newReference },
+    });
+
+    return { success: true, newReference };
   }
 
   async refundDeposit(leaseId, amount, user) {

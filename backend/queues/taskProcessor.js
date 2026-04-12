@@ -11,6 +11,7 @@ const taskMap = {
   rent_reminders_task: jobs.sendRentReminders,
   cleanup_cloudinary_asset_task: jobs.cleanupCloudinaryAsset,
   reconcile_cloudinary_assets_task: jobs.reconcileCloudinaryAssets,
+  auto_acknowledge_refunds_task: jobs.autoAcknowledgeRefunds,
 };
 
 /**

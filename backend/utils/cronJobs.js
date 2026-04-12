@@ -970,7 +970,7 @@ export const autoAcknowledgeRefunds = async () => {
 
     for (const lease of leases) {
       const [approvalLogs] = await db.query(
-        `SELECT created_at FROM audit_logs 
+        `SELECT created_at FROM system_audit_logs 
          WHERE entity_id = ? AND action_type = 'DEPOSIT_REFUND_APPROVED' 
          ORDER BY created_at DESC LIMIT 1`,
         [lease.lease_id]
@@ -988,7 +988,7 @@ export const autoAcknowledgeRefunds = async () => {
       const diffDays =
         (parseLocalDate(today()) - parseLocalDate(approvalDateStr)) /
         (1000 * 60 * 60 * 24);
-      if (diffDays >= 7) {
+      if (diffDays >= 14) {
         console.log(
           `[Auto-Ack] Auto-acknowledging refund for lease ${lease.lease_id} after 7 days.`
         );
@@ -1302,6 +1302,13 @@ export const registerRepeatableJobs = async () => {
     'rent_reminders_task',
     {},
     { repeat: { pattern: '0 8 * * *' }, jobId: 'rent_reminders' }
+  );
+
+  // 5. Automated Refund Acknowledgement (2:00 AM)
+  await mainQueue.add(
+    'auto_acknowledge_refunds_task',
+    {},
+    { repeat: { pattern: '0 2 * * *' }, jobId: 'auto_ack_refunds' }
   );
 
   logger.info('[Queue] All repeatable jobs have been synchronized.');
