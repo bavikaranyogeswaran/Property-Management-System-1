@@ -272,6 +272,51 @@ class EmailService {
     }
   }
 
+  async sendDraftLeaseNotification(email, name, propertyName, unitNumber) {
+    const link = `${config.frontendUrl}/login`;
+
+    if (!this.transporter) {
+      console.log('==================================================');
+      console.log(
+        `[EMAIL MOCK] Draft Lease Notification (Zero-Deposit) to ${email}`
+      );
+      console.log(`Property: ${propertyName}, Unit: ${unitNumber}`);
+      console.log(`Login Link: ${link}`);
+      console.log('==================================================');
+      return true;
+    }
+
+    try {
+      await this.transporter.sendMail({
+        from: `"Property Management System" <${process.env.SMTP_USER}>`,
+        to: email,
+        subject: `Your Draft Lease is Ready: ${propertyName}`,
+        html: this._getTemplate(
+          'Review Your Lease',
+          `
+                    <p>Hi ${name},</p>
+                    <p>Great news! Your application for <strong>${propertyName}</strong> (Unit ${unitNumber}) has been approved.</p>
+                    <p>Since no security deposit is required (or it has been waived), your draft lease is ready for review and signing immediately.</p>
+                    
+                    <div style="text-align: center; margin: 32px 0;">
+                        <a href="${link}" style="background-color: #2563eb; color: white; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px; display: inline-block;">Go to Portal</a>
+                    </div>
+
+                    <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; margin: 24px 0; border: 1px solid #e2e8f0;">
+                         <p style="margin: 0; color: #475569; font-size: 14px;">Please log in to your tenant portal to review, upload necessary documents, and sign your lease agreement electronically.</p>
+                    </div>
+
+                    <p style="color: #94a3b8; font-size: 14px;">If you haven't set up your password yet, you will receive a separate invitation email shortly.</p>
+                `
+        ),
+      });
+      return true;
+    } catch (error) {
+      console.error('Error sending draft lease notification email:', error);
+      return false;
+    }
+  }
+
   async sendVisitNotification(ownerEmail, visitDetails) {
     const {
       visitorName,

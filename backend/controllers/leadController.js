@@ -32,6 +32,24 @@ class LeadController {
         unitId,
       } = req.body;
 
+      // [HARDENING] Verify target unit belongs to the lead's property
+      const targetUnitId = unitId || lead.interestedUnit;
+      if (targetUnitId) {
+        const unitModel = (await import('../models/unitModel.js')).default;
+        const unit = await unitModel.findById(targetUnitId);
+        if (!unit) {
+          return res.status(404).json({ error: 'Target unit not found.' });
+        }
+        if (
+          unit.propertyId !== lead.propertyId &&
+          unit.property_id !== lead.property_id
+        ) {
+          return res.status(400).json({
+            error: "Target unit does not belong to the lead's property.",
+          });
+        }
+      }
+
       const tenantData = {
         nic,
         permanentAddress,

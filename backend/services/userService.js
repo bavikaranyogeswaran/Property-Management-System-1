@@ -266,15 +266,26 @@ class UserService {
 
       // IDEMPOTENCY: If lead already converted, return Success.
       if (lead.status === 'converted') {
-        // Return existing user ID by finding user with lead's email
         const existingUser = await userModel.findByEmail(
           lead.email,
           connection
         );
+        let existingLeaseId = null;
+        if (existingUser) {
+          const [leases] = await connection.query(
+            "SELECT lease_id FROM leases WHERE tenant_id = ? AND unit_id = ? AND status IN ('draft', 'active') ORDER BY created_at DESC LIMIT 1",
+            [existingUser.id, targetUnitIdForLock]
+          );
+          if (leases.length > 0) {
+            existingLeaseId = leases[0].lease_id;
+          }
+        }
         return {
           message: 'Lead already converted',
           tenantId: existingUser ? existingUser.id : null,
+          leaseId: existingLeaseId,
           alreadyConverted: true,
+          magicLinkSent: true,
         };
       }
 
@@ -341,6 +352,7 @@ class UserService {
         leaseId: null,
         propertyName: null,
         unitNumber: null,
+        depositAmount: 0,
       };
 
       // 3. Create Tenant Profile
@@ -417,8 +429,6 @@ class UserService {
       if (targetUnitId) {
         // We rely on LeaseService to handle unit status and lease creation.
         // However, we need to fetch the unit to get the rent first?
-        // LeaseService expects us to pass monthlyRent.
-
         const unit = await unitModel.findById(targetUnitId, connection);
 
         if (unit) {
@@ -466,12 +476,12 @@ class UserService {
               user // Pass the acting user here
             );
 
-          // [NEW] Capture context for Magic Link email
+          // [NEW] Capture context for Notification email
           mailData.leaseId = leaseId;
-          mailData.magicToken = internalMagicToken; // [NEW] Capture raw token from Service
+          mailData.magicToken = internalMagicToken;
           mailData.propertyName = unit.propertyName;
           mailData.unitNumber = unit.unitNumber;
-          mailData.depositAmount = securityDepositLKR; // [FIXED] Use the actual deposit value
+          mailData.depositAmount = securityDepositLKR;
         }
       }
 
@@ -484,32 +494,42 @@ class UserService {
 
       try {
         // [CRITICAL FIX] Send email ONLY after successful transaction commit
-        // [NEW] Use the magicToken returned by LeaseService
-        if (mailData.leaseId && mailData.magicToken) {
-          // Send Deposit Magic Link instead of Account Invitation
-          // (Account Invitation will be sent automatically AFTER deposit is verified)
-          await emailService.sendDepositMagicLink(
-            mailData.email,
-            mailData.name,
-            mailData.propertyName || 'Property',
-            mailData.unitNumber || 'N/A',
-            mailData.depositAmount,
-            mailData.magicToken
-          );
+        if (mailData.leaseId) {
+          if (mailData.magicToken) {
+            // Send Deposit Magic Link
+            await emailService.sendDepositMagicLink(
+              mailData.email,
+              mailData.name,
+              mailData.propertyName || 'Property',
+              mailData.unitNumber || 'N/A',
+              mailData.depositAmount,
+              mailData.magicToken
+            );
+          } else {
+            // Zero deposit path - notify draft is ready
+            await emailService.sendDraftLeaseNotification(
+              mailData.email,
+              mailData.name,
+              mailData.propertyName || 'Property',
+              mailData.unitNumber || 'N/A'
+            );
+            // If new user, ALSO send account setup invitation for credentials
+            if (invitationToken) {
+              await emailService.sendInvitationEmail(
+                mailData.email,
+                'tenant',
+                invitationToken
+              );
+            }
+          }
           return {
-            message: 'Lead converted successfully. Deposit payment link sent.',
+            message: mailData.magicToken
+              ? 'Lead converted successfully. Deposit payment link sent.'
+              : 'Lead converted successfully. Draft lease is ready.',
             tenantId: userId,
+            leaseId: mailData.leaseId,
             magicLinkSent: true,
           };
-        }
-
-        // Fallback: If no deposit magic link, and it's a new user, send account setup invitation
-        if (invitationToken) {
-          await emailService.sendInvitationEmail(
-            mailData.email,
-            'tenant',
-            invitationToken
-          );
         }
       } catch (err) {
         console.error('Failed to send conversion notification email:', err);
@@ -517,12 +537,18 @@ class UserService {
           message:
             'Lead converted successfully, but notification email failed to send. Please resend manually.',
           tenantId: userId,
+          leaseId: mailData.leaseId,
           magicLinkSent: false,
           error: 'Email delivery failed',
         };
       }
 
-      return { message: 'Lead converted successfully', tenantId: userId };
+      return {
+        message: 'Lead converted successfully',
+        tenantId: userId,
+        leaseId: mailData.leaseId,
+        magicLinkSent: false,
+      };
     } catch (error) {
       await connection.rollback();
       throw error;

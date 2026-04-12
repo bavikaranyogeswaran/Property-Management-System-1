@@ -49,7 +49,7 @@ export interface Visit {
   visitorEmail: string;
   visitorPhone: string;
   scheduledDate: string;
-  status: 'pending' | 'confirmed' | 'cancelled' | 'completed';
+  status: 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'no-show';
   notes: string;
   createdAt: string;
   propertyName?: string;
