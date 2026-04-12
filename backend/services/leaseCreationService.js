@@ -410,6 +410,22 @@ class LeaseCreationService {
         conn
       );
 
+      // [D2 FIX] Clear magic tokens for this lease upon activation to kill guest links
+      try {
+        const [invs] = await conn.query(
+          'SELECT invoice_id FROM rent_invoices WHERE lease_id = ? AND magic_token_hash IS NOT NULL',
+          [leaseId]
+        );
+        for (const inv of invs) {
+          await invoiceModel.clearMagicToken(inv.invoice_id, conn);
+        }
+      } catch (tokenErr) {
+        console.warn(
+          `[LeaseService] Failed to clear magic tokens for Lease #${leaseId}:`,
+          tokenErr.message
+        );
+      }
+
       await visitModel.cancelVisitsForUnit(lease.unitId, todayDate, conn);
 
       if (parseLocalDate(lease.startDate) <= getLocalTime()) {

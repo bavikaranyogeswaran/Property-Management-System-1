@@ -247,6 +247,12 @@ class LeaseTerminationService {
 
       await leaseModel.update(leaseId, { status: 'cancelled' }, conn);
 
+      // [D2 FIX] Clear magic tokens for this lease upon cancellation
+      await conn.query(
+        'UPDATE rent_invoices SET magic_token_hash = NULL, magic_token_expires_at = NULL WHERE lease_id = ?',
+        [leaseId]
+      );
+
       // [HARD RESERVATION FIX] Check if unit should go back to available
       // [FIXED] Now uses _syncUnitStatus to account for other future leases correctly
       await this.facade._syncUnitStatus(lease.unitId, conn);
@@ -310,6 +316,12 @@ class LeaseTerminationService {
       }
 
       await leaseModel.update(leaseId, { status: 'cancelled' }, conn);
+
+      // [D2 FIX] Clear magic tokens for this lease upon withdrawal
+      await conn.query(
+        'UPDATE rent_invoices SET magic_token_hash = NULL, magic_token_expires_at = NULL WHERE lease_id = ?',
+        [leaseId]
+      );
 
       // [HARD RESERVATION FIX] Check if unit should go back to available
       // [FIXED] Now uses _syncUnitStatus to account for other future leases correctly
