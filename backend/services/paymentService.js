@@ -461,9 +461,12 @@ class PaymentService {
           });
         }
       } catch (emailErr) {
-        console.error(
-          'Failed to send automated payment confirmation email:',
-          emailErr
+        await this._handleCommunicationFailure(
+          invoiceId,
+          invoice.tenantId || invoice.tenant_id,
+          emailErr,
+          'Payment Confirmation',
+          conn
         );
       }
 
@@ -680,7 +683,13 @@ class PaymentService {
             });
           }
         } catch (emailErr) {
-          console.error('Failed to send payment verification email:', emailErr);
+          await this._handleCommunicationFailure(
+            updatedPayment.invoiceId,
+            invoice.tenantId || invoice.tenant_id,
+            emailErr,
+            'Payment Confirmation',
+            conn
+          );
         }
       } else if (status === 'rejected') {
         const invoice = await invoiceModel.findById(updatedPayment.invoiceId);
@@ -696,7 +705,13 @@ class PaymentService {
             });
           }
         } catch (emailErr) {
-          console.error('Failed to send payment rejection email:', emailErr);
+          await this._handleCommunicationFailure(
+            updatedPayment.invoiceId,
+            invoice.tenantId || invoice.tenant_id,
+            emailErr,
+            'Payment Rejection',
+            conn
+          );
         }
       }
 
@@ -815,7 +830,7 @@ class PaymentService {
           connection
         );
       }
-    } else if (totalVerified > 0) {
+    } else if (totalPaidAfter > 0) {
       await invoiceModel.updateStatus(
         payment.invoiceId,
         'partially_paid',
@@ -1170,6 +1185,79 @@ class PaymentService {
       throw error;
     } finally {
       if (!isExternalConn) conn.release();
+    }
+  }
+
+  /**
+   * [NEW] Resolves Actionable Silent Failures.
+   * Converts a background communication error into a prioritized staff alert.
+   */
+  async _handleCommunicationFailure(
+    invoiceId,
+    tenantId,
+    error,
+    emailType,
+    connection = null
+  ) {
+    const conn = connection || (await pool.getConnection());
+    const isOwnConn = !connection;
+
+    try {
+      console.error(
+        `[Communication Failure] ${emailType} for Invoice #${invoiceId}:`,
+        error.message
+      );
+
+      // 1. Audit Log: Visible in Recent Activity
+      await auditLogger.log(
+        {
+          userId: null, // System action
+          actionType: 'COMMUNICATION_FAILURE',
+          entityId: invoiceId,
+          entityType: 'invoice',
+          details: {
+            emailType,
+            tenantId,
+            errorMessage: error.message,
+            severity: 'warning',
+          },
+        },
+        { user: { role: 'system' } },
+        conn
+      );
+
+      // 2. Notify Assigned Treasurers/Owners
+      const [staff] = await conn.query(
+        `SELECT DISTINCT user_id FROM staff_property_assignments spa
+         JOIN units u ON spa.property_id = u.property_id
+         JOIN leases l ON u.unit_id = l.unit_id
+         JOIN rent_invoices ri ON l.lease_id = ri.lease_id
+         WHERE ri.invoice_id = ?`,
+        [invoiceId]
+      );
+
+      const alertMessage = `URGENT: ${emailType} failed for Invoice #${invoiceId}. Please verify tenant contact info and resend manually. (Error: ${error.message})`;
+
+      for (const s of staff) {
+        await notificationModel.create(
+          {
+            userId: s.user_id,
+            message: alertMessage,
+            type: 'system',
+            severity: 'urgent',
+            entityType: 'invoice',
+            entityId: invoiceId,
+          },
+          conn
+        );
+      }
+    } catch (handlerErr) {
+      console.error(
+        '[Critical] Failed to handle communication failure:',
+        handlerErr
+      );
+    } finally {
+      if (isOwnConn) conn.release();
     }
   }
 }
