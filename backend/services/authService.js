@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 const { sign } = jwt;
 import userModel from '../models/userModel.js';
 import tenantModel from '../models/tenantModel.js';
+import auditLogger from '../utils/auditLogger.js';
 
 import { config } from '../config/config.js';
 import AppError from '../utils/AppError.js';
@@ -98,7 +99,6 @@ class AuthService {
 
       // Log audit
       try {
-        const auditLogger = (await import('../utils/auditLogger.js')).default;
         await auditLogger.log({
           userId: user.id,
           actionType: 'PASSWORD_RESET_REQUESTED',
@@ -138,7 +138,6 @@ class AuthService {
 
       // Log audit
       try {
-        const auditLogger = (await import('../utils/auditLogger.js')).default;
         await auditLogger.log({
           userId: decoded.id,
           actionType: 'PASSWORD_RESET_COMPLETED',

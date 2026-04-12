@@ -198,6 +198,13 @@ export const validatePropertyConfig = (data) => {
     }
   }
 
+  if (data.managementFeePercentage !== undefined) {
+    const val = parseFloat(data.managementFeePercentage);
+    if (isNaN(val) || val < 0 || val > 100) {
+      errors.push('Management fee percentage must be between 0 and 100');
+    }
+  }
+
   return {
     isValid: errors.length === 0,
     errors: errors,

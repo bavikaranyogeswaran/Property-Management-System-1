@@ -12,6 +12,7 @@ import {
   getLocalTime,
 } from '../utils/dateUtils.js';
 import { toCentsFromMajor } from '../utils/moneyUtils.js';
+import auditLogger from '../utils/auditLogger.js';
 
 /**
  * [ARCHITECTURAL SEMANTICS]
@@ -46,7 +47,6 @@ class RenewalService {
             : 'system', // [H19]
     });
 
-    const auditLogger = (await import('../utils/auditLogger.js')).default;
     await auditLogger.log({
       userId: user?.id || null,
       actionType: 'RENEWAL_REQUEST_CREATED',
@@ -100,7 +100,6 @@ class RenewalService {
       status: 'negotiating',
     });
 
-    const auditLogger = (await import('../utils/auditLogger.js')).default;
     await auditLogger.log({
       userId: user.id || user.user_id,
       actionType: 'RENEWAL_TERMS_PROPOSED',
@@ -108,6 +107,26 @@ class RenewalService {
       entityType: 'renewal_request',
       details: data,
     });
+
+    // [H11 FIX] Added notification to tenant when terms are proposed
+    try {
+      const lease = await leaseModel.findById(
+        request.lease_id || request.leaseId
+      );
+      const tenantUser = await userModel.findById(lease.tenantId);
+      if (tenantUser && tenantUser.email) {
+        const property = await propertyModel.findById(
+          request.property_id || request.propertyId
+        );
+        await emailService.sendRenewalProposed(
+          tenantUser.email,
+          property.name,
+          toCentsFromMajor(data.proposedMonthlyRent)
+        );
+      }
+    } catch (err) {
+      console.warn('[RENEWAL] Notification failed:', err.message);
+    }
   }
 
   async approve(requestId, user) {
@@ -200,7 +219,6 @@ class RenewalService {
         connection
       );
 
-      const auditLogger = (await import('../utils/auditLogger.js')).default;
       await auditLogger.log(
         {
           userId: user.id || user.user_id,
@@ -264,7 +282,6 @@ class RenewalService {
     // Reset the lease notice_status
     await leaseModel.update(request.lease_id, { notice_status: 'undecided' });
 
-    const auditLogger = (await import('../utils/auditLogger.js')).default;
     await auditLogger.log({
       userId: user.id || user.user_id,
       actionType: 'RENEWAL_REJECTED',
@@ -330,6 +347,19 @@ class RenewalService {
       return allRequests;
     }
     throw new Error('Access denied');
+  }
+
+  /**
+   * [H11 NEW] Automatically cancels any pending renewal requests for a lease.
+   * Triggered when a tenant decides to vacate.
+   */
+  async cancelPendingRenewals(leaseId, connection = null) {
+    const db = connection || pool;
+    await db.query(
+      "UPDATE renewal_requests SET status = 'cancelled' WHERE lease_id = ? AND status IN ('pending', 'negotiating')",
+      [leaseId]
+    );
+    console.log(`[RENEWAL] Cancelled pending requests for Lease #${leaseId}`);
   }
 }
 

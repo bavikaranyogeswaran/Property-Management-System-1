@@ -7,6 +7,10 @@ import invoiceModel from '../models/invoiceModel.js';
 import visitModel from '../models/visitModel.js';
 import leadModel from '../models/leadModel.js';
 import { validateLeaseDuration } from '../utils/validators.js';
+import auditLogger from '../utils/auditLogger.js';
+import paymentModel from '../models/paymentModel.js';
+import receiptModel from '../models/receiptModel.js';
+import ledgerModel from '../models/ledgerModel.js';
 import {
   getCurrentDateString,
   getLocalTime,
@@ -59,7 +63,6 @@ class LeaseRefundService {
       refundNotes: notes,
     });
 
-    const auditLogger = (await import('../utils/auditLogger.js')).default;
     await auditLogger.log({
       userId: user.id || user.user_id,
       actionType: 'DEPOSIT_REFUND_REQUESTED',
@@ -103,8 +106,6 @@ class LeaseRefundService {
       let withheldAmount = ledgerBalance - amount;
 
       if (withheldAmount > 0) {
-        const paymentModel = (await import('../models/paymentModel.js'))
-          .default;
         const pendingInvoices = await invoiceModel.findPendingDebts(
           leaseId,
           connection
@@ -166,8 +167,6 @@ class LeaseRefundService {
               );
             }
 
-            const receiptModel = (await import('../models/receiptModel.js'))
-              .default;
             await receiptModel.create(
               {
                 paymentId: payId,
@@ -180,8 +179,6 @@ class LeaseRefundService {
               connection
             );
 
-            const ledgerModel = (await import('../models/ledgerModel.js'))
-              .default;
             await ledgerModel.create(
               {
                 paymentId: payId,
@@ -231,8 +228,6 @@ class LeaseRefundService {
           connection
         );
 
-        const paymentModel = (await import('../models/paymentModel.js'))
-          .default;
         const payId = await paymentModel.create(
           {
             invoiceId: invId,
@@ -247,8 +242,6 @@ class LeaseRefundService {
         await paymentModel.updateStatus(payId, 'verified', null, connection);
         await invoiceModel.updateStatus(invId, 'paid', connection);
 
-        const receiptModel = (await import('../models/receiptModel.js'))
-          .default;
         await receiptModel.create(
           {
             paymentId: payId,
@@ -261,7 +254,6 @@ class LeaseRefundService {
           connection
         );
 
-        const ledgerModel = (await import('../models/ledgerModel.js')).default;
         await ledgerModel.create(
           {
             paymentId: payId,
@@ -299,7 +291,6 @@ class LeaseRefundService {
         connection
       );
 
-      const auditLogger = (await import('../utils/auditLogger.js')).default;
       await auditLogger.log(
         {
           userId: user.id || user.user_id,
@@ -362,7 +353,7 @@ class LeaseRefundService {
       );
 
       // 2. Create the final "Cash Outflow" Ledger Entry
-      const ledgerModel = (await import('../models/ledgerModel.js')).default;
+
       await ledgerModel.create(
         {
           leaseId: Number(leaseId),
@@ -375,7 +366,6 @@ class LeaseRefundService {
         connection
       );
 
-      const auditLogger = (await import('../utils/auditLogger.js')).default;
       await auditLogger.log(
         {
           userId: user.id || user.user_id,
@@ -421,7 +411,6 @@ class LeaseRefundService {
       refundNotes: notes,
     });
 
-    const auditLogger = (await import('../utils/auditLogger.js')).default;
     await auditLogger.log({
       userId: user.id || user.user_id,
       actionType: 'DEPOSIT_REFUND_DISPUTED',
@@ -469,7 +458,6 @@ class LeaseRefundService {
         connection
       );
 
-      const auditLogger = (await import('../utils/auditLogger.js')).default;
       await auditLogger.log(
         {
           userId: tenantId,
@@ -516,7 +504,6 @@ class LeaseRefundService {
       proposedRefundAmount: adjustedAmount,
     });
 
-    const auditLogger = (await import('../utils/auditLogger.js')).default;
     await auditLogger.log({
       userId: user.id || user.user_id,
       actionType: 'DEPOSIT_REFUND_RESOLVED',

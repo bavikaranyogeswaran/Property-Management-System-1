@@ -241,7 +241,9 @@ class ReportService {
     });
 
     const portfolioRate =
-      totalUnits > 0 ? Math.round((totalOccupied / totalUnits) * 100) : 0;
+      totalUnits > 0
+        ? Math.round(((totalOccupied + totalReserved) / totalUnits) * 100)
+        : 0;
 
     // Insights for Occupancy
     const insights = [];
@@ -305,7 +307,7 @@ class ReportService {
              WHERE un.property_id IN (${placeholders})
              AND l.status = 'active'
              GROUP BY t.user_id, u.name, t.behavior_score`,
-      propertyIds
+      [...propertyIds]
     );
 
     const data = tenants.map((tenant) => {
@@ -359,24 +361,37 @@ class ReportService {
     return { tenants: data, highRisk, medRisk, avgScore, insights };
   }
 
-  async getMaintenanceCategoryStats(user, year = null) {
+  async getMaintenanceCategoryStats(
+    user,
+    year = null,
+    startDate = null,
+    endDate = null
+  ) {
     const propertyIds = await this._getAccessiblePropertyIds(user);
     if (propertyIds.length === 0) return { categories: {}, totalCost: 0 };
 
-    const targetYear = year || new Date().getFullYear();
     const placeholders = propertyIds.map(() => '?').join(',');
+    let query = `SELECT mc.*, mr.title, p.name as property_name
+                 FROM maintenance_costs mc
+                 JOIN maintenance_requests mr ON mc.request_id = mr.request_id
+                 JOIN units u ON mr.unit_id = u.unit_id
+                 JOIN properties p ON u.property_id = p.property_id
+                 WHERE p.property_id IN (${placeholders})`;
 
-    const [costs] = await pool.query(
-      `SELECT mc.*, mr.title, p.name as property_name
-             FROM maintenance_costs mc
-             JOIN maintenance_requests mr ON mc.request_id = mr.request_id
-             JOIN units u ON mr.unit_id = u.unit_id
-             JOIN properties p ON u.property_id = p.property_id
-             WHERE p.property_id IN (${placeholders})
-             AND YEAR(mc.recorded_date) = ?
-             ORDER BY mc.recorded_date DESC`,
-      [...propertyIds, targetYear]
-    );
+    const params = [...propertyIds];
+
+    if (startDate && endDate) {
+      query += ` AND mc.recorded_date BETWEEN ? AND ?`;
+      params.push(startDate, endDate);
+    } else {
+      const targetYear = year || new Date().getFullYear();
+      query += ` AND YEAR(mc.recorded_date) = ?`;
+      params.push(targetYear);
+    }
+
+    query += ` ORDER BY mc.recorded_date DESC`;
+
+    const [costs] = await pool.query(query, params);
 
     const categories = {};
     let totalCost = 0;

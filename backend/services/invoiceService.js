@@ -9,6 +9,8 @@ import tenantModel from '../models/tenantModel.js';
 import userModel from '../models/userModel.js';
 import emailService from '../utils/emailService.js';
 import billingEngine from '../utils/billingEngine.js';
+import auditLogger from '../utils/auditLogger.js';
+import { toCentsFromMajor } from '../utils/moneyUtils.js';
 import {
   getCurrentDateString,
   getLocalTime,
@@ -43,7 +45,6 @@ class InvoiceService {
       const lease = await leaseModel.findById(data.leaseId, connection);
       if (!lease) throw new Error('Lease not found');
 
-      const staffModel = (await import('../models/staffModel.js')).default;
       const assigned = await staffModel.getAssignedProperties(user.id);
       const assignedPropertyIds = assigned.map((p) => p.id.toString());
 
@@ -274,8 +275,6 @@ class InvoiceService {
       // 1. Void the original
       await invoiceModel.updateStatus(invoiceId, 'void', connection);
 
-      const { toCentsFromMajor } = await import('../utils/moneyUtils.js');
-
       // 2. Create replacement
       const newInvoiceId = await invoiceModel.create(
         {
@@ -289,7 +288,7 @@ class InvoiceService {
       );
 
       // 3. Audit log
-      const auditLogger = (await import('../utils/auditLogger.js')).default;
+
       await auditLogger.log(
         {
           userId: user.id || user.user_id,

@@ -18,6 +18,7 @@ import {
 } from '../utils/dateUtils.js';
 import { toCentsFromMajor, moneyMath, fromCents } from '../utils/moneyUtils.js';
 import renewalService from './renewalService.js';
+import auditLogger from '../utils/auditLogger.js';
 
 class LeaseBillingService {
   constructor(facade) {
@@ -51,7 +52,6 @@ class LeaseBillingService {
       notes,
     });
 
-    const auditLogger = (await import('../utils/auditLogger.js')).default;
     await auditLogger.log({
       userId: user.id || user.user_id,
       actionType: 'LEASE_RENT_ADJUSTED',

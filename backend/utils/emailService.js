@@ -866,6 +866,45 @@ class EmailService {
     }
   }
 
+  async sendRenewalProposed(email, propertyName, newRent) {
+    const formattedRent = new Intl.NumberFormat('en-LK', {
+      style: 'currency',
+      currency: 'LKR',
+    }).format(newRent);
+
+    if (!this.transporter) {
+      console.log('==================================================');
+      logger.info(`[EMAIL MOCK] Renewal Terms Proposed for ${email}`);
+      logger.info(`Property: ${propertyName}, New Rent: ${formattedRent}`);
+      console.log('==================================================');
+      return true;
+    }
+    try {
+      await this.transporter.sendMail({
+        from: `"Property Management System" <${process.env.SMTP_USER}>`,
+        to: email,
+        subject: `New Renewal Terms Proposed - ${propertyName}`,
+        html: this._getTemplate(
+          'New Lease Terms Proposed',
+          `
+          <p>The property management has proposed new renewal terms for your lease at <strong>${propertyName}</strong>.</p>
+          <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; margin: 24px 0; border: 1px solid #e2e8f0;">
+              <p style="margin: 4px 0; color: #475569;"><strong>Proposed Monthly Rent:</strong> ${formattedRent}</p>
+          </div>
+          <p>Please log in to your portal to accept the terms or negotiate further.</p>
+          <div style="text-align: center; margin: 32px 0;">
+            <a href="${config.frontendUrl}/login" style="background-color: #2563eb; color: white; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px; display: inline-block;">Review & Respond</a>
+          </div>
+          `
+        ),
+      });
+      return true;
+    } catch (e) {
+      logger.error('Error sending renewal proposed email:', e);
+      return false;
+    }
+  }
+
   async sendRenewalRejection(email, propertyName, notes) {
     if (!this.transporter) {
       console.log('==================================================');

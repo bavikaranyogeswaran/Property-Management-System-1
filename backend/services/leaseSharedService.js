@@ -7,6 +7,11 @@ import invoiceModel from '../models/invoiceModel.js';
 import visitModel from '../models/visitModel.js';
 import leadModel from '../models/leadModel.js';
 import { validateLeaseDuration } from '../utils/validators.js';
+import propertyModel from '../models/propertyModel.js';
+import staffModel from '../models/staffModel.js';
+import auditLogger from '../utils/auditLogger.js';
+import emailService from '../utils/emailService.js';
+import userModel from '../models/userModel.js';
 import {
   getCurrentDateString,
   getLocalTime,
@@ -37,14 +42,11 @@ class LeaseSharedService {
     const lease = await leaseModel.findById(id);
     if (!lease) throw new Error('Lease not found');
     if (user.role === 'owner') {
-      const propertyModel = (await import('../models/propertyModel.js'))
-        .default;
       const property = await propertyModel.findById(lease.propertyId);
       if (property && String(property.ownerId) === String(user.id))
         return lease;
     }
     if (user.role === 'treasurer') {
-      const staffModel = (await import('../models/staffModel.js')).default;
       const assigned = await staffModel.getAssignedProperties(user.id);
       if (
         assigned.some((p) => String(p.property_id) === String(lease.propertyId))
@@ -115,7 +117,6 @@ class LeaseSharedService {
 
     await leaseModel.update(id, { documentUrl: documentUrl });
 
-    const auditLogger = (await import('../utils/auditLogger.js')).default;
     await auditLogger.log({
       userId: user?.id || user?.user_id || null,
       actionType: 'LEASE_DOCUMENT_UPDATED',
@@ -162,10 +163,6 @@ class LeaseSharedService {
       );
 
       // Notify via email - Reusing emailService
-      const emailService = (await import('../utils/emailService.js')).default;
-      const userModel = (await import('../models/userModel.js')).default;
-      const propertyModel = (await import('../models/propertyModel.js'))
-        .default;
 
       const tenant = await userModel.findById(lease.tenantId);
       const unit = await unitModel.findById(lease.unitId, conn);
@@ -182,7 +179,6 @@ class LeaseSharedService {
         );
       }
 
-      const auditLogger = (await import('../utils/auditLogger.js')).default;
       await auditLogger.log(
         {
           userId: user.id || user.user_id || null,

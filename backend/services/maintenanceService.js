@@ -19,6 +19,8 @@ import { toCentsFromMajor, fromCents } from '../utils/moneyUtils.js';
 import authorizationService from './authorizationService.js';
 import paymentService from './paymentService.js';
 import { ROLES } from '../utils/roleUtils.js';
+import auditLogger from '../utils/auditLogger.js';
+import staffModel from '../models/staffModel.js';
 
 class MaintenanceService {
   async createRequest(data, tenantId) {
@@ -463,7 +465,6 @@ class MaintenanceService {
         );
       }
 
-      const auditLogger = (await import('../utils/auditLogger.js')).default;
       await auditLogger.log(
         {
           userId: user.user_id || user.id,

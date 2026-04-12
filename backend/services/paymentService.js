@@ -849,7 +849,6 @@ class PaymentService {
           connection
         );
 
-        const auditLogger = (await import('../utils/auditLogger.js')).default;
         await auditLogger.log(
           {
             userId: null,

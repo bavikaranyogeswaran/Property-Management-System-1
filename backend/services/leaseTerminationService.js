@@ -7,6 +7,9 @@ import invoiceModel from '../models/invoiceModel.js';
 import visitModel from '../models/visitModel.js';
 import leadModel from '../models/leadModel.js';
 import { validateLeaseDuration } from '../utils/validators.js';
+import auditLogger from '../utils/auditLogger.js';
+import notificationModel from '../models/notificationModel.js';
+import userModel from '../models/userModel.js';
 import {
   getCurrentDateString,
   getLocalTime,
@@ -101,7 +104,6 @@ class LeaseTerminationService {
         );
       }
 
-      const auditLogger = (await import('../utils/auditLogger.js')).default;
       await auditLogger.log(
         {
           userId: user?.id || user?.user_id || null,
@@ -114,8 +116,6 @@ class LeaseTerminationService {
         connection
       );
 
-      const notificationModel = (await import('../models/notificationModel.js'))
-        .default;
       await notificationModel.create(
         {
           userId: lease.tenantId,
@@ -128,7 +128,6 @@ class LeaseTerminationService {
         connection
       );
 
-      const userModel = (await import('../models/userModel.js')).default;
       const treasurers = await userModel.findByRole('treasurer');
       for (const t of treasurers) {
         await notificationModel.create(
@@ -200,7 +199,6 @@ class LeaseTerminationService {
       await this.facade._syncUnitStatus(lease.unitId, connection);
 
       // 3. Audit Log
-      const auditLogger = (await import('../utils/auditLogger.js')).default;
       await auditLogger.log(
         {
           userId: user.id || user.user_id,
@@ -258,7 +256,6 @@ class LeaseTerminationService {
       await this.facade._syncUnitStatus(lease.unitId, conn);
 
       // [B4 FIX] Added missing auditLogger import
-      const auditLogger = (await import('../utils/auditLogger.js')).default;
       await auditLogger.log(
         {
           userId: user.id || user.user_id,
@@ -322,7 +319,6 @@ class LeaseTerminationService {
       // [FIXED] Now uses _syncUnitStatus to account for other future leases correctly
       await this.facade._syncUnitStatus(lease.unitId, conn);
 
-      const auditLogger = (await import('../utils/auditLogger.js')).default;
       await auditLogger.log(
         {
           userId: user.id || user.user_id,
@@ -392,9 +388,7 @@ class LeaseTerminationService {
         );
 
         // 3. Notification Logic
-        const notificationModel = (
-          await import('../models/notificationModel.js')
-        ).default;
+
         await notificationModel.create(
           {
             userId: lease.tenant_id,
@@ -406,7 +400,6 @@ class LeaseTerminationService {
           conn
         );
 
-        const auditLogger = (await import('../utils/auditLogger.js')).default;
         await auditLogger.log(
           {
             userId: null, // System action
@@ -450,6 +443,11 @@ class LeaseTerminationService {
     if (!['undecided', 'vacating', 'renewing'].includes(status))
       throw new Error('Invalid notice status');
     await leaseModel.update(leaseId, { noticeStatus: status });
+
+    // [H11 FIX] Auto-cancel renewals if tenant decides to vacate
+    if (status === 'vacating') {
+      await renewalService.cancelPendingRenewals(leaseId);
+    }
 
     // [FIX] Negotiated Renewal Flow: Create a renewal request instead of a draft lease
     if (status === 'renewing' && lease.status === 'active' && lease.endDate) {

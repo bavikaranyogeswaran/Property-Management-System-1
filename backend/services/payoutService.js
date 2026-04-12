@@ -1,5 +1,6 @@
 import payoutModel from '../models/payoutModel.js';
 import ledgerModel from '../models/ledgerModel.js';
+import pool from '../config/db.js';
 import { fromCents } from '../utils/moneyUtils.js';
 
 class PayoutService {
@@ -128,14 +129,35 @@ class PayoutService {
   }
 
   async markAsPaid(payoutId, treasurerId, bankReference, proofUrl = null) {
-    // Logic moved to model for transactional safety if needed, here we just trigger it
-    await payoutModel.markAsPaid(
-      payoutId,
-      treasurerId,
-      bankReference,
-      proofUrl
-    );
-    return true;
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      // [H4 HARDENING] Perform row locking to prevent concurrent status updates
+      const payout = await payoutModel.findByIdForUpdate(payoutId, connection);
+      if (!payout) throw new Error('Payout record not found.');
+      if (payout.status !== 'pending') {
+        throw new Error(
+          `Cannot mark payout as paid. Current status: ${payout.status}`
+        );
+      }
+
+      await payoutModel.markAsPaid(
+        payoutId,
+        treasurerId,
+        bankReference,
+        proofUrl,
+        connection
+      );
+
+      await connection.commit();
+      return true;
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
   }
 
   async acknowledgePayout(ownerId, payoutId) {

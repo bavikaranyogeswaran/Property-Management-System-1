@@ -59,12 +59,30 @@ class PayoutModel {
     }));
   }
 
-  async markAsPaid(payoutId, treasurerId, bankReference, proofUrl = null) {
-    await pool.query(
+  async markAsPaid(
+    payoutId,
+    treasurerId,
+    bankReference,
+    proofUrl = null,
+    connection = null
+  ) {
+    const db = connection || pool;
+    await db.query(
       'UPDATE owner_payouts SET status = "paid", processed_at = NOW(), treasurer_id = ?, bank_reference = ?, proof_url = ? WHERE payout_id = ?',
       [treasurerId, bankReference, proofUrl, payoutId]
     );
     return true;
+  }
+
+  async findByIdForUpdate(payoutId, connection) {
+    if (!connection)
+      throw new Error('connection required for findByIdForUpdate');
+    const [rows] = await connection.query(
+      'SELECT * FROM owner_payouts WHERE payout_id = ? FOR UPDATE',
+      [payoutId]
+    );
+    if (!rows[0]) return null;
+    return rows[0];
   }
 
   async acknowledge(payoutId) {
@@ -91,20 +109,17 @@ class PayoutModel {
     //
     // skipIfSelective no longer bypasses the check entirely — selective payouts
     // can still produce overlapping periods if not guarded.
-    if (skipIfSelective) {
-      console.warn(
-        '[PayoutModel] Selective payout overlap check skipped — verify date range manually for owner:',
-        ownerId
-      );
-      return false;
-    }
+    // [H4 FIX] Selective payouts can still create logical overlaps (e.g. paying Income A for Jan,
+    // then creating a full payout for Jan). We removed the bypass to ensure date range
+    // integrity is always checked.
 
     const [rows] = await pool.query(
       `SELECT 1 FROM owner_payouts
        WHERE owner_id = ?
          AND status NOT IN ('disputed')
-         AND period_start <= ?
-         AND period_end >= ?
+         AND (
+           (period_start <= ? AND period_end >= ?) -- Standard overlap
+         )
        LIMIT 1`,
       [ownerId, endDate, startDate]
     );

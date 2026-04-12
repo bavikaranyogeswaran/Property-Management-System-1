@@ -18,6 +18,12 @@ import {
 } from '../utils/dateUtils.js';
 import { toCentsFromMajor, moneyMath, fromCents } from '../utils/moneyUtils.js';
 import renewalService from './renewalService.js';
+import auditLogger from '../utils/auditLogger.js';
+import userModel from '../models/userModel.js';
+import leadModel from '../models/leadModel.js';
+import emailService from '../utils/emailService.js';
+import billingEngine from '../utils/billingEngine.js';
+import userService from './userService.js';
 
 class LeaseCreationService {
   constructor(facade) {
@@ -161,7 +167,6 @@ class LeaseCreationService {
       }
 
       // Audit Log
-      const auditLogger = (await import('../utils/auditLogger.js')).default;
       await auditLogger.log(
         {
           userId: user?.id || user?.user_id || null,
@@ -225,7 +230,6 @@ class LeaseCreationService {
       );
 
       // Audit Log
-      const auditLogger = (await import('../utils/auditLogger.js')).default;
       await auditLogger.log(
         {
           userId: user.id || user.user_id,
@@ -247,7 +251,6 @@ class LeaseCreationService {
       if (depositStats && depositStats.isFullyPaid) {
         await this.facade.signLease(leaseId, user, connection);
 
-        const userService = (await import('./userService.js')).default;
         await userService.triggerOnboarding(lease.tenantId, connection);
         activated = true;
       }
@@ -289,7 +292,6 @@ class LeaseCreationService {
       );
 
       // Audit Log
-      const auditLogger = (await import('../utils/auditLogger.js')).default;
       await auditLogger.log(
         {
           userId: user.id || user.user_id,
@@ -414,9 +416,7 @@ class LeaseCreationService {
         await unitModel.update(lease.unitId, { status: 'occupied' }, conn);
 
         try {
-          const tenantUser = await (
-            await import('../models/userModel.js')
-          ).default.findById(lease.tenantId, conn);
+          const tenantUser = await userModel.findById(lease.tenantId, conn);
           if (tenantUser?.email) {
             // [HARDENED] Fuzzy Matching for Lead Conversion
             // Use LOWER() and TRIM() to ensure conversion works even with inconsistent user entry.
@@ -434,8 +434,6 @@ class LeaseCreationService {
               ]
             );
             if (matchingLeads.length > 0) {
-              const leadModel = (await import('../models/leadModel.js'))
-                .default;
               await leadModel.update(
                 matchingLeads[0].lead_id,
                 { status: 'converted' },
@@ -460,8 +458,7 @@ class LeaseCreationService {
              AND l.notes LIKE '%Unit Leased%'`,
             [lease.unitId]
           );
-          const emailService = (await import('../utils/emailService.js'))
-            .default;
+
           for (const lead of droppedLeads) {
             if (lead.email) {
               await emailService
@@ -490,8 +487,6 @@ class LeaseCreationService {
       try {
         const start = parseLocalDate(lease.startDate);
         const now = getLocalTime();
-        const billingEngine = (await import('../utils/billingEngine.js'))
-          .default;
 
         let cursorDate = new Date(start.getFullYear(), start.getMonth(), 1);
         const targetDate = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -532,7 +527,6 @@ class LeaseCreationService {
         // We do NOT throw here. The lease activation is the priority.
       }
 
-      const auditLogger = (await import('../utils/auditLogger.js')).default;
       await auditLogger.log(
         {
           userId: user?.id || user?.user_id || null,

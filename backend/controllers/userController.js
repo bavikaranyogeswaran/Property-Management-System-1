@@ -8,6 +8,7 @@
 import userService from '../services/userService.js';
 import staffModel from '../models/staffModel.js';
 import { validateEmail } from '../utils/validators.js';
+import auditLogger from '../utils/auditLogger.js';
 
 class UserController {
   //  HIRE TREASURER: Owner adds a new staff member to handle money.
@@ -199,7 +200,6 @@ class UserController {
       const { userId, propertyId } = req.body;
       await staffModel.assignProperty(userId, propertyId);
 
-      const auditLogger = (await import('../utils/auditLogger.js')).default;
       await auditLogger.log(
         {
           userId: req.user.id || req.user.user_id,
@@ -225,7 +225,6 @@ class UserController {
       const { userId, propertyId } = req.params;
       await staffModel.removePropertyAssignment(userId, propertyId);
 
-      const auditLogger = (await import('../utils/auditLogger.js')).default;
       await auditLogger.log(
         {
           userId: req.user.id || req.user.user_id,
@@ -272,7 +271,6 @@ class UserController {
         return res.status(404).json({ error: 'User not found' });
       }
 
-      const auditLogger = (await import('../utils/auditLogger.js')).default;
       await auditLogger.log(
         {
           userId: req.user.id || req.user.user_id,

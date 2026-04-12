@@ -26,6 +26,7 @@ import unitLockService from '../services/unitLockService.js';
 import leadTokenModel from '../models/leadTokenModel.js';
 import leadStageHistoryModel from '../models/leadStageHistoryModel.js';
 import { toCentsFromMajor, fromCents } from '../utils/moneyUtils.js';
+import auditLogger from '../utils/auditLogger.js';
 
 const SALT_ROUNDS = 10;
 
@@ -76,7 +77,6 @@ class UserService {
         connection
       );
 
-      const auditLogger = (await import('../utils/auditLogger.js')).default;
       await auditLogger.log(
         {
           userId: user?.id || null,
@@ -177,7 +177,6 @@ class UserService {
 
       // 4. Log the action (Audit)
       try {
-        const auditLogger = (await import('../utils/auditLogger.js')).default;
         await auditLogger.log(
           {
             userId: id,
@@ -585,7 +584,6 @@ class UserService {
 
     // Log audit trail
     try {
-      const auditLogger = (await import('../utils/auditLogger.js')).default;
       await auditLogger.log(
         {
           userId: null, // System action

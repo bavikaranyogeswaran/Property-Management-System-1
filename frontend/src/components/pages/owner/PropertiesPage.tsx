@@ -1216,6 +1216,12 @@ export function PropertiesPage() {
                       }
                     </p>
                   </div>
+                  <div className="col-span-2">
+                    <p className="text-xs text-gray-500">Management Fee</p>
+                    <p className="text-sm font-medium text-blue-600">
+                      {(property.managementFeePercentage || 0).toFixed(2)}%
+                    </p>
+                  </div>
                 </div>
 
                 <div className="flex flex-wrap gap-2 pt-4">
@@ -1342,6 +1348,13 @@ export function PropertiesPage() {
                       <p className="text-xs text-gray-500">Total Units</p>
                       <p className="text-xl font-bold">
                         {getUnitCount(viewProperty.id)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Management Fee</p>
+                      <p className="text-xl font-bold text-blue-600">
+                        {(viewProperty.managementFeePercentage || 0).toFixed(2)}
+                        %
                       </p>
                     </div>
                   </div>
