@@ -30,8 +30,10 @@ class MaintenanceRequestModel {
       status: row.status,
       assignedTo: row.assigned_to ? row.assigned_to.toString() : null,
       assignedBy: row.assigned_by ? row.assigned_by.toString() : null,
-      createdAt: row.created_at,
       images: row.images, // Already JSON
+      eta: row.eta,
+      resolutionNotes: row.resolution_notes,
+      resolvedAt: row.resolved_at,
     }));
   }
 
@@ -64,6 +66,9 @@ class MaintenanceRequestModel {
       assignedTo: row.assigned_to ? row.assigned_to.toString() : null,
       assignedBy: row.assigned_by ? row.assigned_by.toString() : null,
       images: row.images,
+      eta: row.eta,
+      resolutionNotes: row.resolution_notes,
+      resolvedAt: row.resolved_at,
     }));
   }
 
@@ -130,6 +135,9 @@ class MaintenanceRequestModel {
       assignedBy: row.assigned_by ? row.assigned_by.toString() : null,
       createdAt: row.created_at,
       images: row.images, // Already JSON
+      eta: row.eta,
+      resolutionNotes: row.resolution_notes,
+      resolvedAt: row.resolved_at,
     };
   }
 
@@ -246,11 +254,37 @@ class MaintenanceRequestModel {
     }
   }
 
-  async updateStatus(id, status) {
-    await pool.query(
-      'UPDATE maintenance_requests SET status = ? WHERE request_id = ?',
-      [status, id]
-    );
+  async updateStatus(id, status, assignmentData = {}) {
+    const { assignedTo, assignedBy, eta, resolutionNotes } = assignmentData;
+
+    let query = 'UPDATE maintenance_requests SET status = ?';
+    const params = [status];
+
+    if (assignedTo !== undefined) {
+      query += ', assigned_to = ?';
+      params.push(assignedTo);
+    }
+    if (assignedBy !== undefined) {
+      query += ', assigned_by = ?';
+      params.push(assignedBy);
+    }
+    if (eta !== undefined) {
+      query += ', eta = ?';
+      params.push(eta);
+    }
+    if (resolutionNotes !== undefined) {
+      query += ', resolution_notes = ?';
+      params.push(resolutionNotes);
+    }
+
+    if (status === 'completed' || status === 'closed') {
+      query += ', resolved_at = NOW()';
+    }
+
+    query += ' WHERE request_id = ?';
+    params.push(id);
+
+    await pool.query(query, params);
     return this.findById(id);
   }
 

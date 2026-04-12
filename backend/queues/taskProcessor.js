@@ -12,6 +12,7 @@ const taskMap = {
   cleanup_cloudinary_asset_task: jobs.cleanupCloudinaryAsset,
   reconcile_cloudinary_assets_task: jobs.reconcileCloudinaryAssets,
   auto_acknowledge_refunds_task: jobs.autoAcknowledgeRefunds,
+  maintenance_sla_task: jobs.checkMaintenanceSLA,
 };
 
 /**

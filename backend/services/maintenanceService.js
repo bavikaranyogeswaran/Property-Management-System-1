@@ -139,7 +139,19 @@ class MaintenanceService {
         );
       }
 
-      const updated = await maintenanceRequestModel.updateStatus(id, status);
+      // Extract assignment metadata if provided
+      const assignmentData = {
+        assignedTo: data.assignedTo,
+        assignedBy: user.id,
+        eta: data.eta,
+        resolutionNotes: data.resolutionNotes,
+      };
+
+      const updated = await maintenanceRequestModel.updateStatus(
+        id,
+        status,
+        assignmentData
+      );
 
       // [NEW] Record resolution timestamp for performance tracking
       if (status === 'completed' || status === 'closed') {
@@ -392,6 +404,10 @@ class MaintenanceService {
     const request = await maintenanceRequestModel.findById(requestId);
     if (!request) throw new Error('Maintenance Request not found');
 
+    if (request.status === 'closed') {
+      throw new Error('Cannot record costs for a closed maintenance request.');
+    }
+
     const connection = await pool.getConnection();
     try {
       await connection.beginTransaction();
@@ -452,9 +468,12 @@ class MaintenanceService {
           {
             leaseId: targetLease.id,
             accountType: 'expense',
-            category: 'maintenance_repair',
+            category:
+              billTo === 'tenant'
+                ? 'reimbursable_maintenance'
+                : 'maintenance_repair',
             credit: toCentsFromMajor(amount),
-            description: `Maintenance Cost: ${description || request.title} (Req #${requestId})`,
+            description: `Maintenance Cost: ${description || request.title} (Req #${requestId})${billTo === 'tenant' ? ' [REIMBURSABLE]' : ''}`,
             entryDate: recordedDate || getCurrentDateString(),
           },
           connection
@@ -513,10 +532,13 @@ class MaintenanceService {
       );
     });
 
-    // 2. Fallback: Current active lease for the same unit
+    // 2. Fallback: Current active lease for the same unit (Must have started before/on request date)
     if (!targetLease) {
       targetLease = leases.find(
-        (l) => l.unitId === request.unitId.toString() && l.status === 'active'
+        (l) =>
+          l.unitId === request.unitId.toString() &&
+          l.status === 'active' &&
+          requestDateString >= l.startDate
       );
     }
 

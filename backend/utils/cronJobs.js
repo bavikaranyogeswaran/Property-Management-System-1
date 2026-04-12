@@ -881,6 +881,66 @@ export const expireDraftLeases = async () => {
     console.error('Error expiring stale draft leases:', error);
   }
 };
+
+/**
+ * [H24 FIX] Maintenance SLA Monitoring
+ * Alerts owners/treasurers for stale requests.
+ */
+export const checkMaintenanceSLA = async () => {
+  try {
+    const [staleRequests] = await db.query(
+      `SELECT mr.*, p.owner_id, p.name as property_name, u.unit_number
+       FROM maintenance_requests mr
+       JOIN units u ON mr.unit_id = u.unit_id
+       JOIN properties p ON u.property_id = p.property_id
+       WHERE mr.status = 'submitted'
+       AND (
+         (mr.priority IN ('high', 'urgent') AND mr.created_at < DATE_SUB(NOW(), INTERVAL 24 HOUR))
+         OR 
+         (mr.priority IN ('low', 'medium') AND mr.created_at < DATE_SUB(NOW(), INTERVAL 3 DAY))
+       )`
+    );
+
+    for (const req of staleRequests) {
+      // 1. Notify Owner
+      await notificationModel.create({
+        userId: req.owner_id,
+        message: `SLA BREACH: Maintenance Request '${req.title}' for ${req.property_name} (Unit ${req.unit_number}) has been idle for too long.`,
+        type: 'maintenance',
+        severity: 'urgent',
+        entityType: 'maintenance_request',
+        entityId: req.request_id,
+      });
+
+      // 2. Notify assigned Treasurers
+      const [treasurers] = await db.query(
+        `SELECT user_id FROM staff_property_assignments WHERE property_id = (
+          SELECT property_id FROM units WHERE unit_id = ?
+        )`,
+        [req.unit_id]
+      );
+      for (const t of treasurers) {
+        await notificationModel.create({
+          userId: t.user_id,
+          message: `SLA BREACH: Maintenance Request '${req.title}' for ${req.property_name} (Unit ${req.unit_number}) is stale.`,
+          type: 'maintenance',
+          severity: 'urgent',
+          entityType: 'maintenance_request',
+          entityId: req.request_id,
+        });
+      }
+    }
+
+    if (staleRequests.length > 0) {
+      logger.info(
+        `[SLA] Sent alerts for ${staleRequests.length} stale maintenance requests.`
+      );
+    }
+  } catch (error) {
+    logger.error('Error in Maintenance SLA check:', error);
+  }
+};
+
 /**
  * Audit #9: Automatically revoke portal access for former tenants.
  * Deactivates accounts based on property-specific deactivation periods,
@@ -1309,6 +1369,13 @@ export const registerRepeatableJobs = async () => {
     'auto_acknowledge_refunds_task',
     {},
     { repeat: { pattern: '0 2 * * *' }, jobId: 'auto_ack_refunds' }
+  );
+
+  // 6. Maintenance SLA Monitoring (3:00 AM)
+  await mainQueue.add(
+    'maintenance_sla_task',
+    {},
+    { repeat: { pattern: '0 3 * * *' }, jobId: 'maintenance_sla' }
   );
 
   logger.info('[Queue] All repeatable jobs have been synchronized.');
