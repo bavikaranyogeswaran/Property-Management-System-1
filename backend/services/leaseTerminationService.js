@@ -65,7 +65,7 @@ class LeaseTerminationService {
           { status: 'cancelled', endDate: terminationDate },
           connection
         );
-        await invoiceModel.voidPendingByLeaseId(leaseId, connection);
+        await invoiceModel.voidAllPendingByLeaseId(leaseId, connection);
         await this.facade._syncUnitStatus(lease.unitId, connection);
       } else {
         if (terminationFee > 0) {
@@ -86,14 +86,10 @@ class LeaseTerminationService {
           { status: 'ended', endDate: terminationDate },
           connection
         );
-        await invoiceModel.voidFuturePendingByLeaseId(
-          leaseId,
-          terminationDate,
-          connection
-        );
+        await invoiceModel.voidAllPendingByLeaseId(leaseId, connection);
         await unitModel.update(
           lease.unitId,
-          { status: 'maintenance' },
+          { status: 'maintenance', isTurnoverCleared: false },
           connection
         );
 

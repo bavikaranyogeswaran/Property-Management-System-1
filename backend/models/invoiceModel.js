@@ -372,6 +372,14 @@ class InvoiceModel {
       [leaseId, date]
     );
   }
+
+  async voidAllPendingByLeaseId(leaseId, connection = null) {
+    const db = connection || pool;
+    await db.query(
+      "UPDATE rent_invoices SET status='void' WHERE lease_id = ? AND status IN ('pending', 'partially_paid')",
+      [leaseId]
+    );
+  }
   async findPendingDebts(leaseId, connection = null) {
     const db = connection || pool;
     const [rows] = await db.query(
