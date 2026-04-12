@@ -242,6 +242,35 @@ class LeaseModel {
     return this.mapRows(rows);
   }
 
+  async findByUnitId(unitId, connection = null) {
+    const dbConn = connection || db;
+    const [rows] = await dbConn.query(
+      `
+            SELECT l.*, 
+                   u.unit_number,
+                   u.property_id,
+                   p.name as property_name,
+                   t_usr.name as tenant_name,
+                   COALESCE(dep_bal.deposit_balance, 0) AS real_deposit_balance
+            FROM leases l
+            JOIN units u ON l.unit_id = u.unit_id
+            JOIN properties p ON u.property_id = p.property_id
+            JOIN users t_usr ON l.tenant_id = t_usr.user_id
+            LEFT JOIN (
+              SELECT lease_id,
+                     COALESCE(SUM(credit), 0) - COALESCE(SUM(debit), 0) AS deposit_balance
+              FROM accounting_ledger
+              WHERE category IN ('deposit_held', 'deposit_withheld', 'deposit_refund')
+              GROUP BY lease_id
+            ) dep_bal ON dep_bal.lease_id = l.lease_id
+            WHERE l.unit_id = ?
+            ORDER BY l.start_date DESC
+        `,
+      [unitId]
+    );
+    return this.mapRows(rows);
+  }
+
   async findActive() {
     // [H7 FIX] Derived-table JOIN replaces correlated subquery.
     const [rows] = await db.query(`

@@ -514,44 +514,26 @@ class MaintenanceService {
     const request = await maintenanceRequestModel.findById(requestId);
     if (!request) return null;
 
-    const leases = await leaseModel.findByTenantId(
-      request.tenantId,
-      connection
-    );
+    // [BILLING FIX] Fetch ALL leases for this physical unit, regardless of tenant mapping.
+    // This allows maintenance on vacant units to be anchored to the most recent lease for ledger/payout routing.
+    const leases = await leaseModel.findByUnitId(request.unitId, connection);
+
     const requestDateString =
       request.createdAt instanceof Date
         ? request.createdAt.toISOString().split('T')[0]
         : new Date(request.createdAt).toISOString().split('T')[0];
 
-    // 1. Best Match: Lease active at the time of request
+    // 1. Best Match: Lease that was active spanning the date the request was created.
     let targetLease = leases.find((l) => {
       return (
-        l.unitId === request.unitId.toString() &&
         requestDateString >= l.startDate &&
         (!l.endDate || requestDateString <= l.endDate)
       );
     });
 
-    // 2. Fallback: Current active lease for the same unit (Must have started before/on request date)
-    if (!targetLease) {
-      targetLease = leases.find(
-        (l) =>
-          l.unitId === request.unitId.toString() &&
-          l.status === 'active' &&
-          requestDateString >= l.startDate
-      );
-    }
-
-    // 3. Fallback: Most recent lease for that unit
-    if (!targetLease) {
-      const unitLeases = leases
-        .filter((l) => l.unitId === request.unitId.toString())
-        .sort(
-          (a, b) =>
-            new Date(b.endDate || '2099-12-31').getTime() -
-            new Date(a.endDate || '2099-12-31').getTime()
-        );
-      if (unitLeases.length > 0) targetLease = unitLeases[0];
+    // 2. Fallback: Most recent lease for that unit (findByUnitId is pre-ordered DESC)
+    if (!targetLease && leases.length > 0) {
+      targetLease = leases[0];
     }
 
     return targetLease;

@@ -251,6 +251,34 @@ class LeaseTerminationService {
 
       await leaseModel.update(leaseId, { status: 'cancelled' }, conn);
 
+      // [FIX] Detect Trapped Deposits: If the application was paid, queue for refund.
+      if (lease.depositStatus === 'paid') {
+        await leaseModel.update(
+          leaseId,
+          {
+            proposedRefundAmount: lease.targetDeposit,
+            refundNotes:
+              'Auto-queued: Lease application cancelled by staff after deposit payment.',
+          },
+          conn
+        );
+
+        const treasurers = await userModel.findByRole('treasurer');
+        for (const t of treasurers) {
+          await notificationModel.create(
+            {
+              userId: t.user_id,
+              message: `Refund Alert: Lease #${leaseId} was cancelled by staff. A paid deposit of ${fromCents(lease.targetDeposit)} is trapped and needs processing.`,
+              type: 'lease',
+              severity: 'urgent',
+              entityType: 'lease',
+              entityId: leaseId,
+            },
+            conn
+          );
+        }
+      }
+
       // [D2 FIX] Clear magic tokens for this lease upon cancellation
       await conn.query(
         'UPDATE rent_invoices SET magic_token_hash = NULL, magic_token_expires_at = NULL WHERE lease_id = ?',
@@ -322,6 +350,34 @@ class LeaseTerminationService {
       }
 
       await leaseModel.update(leaseId, { status: 'cancelled' }, conn);
+
+      // [FIX] Detect Trapped Deposits: If the prospect paid, queue for refund.
+      if (lease.depositStatus === 'paid') {
+        await leaseModel.update(
+          leaseId,
+          {
+            proposedRefundAmount: lease.targetDeposit,
+            refundNotes:
+              'Auto-queued: Prospect withdrew application after deposit payment.',
+          },
+          conn
+        );
+
+        const treasurers = await userModel.findByRole('treasurer');
+        for (const t of treasurers) {
+          await notificationModel.create(
+            {
+              userId: t.user_id,
+              message: `Refund Alert: Prospect withdrew application for Lease #${leaseId}. A paid deposit of ${fromCents(lease.targetDeposit)} is trapped and needs processing.`,
+              type: 'lease',
+              severity: 'urgent',
+              entityType: 'lease',
+              entityId: leaseId,
+            },
+            conn
+          );
+        }
+      }
 
       // [D2 FIX] Clear magic tokens for this lease upon withdrawal
       await conn.query(
