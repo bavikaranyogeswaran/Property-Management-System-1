@@ -423,12 +423,18 @@ class PaymentService {
 
       const payment = await paymentModel.findById(paymentId, conn);
 
+      // [NEW] Reload Invoice with Lock AFTER trigger has fired (to get updated amount_paid)
+      const freshInvoice = await invoiceModel.findByIdForUpdate(
+        invoiceId,
+        conn
+      );
+
       // 2. Finalize actions (ledger, receipt, activation, notifications)
       // Use a dummy system user for automated actions
       const systemUser = { id: null, role: 'system' };
       await this._finalizeVerifiedPayment(
         paymentId,
-        invoice,
+        freshInvoice || invoice, // Fallback to stale if something went critically wrong
         payment,
         systemUser,
         conn
@@ -551,9 +557,15 @@ class PaymentService {
       if (status === 'verified') {
         const payment = updatedPayment;
         if (payment) {
+          // [NEW] Reload Invoice with Lock AFTER trigger has fired (to get updated amount_paid)
+          const freshInvoice = await invoiceModel.findByIdForUpdate(
+            payment.invoiceId || payment.invoice_id,
+            conn
+          );
+
           await this._finalizeVerifiedPayment(
             paymentId,
-            invoice,
+            freshInvoice || invoice,
             payment,
             user,
             conn
@@ -710,14 +722,23 @@ class PaymentService {
     user,
     connection
   ) {
-    // Logic Check: Partial Payments
-    const allPayments = await paymentModel.findByInvoiceId(
-      payment.invoiceId,
-      connection
+    const invAmount = Number(invoice.amount);
+    const totalPaidAfter = Number(
+      invoice.amountPaid || invoice.amount_paid || 0
     );
-    const totalVerified = allPayments
-      .filter((p) => p.status === 'verified')
-      .reduce((sum, p) => sum + Number(p.amount), 0);
+    const thisPaymentAmount = Number(payment.amount);
+
+    // [ATOMIC FIX] Calculate overpayment using point-in-time snapshots from the DB-controlled counter.
+    // Logic: incrementalOverpayment = max(0, totalPaidAfter - totalAmount) - max(0, (totalPaidAfter - thisPaymentAmount) - totalAmount)
+    const currentSurplus = Math.max(0, totalPaidAfter - invAmount);
+    const previousSurplus = Math.max(
+      0,
+      totalPaidAfter - thisPaymentAmount - invAmount
+    );
+    const incrementalOverpayment = Math.max(
+      0,
+      currentSurplus - previousSurplus
+    );
 
     // Lease Status Warning
     const lease = await leaseModel.findById(invoice.leaseId, connection);
@@ -727,15 +748,7 @@ class PaymentService {
       );
     }
 
-    const previousVerified = totalVerified - Number(payment.amount);
-    const amountAppliedToInvoice = Math.min(
-      Number(payment.amount),
-      Math.max(0, invoice.amount - previousVerified)
-    );
-    const incrementalOverpayment =
-      Number(payment.amount) - amountAppliedToInvoice;
-
-    if (totalVerified >= invoice.amount) {
+    if (totalPaidAfter >= invAmount) {
       await invoiceModel.updateStatus(payment.invoiceId, 'paid', connection);
 
       // [F2.12] Positive behavior scoring for on-time payment
