@@ -42,14 +42,14 @@ router.post(
   authorizeResource('lease', 'id', 'params'),
   leaseController.refundDeposit
 );
-router.post(
+router.patch(
   '/:id/refund/approve',
   authenticateToken,
   authorizeRoles('owner'),
   authorizeResource('lease', 'id', 'params'),
   leaseController.approveRefund
 );
-router.post(
+router.patch(
   '/:id/refund/dispute',
   authenticateToken,
   authorizeRoles('owner', 'treasurer'),
@@ -113,20 +113,20 @@ router.get(
   authorizeResource('lease', 'id', 'params'),
   leaseController.getDepositStatus
 );
-router.post(
+router.patch(
   '/:id/acknowledge-refund',
   authenticateToken,
   authorizeResource('lease', 'id', 'params'),
   leaseController.acknowledgeRefund
 );
-router.post(
+router.patch(
   '/:id/verify-documents',
   authenticateToken,
   authorizeRoles('owner', 'treasurer'),
   authorizeResource('lease', 'id', 'params'),
   leaseController.verifyLeaseDocuments
 );
-router.post(
+router.patch(
   '/:id/reject-documents',
   authenticateToken,
   authorizeRoles('owner', 'treasurer'),

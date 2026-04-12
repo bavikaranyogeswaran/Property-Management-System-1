@@ -254,7 +254,7 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
 
   const approveRefund = async (id: string) => {
     try {
-      await apiClient.post(`/leases/${id}/refund/approve`);
+      await apiClient.patch(`/leases/${id}/refund/approve`);
       await fetchLeases();
       toast.success(
         'Refund approved. Awaiting physical bank transfer confirmation.'
@@ -268,7 +268,7 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
 
   const acknowledgeRefund = async (id: string) => {
     try {
-      await apiClient.put(`/leases/${id}/acknowledge-refund`);
+      await apiClient.patch(`/leases/${id}/acknowledge-refund`);
       await fetchLeases();
       toast.success('Refund settlement acknowledged.');
     } catch (e: any) {
@@ -280,7 +280,7 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
 
   const disputeRefund = async (id: string, notes: string) => {
     try {
-      await apiClient.post(`/leases/${id}/refund/dispute`, { notes });
+      await apiClient.patch(`/leases/${id}/refund/dispute`, { notes });
       await fetchLeases();
       toast.success('Refund disputed successfully');
     } catch (e: any) {
@@ -384,7 +384,7 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
 
   const verifyLeaseDocuments = async (id: string) => {
     try {
-      const response = await apiClient.post(`/leases/${id}/verify-documents`);
+      const response = await apiClient.patch(`/leases/${id}/verify-documents`);
       await fetchLeases();
       toast.success(response.data.message);
     } catch (e: any) {
@@ -396,7 +396,7 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
 
   const rejectLeaseDocuments = async (id: string, reason: string) => {
     try {
-      await apiClient.post(`/leases/${id}/reject-documents`, { reason });
+      await apiClient.patch(`/leases/${id}/reject-documents`, { reason });
       await fetchLeases();
       toast.success('Documents rejected. Feedback sent to tenant.');
     } catch (e: any) {
