@@ -24,6 +24,7 @@ import leadModel from '../models/leadModel.js';
 import emailService from '../utils/emailService.js';
 import billingEngine from '../utils/billingEngine.js';
 import userService from './userService.js';
+import AppError from '../utils/AppError.js';
 
 class LeaseCreationService {
   constructor(facade) {
@@ -50,32 +51,24 @@ class LeaseCreationService {
       monthlyRent === undefined ||
       monthlyRent === null
     ) {
-      const err = new Error('All fields are required for lease creation.');
-      err.statusCode = 400;
-      throw err;
+      throw new AppError('All fields are required for lease creation.', 400);
     }
 
     if (parseLocalDate(startDate) >= parseLocalDate(endDate)) {
-      const err = new Error('End date must be after start date');
-      err.statusCode = 400;
-      throw err;
+      throw new AppError('End date must be after start date', 400);
     }
 
     const durationCheck = validateLeaseDuration(startDate, endDate);
     if (!durationCheck.isValid) {
-      const err = new Error(durationCheck.error);
-      err.statusCode = 400;
-      throw err;
+      throw new AppError(durationCheck.error, 400);
     }
 
     if (!parseLocalDate(startDate) || !parseLocalDate(endDate)) {
-      throw new Error('Invalid date format');
+      throw new AppError('Invalid date format', 400);
     }
 
     if (monthlyRent <= 0) {
-      const err = new Error('Monthly rent must be greater than 0');
-      err.statusCode = 400;
-      throw err;
+      throw new AppError('Monthly rent must be greater than 0', 400);
     }
 
     // If no connection provided, create our own transaction.
@@ -89,32 +82,25 @@ class LeaseCreationService {
 
       const tenant = await tenantModel.findByUserId(tenantId, conn);
       if (!tenant) {
-        const err = new Error('Tenant not found');
-        err.statusCode = 404;
-        throw err;
+        throw new AppError('Tenant not found', 404);
       }
 
       // 1. Check if unit is available (and LOCK it)
       const unit = await unitModel.findByIdForUpdate(unitId, conn);
       if (!unit) {
-        const err = new Error('Unit not found');
-        err.statusCode = 404;
-        throw err;
+        throw new AppError('Unit not found', 404);
       }
 
       // Check unit status - cannot lease units currently under maintenance or trashed
       if (unit.status === 'maintenance') {
-        const err = new Error(
-          'Unit is currently under maintenance and cannot be leased.'
+        throw new AppError(
+          'Unit is currently under maintenance and cannot be leased.',
+          409
         );
-        err.statusCode = 409;
-        throw err;
       }
       // [C2 FIX - Problem 3] Changed 'trashed' → 'inactive' (matches actual ENUM)
       if (unit.status === 'inactive') {
-        const err = new Error('Unit is no longer available (inactive).');
-        err.statusCode = 409;
-        throw err;
+        throw new AppError('Unit is no longer available (inactive).', 409);
       }
 
       // 2a. [REMOVED] Same-tenant overlap check (Supporting Multi-Unit Leases)
@@ -131,9 +117,10 @@ class LeaseCreationService {
         conn
       );
       if (hasOverlap) {
-        const err = new Error('Unit is already leased for the selected dates.');
-        err.statusCode = 409;
-        throw err;
+        throw new AppError(
+          'Unit is already leased for the selected dates.',
+          409
+        );
       }
 
       const leaseParams = {
@@ -213,7 +200,7 @@ class LeaseCreationService {
       if (isOwnTransaction) {
         await conn.rollback();
       }
-      throw new Error(`Database transaction failed: ${error.message}`);
+      throw error;
     } finally {
       if (isOwnTransaction) {
         conn.release();
@@ -227,9 +214,12 @@ class LeaseCreationService {
       await connection.beginTransaction();
 
       const lease = await leaseModel.findById(leaseId, connection);
-      if (!lease) throw new Error('Lease not found');
+      if (!lease) throw new AppError('Lease not found', 404);
       if (lease.status !== 'draft')
-        throw new Error('Only draft leases can have documents verified');
+        throw new AppError(
+          'Only draft leases can have documents verified',
+          400
+        );
 
       await leaseModel.update(
         leaseId,
@@ -283,9 +273,12 @@ class LeaseCreationService {
       await connection.beginTransaction();
 
       const lease = await leaseModel.findById(leaseId, connection);
-      if (!lease) throw new Error('Lease not found');
+      if (!lease) throw new AppError('Lease not found', 404);
       if (lease.status !== 'draft')
-        throw new Error('Only draft leases can have documents rejected');
+        throw new AppError(
+          'Only draft leases can have documents rejected',
+          400
+        );
 
       await leaseModel.update(
         leaseId,
@@ -333,20 +326,19 @@ class LeaseCreationService {
         await conn.beginTransaction();
       }
 
-      // [HARDENED] Deterministic Locking Order (Unit -> Lease)
       // 1. Initial look up to get Unit ID (no lock)
       const baseLease = await leaseModel.findById(leaseId, conn);
-      if (!baseLease) throw new Error('Lease not found');
+      if (!baseLease) throw new AppError('Lease not found', 404);
 
       // 2. Lock Parent (Unit) first
       const unit = await unitModel.findByIdForUpdate(baseLease.unitId, conn);
       if (!unit || unit.status === 'inactive') {
-        throw new Error('Unit is no longer available for occupancy.');
+        throw new AppError('Unit is no longer available for occupancy.', 409);
       }
 
       // 3. Lock Child (Lease) second
       const lease = await leaseModel.findByIdForUpdate(leaseId, conn);
-      if (!lease) throw new Error('Lease not found');
+      if (!lease) throw new AppError('Lease not found', 404);
 
       // [FIX B] Allow idempotent re-entry — lease may have been activated in a previous
       // crashed transaction that the gateway is retrying.
@@ -363,29 +355,27 @@ class LeaseCreationService {
       }
 
       if (lease.status !== 'draft')
-        throw new Error('Only draft leases can be signed');
+        throw new AppError('Only draft leases can be signed', 400);
 
       if (unit.status === 'maintenance') {
-        throw new Error(
-          'Unit is currently under maintenance or repair and cannot be leased until cleared by staff.'
+        throw new AppError(
+          'Unit is currently under maintenance or repair and cannot be leased until cleared by staff.',
+          409
         );
       }
 
       if (!unit.isTurnoverCleared) {
-        throw new Error(
-          'Unit is pending turnover clearance. Occupancy is blocked until inspection is complete.'
+        throw new AppError(
+          'Unit is pending turnover clearance. Occupancy is blocked until inspection is complete.',
+          400
         );
       }
 
-      const hasOverlap = await leaseModel.checkOverlap(
-        lease.unitId,
-        lease.startDate,
-        lease.endDate,
-        leaseId,
-        conn
-      );
       if (hasOverlap) {
-        throw new Error('Unit is already leased for the selected dates.');
+        throw new AppError(
+          'Unit is already leased for the selected dates.',
+          409
+        );
       }
 
       const todayDate = today();
@@ -394,15 +384,17 @@ class LeaseCreationService {
       // This ensures the unit status move to 'occupied' is backed by verified funds.
       const depositStats = await leaseModel.getDepositStatus(leaseId, conn);
       if (depositStats && !depositStats.isFullyPaid) {
-        throw new Error(
-          `Cannot activate lease: Security Deposit of LKR ${depositStats.targetAmount.toLocaleString()} is not fully paid. Current ledger balance: LKR ${depositStats.paidAmount.toLocaleString()}.`
+        throw new AppError(
+          `Cannot activate lease: Security Deposit of LKR ${depositStats.targetAmount.toLocaleString()} is not fully paid. Current ledger balance: LKR ${depositStats.paidAmount.toLocaleString()}.`,
+          400
         );
       }
 
       // [NEW] Verify Documents
       if (!lease.isDocumentsVerified) {
-        throw new Error(
-          'Cannot activate lease: Tenant documents have not been verified by staff.'
+        throw new AppError(
+          'Cannot activate lease: Tenant documents have not been verified by staff.',
+          400
         );
       }
 
@@ -569,7 +561,7 @@ class LeaseCreationService {
       if (isOwnTransaction) {
         await conn.rollback();
       }
-      throw new Error(`Transaction failed: ${error.message}`);
+      throw error;
     } finally {
       if (isOwnTransaction) {
         conn.release();

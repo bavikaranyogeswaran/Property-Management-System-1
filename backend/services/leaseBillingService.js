@@ -19,6 +19,7 @@ import {
 import { toCentsFromMajor, moneyMath, fromCents } from '../utils/moneyUtils.js';
 import renewalService from './renewalService.js';
 import auditLogger from '../utils/auditLogger.js';
+import AppError from '../utils/AppError.js';
 
 class LeaseBillingService {
   constructor(facade) {
@@ -27,10 +28,11 @@ class LeaseBillingService {
 
   async addRentAdjustment(leaseId, data, user) {
     const lease = await this.facade.getLeaseById(leaseId, user);
-    if (!lease) throw new Error('Lease not found');
+    if (!lease) throw new AppError('Lease not found', 404);
     if (user.role !== 'owner')
-      throw new Error(
-        'Access denied: Only owners can perform rent adjustments'
+      throw new AppError(
+        'Access denied: Only owners can perform rent adjustments',
+        403
       );
 
     const { effectiveDate, newMonthlyRent, notes } = data;
@@ -38,9 +40,9 @@ class LeaseBillingService {
     const eff = parseLocalDate(effectiveDate);
 
     if (eff < start)
-      throw new Error('Adjustment date cannot be before lease start');
+      throw new AppError('Adjustment date cannot be before lease start', 400);
     if (lease.endDate && eff > parseLocalDate(lease.endDate))
-      throw new Error('Adjustment date cannot be after lease end');
+      throw new AppError('Adjustment date cannot be after lease end', 400);
 
     // [HARDENED] Input is now sanitized to cents at the controller.
     const newRentCents = newMonthlyRent;
@@ -65,7 +67,7 @@ class LeaseBillingService {
 
   async getRentAdjustments(leaseId, user) {
     const lease = await this.facade.getLeaseById(leaseId, user);
-    if (!lease) throw new Error('Lease not found');
+    if (!lease) throw new AppError('Lease not found', 404);
     return await leaseModel.findAdjustmentsByLeaseId(leaseId);
   }
 }

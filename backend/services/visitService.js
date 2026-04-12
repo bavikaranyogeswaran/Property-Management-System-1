@@ -5,6 +5,7 @@ import unitModel from '../models/unitModel.js';
 import notificationModel from '../models/notificationModel.js';
 import emailService from '../utils/emailService.js';
 import auditLogger from '../utils/auditLogger.js';
+import AppError from '../utils/AppError.js';
 
 class VisitService {
   async scheduleVisit(data) {
@@ -12,7 +13,7 @@ class VisitService {
     let unit = null;
 
     if (!propertyId || !name || !email || !date || !time) {
-      throw new Error('Missing required fields');
+      throw new AppError('Missing required fields', 400);
     }
 
     // 1. Time Slot Rounding (Nearest 30 mins)
@@ -28,8 +29,9 @@ class VisitService {
     // 2a. Business Hours Validation (9 AM - 6 PM)
     const hour = scheduledDate.getHours();
     if (hour < 9 || hour >= 18) {
-      throw new Error(
-        'Visits can only be scheduled between 9:00 AM and 6:00 PM.'
+      throw new AppError(
+        'Visits can only be scheduled between 9:00 AM and 6:00 PM.',
+        400
       );
     }
 
@@ -37,24 +39,29 @@ class VisitService {
     const now = new Date();
     const twoHoursFromNow = new Date(now.getTime() + 2 * 60 * 60 * 1000);
     if (scheduledDate < twoHoursFromNow) {
-      throw new Error('Visits must be scheduled at least 2 hours in advance');
+      throw new AppError(
+        'Visits must be scheduled at least 2 hours in advance',
+        400
+      );
     }
 
     // 3. Unit Status Validation
     if (unitId) {
       unit = await unitModel.findById(unitId);
-      if (!unit) throw new Error('Unit not found');
+      if (!unit) throw new AppError('Unit not found', 404);
       if (unit.status !== 'available') {
-        throw new Error(
-          `Unit ${unit.unitNumber} is currently ${unit.status} and not available for visits.`
+        throw new AppError(
+          `Unit ${unit.unitNumber} is currently ${unit.status} and not available for visits.`,
+          409
         );
       }
 
       // 4. Conflict Detection
       const hasConflict = await visitModel.existsInSlot(unitId, scheduledDate);
       if (hasConflict) {
-        throw new Error(
-          'This time slot is already booked for this unit. Please select another time.'
+        throw new AppError(
+          'This time slot is already booked for this unit. Please select another time.',
+          409
         );
       }
     }
@@ -65,8 +72,9 @@ class VisitService {
       scheduledDate
     );
     if (concurrentVisits >= 1) {
-      throw new Error(
-        'Property viewing capacity reached for this time slot (Max 1). Please select another time.'
+      throw new AppError(
+        'Property viewing capacity reached for this time slot (Max 1). Please select another time.',
+        409
       );
     }
 
@@ -156,7 +164,7 @@ class VisitService {
     // If user is provided, check ownership if needed.
     // For public cancellation, we might use a token, but for now we follow the simple pattern.
     const visit = await visitModel.findById(visitId);
-    if (!visit) throw new Error('Visit not found');
+    if (!visit) throw new AppError('Visit not found', 404);
 
     const success = await visitModel.updateStatus(visitId, 'cancelled');
 
@@ -187,16 +195,18 @@ class VisitService {
       if (propertyIds.length === 0) return [];
       return await visitModel.findAll({ propertyIds });
     } else {
-      throw new Error(
-        'Access denied. Insufficient permissions to view visits.'
+      throw new AppError(
+        'Access denied. Insufficient permissions to view visits.',
+        403
       );
     }
   }
 
   async updateStatus(id, status, user) {
     if (!user || (user.role !== 'owner' && user.role !== 'treasurer')) {
-      throw new Error(
-        'Access denied. Only owners and treasurers can update visit status.'
+      throw new AppError(
+        'Access denied. Only owners and treasurers can update visit status.',
+        403
       );
     }
 
@@ -208,11 +218,11 @@ class VisitService {
       'no-show',
     ];
     if (!validStatuses.includes(status)) {
-      throw new Error('Invalid status');
+      throw new AppError('Invalid status', 400);
     }
 
     const success = await visitModel.updateStatus(id, status);
-    if (!success) throw new Error('Visit not found');
+    if (!success) throw new AppError('Visit not found', 404);
 
     // Logic Hook: Update Lead
     const visit = await visitModel.findById(id);
@@ -269,15 +279,16 @@ class VisitService {
 
   async rescheduleVisit(id, data, user) {
     const { date, time, notes } = data;
-    if (!date || !time) throw new Error('New date and time are required');
+    if (!date || !time)
+      throw new AppError('New date and time are required', 400);
 
     const visit = await visitModel.findById(id);
-    if (!visit) throw new Error('Visit not found');
+    if (!visit) throw new AppError('Visit not found', 404);
 
     // Security check: Only owner/staff or the visitor themselves (if we had a token)
     // For now, owner/staff only as per the controller routes
     if (!user || (user.role !== 'owner' && user.role !== 'treasurer')) {
-      throw new Error('Access denied.');
+      throw new AppError('Access denied.', 403);
     }
 
     // 1. Time Slot Rounding
@@ -297,8 +308,9 @@ class VisitService {
         scheduledDate
       );
       if (hasConflict) {
-        throw new Error(
-          'The new time slot is already booked for this unit. Please select another time.'
+        throw new AppError(
+          'The new time slot is already booked for this unit. Please select another time.',
+          409
         );
       }
     }

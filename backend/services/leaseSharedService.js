@@ -23,6 +23,7 @@ import {
 } from '../utils/dateUtils.js';
 import { toCentsFromMajor, moneyMath, fromCents } from '../utils/moneyUtils.js';
 import renewalService from './renewalService.js';
+import AppError from '../utils/AppError.js';
 
 class LeaseSharedService {
   constructor(facade) {
@@ -35,12 +36,12 @@ class LeaseSharedService {
       return await leaseModel.findAll(null, user.id);
     }
     if (user.role === 'tenant') return await leaseModel.findByTenantId(user.id);
-    throw new Error('Access denied');
+    throw new AppError('Access denied', 403);
   }
 
   async getLeaseById(id, user) {
     const lease = await leaseModel.findById(id);
-    if (!lease) throw new Error('Lease not found');
+    if (!lease) throw new AppError('Lease not found', 404);
     if (user.role === 'owner') {
       const property = await propertyModel.findById(lease.propertyId);
       if (property && String(property.ownerId) === String(user.id))
@@ -55,7 +56,7 @@ class LeaseSharedService {
     }
     if (user.role === 'tenant' && String(lease.tenantId) === String(user.id))
       return lease;
-    throw new Error('Access denied');
+    throw new AppError('Access denied', 403);
   }
 
   async _syncUnitStatus(unitId, connection) {
@@ -113,7 +114,7 @@ class LeaseSharedService {
 
   async updateLeaseDocument(id, documentUrl, user = null) {
     const lease = await leaseModel.findById(id);
-    if (!lease) throw new Error('Lease not found');
+    if (!lease) throw new AppError('Lease not found', 404);
 
     await leaseModel.update(id, { documentUrl: documentUrl });
 
@@ -134,10 +135,11 @@ class LeaseSharedService {
       await conn.beginTransaction();
 
       const lease = await leaseModel.findById(leaseId, conn);
-      if (!lease) throw new Error('Lease not found');
+      if (!lease) throw new AppError('Lease not found', 404);
       if (lease.status !== 'draft')
-        throw new Error(
-          'Magic links can only be regenerated for draft leases.'
+        throw new AppError(
+          'Magic links can only be regenerated for draft leases.',
+          400
         );
 
       // Find the deposit invoice
@@ -147,7 +149,10 @@ class LeaseSharedService {
       );
 
       if (invoices.length === 0)
-        throw new Error('No pending deposit invoice found for this lease.');
+        throw new AppError(
+          'No pending deposit invoice found for this lease.',
+          404
+        );
 
       const invoice = invoices[0];
       const rawToken = randomUUID();

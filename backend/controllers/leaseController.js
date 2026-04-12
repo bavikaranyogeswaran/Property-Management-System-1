@@ -1,427 +1,241 @@
 import leaseService from '../services/leaseService.js';
 import renewalService from '../services/renewalService.js';
 import { toCentsFromMajor } from '../utils/moneyUtils.js';
+import catchAsync from '../utils/catchAsync.js';
 
 class LeaseController {
-  async getLeases(req, res) {
-    try {
-      const results = await leaseService.getLeases(req.user);
-      res.json(results);
-    } catch (error) {
-      console.error(error);
-      const status = error.status || error.statusCode || 500;
-      if (status === 403 || error.message.includes('Access denied')) {
-        return res.status(403).json({ error: error.message });
-      }
-      res.status(status).json({ error: error.message });
+  getLeases = catchAsync(async (req, res) => {
+    const results = await leaseService.getLeases(req.user);
+    res.json(results);
+  });
+
+  getLeaseById = catchAsync(async (req, res) => {
+    const { id } = req.params;
+    const lease = await leaseService.getLeaseById(id, req.user);
+    res.json(lease);
+  });
+
+  createLease = catchAsync(async (req, res) => {
+    const result = await leaseService.createLease(req.body, null, req.user);
+    res.status(201).json({
+      leaseId: result.leaseId,
+      magicToken: result.magicToken,
+      message: 'Lease created successfully',
+    });
+  });
+
+  rejectLeaseDocuments = catchAsync(async (req, res) => {
+    const { id } = req.params;
+    const { reason } = req.body;
+    if (!reason) {
+      return res.status(400).json({ error: 'Rejection reason is required' });
     }
-  }
 
-  async getLeaseById(req, res) {
-    try {
-      const { id } = req.params;
-      const lease = await leaseService.getLeaseById(id, req.user);
-      res.json(lease);
-    } catch (error) {
-      const status = error.status || error.statusCode || 500;
-      if (status === 404 || error.message === 'Lease not found')
-        return res.status(404).json({ error: error.message });
-      if (status === 403 || error.message.includes('Access denied'))
-        return res.status(403).json({ error: error.message });
-      res.status(status).json({ error: error.message });
+    const result = await leaseService.rejectLeaseDocuments(
+      id,
+      reason,
+      req.user
+    );
+    res.status(200).json(result);
+  });
+
+  withdrawApplication = catchAsync(async (req, res) => {
+    const { id } = req.params;
+    await leaseService.withdrawApplication(id, req.user);
+    res.status(200).json({ message: 'Application withdrawn successfully' });
+  });
+
+  signLease = catchAsync(async (req, res) => {
+    const { id } = req.params;
+    const result = await leaseService.signLease(id, req.user);
+    res.json({ message: 'Lease signed successfully', status: result.status });
+  });
+
+  verifyLeaseDocuments = catchAsync(async (req, res) => {
+    const { id } = req.params;
+    const result = await leaseService.verifyLeaseDocuments(id, req.user);
+    res.json({
+      message: result.activated
+        ? 'Documents verified and lease activated (deposit was already paid).'
+        : 'Documents verified. Awaiting deposit payment for activation.',
+      ...result,
+    });
+  });
+
+  getDepositStatus = catchAsync(async (req, res) => {
+    const { id } = req.params;
+    const leaseModel = (await import('../models/leaseModel.js')).default;
+    const status = await leaseModel.getDepositStatus(id);
+
+    if (!status) {
+      return res.status(404).json({ error: 'Lease not found' });
     }
-  }
+    res.json(status);
+  });
 
-  //  CREATE LEASE
-  async createLease(req, res) {
-    try {
-      const leaseId = await leaseService.createLease(req.body, null, req.user);
-      res
-        .status(201)
-        .json({ id: leaseId, message: 'Lease created successfully' });
-    } catch (error) {
-      console.error('Create Lease Error:', error);
-      const status = error.status || error.statusCode || 500;
-      if (
-        status === 400 ||
-        error.message.includes('required') ||
-        error.message.includes('Invalid') ||
-        error.message.includes('greater than 0')
-      ) {
-        return res.status(400).json({ error: error.message });
-      }
-      if (status === 404 || error.message.includes('Unit not found')) {
-        return res.status(404).json({ error: error.message });
-      }
-      if (
-        status === 409 ||
-        error.message.includes('Unit is already leased') ||
-        error.message.includes('Unit is currently under maintenance')
-      ) {
-        return res.status(409).json({ error: error.message });
-      }
-      res.status(status).json({ error: error.message });
+  instantRenew = catchAsync(async (req, res) => {
+    const { id } = req.params;
+    const { newEndDate, newMonthlyRent } = req.body;
+
+    const result = await renewalService.instantRenew(
+      id,
+      newEndDate,
+      toCentsFromMajor(newMonthlyRent),
+      req.user
+    );
+    res.json({ message: 'Lease instantly renewed successfully', ...result });
+  });
+
+  refundDeposit = catchAsync(async (req, res) => {
+    const { id } = req.params;
+    const { amount, notes } = req.body;
+
+    const result = await leaseService.requestRefund(
+      id,
+      toCentsFromMajor(amount),
+      notes,
+      req.user
+    );
+    res.json({ message: 'Deposit refund requested successfully', ...result });
+  });
+
+  approveRefund = catchAsync(async (req, res) => {
+    const { id } = req.params;
+    const result = await leaseService.approveRefund(id, req.user);
+    res.json({
+      message: 'Refund approved and executed successfully',
+      ...result,
+    });
+  });
+
+  disputeRefund = catchAsync(async (req, res) => {
+    const { id } = req.params;
+    const { notes } = req.body;
+    const result = await leaseService.disputeRefund(id, notes, req.user);
+    res.json({ message: 'Refund request marked as disputed', ...result });
+  });
+
+  terminateLease = catchAsync(async (req, res) => {
+    const { id } = req.params;
+    const { terminationDate, terminationFee } = req.body; // Fee optional
+
+    const result = await leaseService.terminateLease(
+      id,
+      terminationDate,
+      toCentsFromMajor(terminationFee),
+      req.user
+    );
+    res.json({ message: 'Lease terminated successfully', ...result });
+  });
+
+  updateLeaseDocument = catchAsync(async (req, res) => {
+    const { id } = req.params;
+    const { documentUrl } = req.body;
+
+    if (!documentUrl) {
+      return res.status(400).json({ error: 'documentUrl is required' });
     }
-  }
 
-  async rejectLeaseDocuments(req, res) {
-    try {
-      const { id } = req.params;
-      const { reason } = req.body;
-      if (!reason)
-        return res.status(400).json({ error: 'Rejection reason is required' });
+    await leaseService.updateLeaseDocument(id, documentUrl, req.user);
+    res.json({ message: 'Lease document updated successfully', documentUrl });
+  });
 
-      const result = await leaseService.rejectLeaseDocuments(
-        id,
-        reason,
-        req.user
-      );
-      res.status(200).json(result);
-    } catch (error) {
-      res.status(400).json({ error: error.message });
+  updateNoticeStatus = catchAsync(async (req, res) => {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    await leaseService.updateNoticeStatus(id, status, req.user);
+    res.json({ message: 'Notice status updated successfully', status });
+  });
+
+  addRentAdjustment = catchAsync(async (req, res) => {
+    const { id } = req.params;
+    const { effectiveDate, newMonthlyRent, notes } = req.body;
+
+    if (!effectiveDate || !newMonthlyRent) {
+      return res
+        .status(400)
+        .json({ error: 'effectiveDate and newMonthlyRent are required' });
     }
-  }
 
-  async withdrawApplication(req, res) {
-    try {
-      const { id } = req.params;
-      await leaseService.withdrawApplication(id, req.user);
-      res.status(200).json({ message: 'Application withdrawn successfully' });
-    } catch (error) {
-      res.status(400).json({ error: error.message });
-    }
-  }
-
-  async signLease(req, res) {
-    try {
-      const { id } = req.params;
-      const result = await leaseService.signLease(id, req.user);
-      res.json({ message: 'Lease signed successfully', status: result.status });
-    } catch (error) {
-      console.error('Sign Lease Error:', error);
-      if (error.message.includes('not found'))
-        return res.status(404).json({ error: error.message });
-      if (error.message.includes('draft'))
-        return res.status(400).json({ error: error.message });
-      if (
-        error.message.includes('available') ||
-        error.message.includes('already leased')
-      )
-        return res.status(409).json({ error: error.message });
-      if (
-        error.message.includes('not fully paid') ||
-        error.message.includes('not been verified') ||
-        error.message.includes('turnover') ||
-        error.message.includes('inspection') ||
-        error.message.includes('occupancy')
-      )
-        return res.status(400).json({ error: error.message });
-      res.status(500).json({ error: error.message });
-    }
-  }
-
-  async verifyLeaseDocuments(req, res) {
-    try {
-      const { id } = req.params;
-      const result = await leaseService.verifyLeaseDocuments(id, req.user);
-      res.json({
-        message: result.activated
-          ? 'Documents verified and lease activated (deposit was already paid).'
-          : 'Documents verified. Awaiting deposit payment for activation.',
-        ...result,
-      });
-    } catch (error) {
-      console.error('Verify Lease Documents Error:', error);
-      if (error.message.includes('not found'))
-        return res.status(404).json({ error: error.message });
-      if (error.message.includes('Access denied'))
-        return res.status(403).json({ error: error.message });
-      res.status(500).json({ error: error.message });
-    }
-  }
-
-  async getDepositStatus(req, res) {
-    try {
-      const { id } = req.params;
-      const leaseModel = (await import('../models/leaseModel.js')).default;
-      const status = await leaseModel.getDepositStatus(id);
-
-      if (!status) return res.status(404).json({ error: 'Lease not found' });
-      res.json(status);
-    } catch (error) {
-      console.error('Get Deposit Status Error:', error);
-      res.status(500).json({ error: error.message });
-    }
-  }
-
-  async instantRenew(req, res) {
-    try {
-      const { id } = req.params;
-      const { newEndDate, newMonthlyRent } = req.body;
-
-      const result = await renewalService.instantRenew(
-        id,
-        newEndDate,
-        toCentsFromMajor(newMonthlyRent),
-        req.user
-      );
-      res.json({ message: 'Lease instantly renewed successfully', ...result });
-    } catch (error) {
-      if (error.message.includes('not found'))
-        return res.status(404).json({ error: error.message });
-      if (error.message.includes('approved'))
-        return res.status(400).json({ error: error.message });
-      if (error.message.includes('AFTER'))
-        return res.status(400).json({ error: error.message });
-      res.status(500).json({ error: error.message });
-    }
-  }
-
-  async refundDeposit(req, res) {
-    try {
-      const { id } = req.params;
-      const { amount, notes } = req.body;
-
-      const result = await leaseService.requestRefund(
-        id,
-        toCentsFromMajor(amount),
+    const adjustmentId = await leaseService.addRentAdjustment(
+      id,
+      {
+        effectiveDate,
+        newMonthlyRent: toCentsFromMajor(newMonthlyRent),
         notes,
-        req.user
-      );
-      res.json({ message: 'Deposit refund requested successfully', ...result });
-    } catch (error) {
-      if (error.message.includes('not found'))
-        return res.status(404).json({ error: error.message });
-      if (
-        error.message.includes('exceed') ||
-        error.message.includes('required')
-      )
-        return res.status(400).json({ error: error.message });
-      res.status(500).json({ error: error.message });
+      },
+      req.user
+    );
+
+    res.status(201).json({
+      message: 'Rent adjustment added successfully',
+      adjustmentId,
+    });
+  });
+
+  getRentAdjustments = catchAsync(async (req, res) => {
+    const { id } = req.params;
+    const adjustments = await leaseService.getRentAdjustments(id, req.user);
+    res.json(adjustments);
+  });
+
+  finalizeCheckout = catchAsync(async (req, res) => {
+    const { id } = req.params;
+    const result = await leaseService.finalizeLeaseCheckout(id, req.user);
+    res.json({ message: 'Lease checkout finalized successfully', ...result });
+  });
+
+  resolveRefundDispute = catchAsync(async (req, res) => {
+    const { id } = req.params;
+    const { adjustedAmount } = req.body;
+    if (adjustedAmount === undefined || adjustedAmount < 0) {
+      return res
+        .status(400)
+        .json({ error: 'Valid adjustedAmount is required' });
     }
-  }
+    const result = await leaseService.resolveRefundDispute(
+      id,
+      req.user,
+      toCentsFromMajor(adjustedAmount)
+    );
+    res.json(result);
+  });
 
-  async approveRefund(req, res) {
-    try {
-      const { id } = req.params;
-      const result = await leaseService.approveRefund(id, req.user);
-      res.json({
-        message: 'Refund approved and executed successfully',
-        ...result,
-      });
-    } catch (error) {
-      if (error.message.includes('not found'))
-        return res.status(404).json({ error: error.message });
-      res.status(500).json({ error: error.message });
-    }
-  }
+  acknowledgeRefund = catchAsync(async (req, res) => {
+    const { id } = req.params;
+    const result = await leaseService.acknowledgeRefund(id, req.user.id);
+    res.json(result);
+  });
 
-  async disputeRefund(req, res) {
-    try {
-      const { id } = req.params;
-      const { notes } = req.body;
-      const result = await leaseService.disputeRefund(id, notes, req.user);
-      res.json({ message: 'Refund request marked as disputed', ...result });
-    } catch (error) {
-      if (error.message.includes('not found'))
-        return res.status(404).json({ error: error.message });
-      res.status(500).json({ error: error.message });
-    }
-  }
+  recordDisbursement = catchAsync(async (req, res) => {
+    const { id } = req.params;
+    const result = await leaseService.confirmDisbursement(
+      id,
+      req.body,
+      req.user
+    );
+    res.json({
+      message: 'Disbursement recorded and refund finalized.',
+      ...result,
+    });
+  });
 
-  async terminateLease(req, res) {
-    try {
-      const { id } = req.params;
-      const { terminationDate, terminationFee } = req.body; // Fee optional
+  cancelLease = catchAsync(async (req, res) => {
+    const { id } = req.params;
+    await leaseService.cancelLease(id, req.user);
+    res.json({
+      message: 'Lease cancelled successfully and unit status updated.',
+    });
+  });
 
-      const result = await leaseService.terminateLease(
-        id,
-        terminationDate,
-        toCentsFromMajor(terminationFee),
-        req.user
-      );
-      res.json({ message: 'Lease terminated successfully', ...result });
-    } catch (error) {
-      if (error.message.includes('not found'))
-        return res.status(404).json({ error: error.message });
-      res.status(500).json({ error: error.message });
-    }
-  }
-
-  async updateLeaseDocument(req, res) {
-    try {
-      const { id } = req.params;
-      const { documentUrl } = req.body;
-
-      if (!documentUrl) {
-        return res.status(400).json({ error: 'documentUrl is required' });
-      }
-
-      await leaseService.updateLeaseDocument(id, documentUrl, req.user);
-      res.json({ message: 'Lease document updated successfully', documentUrl });
-    } catch (error) {
-      if (error.message.includes('not found'))
-        return res.status(404).json({ error: error.message });
-      res.status(500).json({ error: error.message });
-    }
-  }
-
-  async updateNoticeStatus(req, res) {
-    try {
-      const { id } = req.params;
-      const { status } = req.body;
-
-      await leaseService.updateNoticeStatus(id, status, req.user);
-      res.json({ message: 'Notice status updated successfully', status });
-    } catch (error) {
-      if (error.message.includes('not found'))
-        return res.status(404).json({ error: error.message });
-      if (error.message.includes('Access denied'))
-        return res.status(403).json({ error: error.message });
-      res.status(500).json({ error: error.message });
-    }
-  }
-
-  async addRentAdjustment(req, res) {
-    try {
-      const { id } = req.params;
-      const { effectiveDate, newMonthlyRent, notes } = req.body;
-
-      if (!effectiveDate || !newMonthlyRent) {
-        return res
-          .status(400)
-          .json({ error: 'effectiveDate and newMonthlyRent are required' });
-      }
-
-      const adjustmentId = await leaseService.addRentAdjustment(
-        id,
-        {
-          effectiveDate,
-          newMonthlyRent: toCentsFromMajor(newMonthlyRent),
-          notes,
-        },
-        req.user
-      );
-
-      res.status(201).json({
-        message: 'Rent adjustment added successfully',
-        adjustmentId,
-      });
-    } catch (error) {
-      if (error.message.includes('not found'))
-        return res.status(404).json({ error: error.message });
-      if (error.message.includes('Access denied'))
-        return res.status(403).json({ error: error.message });
-      res.status(500).json({ error: error.message });
-    }
-  }
-
-  async getRentAdjustments(req, res) {
-    try {
-      const { id } = req.params;
-      const adjustments = await leaseService.getRentAdjustments(id, req.user);
-      res.json(adjustments);
-    } catch (error) {
-      if (error.message.includes('not found'))
-        return res.status(404).json({ error: error.message });
-      if (error.message.includes('Access denied'))
-        return res.status(403).json({ error: error.message });
-      res.status(500).json({ error: error.message });
-    }
-  }
-
-  async finalizeCheckout(req, res) {
-    try {
-      const { id } = req.params;
-      const result = await leaseService.finalizeLeaseCheckout(id, req.user);
-      res.json({ message: 'Lease checkout finalized successfully', ...result });
-    } catch (error) {
-      if (error.message.includes('not found'))
-        return res.status(404).json({ error: error.message });
-      if (error.message.includes('Only expired or ended'))
-        return res.status(400).json({ error: error.message });
-      res.status(500).json({ error: error.message });
-    }
-  }
-
-  async resolveRefundDispute(req, res) {
-    try {
-      const { id } = req.params;
-      const { adjustedAmount } = req.body;
-      if (adjustedAmount === undefined || adjustedAmount < 0) {
-        return res
-          .status(400)
-          .json({ error: 'Valid adjustedAmount is required' });
-      }
-      const result = await leaseService.resolveRefundDispute(
-        id,
-        req.user,
-        toCentsFromMajor(adjustedAmount)
-      );
-      res.json(result);
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: error.message });
-    }
-  }
-
-  async acknowledgeRefund(req, res) {
-    try {
-      const { id } = req.params;
-      const result = await leaseService.acknowledgeRefund(id, req.user.id);
-      res.json(result);
-    } catch (error) {
-      console.error(error);
-      res.status(400).json({ error: error.message });
-    }
-  }
-
-  async recordDisbursement(req, res) {
-    try {
-      const { id } = req.params;
-      const result = await leaseService.confirmDisbursement(
-        id,
-        req.body,
-        req.user
-      );
-      res.json({
-        message: 'Disbursement recorded and refund finalized.',
-        ...result,
-      });
-    } catch (error) {
-      console.error('Record Disbursement Error:', error);
-      if (error.message.includes('Access denied'))
-        return res.status(403).json({ error: error.message });
-      if (error.message.includes('not found'))
-        return res.status(404).json({ error: error.message });
-      res.status(400).json({ error: error.message });
-    }
-  }
-
-  async cancelLease(req, res) {
-    try {
-      const { id } = req.params;
-      await leaseService.cancelLease(id, req.user);
-      res.json({
-        message: 'Lease cancelled successfully and unit status updated.',
-      });
-    } catch (error) {
-      res.status(500).json({ error: error.message });
-    }
-  }
-
-  async regenerateMagicToken(req, res) {
-    try {
-      const { id } = req.params;
-      await leaseService.regenerateMagicLink(id, req.user);
-      res.json({
-        message: 'New magic link generated and sent to tenant successfully.',
-      });
-    } catch (error) {
-      console.error('Regenerate Token Error:', error);
-      res.status(400).json({ error: error.message });
-    }
-  }
+  regenerateMagicToken = catchAsync(async (req, res) => {
+    const { id } = req.params;
+    await leaseService.regenerateMagicLink(id, req.user);
+    res.json({
+      message: 'New magic link generated and sent to tenant successfully.',
+    });
+  });
 }
 
 export default new LeaseController();

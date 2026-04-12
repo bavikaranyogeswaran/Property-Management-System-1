@@ -24,6 +24,7 @@ import { toCentsFromMajor, moneyMath, fromCents } from '../utils/moneyUtils.js';
 import renewalService from './renewalService.js';
 import notificationModel from '../models/notificationModel.js';
 import userModel from '../models/userModel.js';
+import AppError from '../utils/AppError.js';
 
 class LeaseRefundService {
   constructor(facade) {
@@ -32,16 +33,17 @@ class LeaseRefundService {
 
   async requestRefund(leaseId, amount, notes, user) {
     const lease = await leaseModel.findById(leaseId);
-    if (!lease) throw new Error('Lease not found');
+    if (!lease) throw new AppError('Lease not found', 404);
 
     const ledgerBalance = await leaseModel.getDepositBalance(leaseId);
     if (ledgerBalance <= 0) {
-      throw new Error('No security deposit available to refund.');
+      throw new AppError('No security deposit available to refund.', 400);
     }
 
     if (['refunded', 'awaiting_approval'].includes(lease.depositStatus)) {
-      throw new Error(
-        `Deposit is already ${lease.depositStatus.replace('_', ' ')}.`
+      throw new AppError(
+        `Deposit is already ${lease.depositStatus.replace('_', ' ')}.`,
+        400
       );
     }
 
@@ -49,13 +51,17 @@ class LeaseRefundService {
       lease.depositStatus !== 'paid' &&
       lease.depositStatus !== 'partially_refunded'
     ) {
-      throw new Error('Cannot refund deposit that has not been fully paid.');
+      throw new AppError(
+        'Cannot refund deposit that has not been fully paid.',
+        400
+      );
     }
 
     // [B2 FIX] Removed duplicate getDepositBalance call that reassigned a const
     if (amount > ledgerBalance) {
-      throw new Error(
-        `Refund amount (LKR ${amount.toLocaleString()}) cannot exceed verified ledger balance (LKR ${ledgerBalance.toLocaleString()}).`
+      throw new AppError(
+        `Refund amount (LKR ${amount.toLocaleString()}) cannot exceed verified ledger balance (LKR ${ledgerBalance.toLocaleString()}).`,
+        400
       );
     }
 
@@ -78,13 +84,13 @@ class LeaseRefundService {
 
   async approveRefund(leaseId, user) {
     const lease = await leaseModel.findById(leaseId);
-    if (!lease) throw new Error('Lease not found');
+    if (!lease) throw new AppError('Lease not found', 404);
 
     if (
       !lease.proposedRefundAmount ||
       Number(lease.proposedRefundAmount) <= 0
     ) {
-      throw new Error('No refund request awaiting approval.');
+      throw new AppError('No refund request awaiting approval.', 400);
     }
 
     const amount = lease.proposedRefundAmount;
@@ -100,8 +106,9 @@ class LeaseRefundService {
         connection
       );
       if (amount > ledgerBalance) {
-        throw new Error(
-          `Refund amount (LKR ${amount.toLocaleString()}) cannot exceed verified ledger balance (LKR ${ledgerBalance.toLocaleString()}).`
+        throw new AppError(
+          `Refund amount (LKR ${amount.toLocaleString()}) cannot exceed verified ledger balance (LKR ${ledgerBalance.toLocaleString()}).`,
+          400
         );
       }
 
@@ -317,21 +324,26 @@ class LeaseRefundService {
 
   async confirmDisbursement(leaseId, data, user) {
     if (user.role !== 'owner' && user.role !== 'treasurer') {
-      throw new Error(
-        'Access denied. Only owners and treasurers can record disbursements.'
+      throw new AppError(
+        'Access denied. Only owners and treasurers can record disbursements.',
+        403
       );
     }
 
     const { bankReferenceId, disbursementDate } = data;
     if (!bankReferenceId)
-      throw new Error('Bank Reference ID is required for disbursement.');
+      throw new AppError(
+        'Bank Reference ID is required for disbursement.',
+        400
+      );
 
     const lease = await leaseModel.findById(leaseId);
-    if (!lease) throw new Error('Lease not found');
+    if (!lease) throw new AppError('Lease not found', 404);
 
     if (lease.depositStatus !== 'awaiting_acknowledgment') {
-      throw new Error(
-        'This refund is not in the correct state (Approved, Pending Disbursement).'
+      throw new AppError(
+        'This refund is not in the correct state (Approved, Pending Disbursement).',
+        400
       );
     }
 
@@ -392,19 +404,26 @@ class LeaseRefundService {
 
   async disputeRefund(leaseId, notes, user) {
     const lease = await leaseModel.findById(leaseId);
-    if (!lease) throw new Error('Lease not found');
+    if (!lease) throw new AppError('Lease not found', 404);
 
     // Only the tenant of this specific lease can file a dispute
     if (user.role !== 'tenant') {
-      throw new Error('Access denied: Only tenants can dispute a refund.');
+      throw new AppError(
+        'Access denied: Only tenants can dispute a refund.',
+        403
+      );
     }
     if (String(lease.tenantId) !== String(user.id)) {
-      throw new Error('Access denied: You are not the tenant of this lease.');
+      throw new AppError(
+        'Access denied: You are not the tenant of this lease.',
+        403
+      );
     }
     // A dispute is only valid when a settlement is awaiting the tenant's acknowledgment
     if (lease.depositStatus !== 'awaiting_acknowledgment') {
-      throw new Error(
-        'No refund settlement is currently awaiting your review. A dispute can only be filed after a settlement has been proposed.'
+      throw new AppError(
+        'No refund settlement is currently awaiting your review. A dispute can only be filed after a settlement has been proposed.',
+        400
       );
     }
 
@@ -459,16 +478,20 @@ class LeaseRefundService {
 
   async acknowledgeRefund(leaseId, tenantId) {
     const lease = await leaseModel.findById(leaseId);
-    if (!lease) throw new Error('Lease not found');
+    if (!lease) throw new AppError('Lease not found', 404);
 
     // Authorization: Only the tenant of this lease can acknowledge
     if (String(lease.tenantId) !== String(tenantId)) {
-      throw new Error('Access denied: You are not the tenant of this lease.');
+      throw new AppError(
+        'Access denied: You are not the tenant of this lease.',
+        403
+      );
     }
 
     if (lease.depositStatus !== 'awaiting_acknowledgment') {
-      throw new Error(
-        'No refund settlement is currently awaiting your acknowledgment.'
+      throw new AppError(
+        'No refund settlement is currently awaiting your acknowledgment.',
+        400
       );
     }
 
@@ -517,20 +540,21 @@ class LeaseRefundService {
 
   async resolveRefundDispute(leaseId, user, adjustedAmount) {
     if (user.role !== 'owner' && user.role !== 'treasurer') {
-      throw new Error('Access denied');
+      throw new AppError('Access denied', 403);
     }
 
     const lease = await leaseModel.findById(leaseId);
-    if (!lease) throw new Error('Lease not found');
+    if (!lease) throw new AppError('Lease not found', 404);
 
     if (lease.depositStatus !== 'disputed') {
-      throw new Error('Only disputed refunds can be resolved.');
+      throw new AppError('Only disputed refunds can be resolved.', 400);
     }
 
     const ledgerBalance = await leaseModel.getDepositBalance(leaseId);
     if (adjustedAmount > ledgerBalance) {
-      throw new Error(
-        `Adjusted refund amount (LKR ${adjustedAmount.toLocaleString()}) cannot exceed verified ledger balance (LKR ${ledgerBalance.toLocaleString()}).`
+      throw new AppError(
+        `Adjusted refund amount (LKR ${adjustedAmount.toLocaleString()}) cannot exceed verified ledger balance (LKR ${ledgerBalance.toLocaleString()}).`,
+        400
       );
     }
 
@@ -581,15 +605,16 @@ class LeaseRefundService {
 
   async updateDisbursementReference(leaseId, newReference, user) {
     if (user.role !== 'owner' && user.role !== 'treasurer') {
-      throw new Error('Access denied');
+      throw new AppError('Access denied', 403);
     }
 
     const lease = await leaseModel.findById(leaseId);
-    if (!lease) throw new Error('Lease not found');
+    if (!lease) throw new AppError('Lease not found', 404);
 
     if (lease.depositStatus !== 'refunded') {
-      throw new Error(
-        'Disbursement reference can only be updated for finalized (refunded) settlements.'
+      throw new AppError(
+        'Disbursement reference can only be updated for finalized (refunded) settlements.',
+        400
       );
     }
 

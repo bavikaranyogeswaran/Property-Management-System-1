@@ -13,6 +13,7 @@ import {
 } from '../utils/dateUtils.js';
 import { toCentsFromMajor } from '../utils/moneyUtils.js';
 import auditLogger from '../utils/auditLogger.js';
+import AppError from '../utils/AppError.js';
 
 /**
  * [ARCHITECTURAL SEMANTICS]
@@ -27,7 +28,7 @@ import auditLogger from '../utils/auditLogger.js';
 class RenewalService {
   async createFromNotice(leaseId, user = null) {
     const lease = await leaseModel.findById(leaseId);
-    if (!lease) throw new Error('Lease not found');
+    if (!lease) throw new AppError('Lease not found', 404);
 
     // Check if a pending or negotiating request already exists
     const existing = await renewalRequestModel.findByLeaseId(leaseId);
@@ -60,11 +61,11 @@ class RenewalService {
 
   async proposeTerms(requestId, data, user) {
     const request = await renewalRequestModel.findById(requestId);
-    if (!request) throw new Error('Renewal request not found');
+    if (!request) throw new AppError('Renewal request not found', 404);
 
     // [F2.5] Validate proposed end date is after current lease end date
     if (!data.proposedEndDate) {
-      throw new Error('Proposed end date is required.');
+      throw new AppError('Proposed end date is required.', 400);
     }
     const leaseForTerm = await leaseModel.findById(
       request.leaseId || request.lease_id
@@ -73,8 +74,9 @@ class RenewalService {
       parseLocalDate(data.proposedEndDate) <=
       parseLocalDate(leaseForTerm.endDate)
     ) {
-      throw new Error(
-        `Proposed end date (${data.proposedEndDate}) must be after the current lease end date (${leaseForTerm.endDate}).`
+      throw new AppError(
+        `Proposed end date (${data.proposedEndDate}) must be after the current lease end date (${leaseForTerm.endDate}).`,
+        400
       );
     }
 
@@ -87,8 +89,9 @@ class RenewalService {
           (p) => String(p.property_id) === String(request.property_id)
         )
       ) {
-        throw new Error(
-          'Access denied. You are not assigned to this property.'
+        throw new AppError(
+          'Access denied. You are not assigned to this property.',
+          403
         );
       }
     }
@@ -131,7 +134,7 @@ class RenewalService {
 
   async approve(requestId, user) {
     const request = await renewalRequestModel.findById(requestId);
-    if (!request) throw new Error('Renewal request not found');
+    if (!request) throw new AppError('Renewal request not found', 404);
 
     // RBAC: Treasurer assignment check
     if (user.role === 'treasurer') {
@@ -142,15 +145,17 @@ class RenewalService {
           (p) => String(p.property_id) === String(request.property_id)
         )
       ) {
-        throw new Error(
-          'Access denied. You are not assigned to this property.'
+        throw new AppError(
+          'Access denied. You are not assigned to this property.',
+          403
         );
       }
     }
 
     if (!request.proposed_monthly_rent || !request.proposed_end_date) {
-      throw new Error(
-        'Proposed terms (rent and end date) are required for approval'
+      throw new AppError(
+        'Proposed terms (rent and end date) are required for approval',
+        400
       );
     }
 
@@ -168,8 +173,9 @@ class RenewalService {
 
       // [VALIDATION] Ensure the new lease period is logical
       if (parseLocalDate(request.proposed_end_date) <= nextStartDate) {
-        throw new Error(
-          `The proposed renewal end date (${request.proposed_end_date}) must be AFTER the calculated start date (${nextStartDateStr})`
+        throw new AppError(
+          `The proposed renewal end date (${request.proposed_end_date}) must be AFTER the calculated start date (${nextStartDateStr})`,
+          400
         );
       }
 
@@ -185,8 +191,9 @@ class RenewalService {
         [lease.unitId, proposedEndDate, nextStartDateStr]
       );
       if (overlapping.length > 0) {
-        throw new Error(
-          `Unit ${lease.unitId} already has an overlapping lease for this period. Renewal cannot proceed.`
+        throw new AppError(
+          `Unit ${lease.unitId} already has an overlapping lease for this period. Renewal cannot proceed.`,
+          409
         );
       }
 
@@ -260,7 +267,7 @@ class RenewalService {
 
   async reject(requestId, user) {
     const request = await renewalRequestModel.findById(requestId);
-    if (!request) throw new Error('Renewal request not found');
+    if (!request) throw new AppError('Renewal request not found', 404);
 
     // RBAC: Treasurer assignment check
     if (user.role === 'treasurer') {
@@ -271,8 +278,9 @@ class RenewalService {
           (p) => String(p.property_id) === String(request.property_id)
         )
       ) {
-        throw new Error(
-          'Access denied. You are not assigned to this property.'
+        throw new AppError(
+          'Access denied. You are not assigned to this property.',
+          403
         );
       }
     }
@@ -313,7 +321,7 @@ class RenewalService {
 
     const request = await renewalRequestModel.findById(requestId);
     if (request.status === 'approved') {
-      throw new Error('This lease renewal has already been approved.');
+      throw new AppError('This lease renewal has already been approved.', 409);
     }
 
     // 2. Propose terms automatically
@@ -346,7 +354,7 @@ class RenewalService {
       }
       return allRequests;
     }
-    throw new Error('Access denied');
+    throw new AppError('Access denied', 403);
   }
 
   /**

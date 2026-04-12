@@ -21,6 +21,7 @@ import {
 } from '../utils/dateUtils.js';
 import { toCentsFromMajor, moneyMath, fromCents } from '../utils/moneyUtils.js';
 import renewalService from './renewalService.js';
+import AppError from '../utils/AppError.js';
 
 class LeaseTerminationService {
   constructor(facade) {
@@ -34,20 +35,21 @@ class LeaseTerminationService {
     user = null
   ) {
     const lease = await leaseModel.findById(leaseId);
-    if (!lease) throw new Error('Lease not found');
+    if (!lease) throw new AppError('Lease not found', 404);
 
     if (lease.status !== 'active') {
-      throw new Error('Only active leases can be terminated');
+      throw new AppError('Only active leases can be terminated', 400);
     }
 
     if (!terminationDate) {
-      throw new Error('Termination date is required.');
+      throw new AppError('Termination date is required.', 400);
     }
     const termDate = parseLocalDate(terminationDate);
     const leaseEnd = parseLocalDate(lease.endDate);
     if (termDate > leaseEnd) {
-      throw new Error(
-        `Termination date (${terminationDate}) cannot be after the lease's original end date (${lease.endDate}).`
+      throw new AppError(
+        `Termination date (${terminationDate}) cannot be after the lease's original end date (${lease.endDate}).`,
+        400
       );
     }
 
@@ -154,12 +156,13 @@ class LeaseTerminationService {
 
   async finalizeLeaseCheckout(leaseId, user) {
     const lease = await leaseModel.findById(leaseId);
-    if (!lease) throw new Error('Lease not found');
+    if (!lease) throw new AppError('Lease not found', 404);
 
     // [C2 FIX - Problem 2] Accept both 'expired' and 'ended' leases for checkout
     if (lease.status !== 'expired' && lease.status !== 'ended') {
-      throw new Error(
-        'Only expired or ended leases can be finalized for checkout'
+      throw new AppError(
+        'Only expired or ended leases can be finalized for checkout',
+        400
       );
     }
 
@@ -226,22 +229,23 @@ class LeaseTerminationService {
 
       // 1. Initial look up (no lock) to get Unit ID
       const baseLease = await leaseModel.findById(leaseId, conn);
-      if (!baseLease) throw new Error('Lease not found');
+      if (!baseLease) throw new AppError('Lease not found', 404);
 
       // 2. Lock Parent (Unit) first
       const unitLock = await unitModel.findByIdForUpdate(
         baseLease.unitId,
         conn
       );
-      if (!unitLock) throw new Error('Unit reference not found.');
+      if (!unitLock) throw new AppError('Unit reference not found.', 404);
 
       // 3. Lock Child (Lease) second
       const lease = await leaseModel.findByIdForUpdate(leaseId, conn);
-      if (!lease) throw new Error('Lease reference not found.');
+      if (!lease) throw new AppError('Lease reference not found.', 404);
 
       if (['active', 'expired', 'ended'].includes(baseLease.status)) {
-        throw new Error(
-          'Only draft or pending leases can be cancelled manually. Use termination flow for active leases.'
+        throw new AppError(
+          'Only draft or pending leases can be cancelled manually. Use termination flow for active leases.',
+          400
         );
       }
 
@@ -289,29 +293,31 @@ class LeaseTerminationService {
 
       // 1. Initial look up (no lock) to get Unit ID
       const baseLease = await leaseModel.findById(leaseId, conn);
-      if (!baseLease) throw new Error('Lease not found');
+      if (!baseLease) throw new AppError('Lease not found', 404);
 
       // 2. Lock Parent (Unit) first
       const unitLock = await unitModel.findByIdForUpdate(
         baseLease.unitId,
         conn
       );
-      if (!unitLock) throw new Error('Unit reference not found.');
+      if (!unitLock) throw new AppError('Unit reference not found.', 404);
 
       // 3. Lock Child (Lease) second
       const lease = await leaseModel.findByIdForUpdate(leaseId, conn);
-      if (!lease) throw new Error('Lease reference not found.');
+      if (!lease) throw new AppError('Lease reference not found.', 404);
 
       // Ownership check: must be the tenant
       if (String(lease.tenantId) !== String(user.id)) {
-        throw new Error(
-          'Access denied: You can only withdraw your own application.'
+        throw new AppError(
+          'Access denied: You can only withdraw your own application.',
+          403
         );
       }
 
       if (lease.status !== 'draft') {
-        throw new Error(
-          'Applications can only be withdrawn while in draft status. Use termination flow for active leases.'
+        throw new AppError(
+          'Applications can only be withdrawn while in draft status. Use termination flow for active leases.',
+          400
         );
       }
 
@@ -445,11 +451,11 @@ class LeaseTerminationService {
 
   async updateNoticeStatus(leaseId, status, user) {
     const lease = await leaseModel.findById(leaseId);
-    if (!lease) throw new Error('Lease not found');
+    if (!lease) throw new AppError('Lease not found', 404);
     if (user.role === 'tenant' && String(lease.tenantId) !== String(user.id))
-      throw new Error('Access denied');
+      throw new AppError('Access denied', 403);
     if (!['undecided', 'vacating', 'renewing'].includes(status))
-      throw new Error('Invalid notice status');
+      throw new AppError('Invalid notice status', 400);
     await leaseModel.update(leaseId, { noticeStatus: status });
 
     // [H11 FIX] Auto-cancel renewals if tenant decides to vacate
