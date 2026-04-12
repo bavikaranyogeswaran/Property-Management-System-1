@@ -107,7 +107,7 @@ router.post(
   authorizeResource('lease', 'id', 'params'),
   leaseController.finalizeCheckout
 );
-router.post(
+router.get(
   '/:id/deposit-status',
   authenticateToken,
   authorizeResource('lease', 'id', 'params'),
@@ -122,12 +122,14 @@ router.post(
 router.post(
   '/:id/verify-documents',
   authenticateToken,
+  authorizeRoles('owner', 'treasurer'),
   authorizeResource('lease', 'id', 'params'),
   leaseController.verifyLeaseDocuments
 );
 router.post(
   '/:id/reject-documents',
   authenticateToken,
+  authorizeRoles('owner', 'treasurer'),
   authorizeResource('lease', 'id', 'params'),
   leaseController.rejectLeaseDocuments
 );

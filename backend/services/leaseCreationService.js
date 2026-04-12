@@ -50,16 +50,22 @@ class LeaseCreationService {
       monthlyRent === undefined ||
       monthlyRent === null
     ) {
-      throw new Error('All fields are required for lease creation.');
+      const err = new Error('All fields are required for lease creation.');
+      err.statusCode = 400;
+      throw err;
     }
 
     if (parseLocalDate(startDate) >= parseLocalDate(endDate)) {
-      throw new Error('End date must be after start date');
+      const err = new Error('End date must be after start date');
+      err.statusCode = 400;
+      throw err;
     }
 
     const durationCheck = validateLeaseDuration(startDate, endDate);
     if (!durationCheck.isValid) {
-      throw new Error(durationCheck.error);
+      const err = new Error(durationCheck.error);
+      err.statusCode = 400;
+      throw err;
     }
 
     if (!parseLocalDate(startDate) || !parseLocalDate(endDate)) {
@@ -67,7 +73,9 @@ class LeaseCreationService {
     }
 
     if (monthlyRent <= 0) {
-      throw new Error('Monthly rent must be greater than 0');
+      const err = new Error('Monthly rent must be greater than 0');
+      err.statusCode = 400;
+      throw err;
     }
 
     // If no connection provided, create our own transaction.
@@ -81,24 +89,32 @@ class LeaseCreationService {
 
       const tenant = await tenantModel.findByUserId(tenantId, conn);
       if (!tenant) {
-        throw new Error('Tenant not found');
+        const err = new Error('Tenant not found');
+        err.statusCode = 404;
+        throw err;
       }
 
       // 1. Check if unit is available (and LOCK it)
       const unit = await unitModel.findByIdForUpdate(unitId, conn);
       if (!unit) {
-        throw new Error('Unit not found');
+        const err = new Error('Unit not found');
+        err.statusCode = 404;
+        throw err;
       }
 
       // Check unit status - cannot lease units currently under maintenance or trashed
       if (unit.status === 'maintenance') {
-        throw new Error(
+        const err = new Error(
           'Unit is currently under maintenance and cannot be leased.'
         );
+        err.statusCode = 409;
+        throw err;
       }
       // [C2 FIX - Problem 3] Changed 'trashed' → 'inactive' (matches actual ENUM)
       if (unit.status === 'inactive') {
-        throw new Error('Unit is no longer available (inactive).');
+        const err = new Error('Unit is no longer available (inactive).');
+        err.statusCode = 409;
+        throw err;
       }
 
       // 2a. [REMOVED] Same-tenant overlap check (Supporting Multi-Unit Leases)
@@ -115,7 +131,9 @@ class LeaseCreationService {
         conn
       );
       if (hasOverlap) {
-        throw new Error('Unit is already leased for the selected dates.');
+        const err = new Error('Unit is already leased for the selected dates.');
+        err.statusCode = 409;
+        throw err;
       }
 
       const leaseParams = {
@@ -204,12 +222,6 @@ class LeaseCreationService {
   }
 
   async verifyLeaseDocuments(leaseId, user) {
-    if (user.role !== 'owner' && user.role !== 'treasurer') {
-      throw new Error(
-        'Access denied: Only owners or treasurers can verify documents.'
-      );
-    }
-
     const connection = await pool.getConnection();
     try {
       await connection.beginTransaction();
@@ -266,12 +278,6 @@ class LeaseCreationService {
   }
 
   async rejectLeaseDocuments(leaseId, reason, user) {
-    if (user.role !== 'owner' && user.role !== 'treasurer') {
-      throw new Error(
-        'Access denied: Only owners or treasurers can reject documents.'
-      );
-    }
-
     const connection = await pool.getConnection();
     try {
       await connection.beginTransaction();

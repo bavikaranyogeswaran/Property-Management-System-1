@@ -29,7 +29,7 @@ router.get('/', authenticateToken, paymentController.getPayments);
 router.put(
   '/:id/verify',
   authenticateToken,
-  authorizeRoles('treasurer'),
+  authorizeRoles('owner', 'treasurer'),
   authorizeResource('payment', 'id', 'params'),
   validateRequest(verifyPaymentSchema),
   paymentController.verifyPayment

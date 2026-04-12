@@ -157,7 +157,9 @@ export const leaseApi = {
   getLeases: () => apiClient.get('/leases'),
   getById: (id: string) => apiClient.get(`/leases/${id}`),
   updateNotice: (id: string, status: string) =>
-    apiClient.put(`/leases/${id}/notice`, { status }),
+    apiClient.patch(`/leases/${id}/notice-status`, { status }),
+  getDepositStatus: (id: string) =>
+    apiClient.get(`/leases/${id}/deposit-status`),
 };
 
 // Receipts

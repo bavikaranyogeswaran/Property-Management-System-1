@@ -9,10 +9,11 @@ class LeaseController {
       res.json(results);
     } catch (error) {
       console.error(error);
-      if (error.message.includes('Access denied')) {
+      const status = error.status || error.statusCode || 500;
+      if (status === 403 || error.message.includes('Access denied')) {
         return res.status(403).json({ error: error.message });
       }
-      res.status(500).json({ error: error.message });
+      res.status(status).json({ error: error.message });
     }
   }
 
@@ -22,11 +23,12 @@ class LeaseController {
       const lease = await leaseService.getLeaseById(id, req.user);
       res.json(lease);
     } catch (error) {
-      if (error.message === 'Lease not found')
+      const status = error.status || error.statusCode || 500;
+      if (status === 404 || error.message === 'Lease not found')
         return res.status(404).json({ error: error.message });
-      if (error.message.includes('Access denied'))
+      if (status === 403 || error.message.includes('Access denied'))
         return res.status(403).json({ error: error.message });
-      res.status(500).json({ error: error.message });
+      res.status(status).json({ error: error.message });
     }
   }
 
@@ -39,23 +41,26 @@ class LeaseController {
         .json({ id: leaseId, message: 'Lease created successfully' });
     } catch (error) {
       console.error('Create Lease Error:', error);
+      const status = error.status || error.statusCode || 500;
       if (
+        status === 400 ||
         error.message.includes('required') ||
         error.message.includes('Invalid') ||
         error.message.includes('greater than 0')
       ) {
         return res.status(400).json({ error: error.message });
       }
-      if (error.message.includes('Unit not found')) {
+      if (status === 404 || error.message.includes('Unit not found')) {
         return res.status(404).json({ error: error.message });
       }
       if (
+        status === 409 ||
         error.message.includes('Unit is already leased') ||
         error.message.includes('Unit is currently under maintenance')
       ) {
         return res.status(409).json({ error: error.message });
       }
-      res.status(500).json({ error: error.message });
+      res.status(status).json({ error: error.message });
     }
   }
 
