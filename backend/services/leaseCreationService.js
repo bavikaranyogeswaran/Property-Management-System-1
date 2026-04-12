@@ -20,7 +20,7 @@ import { toCentsFromMajor, moneyMath, fromCents } from '../utils/moneyUtils.js';
 import renewalService from './renewalService.js';
 import auditLogger from '../utils/auditLogger.js';
 import userModel from '../models/userModel.js';
-import leadModel from '../models/leadModel.js';
+
 import emailService from '../utils/emailService.js';
 import billingEngine from '../utils/billingEngine.js';
 import userService from './userService.js';
