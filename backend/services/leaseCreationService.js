@@ -397,6 +397,13 @@ class LeaseCreationService {
         );
       }
 
+      const hasOverlap = await leaseModel.checkOverlap(
+        lease.unitId,
+        lease.startDate,
+        lease.endDate,
+        leaseId,
+        conn
+      );
       if (hasOverlap) {
         throw new AppError(
           'Unit is already leased for the selected dates.',

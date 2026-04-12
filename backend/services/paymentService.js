@@ -381,15 +381,24 @@ class PaymentService {
         paymentId = Number(existingPayment.id);
       }
 
-      // [SECURITY FIX] 100x Revenue Bleed and Tampering Guard
+      // [SECURITY FIX] True Tampering Guard: Reject zero-value or negative amounts only.
+      // Legitimate underpayments from the gateway are recorded and flagged for Treasurer review unless guaranteeFullSettlement is strict.
       const expectedCents = Number(invoice.amount);
-      if (Number(amount) < expectedCents) {
-        console.error(
-          `[Security Alert] Underpayment detected for automated invoice #${invoiceId}. Expected ${expectedCents} cents, but received ${amount} cents.`
-        );
+      if (Number(amount) <= 0) {
         throw new Error(
-          'Payment amount mismatch. Security verification failed.'
+          'Invalid payment amount. Gateway sent a zero or negative value — possible tampering.'
         );
+      }
+      const isUnderpayment = Number(amount) < expectedCents;
+      if (isUnderpayment) {
+        console.warn(
+          `[Security Alert] Gateway underpayment for Invoice #${invoiceId}. Expected: ${expectedCents}, Received: ${amount}. Recording and flagging.`
+        );
+        if (data.guaranteeFullSettlement) {
+          throw new Error(
+            'Payment amount mismatch from a strict-settlement gateway. Security verification failed.'
+          );
+        }
       }
 
       if (!paymentId) {
@@ -439,6 +448,26 @@ class PaymentService {
         systemUser,
         conn
       );
+
+      // [NEW] Notify Treasurer of gateway underpayment
+      if (isUnderpayment) {
+        const [treasurers] = await conn.query(
+          "SELECT user_id FROM users WHERE role = 'treasurer' AND status = 'active'"
+        );
+        for (const t of treasurers) {
+          await notificationModel.create(
+            {
+              userId: t.user_id,
+              message: `Gateway Underpayment Alert: Invoice #${invoiceId} received ${fromCents(Number(amount)).toFixed(2)} but expected ${fromCents(expectedCents).toFixed(2)}. Shortfall: ${fromCents(expectedCents - Number(amount)).toFixed(2)}. Please follow up with tenant.`,
+              type: 'payment',
+              severity: 'urgent',
+              entityType: 'payment',
+              entityId: paymentId,
+            },
+            conn
+          );
+        }
+      }
 
       if (!isExternalConn) {
         await conn.commit();

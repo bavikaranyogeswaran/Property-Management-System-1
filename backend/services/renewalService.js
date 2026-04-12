@@ -101,6 +101,7 @@ class RenewalService {
       proposedEndDate: data.proposedEndDate,
       notes: data.notes,
       status: 'negotiating',
+      acceptanceDeadline: formatToLocalDate(addDays(getLocalTime(), 7)),
     });
 
     await auditLogger.log({
@@ -135,6 +136,14 @@ class RenewalService {
   async approve(requestId, user) {
     const request = await renewalRequestModel.findById(requestId);
     if (!request) throw new AppError('Renewal request not found', 404);
+
+    // [FIX] Tenant must have explicitly accepted terms before staff can finalise
+    if (request.status !== 'tenant_accepted') {
+      throw new AppError(
+        `Cannot approve: renewal is in '${request.status}' status. Tenant must accept proposed terms first.`,
+        400
+      );
+    }
 
     // RBAC: Treasurer assignment check
     if (user.role === 'treasurer') {
@@ -315,7 +324,137 @@ class RenewalService {
     }
   }
 
+  async tenantAccept(requestId, user) {
+    const request = await renewalRequestModel.findById(requestId);
+    if (!request) throw new AppError('Renewal request not found', 404);
+
+    if (request.status !== 'negotiating') {
+      throw new AppError(
+        `Cannot accept: renewal is in '${request.status}' status. Terms must be proposed first.`,
+        400
+      );
+    }
+
+    // Ownership check: only the tenant of this lease can accept
+    const lease = await leaseModel.findById(
+      request.leaseId || request.lease_id
+    );
+    if (String(lease.tenantId) !== String(user.id)) {
+      throw new AppError(
+        'Access denied: only the lease tenant can accept renewal terms.',
+        403
+      );
+    }
+
+    // Deadline check
+    if (
+      request.acceptanceDeadline &&
+      new Date() > parseLocalDate(request.acceptanceDeadline)
+    ) {
+      throw new AppError(
+        'The acceptance window for this renewal proposal has expired. Please contact your property manager.',
+        400
+      );
+    }
+
+    await renewalRequestModel.updateStatus(requestId, 'tenant_accepted');
+
+    await auditLogger.log({
+      userId: user.id,
+      actionType: 'RENEWAL_ACCEPTED_BY_TENANT',
+      entityId: requestId,
+      entityType: 'renewal_request',
+      details: { leaseId: request.leaseId || request.lease_id },
+    });
+
+    // Notify Treasurer
+    try {
+      const [treasurers] = await pool.query(
+        "SELECT user_id FROM users WHERE role = 'treasurer' AND status = 'active'"
+      );
+      const notificationModel = (await import('../models/notificationModel.js'))
+        .default;
+      for (const t of treasurers) {
+        await notificationModel.create({
+          userId: t.user_id,
+          message: `Tenant has accepted renewal terms for Lease #${request.leaseId || request.lease_id} (Unit ${request.unitNumber}). Please proceed with final approval.`,
+          type: 'lease_update',
+          entityType: 'renewal_request',
+          entityId: requestId,
+        });
+      }
+    } catch (err) {
+      console.warn(
+        '[RENEWAL] Failed to notify treasurers of tenant acceptance:',
+        err.message
+      );
+    }
+
+    return true;
+  }
+
+  async tenantDecline(requestId, user) {
+    const request = await renewalRequestModel.findById(requestId);
+    if (!request) throw new AppError('Renewal request not found', 404);
+
+    if (request.status !== 'negotiating') {
+      throw new AppError(
+        `Cannot decline: renewal is in '${request.status}' status.`,
+        400
+      );
+    }
+
+    const lease = await leaseModel.findById(
+      request.leaseId || request.lease_id
+    );
+    if (String(lease.tenantId) !== String(user.id)) {
+      throw new AppError(
+        'Access denied: only the lease tenant can decline renewal terms.',
+        403
+      );
+    }
+
+    // Keep in 'negotiating' so staff can revise and re-propose
+    await renewalRequestModel.updateStatus(requestId, 'negotiating');
+
+    await auditLogger.log({
+      userId: user.id,
+      actionType: 'RENEWAL_DECLINED_BY_TENANT',
+      entityId: requestId,
+      entityType: 'renewal_request',
+    });
+
+    // Notify Treasurer that tenant declined
+    try {
+      const [treasurers] = await pool.query(
+        "SELECT user_id FROM users WHERE role = 'treasurer' AND status = 'active'"
+      );
+      const notificationModel = (await import('../models/notificationModel.js'))
+        .default;
+      for (const t of treasurers) {
+        await notificationModel.create({
+          userId: t.user_id,
+          message: `Tenant has declined renewal terms for Lease #${request.leaseId || request.lease_id}. Please revise the proposal.`,
+          type: 'lease_update',
+          severity: 'warning',
+          entityType: 'renewal_request',
+          entityId: requestId,
+        });
+      }
+    } catch (err) {
+      console.warn(
+        '[RENEWAL] Failed to notify treasurers of tenant decline:',
+        err.message
+      );
+    }
+
+    return true;
+  }
+
   async instantRenew(leaseId, newEndDate, newMonthlyRent, user) {
+    // [PRIVILEGED OVERRIDE] instantRenew is a staff-initiated action used for bulk renewals
+    // and owner-directed changes. It deliberately bypasses the tenant_accepted gate.
+    // Only available to Owner/Admin roles. Do not route this through the standard approve() path.
     // 1. Create a renewal request from the lease automatically
     const requestId = await this.createFromNotice(leaseId, user);
 

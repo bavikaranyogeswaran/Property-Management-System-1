@@ -102,6 +102,7 @@ class RenewalRequestModel {
       tenantName: row.tenant_name,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
+      acceptanceDeadline: row.acceptance_deadline,
     };
   }
 
@@ -114,13 +115,26 @@ class RenewalRequestModel {
   }
 
   async updateTerms(id, data, connection = null) {
-    const { proposedMonthlyRent, proposedEndDate, notes, status } = data;
+    const {
+      proposedMonthlyRent,
+      proposedEndDate,
+      notes,
+      status,
+      acceptanceDeadline,
+    } = data;
     const conn = connection || pool;
     await conn.query(
       `UPDATE renewal_requests 
-             SET proposed_monthly_rent = ?, proposed_end_date = ?, negotiation_notes = ?, status = ?
+             SET proposed_monthly_rent = ?, proposed_end_date = ?, negotiation_notes = ?, status = ?, acceptance_deadline = ?
              WHERE request_id = ?`,
-      [proposedMonthlyRent, proposedEndDate, notes, status || 'negotiating', id]
+      [
+        proposedMonthlyRent,
+        proposedEndDate,
+        notes,
+        status || 'negotiating',
+        acceptanceDeadline || null,
+        id,
+      ]
     );
   }
 }

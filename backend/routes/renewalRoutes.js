@@ -6,6 +6,8 @@ const router = Router();
 
 router.get('/', authenticateToken, renewalController.getRequests);
 router.post('/:id/propose', authenticateToken, renewalController.proposeTerms);
+router.post('/:id/accept', authenticateToken, renewalController.tenantAccept);
+router.post('/:id/decline', authenticateToken, renewalController.tenantDecline);
 router.post(
   '/:id/approve',
   authenticateToken,
