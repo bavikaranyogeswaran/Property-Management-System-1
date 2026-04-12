@@ -213,8 +213,18 @@ class LeaseCreationService {
     try {
       await connection.beginTransaction();
 
-      const lease = await leaseModel.findById(leaseId, connection);
+      // [CONCURRENCY HARDENING] Lock Hierarchy (Unit -> Lease)
+      // Load base lease to get unitId
+      const baseLease = await leaseModel.findById(leaseId, connection);
+      if (!baseLease) throw new AppError('Lease not found', 404);
+
+      // Lock parent (Unit) first to maintain global hierarchy order
+      await unitModel.findByIdForUpdate(baseLease.unitId, connection);
+
+      // Lock child (Lease) second
+      const lease = await leaseModel.findByIdForUpdate(leaseId, connection);
       if (!lease) throw new AppError('Lease not found', 404);
+
       if (lease.status !== 'draft')
         throw new AppError(
           'Only draft leases can have documents verified',
@@ -272,8 +282,18 @@ class LeaseCreationService {
     try {
       await connection.beginTransaction();
 
-      const lease = await leaseModel.findById(leaseId, connection);
+      // [CONCURRENCY HARDENING] Lock Hierarchy (Unit -> Lease)
+      // Load base lease to get unitId
+      const baseLease = await leaseModel.findById(leaseId, connection);
+      if (!baseLease) throw new AppError('Lease not found', 404);
+
+      // Lock parent (Unit) first
+      await unitModel.findByIdForUpdate(baseLease.unitId, connection);
+
+      // Lock child (Lease) second
+      const lease = await leaseModel.findByIdForUpdate(leaseId, connection);
       if (!lease) throw new AppError('Lease not found', 404);
+
       if (lease.status !== 'draft')
         throw new AppError(
           'Only draft leases can have documents rejected',

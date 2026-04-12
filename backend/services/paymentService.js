@@ -337,6 +337,20 @@ class PaymentService {
       const invoice = await invoiceModel.findByIdForUpdate(invoiceId, conn);
       if (!invoice) throw new Error(`Invoice #${invoiceId} not found`);
 
+      // [CONCURRENCY FIX] Lock Lease Hierarchy (Unit -> Lease) for Deposit Payments
+      // This prevents race conditions where staff reject documents while the webhook confirms payment.
+      const invType =
+        invoice.invoice_type || invoice.type || invoice.invoiceType;
+      if (invType === 'deposit' && invoice.lease_id) {
+        // Lock Unit first (Global Parent)
+        const leaseData = await leaseModel.findById(invoice.lease_id, conn);
+        if (leaseData?.unitId) {
+          await unitModel.findByIdForUpdate(leaseData.unitId, conn);
+        }
+        // Lock Lease second (Business child)
+        await leaseModel.findByIdForUpdate(invoice.lease_id, conn);
+      }
+
       // [HARDENED] 2. Atomic Idempotency Check (Within protected row lock)
       const existingPayment = await paymentModel.findByReferenceNumber(
         referenceNumber,
