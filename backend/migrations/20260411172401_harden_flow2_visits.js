@@ -14,7 +14,25 @@ export const up = async (knex) => {
     MODIFY COLUMN status ENUM('pending', 'confirmed', 'cancelled', 'completed', 'no-show') DEFAULT 'pending'
   `);
 
-  // 3. Relax Unique Key
+  // 3. Add loose index first to support FK while we drop the unique key
+  try {
+    const [existing] = await knex.raw(`
+      SELECT INDEX_NAME FROM INFORMATION_SCHEMA.STATISTICS
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME = 'property_visits'
+        AND INDEX_NAME = 'idx_unit_visit_time'
+    `);
+    if (existing.length === 0) {
+      await knex.schema.table('property_visits', (table) => {
+        table.index(['unit_id', 'scheduled_date'], 'idx_unit_visit_time');
+      });
+      console.log('[Flow 2] idx_unit_visit_time index added.');
+    }
+  } catch (err) {
+    console.warn('[Flow 2] Could not add loose index:', err.message);
+  }
+
+  // 4. Relax Unique Key (Now safe to drop because idx_unit_visit_time exists)
   try {
     const [indexes] = await knex.raw(`
       SELECT INDEX_NAME FROM INFORMATION_SCHEMA.STATISTICS
@@ -31,24 +49,6 @@ export const up = async (knex) => {
     }
   } catch (err) {
     console.warn('[Flow 2] Could not drop unique_unit_visit:', err.message);
-  }
-
-  // 4. Add loose index
-  try {
-    const [existing] = await knex.raw(`
-      SELECT INDEX_NAME FROM INFORMATION_SCHEMA.STATISTICS
-      WHERE TABLE_SCHEMA = DATABASE()
-        AND TABLE_NAME = 'property_visits'
-        AND INDEX_NAME = 'idx_unit_visit_time'
-    `);
-    if (existing.length === 0) {
-      await knex.schema.table('property_visits', (table) => {
-        table.index(['unit_id', 'scheduled_date'], 'idx_unit_visit_time');
-      });
-      console.log('[Flow 2] idx_unit_visit_time index added.');
-    }
-  } catch (err) {
-    console.warn('[Flow 2] Could not add loose index:', err.message);
   }
 };
 

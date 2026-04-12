@@ -16,14 +16,27 @@ export const up = async (knex) => {
   `);
 
   if (existingIndex.length > 0) {
+    // We must add a temporary index on lease_id because MySQL won't let us drop
+    // unique_periodic_invoice if it's the only index supporting the lease_id foreign key.
+    await knex.raw(
+      'ALTER TABLE rent_invoices ADD INDEX temp_idx_lease_id (lease_id)'
+    );
+
     await knex.raw(
       'ALTER TABLE rent_invoices DROP INDEX unique_periodic_invoice'
     );
-  }
 
-  await knex.raw(
-    'ALTER TABLE rent_invoices ADD UNIQUE KEY unique_periodic_invoice (lease_id, year, month, invoice_type)'
-  );
+    await knex.raw(
+      'ALTER TABLE rent_invoices ADD UNIQUE KEY unique_periodic_invoice (lease_id, year, month, invoice_type)'
+    );
+
+    // Now safe to remove the temporary index
+    await knex.raw('ALTER TABLE rent_invoices DROP INDEX temp_idx_lease_id');
+  } else {
+    await knex.raw(
+      'ALTER TABLE rent_invoices ADD UNIQUE KEY unique_periodic_invoice (lease_id, year, month, invoice_type)'
+    );
+  }
 };
 
 export const down = async (knex) => {
@@ -36,12 +49,23 @@ export const down = async (knex) => {
   `);
 
   if (existingIndex.length > 0) {
+    // Temporary index to support FK while swapping unique key back
+    await knex.raw(
+      'ALTER TABLE rent_invoices ADD INDEX temp_idx_lease_id (lease_id)'
+    );
+
     await knex.raw(
       'ALTER TABLE rent_invoices DROP INDEX unique_periodic_invoice'
     );
-  }
 
-  await knex.raw(
-    'ALTER TABLE rent_invoices ADD UNIQUE KEY unique_periodic_invoice (lease_id, year, month, invoice_type, due_date, description(64))'
-  );
+    await knex.raw(
+      'ALTER TABLE rent_invoices ADD UNIQUE KEY unique_periodic_invoice (lease_id, year, month, invoice_type, due_date, description(64))'
+    );
+
+    await knex.raw('ALTER TABLE rent_invoices DROP INDEX temp_idx_lease_id');
+  } else {
+    await knex.raw(
+      'ALTER TABLE rent_invoices ADD UNIQUE KEY unique_periodic_invoice (lease_id, year, month, invoice_type, due_date, description(64))'
+    );
+  }
 };
