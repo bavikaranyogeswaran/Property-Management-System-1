@@ -1,263 +1,52 @@
-import leadModel from '../models/leadModel.js';
-import leadTokenModel from '../models/leadTokenModel.js';
-import messageModel from '../models/messageModel.js';
-import propertyModel from '../models/propertyModel.js';
-import unitModel from '../models/unitModel.js';
-import leaseTermModel from '../models/leaseTermModel.js';
-import db from '../config/db.js';
+import leadPortalService from '../services/leadPortalService.js';
+import catchAsync from '../utils/catchAsync.js';
 
+/**
+ * LeadPortalController
+ * Dedicated to guest applicant access to their inquiry status and chat.
+ * Delegates all orchestration to leadPortalService.
+ */
 class LeadPortalController {
   /**
    * GET /api/lead-portal?token=xxx
-   * Returns lead profile, property details, and unit details.
+   * Returns lead profile, property details, unit details, and active lease.
    */
-  async getPortalData(req, res) {
-    try {
-      const { token } = req.query;
-      if (!token) {
-        return res.status(400).json({ error: 'Access token is required' });
-      }
-
-      const tokenRecord = await leadTokenModel.findByToken(token);
-      if (!tokenRecord) {
-        return res.status(401).json({
-          error:
-            'Invalid or expired access link. Please contact the property owner for a new link.',
-        });
-      }
-
-      const lead = await leadModel.findById(tokenRecord.leadId);
-      if (!lead) {
-        return res.status(404).json({ error: 'Lead not found' });
-      }
-
-      // [FIX] SECURITY: Block access for 'dropped' inquiries
-      if (lead.status === 'dropped') {
-        return res.status(403).json({
-          error:
-            'This inquiry has been closed. Please contact the property owner for more information.',
-        });
-      }
-
-      // Fetch property details
-      let property = null;
-      if (lead.propertyId) {
-        try {
-          property = await propertyModel.findById(lead.propertyId);
-        } catch (e) {
-          console.error('Failed to load property for portal', e);
-        }
-      }
-
-      // Fetch unit details
-      let unit = null;
-      if (lead.interestedUnit) {
-        try {
-          unit = await unitModel.findById(lead.interestedUnit);
-        } catch (e) {
-          console.error('Failed to load unit for portal', e);
-        }
-      }
-
-      // Fetch associated draft lease if it exists
-      let activeLease = null;
-      if (lead.email) {
-        const leaseModel = (await import('../models/leaseModel.js')).default;
-        const [leases] = await db.query(
-          "SELECT * FROM leases WHERE tenant_id = (SELECT user_id FROM users WHERE email = ? LIMIT 1) AND status = 'draft' ORDER BY created_at DESC LIMIT 1",
-          [lead.email]
-        );
-        if (leases.length > 0) {
-          const rawLease = leaseModel.mapRows(leases)[0];
-
-          // Enrich with deposit status
-          const depositStats = await leaseModel.getDepositStatus(rawLease.id);
-
-          // [FIX] SECURITY: PII Sanitization (DTO mapping)
-          // Only expose fields relevant to the prospective tenant's onboarding.
-          activeLease = {
-            id: rawLease.id,
-            startDate: rawLease.startDate,
-            endDate: rawLease.endDate,
-            monthlyRent: rawLease.monthlyRent,
-            status: rawLease.status,
-            currentDepositBalance: rawLease.currentDepositBalance,
-            depositStatus: rawLease.depositStatus,
-            targetDeposit: rawLease.targetDeposit,
-            documentUrl: rawLease.documentUrl,
-            depositStats: depositStats,
-          };
-        }
-      }
-
-      // Fetch available lease terms for the owner
-      let leaseTerms = [];
-      if (property && property.owner_id) {
-        leaseTerms = await leaseTermModel.findAllByOwner(property.owner_id);
-      }
-
-      res.json({
-        lead: {
-          id: lead.id,
-          name: lead.name,
-          email: lead.email,
-          phone: lead.phone,
-          status: lead.status,
-          propertyId: lead.propertyId,
-          interestedUnit: lead.interestedUnit,
-          createdAt: lead.createdAt,
-          moveInDate: lead.moveInDate,
-          preferredTermMonths: lead.preferredTermMonths,
-        },
-        property: property
-          ? {
-              name: property.name,
-              street: property.street,
-              city: property.city,
-              district: property.district,
-            }
-          : null,
-        unit: unit
-          ? {
-              unitNumber: unit.unitNumber,
-              type: unit.type,
-              monthlyRent: unit.monthlyRent,
-              status: unit.status,
-              isAvailable: unit.status === 'available',
-            }
-          : null,
-        activeLease,
-        leaseTerms: leaseTerms,
-      });
-    } catch (error) {
-      console.error('Error in getPortalData:', error);
-      res.status(500).json({ error: 'Failed to load portal data' });
-    }
-  }
+  getPortalData = catchAsync(async (req, res) => {
+    const { token } = req.query;
+    const data = await leadPortalService.getPortalContext(token);
+    res.json(data);
+  });
 
   /**
    * GET /api/lead-portal/messages?token=xxx
    * Returns all messages for the lead's chat thread.
    */
-  async getMessages(req, res) {
-    try {
-      const { token } = req.query;
-      if (!token) {
-        return res.status(400).json({ error: 'Access token is required' });
-      }
-
-      const tokenRecord = await leadTokenModel.findByToken(token);
-      if (!tokenRecord) {
-        return res
-          .status(401)
-          .json({ error: 'Invalid or expired access link' });
-      }
-
-      const messages = await messageModel.findByLeadId(tokenRecord.leadId);
-      res.json(messages);
-    } catch (error) {
-      console.error('Error in portal getMessages:', error);
-      res.status(500).json({ error: 'Failed to load messages' });
-    }
-  }
+  getMessages = catchAsync(async (req, res) => {
+    const { token } = req.query;
+    const messages = await leadPortalService.getMessages(token);
+    res.json(messages);
+  });
 
   /**
    * POST /api/lead-portal/messages?token=xxx
-   * Send a message as the lead. Uses the lead's user_id as sender_id.
+   * Send a message as the lead.
    */
-  async sendMessage(req, res) {
-    try {
-      const { token } = req.query;
-      const { content } = req.body;
-
-      if (!token) {
-        return res.status(400).json({ error: 'Access token is required' });
-      }
-      if (!content || !content.trim()) {
-        return res.status(400).json({ error: 'Message content is required' });
-      }
-
-      const tokenRecord = await leadTokenModel.findByToken(token);
-      if (!tokenRecord) {
-        return res
-          .status(401)
-          .json({ error: 'Invalid or expired access link' });
-      }
-
-      const lead = await leadModel.findById(tokenRecord.leadId);
-      if (!lead) {
-        return res.status(404).json({ error: 'Lead not found' });
-      }
-
-      if (lead.status === 'dropped') {
-        return res.status(403).json({
-          error: 'This inquiry has been closed. You cannot send messages.',
-        });
-      }
-
-      // Use the lead's own ID as the sender (leads are guests, not users)
-      const messageId = await messageModel.create({
-        leadId: tokenRecord.leadId,
-        senderId: null,
-        content: content.trim(),
-        senderType: 'lead',
-        senderLeadId: lead.id,
-      });
-
-      // Update last contacted
-      await leadModel.update(tokenRecord.leadId, {
-        lastContactedAt: new Date(),
-      });
-
-      res.status(201).json({
-        id: messageId,
-        leadId: tokenRecord.leadId,
-        senderLeadId: lead.id,
-        senderType: 'lead',
-        content: content.trim(),
-        createdAt: new Date(),
-        isRead: false,
-        senderName: lead.name,
-        senderRole: 'lead',
-      });
-    } catch (error) {
-      console.error('Error in portal sendMessage:', error);
-      res.status(500).json({ error: 'Failed to send message' });
-    }
-  }
+  sendMessage = catchAsync(async (req, res) => {
+    const { token } = req.query;
+    const { content } = req.body;
+    const result = await leadPortalService.sendMessage(token, content);
+    res.status(201).json(result);
+  });
 
   /**
    * PUT /api/lead-portal/preferences?token=xxx
    * Updates lead's move-in date and preferred term.
    */
-  async updatePreferences(req, res) {
-    try {
-      const { token } = req.query;
-      const { moveInDate, preferredTermMonths } = req.body;
-
-      if (!token) {
-        return res.status(400).json({ error: 'Access token is required' });
-      }
-
-      const tokenRecord = await leadTokenModel.findByToken(token);
-      if (!tokenRecord) {
-        return res
-          .status(401)
-          .json({ error: 'Invalid or expired access link' });
-      }
-
-      await leadModel.update(tokenRecord.leadId, {
-        move_in_date: moveInDate,
-        preferred_term_months: preferredTermMonths,
-        lease_term_id: req.body.leaseTermId || null,
-      });
-
-      res.json({ message: 'Preferences updated successfully' });
-    } catch (error) {
-      console.error('Error updating portal preferences:', error);
-      res.status(500).json({ error: 'Failed to update preferences' });
-    }
-  }
+  updatePreferences = catchAsync(async (req, res) => {
+    const { token } = req.query;
+    const result = await leadPortalService.updatePreferences(token, req.body);
+    res.json(result);
+  });
 }
 
 export default new LeadPortalController();

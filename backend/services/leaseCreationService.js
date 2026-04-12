@@ -268,7 +268,13 @@ class LeaseCreationService {
       }
 
       await connection.commit();
-      return { isDocumentsVerified: true, activated };
+      return {
+        isDocumentsVerified: true,
+        activated,
+        message: activated
+          ? 'Documents verified and lease activated (deposit was already paid).'
+          : 'Documents verified. Awaiting deposit payment for activation.',
+      };
     } catch (error) {
       await connection.rollback();
       throw error;

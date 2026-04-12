@@ -54,22 +54,12 @@ class LeaseController {
   verifyLeaseDocuments = catchAsync(async (req, res) => {
     const { id } = req.params;
     const result = await leaseService.verifyLeaseDocuments(id, req.user);
-    res.json({
-      message: result.activated
-        ? 'Documents verified and lease activated (deposit was already paid).'
-        : 'Documents verified. Awaiting deposit payment for activation.',
-      ...result,
-    });
+    res.json(result);
   });
 
   getDepositStatus = catchAsync(async (req, res) => {
     const { id } = req.params;
-    const leaseModel = (await import('../models/leaseModel.js')).default;
-    const status = await leaseModel.getDepositStatus(id);
-
-    if (!status) {
-      return res.status(404).json({ error: 'Lease not found' });
-    }
+    const status = await leaseService.getDepositStatus(id);
     res.json(status);
   });
 

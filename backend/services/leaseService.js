@@ -138,6 +138,11 @@ class LeaseService {
   async regenerateMagicLink(leaseId, user) {
     return this.sharedService.regenerateMagicLink(leaseId, user);
   }
+
+  async getDepositStatus(leaseId) {
+    const leaseModel = (await import('../models/leaseModel.js')).default;
+    return await leaseModel.getDepositStatus(leaseId);
+  }
 }
 
 export default new LeaseService();
