@@ -190,7 +190,13 @@ class InvoiceModel {
              JOIN leases l ON ri.lease_id = l.lease_id 
              JOIN units un ON l.unit_id = un.unit_id
              JOIN properties p ON un.property_id = p.property_id
-             WHERE ri.magic_token_hash = ? AND (ri.magic_token_expires_at IS NULL OR ri.magic_token_expires_at > NOW())
+             WHERE ri.magic_token_hash = ? 
+             AND (
+               ri.magic_token_expires_at IS NULL 
+               OR ri.magic_token_expires_at > NOW() 
+               OR ri.status != 'pending'
+               OR EXISTS (SELECT 1 FROM payments pay WHERE pay.invoice_id = ri.invoice_id)
+             )
          `,
       [hash]
     );

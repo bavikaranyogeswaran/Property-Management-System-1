@@ -16,6 +16,8 @@ import authorizationService from './authorizationService.js';
 import { ROLES } from '../utils/roleUtils.js';
 import { fromCents, toCentsFromMajor } from '../utils/moneyUtils.js';
 import unitModel from '../models/unitModel.js';
+import leadModel from '../models/leadModel.js';
+import staffModel from '../models/staffModel.js';
 
 /**
  * Maps an invoice_type to the correct accounting ledger classification.
@@ -500,15 +502,14 @@ class PaymentService {
       );
       if (!lease) throw new Error('Lease not found');
 
-      const unitModel = (await import('../models/unitModel.js')).default;
       const unit = await unitModel.findById(
         lease.unitId || lease.unit_id,
         conn
       );
 
-      const staffModel = (await import('../models/staffModel.js')).default;
       const assignedProperties = await staffModel.getAssignedProperties(
-        user.id
+        user.id,
+        conn
       );
       if (
         !assignedProperties.some(

@@ -156,68 +156,89 @@ class InvoiceService {
       let generatedCount = 0;
       let skippedCount = 0;
 
-      for (const lease of targetLeases) {
-        const leaseStart = parseLocalDate(lease.startDate);
-        leaseStart.setHours(0, 0, 0, 0);
+      // [HARDENED] Chunked Processing: Process in batches of 20 to prevent request timeouts
+      const CHUNK_SIZE = 20;
+      for (let i = 0; i < targetLeases.length; i += CHUNK_SIZE) {
+        const chunk = targetLeases.slice(i, i + CHUNK_SIZE);
 
-        const targetMonthStart = parseLocalDate(
-          `${y}-${String(m).padStart(2, '0')}-01`
-        );
-        targetMonthStart.setHours(0, 0, 0, 0);
+        await Promise.all(
+          chunk.map(async (lease) => {
+            const leaseStart = parseLocalDate(lease.startDate);
+            leaseStart.setHours(0, 0, 0, 0);
 
-        if (leaseStart > targetMonthStart) {
-          skippedCount++;
-          continue;
-        }
+            const targetMonthStart = parseLocalDate(
+              `${y}-${String(m).padStart(2, '0')}-01`
+            );
+            targetMonthStart.setHours(0, 0, 0, 0);
 
-        const exists = await invoiceModel.exists(lease.id, y, m);
-        if (exists) {
-          skippedCount++;
-          continue;
-        }
+            if (leaseStart > targetMonthStart) {
+              skippedCount++;
+              return;
+            }
 
-        const billingInfo = billingEngine.calculateMonthlyRent(lease, y, m);
-        if (!billingInfo) {
-          skippedCount++;
-          continue;
-        }
+            const exists = await invoiceModel.exists(lease.id, y, m);
+            if (exists) {
+              skippedCount++;
+              return;
+            }
 
-        const invoiceId = await invoiceModel.create({
-          leaseId: lease.id,
-          amount: billingInfo.amount,
-          dueDate: billingInfo.dueDate,
-          description: billingInfo.description,
-        });
+            const billingInfo = billingEngine.calculateMonthlyRent(lease, y, m);
+            if (!billingInfo) {
+              skippedCount++;
+              return;
+            }
 
-        // Auto-apply credit if exists
-        try {
-          await paymentService.applyTenantCredit(invoiceId);
-        } catch (err) {
-          console.error(
-            `[InvoiceService] Failed to auto-apply credit to generated invoice ${invoiceId}:`,
-            err
-          );
-        }
-
-        // Notify Tenant via Email
-        try {
-          const tenant = await userModel.findById(lease.tenantId);
-          if (tenant && tenant.email) {
-            await emailService.sendInvoiceNotification(tenant.email, {
+            const invoiceId = await invoiceModel.create({
+              leaseId: lease.id,
               amount: billingInfo.amount,
               dueDate: billingInfo.dueDate,
-              month: m,
-              year: y,
-              invoiceId: invoiceId,
-              entityType: 'invoice',
-              entityId: invoiceId,
+              description: billingInfo.description,
             });
-          }
-        } catch (err) {
-          console.error(`Failed to send email for invoice ${invoiceId}:`, err);
-        }
 
-        generatedCount++;
+            // [FIX] Guard: Only apply credit and send email if invoice was actually created (not a duplicate)
+            if (invoiceId) {
+              // Auto-apply credit if exists
+              try {
+                await paymentService.applyTenantCredit(invoiceId);
+              } catch (err) {
+                console.error(
+                  `[InvoiceService] Failed to auto-apply credit to generated invoice ${invoiceId}:`,
+                  err
+                );
+              }
+
+              // Notify Tenant via Email
+              try {
+                const tenant = await userModel.findById(lease.tenantId);
+                if (tenant && tenant.email) {
+                  await emailService.sendInvoiceNotification(tenant.email, {
+                    amount: billingInfo.amount,
+                    dueDate: billingInfo.dueDate,
+                    month: m,
+                    year: y,
+                    invoiceId: invoiceId,
+                    entityType: 'invoice',
+                    entityId: invoiceId,
+                  });
+                }
+              } catch (err) {
+                console.error(
+                  `Failed to send email for invoice ${invoiceId}:`,
+                  err
+                );
+              }
+
+              generatedCount++;
+            } else {
+              skippedCount++;
+            }
+          })
+        );
+
+        // Small delay between chunks to yield to event loop
+        if (i + CHUNK_SIZE < targetLeases.length) {
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
       }
 
       // 3. RELEASE LOCK: Mark as successful

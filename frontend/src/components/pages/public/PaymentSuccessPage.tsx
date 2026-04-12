@@ -90,6 +90,28 @@ export default function PaymentSuccessPage() {
               </span>
             </div>
 
+            {/* [NEW] Verification Timeline Information */}
+            <div className="bg-green-50/30 border border-green-100 rounded-2xl p-5 space-y-3">
+              <h4 className="text-xs font-bold text-green-800 uppercase tracking-wider flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4" />
+                Next Steps: Verification
+              </h4>
+              <p className="text-[13px] text-slate-600 leading-relaxed font-medium">
+                Our finance team will now manually verify your payment evidence.
+                This process usually takes{' '}
+                <span className="text-green-700 font-bold">
+                  2-4 business hours
+                </span>
+                .
+              </p>
+              <div className="pt-1">
+                <p className="text-[11px] text-slate-400 font-medium italic">
+                  * Note: Bank transfers may take longer depending on inter-bank
+                  processing times.
+                </p>
+              </div>
+            </div>
+
             <div className="flex items-start gap-3 p-4 bg-blue-50/50 rounded-xl border border-blue-50">
               <ShieldCheck className="w-5 h-5 text-blue-500 mt-0.5 shrink-0" />
               <p className="text-xs text-blue-800/80 leading-relaxed font-medium">
