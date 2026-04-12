@@ -12,6 +12,7 @@ import {
   submitPaymentSchema,
   verifyPaymentSchema,
 } from '../schemas/paymentSchemas.js';
+import idempotencyMiddleware from '../middleware/idempotencyMiddleware.js';
 
 const router = Router();
 
@@ -21,6 +22,7 @@ router.post(
   '/',
   authenticateToken,
   upload.single('proof'),
+  idempotencyMiddleware(),
   validateRequest(submitPaymentSchema),
   paymentController.submitPayment
 );

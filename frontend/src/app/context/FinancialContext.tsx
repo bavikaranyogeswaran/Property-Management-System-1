@@ -76,7 +76,8 @@ interface FinancialContextType {
   fetchLedgerSummary: (year: number) => Promise<LedgerSummary>;
   generateMonthlyInvoices: () => Promise<void>;
   submitPayment: (
-    payment: Omit<Payment, 'id' | 'submittedAt'>
+    payment: Omit<Payment, 'id' | 'submittedAt'> | FormData,
+    idempotencyKey?: string
   ) => Promise<void>;
   verifyPayment: (id: string, approved: boolean) => Promise<void>;
   runLateFeeAudit: () => Promise<void>;
@@ -173,19 +174,47 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
   };
 
   const submitPayment = async (
-    payment: Omit<Payment, 'id' | 'submittedAt'>
+    payment: Omit<Payment, 'id' | 'submittedAt'> | FormData,
+    idempotencyKey?: string
   ) => {
     try {
-      const res = await paymentApi.submitPayment({
-        ...payment,
-        amount: toCentsFromLKR(payment.amount),
-      });
+      const headers: any = {};
+      if (idempotencyKey) {
+        headers['X-Idempotency-Key'] = idempotencyKey;
+      }
+
+      let res;
+      if (payment instanceof FormData) {
+        // [HARDENED] Ensure amount is in cents if it's a raw LKR string in FormData
+        // However, TenantInvoicesPage already passed it.
+        // We assume the caller handles the conversion if using FormData,
+        // but for consistency with the object-based path, we'll try to convert if possible.
+        // Actually, FinancialContext should be the one doing the Cents conversion to keep it central.
+        const amount = payment.get('amount');
+        if (amount) {
+          payment.set('amount', toCentsFromLKR(Number(amount)).toString());
+        }
+        res = await paymentApi.submitPayment(payment, headers);
+      } else {
+        res = await paymentApi.submitPayment(
+          {
+            ...payment,
+            amount: toCentsFromLKR(payment.amount),
+          },
+          headers
+        );
+      }
+
       if (res.status === 201) {
         toast.success('Payment submitted successfully');
         await fetchFinancialData();
       }
-    } catch (e) {
-      toast.error('Failed to submit payment');
+    } catch (e: any) {
+      if (e.response?.status === 409) {
+        toast.warning('This payment is already being processed.');
+      } else {
+        toast.error(e.response?.data?.error || 'Failed to submit payment');
+      }
     }
   };
 

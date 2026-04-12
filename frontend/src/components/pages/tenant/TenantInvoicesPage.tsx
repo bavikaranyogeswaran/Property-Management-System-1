@@ -67,6 +67,7 @@ export function TenantInvoicesPage() {
 
   const [preparingPayHere, setPreparingPayHere] = useState(false);
   const [payHereData, setPayHereData] = useState<any>(null);
+  const [idempotencyKey, setIdempotencyKey] = useState<string>('');
 
   // Multi-Unit Logic (E19): Use active lease from context
   const currentLease = leasesFromAuth.find((l) => l.id === activeLeaseId);
@@ -118,7 +119,7 @@ export function TenantInvoicesPage() {
     formData.append('proof', selectedFile); // Backend expects 'proof'
 
     // Fix: Await the submission. AppContext handles toasts.
-    await submitPayment(formData as any);
+    await submitPayment(formData as any, idempotencyKey);
 
     // Close dialog regardless of success/fail or strictly on success?
     // AppContext helper doesn't throw if it handles error, so we might close unconditionally
@@ -200,6 +201,8 @@ export function TenantInvoicesPage() {
         amount: balance.toString(),
       });
       setSelectedFile(null);
+      // Generate unique idempotency key for this payment attempt
+      setIdempotencyKey(crypto.randomUUID());
       setIsPaymentDialogOpen(true);
     }
   };

@@ -78,11 +78,12 @@ export const maintenanceApi = {
 
 // Payment API
 export const paymentApi = {
-  submitPayment: (data: any) =>
+  submitPayment: (data: any, headers = {}) =>
     apiClient.post('/payments', data, {
       headers: {
         'Content-Type':
           data instanceof FormData ? 'multipart/form-data' : 'application/json',
+        ...headers,
       },
     }),
   getPayments: () => apiClient.get('/payments'),
