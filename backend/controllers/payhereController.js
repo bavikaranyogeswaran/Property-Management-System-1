@@ -1,5 +1,7 @@
 import payhereService from '../services/payhereService.js';
 import catchAsync from '../utils/catchAsync.js';
+import invoiceModel from '../models/invoiceModel.js';
+import unitLockService from '../services/unitLockService.js';
 
 /**
  * Handles PayHere checkout and notification.
@@ -25,6 +27,23 @@ class PayHereController {
   preparePublicCheckout = catchAsync(async (req, res) => {
     const { token } = req.params;
     if (!token) throw new Error('Token is required');
+
+    // [NEW] Verify Lock before generating PayHere session
+    const invoice = await invoiceModel.findByMagicToken(token);
+    if (!invoice) throw new Error('Invalid or expired payment link.');
+
+    const lockAcquired = await unitLockService.acquireLock(
+      invoice.unitId,
+      invoice.tenantId
+    );
+
+    if (!lockAcquired) {
+      return res.status(409).json({
+        status: 'error',
+        message:
+          'Another user is currently completing their reservation for this unit. Please try again in 15 minutes.',
+      });
+    }
 
     const checkoutData = await payhereService.prepareCheckout(null, token);
     res.status(200).json({
@@ -84,9 +103,6 @@ class PayHereController {
     const parts = order_id.split('-');
     const invoiceId = Number(parts[1]);
     if (isNaN(invoiceId)) throw new Error('Invalid Order ID format');
-
-    // Dynamic Loading to avoid circular dependencies
-    const invoiceModel = (await import('../models/invoiceModel.js')).default;
 
     // 3. Verify Invoice Existence
     const invoice = await invoiceModel.findById(invoiceId);

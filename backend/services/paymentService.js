@@ -285,6 +285,19 @@ class PaymentService {
       }
 
       await connection.commit();
+
+      // [NEW] Release Redis Lock after successful submission
+      // The database state now reflects the pending payment, so the "soft lock" is no longer needed.
+      try {
+        const unitLockService = (await import('./unitLockService.js')).default;
+        await unitLockService.releaseLock(invoice.unitId);
+      } catch (lockErr) {
+        console.error(
+          '[PaymentService] Failed to release Redis lock:',
+          lockErr
+        );
+      }
+
       return paymentId;
     } catch (error) {
       await connection.rollback();

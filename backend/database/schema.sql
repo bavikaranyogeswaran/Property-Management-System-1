@@ -133,7 +133,6 @@ CREATE TABLE properties (
     status ENUM('active','inactive') DEFAULT 'active',
     is_archived BOOLEAN DEFAULT FALSE,
     archived_at DATETIME,
-
     late_fee_percentage DECIMAL(5,2) DEFAULT 3.00,
     late_fee_type ENUM('flat_percentage', 'daily_fixed') DEFAULT 'flat_percentage',
     late_fee_amount BIGINT DEFAULT 0,
@@ -276,17 +275,8 @@ CREATE TABLE lead_access_tokens (
     FOREIGN KEY (lead_id) REFERENCES leads(lead_id) ON DELETE CASCADE
 );
 
--- =========================
--- UNIT LOCKS (Concurrent Process Protection)
--- =========================
-CREATE TABLE unit_locks (
-    unit_id INT PRIMARY KEY,
-    lead_id INT NOT NULL,
-    expires_at DATETIME NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (unit_id) REFERENCES units(unit_id) ON DELETE CASCADE,
-    FOREIGN KEY (lead_id) REFERENCES leads(lead_id) ON DELETE CASCADE
-);
+-- [REMOVED] unit_locks table (Migrated to Redis)
+
 
 -- =========================
 -- LEASES

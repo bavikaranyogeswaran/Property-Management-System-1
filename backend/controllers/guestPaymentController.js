@@ -1,6 +1,7 @@
 import invoiceModel from '../models/invoiceModel.js';
 import paymentService from '../services/paymentService.js';
 import leaseModel from '../models/leaseModel.js';
+import unitLockService from '../services/unitLockService.js';
 import jwt from 'jsonwebtoken';
 import catchAsync from '../utils/catchAsync.js';
 import AppError from '../utils/AppError.js';
@@ -18,6 +19,26 @@ class GuestPaymentController {
 
     if (invoice.status === 'paid') {
       return next(new AppError('This invoice has already been paid.', 400));
+    }
+
+    // [NEW] Acquire Unit Lock (Cart Locking)
+    // We use the tenantId (User ID) as the lock owner.
+    const lockAcquired = await unitLockService.acquireLock(
+      invoice.unitId,
+      invoice.tenantId
+    );
+
+    if (!lockAcquired) {
+      const lockInfo = await unitLockService.isLocked(
+        invoice.unitId,
+        invoice.tenantId
+      );
+      return next(
+        new AppError(
+          `Another user is currently completing their reservation for this unit. Please try again in 15 minutes.`,
+          409
+        )
+      );
     }
 
     // Return only safe public information
