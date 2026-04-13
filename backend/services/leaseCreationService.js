@@ -179,25 +179,27 @@ class LeaseCreationService {
         // but we've secured the storage.
       }
 
-      // Audit Log
-      await auditLogger.log(
-        {
-          userId: user?.id || user?.user_id || null,
-          actionType: 'LEASE_CREATED_DRAFT',
-          entityId: leaseId,
-          entityType: 'lease',
-          details: {
-            tenantId,
-            unitId,
-            startDate,
-            endDate,
-            monthlyRent,
-            targetDeposit: leaseParams.targetDeposit,
+      // Audit Log (Resilient)
+      await this._safelyExecute('LEASE_CREATED_DRAFT Audit', async () => {
+        await auditLogger.log(
+          {
+            userId: user?.id || user?.user_id || null,
+            actionType: 'LEASE_CREATED_DRAFT',
+            entityId: leaseId,
+            entityType: 'lease',
+            details: {
+              tenantId,
+              unitId,
+              startDate,
+              endDate,
+              monthlyRent: leaseParams.monthlyRent,
+              targetDeposit: leaseParams.targetDeposit,
+            },
           },
-        },
-        null,
-        conn
-      );
+          null,
+          conn
+        );
+      });
 
       if (isOwnTransaction) {
         await conn.commit();
@@ -266,18 +268,20 @@ class LeaseCreationService {
         connection
       );
 
-      // Audit Log
-      await auditLogger.log(
-        {
-          userId: user.id || user.user_id,
-          actionType: 'LEASE_DOCUMENTS_VERIFIED',
-          entityId: leaseId,
-          entityType: 'lease',
-          details: {},
-        },
-        null,
-        connection
-      );
+      // Audit Log (Resilient)
+      await this._safelyExecute('LEASE_DOCUMENTS_VERIFIED Audit', async () => {
+        await auditLogger.log(
+          {
+            userId: user.id || user.user_id,
+            actionType: 'LEASE_DOCUMENTS_VERIFIED',
+            entityId: leaseId,
+            entityType: 'lease',
+            details: {},
+          },
+          null,
+          connection
+        );
+      });
 
       // Check if deposit is already paid. If so, auto-activate now.
       const depositStats = await leaseModel.getDepositStatus(
@@ -287,12 +291,19 @@ class LeaseCreationService {
       let activated = false;
       if (depositStats && depositStats.isFullyPaid) {
         await this.facade.signLease(leaseId, user, connection);
-
-        await userService.triggerOnboarding(lease.tenantId, connection);
         activated = true;
       }
 
       await connection.commit();
+
+      // [POST-COMMIT] Trigger Onboarding (Resilient)
+      // Side effects like email/JWT generation happen only after DB is persisted.
+      if (activated) {
+        await this._safelyExecute('TRIGGER_ONBOARDING', async () => {
+          await userService.triggerOnboarding(lease.tenantId);
+        });
+      }
+
       return {
         isDocumentsVerified: true,
         activated,
@@ -344,18 +355,20 @@ class LeaseCreationService {
         connection
       );
 
-      // Audit Log
-      await auditLogger.log(
-        {
-          userId: user.id || user.user_id,
-          actionType: 'LEASE_DOCUMENTS_REJECTED',
-          entityId: leaseId,
-          entityType: 'lease',
-          details: { reason },
-        },
-        null,
-        connection
-      );
+      // Audit Log (Resilient)
+      await this._safelyExecute('LEASE_DOCUMENTS_REJECTED Audit', async () => {
+        await auditLogger.log(
+          {
+            userId: user.id || user.user_id,
+            actionType: 'LEASE_DOCUMENTS_REJECTED',
+            entityId: leaseId,
+            entityType: 'lease',
+            details: { reason },
+          },
+          null,
+          connection
+        );
+      });
 
       // [HARD RESERVATION FIX] If documents are rejected, we DO NOT automatically cancel the lease
       // to allow the tenant to fix the issue. However, we could release the unit if desired.
@@ -529,40 +542,6 @@ class LeaseCreationService {
         }
 
         await leadModel.dropLeadsForUnit(lease.unitId, conn);
-
-        // [C1 FIX] Notify dropped leads that the unit is no longer available
-        try {
-          const [droppedLeads] = await conn.query(
-            `SELECT l.email, l.name, u.unit_number, p.name AS property_name 
-             FROM leads l
-             JOIN units u ON l.unit_id = u.unit_id
-             JOIN properties p ON l.property_id = p.property_id
-             WHERE l.unit_id = ? AND l.status = 'dropped' 
-             AND l.notes LIKE '%Unit Leased%'`,
-            [lease.unitId]
-          );
-
-          for (const lead of droppedLeads) {
-            if (lead.email) {
-              await emailService
-                .sendGenericNotification(lead.email, {
-                  subject: `Unit ${lead.unit_number} at ${lead.property_name} is no longer available`,
-                  message: `Dear ${lead.name}, Unit ${lead.unit_number} at ${lead.property_name} is no longer available. Please contact us for alternative units.`,
-                })
-                .catch((err) =>
-                  console.error(
-                    `Failed to notify dropped lead ${lead.email}:`,
-                    err
-                  )
-                );
-            }
-          }
-        } catch (notifyErr) {
-          console.error(
-            '[LeaseService] Failed to notify dropped leads:',
-            notifyErr
-          );
-        }
       }
 
       // [IMPROVEMENT] Backfill Missing Rent Invoices if activated late
@@ -610,21 +589,49 @@ class LeaseCreationService {
         // We do NOT throw here. The lease activation is the priority.
       }
 
-      await auditLogger.log(
-        {
-          userId: user?.id || user?.user_id || null,
-          actionType: 'LEASE_SIGNED_ACTIVATED',
-          entityId: leaseId,
-          entityType: 'lease',
-          details: {},
-        },
-        null,
-        conn
-      );
+      // Audit Log (Resilient)
+      await this._safelyExecute('LEASE_SIGNED_ACTIVATED Audit', async () => {
+        await auditLogger.log(
+          {
+            userId: user?.id || user?.user_id || null,
+            actionType: 'LEASE_SIGNED_ACTIVATED',
+            entityId: leaseId,
+            entityType: 'lease',
+            details: {},
+          },
+          null,
+          conn
+        );
+      });
 
       if (isOwnTransaction) {
         await conn.commit();
       }
+
+      // [POST-COMMIT] Notify dropped leads (Resilient)
+      if (parseLocalDate(lease.startDate) <= getLocalTime()) {
+        await this._safelyExecute('Notify Dropped Leads', async () => {
+          const [droppedLeads] = await conn.query(
+            `SELECT l.email, l.name, u.unit_number, p.name AS property_name 
+             FROM leads l
+             JOIN units u ON l.unit_id = u.unit_id
+             JOIN properties p ON l.property_id = p.property_id
+             WHERE l.unit_id = ? AND l.status = 'dropped' 
+             AND l.notes LIKE '%Unit Leased%'`,
+            [lease.unitId]
+          );
+
+          for (const lead of droppedLeads) {
+            if (lead.email) {
+              await emailService.sendGenericNotification(lead.email, {
+                subject: `Unit ${lead.unit_number} at ${lead.property_name} is no longer available`,
+                message: `Dear ${lead.name}, Unit ${lead.unit_number} at ${lead.property_name} is no longer available. Please contact us for alternative units.`,
+              });
+            }
+          }
+        });
+      }
+
       return { status: 'active', signedAt: getLocalTime() };
     } catch (error) {
       if (isOwnTransaction) {
@@ -635,6 +642,22 @@ class LeaseCreationService {
       if (isOwnTransaction) {
         conn.release();
       }
+    }
+  }
+
+  /**
+   * Standard error handler for silent side-effect failures.
+   * Ensures non-critical tasks like logging and notifications do not crash core business state.
+   */
+  async _safelyExecute(label, fn) {
+    try {
+      await fn();
+    } catch (err) {
+      console.error(
+        `[LeaseCreationService] Non-critical failure in ${label}:`,
+        err.message
+      );
+      // We do NOT re-throw. We want the main transaction to complete.
     }
   }
 }
