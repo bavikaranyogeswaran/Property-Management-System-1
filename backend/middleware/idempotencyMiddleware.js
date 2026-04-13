@@ -31,14 +31,15 @@ const idempotencyMiddleware = () => {
     const redisKey = `idempotency:${userId}:${key}`;
 
     try {
-      // 1. Try to acquire the lock (SET if Not Exists)
-      // We set status to 'processing' with a 5-minute timeout for the request lifetime.
+      // [HARDENED] 1. Try to acquire the lock (SET if Not Exists)
+      // We set status to 'processing' with a 60-second timeout.
+      // 5 minutes was excessive and blocked users during server crashes.
       const lockAcquired = await redis.set(
         redisKey,
         'processing',
         'NX',
         'EX',
-        300
+        60
       );
 
       if (!lockAcquired) {
@@ -48,7 +49,7 @@ const idempotencyMiddleware = () => {
         if (cachedData === 'processing') {
           return res.status(409).json({
             error:
-              'This request is already being processed. Please wait or try again later.',
+              'This request is already being processed. Please wait 60 seconds or try again.',
             idempotent: true,
           });
         }
@@ -106,7 +107,23 @@ const idempotencyMiddleware = () => {
       next();
     } catch (err) {
       logger.error(`[Idempotency] Middleware Error: ${err.message}`);
-      // Fallback: Proceed without idempotency if Redis fails
+
+      // [HARDENED] FAIL-CLOSED: For high-integrity routes (Payments, Auth, Leases),
+      // we must block progress if idempotency cannot be guaranteed.
+      const sensitivePatterns = ['/payments', '/auth', '/leases', '/checkout'];
+      const isSensitive = sensitivePatterns.some((p) =>
+        req.originalUrl.includes(p)
+      );
+
+      if (isSensitive) {
+        return res.status(503).json({
+          error:
+            'System is temporarily unable to guarantee request integrity. Please try again in a few moments.',
+          reason: 'IDEMPOTENCY_UNAVAILABLE',
+        });
+      }
+
+      // Fallback for non-critical GETs or minor updates: Proceed without protection
       next();
     }
   };

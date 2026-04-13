@@ -6,6 +6,7 @@
 // ============================================================================
 
 import pool from '../config/db.js';
+import cacheService from '../services/cacheService.js';
 
 class UserModel {
   async findByEmail(email, connection = null) {
@@ -190,9 +191,10 @@ class UserModel {
     const db = connection || pool;
     const { name, email, phone, status } = updateData;
     const normalizedEmail = email ? email.toLowerCase().trim() : null;
-    // Build query dynamically based on provided fields?
-    // For simplicity now, we assume these specific fields are passed.
-    // If password update is needed later, separate method is better.
+
+    // [HARDENED] Invalidate cache before sync
+    await cacheService.invalidate(cacheService.getUserKey(id));
+
     const [result] = await db.query(
       'UPDATE users SET name = ?, email = ?, phone = ?, status = ?, token_version = CASE WHEN status != ? THEN token_version + 1 ELSE token_version END WHERE user_id = ? AND is_archived = FALSE',
       [name, normalizedEmail, phone, status, status, id]
@@ -202,6 +204,10 @@ class UserModel {
 
   async updatePassword(id, passwordHash, connection = null) {
     const db = connection || pool;
+
+    // [HARDENED] Invalidate cache
+    await cacheService.invalidate(cacheService.getUserKey(id));
+
     // [HARDENED] Increment token_version on password change to invalidate other sessions
     const [result] = await db.query(
       'UPDATE users SET password_hash = ?, token_version = token_version + 1 WHERE user_id = ?',
@@ -212,6 +218,10 @@ class UserModel {
 
   async updateRole(id, role, connection = null) {
     const db = connection || pool;
+
+    // [HARDENED] Invalidate cache
+    await cacheService.invalidate(cacheService.getUserKey(id));
+
     const [result] = await db.query(
       'UPDATE users SET role = ? WHERE user_id = ?',
       [role, id]
@@ -231,6 +241,9 @@ class UserModel {
       100
     );
 
+    // [HARDENED] Invalidate cache
+    await cacheService.invalidate(cacheService.getUserKey(id));
+
     const [result] = await db.query(
       'UPDATE users SET archived_at = NOW(), is_archived = TRUE, email = ?, status = ?, name = CONCAT(name, " (Deleted)"), token_version = token_version + 1 WHERE user_id = ?',
       [archivedEmail, 'inactive', id]
@@ -239,6 +252,10 @@ class UserModel {
   }
   async verifyEmail(id, connection = null) {
     const db = connection || pool;
+
+    // [HARDENED] Invalidate cache
+    await cacheService.invalidate(cacheService.getUserKey(id));
+
     const [result] = await db.query(
       'UPDATE users SET is_email_verified = TRUE, email_verified_at = NOW(), status = "active" WHERE user_id = ?',
       [id]
@@ -248,6 +265,10 @@ class UserModel {
 
   async setupPassword(id, passwordHash, connection = null) {
     const db = connection || pool;
+
+    // [HARDENED] Invalidate cache
+    await cacheService.invalidate(cacheService.getUserKey(id));
+
     // [HARDENED] Reset token_version on setup to ensure a clean state
     const [result] = await db.query(
       'UPDATE users SET password_hash = ?, is_email_verified = TRUE, email_verified_at = NOW(), status = "active", token_version = 1 WHERE user_id = ?',
@@ -258,6 +279,10 @@ class UserModel {
 
   async incrementTokenVersion(id, connection = null) {
     const db = connection || pool;
+
+    // [HARDENED] Invalidate cache
+    await cacheService.invalidate(cacheService.getUserKey(id));
+
     const [result] = await db.query(
       'UPDATE users SET token_version = token_version + 1 WHERE user_id = ?',
       [id]

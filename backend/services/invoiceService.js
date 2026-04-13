@@ -17,6 +17,7 @@ import {
   parseLocalDate,
   now,
 } from '../utils/dateUtils.js';
+import { runWithLock } from '../utils/distributionLock.js';
 
 class InvoiceService {
   async getInvoices(user) {
@@ -111,40 +112,10 @@ class InvoiceService {
     const m = month || nowTime.getMonth() + 1;
 
     // 1. CONCURRENCY LOCK: Prevent multiple simultaneous bulk generations
+    // [HARDENED] Migrated to Redis Distributed Lock to avoid SQL row-locking overhead
     const lockName = `generate_invoices_${y}_${m}`;
-    const [existingLock] = await db.query(
-      'SELECT status, updated_at FROM cron_checkpoints WHERE job_name = ? LIMIT 1',
-      [lockName]
-    );
 
-    if (existingLock.length > 0) {
-      const lastUpdate = new Date(existingLock[0].updated_at);
-      const diffMinutes =
-        (new Date().getTime() - lastUpdate.getTime()) / (1000 * 60);
-
-      if (existingLock[0].status === 'running' && diffMinutes < 15) {
-        throw new Error(
-          'Invoice generation for this period is already in progress. Please wait.'
-        );
-      }
-
-      // Rate Limit: Prevent regeneration if successful within last 5 minutes
-      if (existingLock[0].status === 'success' && diffMinutes < 5) {
-        throw new Error(
-          'Invoice generation was recently completed. Please wait 5 minutes before re-running.'
-        );
-      }
-    }
-
-    // Set/Reset Lock to Running
-    await db.query(
-      `INSERT INTO cron_checkpoints (job_name, last_success_date, status, message) 
-             VALUES (?, ?, 'running', 'Manual generation started')
-             ON DUPLICATE KEY UPDATE status = 'running', updated_at = NOW(), message = 'Manual generation re-started'`,
-      [lockName, `${y}-${String(m).padStart(2, '0')}-01`]
-    );
-
-    try {
+    const lockResult = await runWithLock(lockName, 900, async () => {
       const activeLeases = await leaseModel.findActive();
 
       // RBAC: Treasurer assignments
@@ -242,21 +213,29 @@ class InvoiceService {
         }
       }
 
-      // 3. RELEASE LOCK: Mark as successful
+      // 3. LOG COMPLETION: Persistent state for backfill/audit
       await db.query(
-        "UPDATE cron_checkpoints SET status = 'success', message = ?, updated_at = NOW() WHERE job_name = ?",
-        [`Generated ${generatedCount} invoices manually`, lockName]
+        `INSERT INTO cron_checkpoints (job_name, last_success_date, status, message) 
+         VALUES (?, ?, 'success', ?)
+         ON DUPLICATE KEY UPDATE status = 'success', updated_at = NOW(), message = ?, last_success_date = VALUES(last_success_date)`,
+        [
+          lockName,
+          `${y}-${String(m).padStart(2, '0')}-01`,
+          `Generated ${generatedCount} invoices manually`,
+          `Generated ${generatedCount} invoices manually`,
+        ]
       );
 
       return { generated: generatedCount, skipped: skippedCount };
-    } catch (err) {
-      // Handle Error Release
-      await db.query(
-        "UPDATE cron_checkpoints SET status = 'failed', message = ?, updated_at = NOW() WHERE job_name = ?",
-        [err.message, lockName]
+    });
+
+    if (!lockResult.success) {
+      throw new Error(
+        'Invoice generation for this period is already in progress. Please wait.'
       );
-      throw err;
     }
+
+    return lockResult.result;
   }
 
   async correctInvoice(invoiceId, newAmount, reason, user) {

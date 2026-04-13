@@ -488,7 +488,7 @@ class UserService {
 
       // RELEASE LOCK: Clear reservation on success
       if (targetUnitId) {
-        unitLockService.releaseLock(targetUnitId);
+        unitLockService.releaseLock(targetUnitId, leadId);
       }
 
       try {

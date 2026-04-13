@@ -44,10 +44,12 @@ class UnitLockService {
 
     try {
       const currentValue = await redis.get(lockKey);
+
+      // FAIL-CLOSED: If Redis returns a value, we know it's locked.
       if (!currentValue) return null;
 
       if (excludeLeadId && currentValue === excludeLeadId.toString()) {
-        return null;
+        return null; // Locked by the caller, so it's "available" to them.
       }
 
       const ttl = await redis.ttl(lockKey);
@@ -56,18 +58,42 @@ class UnitLockService {
       return { leadId: currentValue, expiresAt };
     } catch (error) {
       console.error('UnitLockService Redis Error (check):', error);
-      return null;
+
+      // [HARDENED] FAIL-CLOSED: If Redis is down, we must assume it IS locked
+      // to prevent race conditions (Double Booking).
+      return {
+        leadId: 'SYSTEM_LOCK_ERROR',
+        expiresAt: new Date(Date.now() + 60000), // Assume locked for 60s while system recovers
+        error: 'Connection failure',
+      };
     }
   }
 
   /**
    * Manually release a lock.
+   * @param {string|number} unitId
+   * @param {string|number} leadId (Optional) If provided, lock will only be released if it matches this lead.
    */
-  async releaseLock(unitId) {
+  async releaseLock(unitId, leadId = null) {
     const id = unitId.toString();
     const lockKey = `unit_lock:${id}`;
+    const lid = leadId ? leadId.toString() : null;
+
     try {
-      await redis.del(lockKey);
+      if (lid) {
+        // Atomic ownership check via Lua script
+        const script = `
+          if redis.call("get", KEYS[1]) == ARGV[1] then
+            return redis.call("del", KEYS[1])
+          else
+            return 0
+          end
+        `;
+        await redis.eval(script, 1, lockKey, lid);
+      } else {
+        // Fallback for system-level overrides or legacy calls
+        await redis.del(lockKey);
+      }
     } catch (error) {
       console.error('UnitLockService Redis Error (release):', error);
     }

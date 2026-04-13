@@ -289,8 +289,12 @@ class PaymentService {
       // [NEW] Release Redis Lock after successful submission
       // The database state now reflects the pending payment, so the "soft lock" is no longer needed.
       try {
+        const leadId = await leadModel.findIdByEmailAndProperty(
+          invoice.tenant_email || invoice.email,
+          unit.propertyId || unit.property_id
+        );
         const unitLockService = (await import('./unitLockService.js')).default;
-        await unitLockService.releaseLock(invoice.unitId);
+        await unitLockService.releaseLock(invoice.unitId, leadId);
       } catch (lockErr) {
         console.error(
           '[PaymentService] Failed to release Redis lock:',

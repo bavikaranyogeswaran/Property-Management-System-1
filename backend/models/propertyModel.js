@@ -6,6 +6,7 @@
 // ============================================================================
 
 import db from '../config/db.js';
+import cacheService from '../services/cacheService.js';
 
 class PropertyModel {
   //  CREATE PROPERTY: Filing a deed for a new building.
@@ -144,66 +145,74 @@ class PropertyModel {
   }
 
   async findById(id) {
-    const [rows] = await db.query(
-      `
-            SELECT 
-                p.property_id, 
-                p.owner_id, 
-                p.name, 
-                p.property_no,
-                p.street,
-                p.city,
-                p.district,
-                COALESCE(
-                  (SELECT pi.image_url FROM property_images pi WHERE pi.property_id = p.property_id AND pi.is_primary = TRUE LIMIT 1),
-                  p.image_url
-                ) AS image_url,
-                p.description,
-                p.status, 
-                p.created_at,
-                p.property_type_id,
-                p.late_fee_percentage,
-                p.late_fee_type,
-                p.late_fee_amount,
-                p.late_fee_grace_period,
-                p.tenant_deactivation_days,
-                p.management_fee_percentage,
-                pt.name as type_name,
-                pt.type_id as type_id
-            FROM properties p
-            JOIN property_types pt ON p.property_type_id = pt.type_id
-            WHERE p.property_id = ? AND p.is_archived = FALSE
-        `,
-      [id]
+    return await cacheService.getOrSet(
+      cacheService.getPropertyKey(id),
+      async () => {
+        const [rows] = await db.query(
+          `
+                SELECT 
+                    p.property_id, 
+                    p.owner_id, 
+                    p.name, 
+                    p.property_no,
+                    p.street,
+                    p.city,
+                    p.district,
+                    COALESCE(
+                      (SELECT pi.image_url FROM property_images pi WHERE pi.property_id = p.property_id AND pi.is_primary = TRUE LIMIT 1),
+                      p.image_url
+                    ) AS image_url,
+                    p.description,
+                    p.status, 
+                    p.created_at,
+                    p.property_type_id,
+                    p.late_fee_percentage,
+                    p.late_fee_type,
+                    p.late_fee_amount,
+                    p.late_fee_grace_period,
+                    p.tenant_deactivation_days,
+                    p.management_fee_percentage,
+                    pt.name as type_name,
+                    pt.type_id as type_id
+                FROM properties p
+                JOIN property_types pt ON p.property_type_id = pt.type_id
+                WHERE p.property_id = ? AND p.is_archived = FALSE
+            `,
+          [id]
+        );
+
+        if (!rows[0]) return null;
+
+        // Fetch amenities for this property
+        const amenities = await this._getAmenities(id);
+
+        return {
+          id: rows[0].property_id.toString(),
+          ownerId: rows[0].owner_id.toString(),
+          name: rows[0].name,
+          propertyNo: rows[0].property_no,
+          street: rows[0].street,
+          city: rows[0].city,
+          district: rows[0].district,
+          propertyTypeId: rows[0].property_type_id,
+          typeName: rows[0].type_name,
+          imageUrl: rows[0].image_url,
+          description: rows[0].description,
+          features: amenities,
+          status: rows[0].status,
+          createdAt: rows[0].created_at,
+          lateFeePercentage: parseFloat(rows[0].late_fee_percentage),
+          lateFeeType: rows[0].late_fee_type,
+          lateFeeAmount: Number(rows[0].late_fee_amount),
+          lateFeeGracePeriod: parseInt(rows[0].late_fee_grace_period),
+          tenantDeactivationDays: parseInt(rows[0].tenant_deactivation_days),
+          managementFeePercentage: parseFloat(
+            rows[0].management_fee_percentage
+          ),
+        };
+      },
+      900 // 15 Minute TTL
     );
-
-    if (!rows[0]) return null;
-
-    // Fetch amenities for this property
-    const amenities = await this._getAmenities(id);
-
-    return {
-      id: rows[0].property_id.toString(),
-      ownerId: rows[0].owner_id.toString(),
-      name: rows[0].name,
-      propertyNo: rows[0].property_no,
-      street: rows[0].street,
-      city: rows[0].city,
-      district: rows[0].district,
-      propertyTypeId: rows[0].property_type_id,
-      typeName: rows[0].type_name,
-      imageUrl: rows[0].image_url,
-      description: rows[0].description,
-      features: amenities,
-      status: rows[0].status,
-      createdAt: rows[0].created_at,
-      lateFeePercentage: parseFloat(rows[0].late_fee_percentage),
-      lateFeeType: rows[0].late_fee_type,
-      lateFeeAmount: Number(rows[0].late_fee_amount),
-      lateFeeGracePeriod: parseInt(rows[0].late_fee_grace_period),
-      tenantDeactivationDays: parseInt(rows[0].tenant_deactivation_days),
-      managementFeePercentage: parseFloat(rows[0].management_fee_percentage),
-    };
   }
 
   static UPDATE_KEY_MAP = {
@@ -241,6 +250,9 @@ class PropertyModel {
     });
 
     if (fields.length === 0 && !featuresToSync) return false;
+
+    // [HARDENED] Invalidate cache
+    await cacheService.invalidate(cacheService.getPropertyKey(id));
 
     if (fields.length > 0) {
       values.push(id);
@@ -282,6 +294,9 @@ class PropertyModel {
       [id]
     );
 
+    // [HARDENED] Invalidate cache
+    await cacheService.invalidate(cacheService.getPropertyKey(id));
+
     // 2. Perform the soft-delete
     const [result] = await dbConn.query(
       "UPDATE properties SET archived_at = NOW(), is_archived = TRUE, status = 'inactive' WHERE property_id = ?",
@@ -311,12 +326,18 @@ class PropertyModel {
   }
 
   async getTypes() {
-    const [rows] = await db.query('SELECT * FROM property_types');
-    return rows.map((row) => ({
-      id: row.type_id.toString(),
-      name: row.name,
-      description: row.description,
-    }));
+    return await cacheService.getOrSet(
+      'cache:property_types',
+      async () => {
+        const [rows] = await db.query('SELECT * FROM property_types');
+        return rows.map((row) => ({
+          id: row.type_id.toString(),
+          name: row.name,
+          description: row.description,
+        }));
+      },
+      86400 // 24 Hour TTL (Static data)
+    );
   }
 
   async addImages(propertyId, imagesData) {

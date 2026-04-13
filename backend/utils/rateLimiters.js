@@ -1,4 +1,6 @@
 import { rateLimit, ipKeyGenerator } from 'express-rate-limit';
+import { RedisStore } from 'rate-limit-redis';
+import redis from '../config/redis.js';
 import logger from './logger.js';
 
 /**
@@ -25,7 +27,7 @@ const emailKeyGenerator = (req, res) => {
 
 /**
  * Global API Limiter
- * Standard protection for general system usage (Dashboard browsing, etc.)
+ * [HARDENED] Multi-instance synchronization via Redis
  */
 export const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -34,11 +36,15 @@ export const apiLimiter = rateLimit({
     error: 'Too many requests from this IP, please try again after 15 minutes',
   },
   handler: limitHandler,
+  store: new RedisStore({
+    sendCommand: (...args) => redis.call(...args),
+    prefix: 'rl:api:',
+  }),
 });
 
 /**
  * Strict Auth Limiter
- * Specifically for Login attempts to prevent brute-force.
+ * [HARDENED] Multi-instance synchronization via Redis
  */
 export const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -47,12 +53,15 @@ export const loginLimiter = rateLimit({
     error: 'Too many login attempts. Please try again after 15 minutes.',
   },
   handler: limitHandler,
+  store: new RedisStore({
+    sendCommand: (...args) => redis.call(...args),
+    prefix: 'rl:login:',
+  }),
 });
 
 /**
  * Sensitive Action Limiter
- * Specifically for Password Reset and Email Verification requests.
- * Uses Email-based throttling to prevent targeted inbox flooding.
+ * [HARDENED] Multi-instance synchronization via Redis
  */
 export const sensitiveActionLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
@@ -62,11 +71,15 @@ export const sensitiveActionLimiter = rateLimit({
     error: 'Too many requests for this action. Please try again after 1 hour.',
   },
   handler: limitHandler,
+  store: new RedisStore({
+    sendCommand: (...args) => redis.call(...args),
+    prefix: 'rl:sensitive:',
+  }),
 });
 
 /**
  * Public Portal Limiter
- * Specifically for the Lead Portal and Guest Payment routes.
+ * [HARDENED] Multi-instance synchronization via Redis
  */
 export const publicPortalLimiter = rateLimit({
   windowMs: 30 * 60 * 1000, // 30 minutes
@@ -75,6 +88,10 @@ export const publicPortalLimiter = rateLimit({
     error: 'Public portal access threshold reached. Please try again later.',
   },
   handler: limitHandler,
+  store: new RedisStore({
+    sendCommand: (...args) => redis.call(...args),
+    prefix: 'rl:public:',
+  }),
 });
 
 export default {

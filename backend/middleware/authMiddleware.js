@@ -1,6 +1,5 @@
-import jwt from 'jsonwebtoken';
-import userModel from '../models/userModel.js';
-import authorizationService from '../services/authorizationService.js';
+import securityTokenService from '../services/securityTokenService.js';
+import cacheService from '../services/cacheService.js';
 const { verify } = jwt;
 
 export const authenticateToken = async (req, res, next) => {
@@ -14,12 +13,17 @@ export const authenticateToken = async (req, res, next) => {
   try {
     const decoded = verify(token, process.env.JWT_SECRET);
 
-    // Revocation Guard: Check server-side status
-    const user = await userModel.findById(decoded.id);
+    // [HARDENED] Session Cache Guard
+    // Replaces redundant DB lookup on every request with Cache-Aside pattern.
+    const user = await cacheService.getOrSet(
+      cacheService.getUserKey(decoded.id),
+      () => userModel.findById(decoded.id),
+      300 // 5 Minute TTL
+    );
 
     if (!user || user.status !== 'active' || user.is_archived) {
       console.warn(
-        `[Auth] Revoked: User ${decoded.id} is blocked, archived, or inactive (Status: ${user?.status}, Archived: ${user?.is_archived}).`
+        `[Auth] Revoked: User ${decoded.id} is blocked, archived, or inactive.`
       );
       return res.status(401).json({
         error:
@@ -31,17 +35,15 @@ export const authenticateToken = async (req, res, next) => {
     const currentTokenVersion = decoded.tokenVersion || 0;
     if (user.tokenVersion !== currentTokenVersion) {
       console.warn(
-        `[Auth] Revoked: Session version mismatch for User ${decoded.id} (${user.tokenVersion} vs ${currentTokenVersion}).`
+        `[Auth] Revoked: Session version mismatch for User ${decoded.id}.`
       );
       return res.status(401).json({
         error:
-          'Your session has been logged out by another security event (e.g., password change). Please log in again.',
+          'Your session has been logged out by another security event. Please log in again.',
       });
     }
 
     // [HARDENED] Real-time Role Synchronization
-    // We overwrite the role from the JWT with the fresh role from the database.
-    // This ensures that demotions or promotions are instant, even with a long-lived token.
     req.user = { ...decoded, role: user.role };
     next();
   } catch (err) {

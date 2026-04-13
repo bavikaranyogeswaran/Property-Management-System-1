@@ -41,73 +41,7 @@ const extractPublicId = (url) => {
 // --- CONFIGURATION ---
 const LATE_FEE_PERCENTAGE = 0.03;
 
-/**
- * Distributed Lock for Cron Jobs using Database Transactions
- *
- * Instead of an in-memory Set(), we use 'SELECT ... FOR UPDATE' on the cron_checkpoints table.
- * This prevents two separate containers from starting the same job simultaneously.
- */
-const runWithDistributedLock = async (jobName, taskFn) => {
-  const connection = await db.getConnection();
-  try {
-    await connection.beginTransaction();
-
-    // 1. Attempt to acquire an exclusive lock on the job row
-    const [rows] = await connection.query(
-      'SELECT status, updated_at FROM cron_checkpoints WHERE job_name = ? FOR UPDATE',
-      [jobName]
-    );
-
-    const now = new Date();
-
-    if (rows.length > 0) {
-      const lock = rows[0];
-      const lastUpdate = new Date(lock.updated_at);
-      const diffMinutes = (now.getTime() - lastUpdate.getTime()) / (1000 * 60);
-
-      // 2. Safety Check: If a job is 'running' but has been silent for > 60 minutes,
-      // assume the container crashed and allow this process to reclaim it.
-      if (lock.status === 'running' && diffMinutes < 60) {
-        logger.warn(
-          `[Worker] Job "${jobName}" is currently locked by another process. Skipping.`
-        );
-        await connection.rollback();
-        return;
-      }
-    }
-
-    // 3. Mark the job as 'running' globally
-    await connection.query(
-      `INSERT INTO cron_checkpoints (job_name, last_success_date, status, message, updated_at)
-       VALUES (?, CURDATE(), 'running', 'Job started', NOW())
-       ON DUPLICATE KEY UPDATE status = 'running', message = 'Job started', updated_at = NOW()`,
-      [jobName]
-    );
-
-    // Commit the lock status
-    await connection.commit();
-    logger.info(`[Worker] Acquired lock for job: ${jobName}`);
-
-    // 4. Execute the Actual Task
-    await taskFn();
-
-    // 5. Mark the job as 'success'
-    await db.query(
-      "UPDATE cron_checkpoints SET status = 'success', message = 'Completed successfully', updated_at = NOW(), last_success_date = CURDATE() WHERE job_name = ?",
-      [jobName]
-    );
-    logger.info(`[Worker] Job "${jobName}" completed and unlocked.`);
-  } catch (err) {
-    console.error(`[Worker] Error in job "${jobName}":`, err);
-    // 6. Mark the job as 'failed' so it can be retried or debugged
-    await db.query(
-      "UPDATE cron_checkpoints SET status = 'failed', message = ?, updated_at = NOW() WHERE job_name = ?",
-      [err.message, jobName]
-    );
-  } finally {
-    connection.release();
-  }
-};
+// Removed redundant runWithDistributedLock in favor of Redis-based distributionLock.js
 
 /**
  * [B5 FIX] Write checkpoint to cron_checkpoints table (UPSERT — one row per job)
@@ -138,34 +72,10 @@ export const generateRentInvoices = async () => {
   const currentMonth = currentToday.getMonth() + 1; // 1-12
 
   // 1. CONCURRENCY LOCK CHECK: Respect manual generation locks
+  // [HARDENED] Uses the same Redis lock as InvoiceService to prevent overlaps.
   const lockName = `generate_invoices_${currentYear}_${currentMonth}`;
-  try {
-    const [existingLock] = await db.query(
-      'SELECT status, updated_at FROM cron_checkpoints WHERE job_name = ? LIMIT 1',
-      [lockName]
-    );
 
-    if (existingLock.length > 0) {
-      const lastUpdate = new Date(existingLock[0].updated_at);
-      const diffMinutes =
-        (new Date().getTime() - lastUpdate.getTime()) / (1000 * 60);
-
-      if (existingLock[0].status === 'running' && diffMinutes < 15) {
-        console.log(
-          `[Cron] Skipping Rent Invoicing: Manual process "${lockName}" is currently running.`
-        );
-        return;
-      }
-    }
-
-    // Set/Update lock for automation
-    await db.query(
-      `INSERT INTO cron_checkpoints (job_name, last_success_date, status, message) 
-         VALUES (?, ?, 'running', 'Automated generation started')
-         ON DUPLICATE KEY UPDATE status = 'running', updated_at = NOW(), message = 'Automated generation refreshed'`,
-      [lockName, `${currentYear}-${String(currentMonth).padStart(2, '0')}-01`]
-    );
-
+  const lockResult = await runWithLock(lockName, 1800, async () => {
     const activeLeases = await leaseModel.findActive();
     console.log(`Found ${activeLeases.length} active leases.`);
 
@@ -245,18 +155,27 @@ export const generateRentInvoices = async () => {
     }
     console.log(`Automated Invoicing: Created ${createdCount} new invoices.`);
 
-    // RELEASE LOCK
+    // Persist completion state in DB for backfill/audit
     await db.query(
-      "UPDATE cron_checkpoints SET status = 'success', message = ?, updated_at = NOW() WHERE job_name = ?",
-      [`Automated generation complete: ${createdCount} created`, lockName]
+      `INSERT INTO cron_checkpoints (job_name, last_success_date, status, message) 
+         VALUES (?, ?, 'success', ?)
+         ON DUPLICATE KEY UPDATE status = 'success', updated_at = NOW(), message = ?`,
+      [
+        lockName,
+        `${currentYear}-${String(currentMonth).padStart(2, '0')}-01`,
+        `Automated generation complete: ${createdCount} created`,
+        `Automated generation complete: ${createdCount} created`,
+      ]
     );
-  } catch (error) {
-    console.error('Error in automated invoicing:', error);
-    // Release with failure
-    await db.query(
-      "UPDATE cron_checkpoints SET status = 'failed', message = ?, updated_at = NOW() WHERE job_name = ?",
-      [error.message, lockName]
+
+    return createdCount;
+  });
+
+  if (!lockResult.success) {
+    console.log(
+      `[Cron] Skipping Rent Invoicing: A process for "${lockName}" is already running.`
     );
+    return;
   }
 };
 
@@ -887,58 +806,61 @@ export const expireDraftLeases = async () => {
  * Alerts owners/treasurers for stale requests.
  */
 export const checkMaintenanceSLA = async () => {
-  try {
-    const [staleRequests] = await db.query(
-      `SELECT mr.*, p.owner_id, p.name as property_name, u.unit_number
-       FROM maintenance_requests mr
-       JOIN units u ON mr.unit_id = u.unit_id
-       JOIN properties p ON u.property_id = p.property_id
-       WHERE mr.status = 'submitted'
-       AND (
-         (mr.priority IN ('high', 'urgent') AND mr.created_at < DATE_SUB(NOW(), INTERVAL 24 HOUR))
-         OR 
-         (mr.priority IN ('low', 'medium') AND mr.created_at < DATE_SUB(NOW(), INTERVAL 3 DAY))
-       )`
-    );
-
-    for (const req of staleRequests) {
-      // 1. Notify Owner
-      await notificationModel.create({
-        userId: req.owner_id,
-        message: `SLA BREACH: Maintenance Request '${req.title}' for ${req.property_name} (Unit ${req.unit_number}) has been idle for too long.`,
-        type: 'maintenance',
-        severity: 'urgent',
-        entityType: 'maintenance_request',
-        entityId: req.request_id,
-      });
-
-      // 2. Notify assigned Treasurers
-      const [treasurers] = await db.query(
-        `SELECT user_id FROM staff_property_assignments WHERE property_id = (
-          SELECT property_id FROM units WHERE unit_id = ?
-        )`,
-        [req.unit_id]
+  return await runWithLock('check_maintenance_sla', 1800, async () => {
+    try {
+      const [staleRequests] = await db.query(
+        `SELECT mr.*, p.owner_id, p.name as property_name, u.unit_number
+         FROM maintenance_requests mr
+         JOIN units u ON mr.unit_id = u.unit_id
+         JOIN properties p ON u.property_id = p.property_id
+         WHERE mr.status = 'submitted'
+         AND (
+           (mr.priority IN ('high', 'urgent') AND mr.created_at < DATE_SUB(NOW(), INTERVAL 24 HOUR))
+           OR 
+           (mr.priority IN ('low', 'medium') AND mr.created_at < DATE_SUB(NOW(), INTERVAL 3 DAY))
+         )`
       );
-      for (const t of treasurers) {
+
+      for (const req of staleRequests) {
+        // 1. Notify Owner
         await notificationModel.create({
-          userId: t.user_id,
-          message: `SLA BREACH: Maintenance Request '${req.title}' for ${req.property_name} (Unit ${req.unit_number}) is stale.`,
+          userId: req.owner_id,
+          message: `SLA BREACH: Maintenance Request '${req.title}' for ${req.property_name} (Unit ${req.unit_number}) has been idle for too long.`,
           type: 'maintenance',
           severity: 'urgent',
           entityType: 'maintenance_request',
           entityId: req.request_id,
         });
-      }
-    }
 
-    if (staleRequests.length > 0) {
-      logger.info(
-        `[SLA] Sent alerts for ${staleRequests.length} stale maintenance requests.`
-      );
+        // 2. Notify assigned Treasurers
+        const [treasurers] = await db.query(
+          `SELECT user_id FROM staff_property_assignments WHERE property_id = (
+            SELECT property_id FROM units WHERE unit_id = ?
+          )`,
+          [req.unit_id]
+        );
+        for (const t of treasurers) {
+          await notificationModel.create({
+            userId: t.user_id,
+            message: `SLA BREACH: Maintenance Request '${req.title}' for ${req.property_name} (Unit ${req.unit_number}) is stale.`,
+            type: 'maintenance',
+            severity: 'urgent',
+            entityType: 'maintenance_request',
+            entityId: req.request_id,
+          });
+        }
+      }
+
+      if (staleRequests.length > 0) {
+        logger.info(
+          `[SLA] Sent alerts for ${staleRequests.length} stale maintenance requests.`
+        );
+      }
+    } catch (error) {
+      logger.error('Error in Maintenance SLA check:', error.message);
+      throw error;
     }
-  } catch (error) {
-    logger.error('Error in Maintenance SLA check:', error);
-  }
+  });
 };
 
 /**
@@ -1018,75 +940,80 @@ export const deactivateFormerTenants = async (targetDate = null) => {
  * [C4 FIX] Auto-acknowledge refunds if over 7 days in awaiting_acknowledgment
  */
 export const autoAcknowledgeRefunds = async () => {
-  try {
-    const [leases] = await db.query(
-      `SELECT l.lease_id, l.deposit_status, l.proposed_refund_amount, 
-              (SELECT (COALESCE(SUM(credit), 0) - COALESCE(SUM(debit), 0)) 
-               FROM accounting_ledger 
-               WHERE lease_id = l.lease_id AND category IN ('deposit_held', 'deposit_withheld', 'deposit_refund')) as real_deposit_balance
-       FROM leases l
-       WHERE l.deposit_status = 'awaiting_acknowledgment'`
-    );
-
-    for (const lease of leases) {
-      const [approvalLogs] = await db.query(
-        `SELECT created_at FROM system_audit_logs 
-         WHERE entity_id = ? AND action_type = 'DEPOSIT_REFUND_APPROVED' 
-         ORDER BY created_at DESC LIMIT 1`,
-        [lease.lease_id]
+  return await runWithLock('auto_ack_refunds', 1800, async () => {
+    try {
+      const [leases] = await db.query(
+        `SELECT l.lease_id, l.deposit_status, l.proposed_refund_amount, 
+                (SELECT (COALESCE(SUM(credit), 0) - COALESCE(SUM(debit), 0)) 
+                 FROM accounting_ledger 
+                 WHERE lease_id = l.lease_id AND category IN ('deposit_held', 'deposit_withheld', 'deposit_refund')) as real_deposit_balance
+         FROM leases l
+         WHERE l.deposit_status = 'awaiting_acknowledgment'`
       );
 
-      let approvalDateStr;
-      if (approvalLogs.length > 0) {
-        approvalDateStr = formatToLocalDate(approvalLogs[0].created_at);
-      } else {
-        const fallbackDate = new Date();
-        fallbackDate.setDate(fallbackDate.getDate() - 8);
-        approvalDateStr = formatToLocalDate(fallbackDate);
-      }
-
-      const diffDays =
-        (parseLocalDate(today()) - parseLocalDate(approvalDateStr)) /
-        (1000 * 60 * 60 * 24);
-      if (diffDays >= 14) {
-        console.log(
-          `[Auto-Ack] Auto-acknowledging refund for lease ${lease.lease_id} after 7 days.`
+      for (const lease of leases) {
+        const [approvalLogs] = await db.query(
+          `SELECT created_at FROM system_audit_logs 
+           WHERE entity_id = ? AND action_type = 'DEPOSIT_REFUND_APPROVED' 
+           ORDER BY created_at DESC LIMIT 1`,
+          [lease.lease_id]
         );
 
-        const currentBalance = Number(lease.real_deposit_balance || 0);
-        const proposedAmount = Number(lease.proposed_refund_amount || 0);
-        const finalStatus =
-          proposedAmount >= currentBalance ? 'refunded' : 'partially_refunded';
+        let approvalDateStr;
+        if (approvalLogs.length > 0) {
+          approvalDateStr = formatToLocalDate(approvalLogs[0].created_at);
+        } else {
+          const fallbackDate = new Date();
+          fallbackDate.setDate(fallbackDate.getDate() - 8);
+          approvalDateStr = formatToLocalDate(fallbackDate);
+        }
 
-        await db.query(
-          `UPDATE leases SET deposit_status = ? WHERE lease_id = ?`,
-          [finalStatus, lease.lease_id]
-        );
-
-        try {
-          const auditLogger = (await import('./auditLogger.js')).default;
-          await auditLogger.log({
-            userId: null,
-            actionType: 'DEPOSIT_REFUND_ACKNOWLEDGED',
-            entityId: lease.lease_id,
-            entityType: 'lease',
-            details: {
-              status: finalStatus,
-              amount: proposedAmount,
-              mechanism: 'auto_timeout',
-            },
-          });
-        } catch (auditErr) {
-          console.error(
-            `Failed to log auto-ack audit for ${lease.lease_id}:`,
-            auditErr
+        const diffDays =
+          (parseLocalDate(today()) - parseLocalDate(approvalDateStr)) /
+          (1000 * 60 * 60 * 24);
+        if (diffDays >= 14) {
+          console.log(
+            `[Auto-Ack] Auto-acknowledging refund for lease ${lease.lease_id} after 14 days.`
           );
+
+          const currentBalance = Number(lease.real_deposit_balance || 0);
+          const proposedAmount = Number(lease.proposed_refund_amount || 0);
+          const finalStatus =
+            proposedAmount >= currentBalance
+              ? 'refunded'
+              : 'partially_refunded';
+
+          await db.query(
+            `UPDATE leases SET deposit_status = ? WHERE lease_id = ?`,
+            [finalStatus, lease.lease_id]
+          );
+
+          try {
+            const auditLogger = (await import('./auditLogger.js')).default;
+            await auditLogger.log({
+              userId: null,
+              actionType: 'DEPOSIT_REFUND_ACKNOWLEDGED',
+              entityId: lease.lease_id,
+              entityType: 'lease',
+              details: {
+                status: finalStatus,
+                amount: proposedAmount,
+                mechanism: 'auto_timeout',
+              },
+            });
+          } catch (auditErr) {
+            console.error(
+              `Failed to log auto-ack audit for ${lease.lease_id}:`,
+              auditErr
+            );
+          }
         }
       }
+    } catch (error) {
+      logger.error('Error auto-acknowledging refunds:', error.message);
+      throw error;
     }
-  } catch (error) {
-    console.error('Error auto-acknowledging refunds:', error);
-  }
+  });
 };
 
 /**
@@ -1190,12 +1117,15 @@ export const runNightlyCron = async (targetDate = null) => {
   }
 };
 
+import { runWithLock } from './distributionLock.js';
+
 /**
  * Main Entry Point with Backfill Logic
  */
 export const executeNightlyPayload = async () => {
-  await runWithDistributedLock('nightly_billing', async () => {
-    // [B5 FIX] BACKFILL LOGIC: Read from cron_checkpoints instead of cron_logs
+  // [HARDENED] Distributed Lock ensures exactly one instance runs the billing payload.
+  // TTL of 1 hour covers even large portfolios.
+  return await runWithLock('nightly_payload_run', 3600, async () => {
     const [lastRun] = await db.query(
       "SELECT last_success_date AS execution_date FROM cron_checkpoints WHERE job_name = 'nightly_billing' AND status = 'success' LIMIT 1"
     );
@@ -1209,11 +1139,19 @@ export const executeNightlyPayload = async () => {
       startDate = todayDate;
     }
 
-    // Process all missed days up to today
+    // Backfill missed days up to today
     let current = startDate;
     while (current <= todayDate) {
       const dateStr = formatToLocalDate(current);
-      await runNightlyCron(dateStr);
+      try {
+        await runNightlyCron(dateStr);
+      } catch (err) {
+        logger.error(
+          `[Queue] Nightly Cron failed for ${dateStr}:`,
+          err.message
+        );
+        throw err;
+      }
       current = addDays(current, 1);
     }
   });
@@ -1245,82 +1183,84 @@ export const cleanupCloudinaryAsset = async (job) => {
  * Audit Cloudinary assets against Database records (Nightly Reconciliation)
  */
 export const reconcileCloudinaryAssets = async () => {
-  logger.info('[Sync] Starting Cloudinary asset reconciliation...');
+  return await runWithLock('reconcile_cloudinary', 7200, async () => {
+    logger.info('[Sync] Starting Cloudinary asset reconciliation...');
 
-  try {
-    // 1. Fetch all unique Image URLs from Database (association tables are source of truth)
-    const [propertyImages] = await db.query(
-      'SELECT DISTINCT image_url FROM property_images'
-    );
-    const [unitImages] = await db.query(
-      'SELECT DISTINCT image_url FROM unit_images'
-    );
-    const [maintenanceImgs] = await db.query(
-      'SELECT DISTINCT image_url FROM maintenance_images'
-    );
+    try {
+      // 1. Fetch all unique Image URLs from Database
+      const [propertyImages] = await db.query(
+        'SELECT DISTINCT image_url FROM property_images'
+      );
+      const [unitImages] = await db.query(
+        'SELECT DISTINCT image_url FROM unit_images'
+      );
+      const [maintenanceImgs] = await db.query(
+        'SELECT DISTINCT image_url FROM maintenance_images'
+      );
 
-    const dbUrls = new Set([
-      ...propertyImages.map((r) => r.image_url),
-      ...unitImages.map((r) => r.image_url),
-      ...maintenanceImgs.map((r) => r.image_url),
-    ]);
+      const dbUrls = new Set([
+        ...propertyImages.map((r) => r.image_url),
+        ...unitImages.map((r) => r.image_url),
+        ...maintenanceImgs.map((r) => r.image_url),
+      ]);
 
-    const activePublicIds = new Set();
-    dbUrls.forEach((url) => {
-      const pid = extractPublicId(url);
-      if (pid) activePublicIds.add(pid);
-    });
-
-    logger.info(
-      `[Sync] Found ${activePublicIds.size} active asset references in Database.`
-    );
-
-    // 2. Fetch all assets from Cloudinary (pms_uploads folder)
-    let nextCursor = null;
-    let orphanedCount = 0;
-    const safetyBufferMs = 1000 * 60 * 60 * 4; // 4 hours safety buffer
-    const nowThreshold = Date.now() - safetyBufferMs;
-
-    do {
-      const resources = await cloudinary.api.resources({
-        type: 'upload',
-        prefix: 'pms_uploads/',
-        max_results: 500,
-        next_cursor: nextCursor,
+      const activePublicIds = new Set();
+      dbUrls.forEach((url) => {
+        const pid = extractPublicId(url);
+        if (pid) activePublicIds.add(pid);
       });
 
-      for (const resource of resources.resources) {
-        const createdDate = new Date(resource.created_at).getTime();
+      logger.info(
+        `[Sync] Found ${activePublicIds.size} active asset references in Database.`
+      );
 
-        // Skip newly uploaded files (avoid race conditions with active requests)
-        if (createdDate > nowThreshold) continue;
+      // 2. Fetch all assets from Cloudinary (pms_uploads folder)
+      let nextCursor = null;
+      let orphanedCount = 0;
+      const safetyBufferMs = 1000 * 60 * 60 * 4; // 4 hours safety buffer
+      const nowThreshold = Date.now() - safetyBufferMs;
 
-        if (!activePublicIds.has(resource.public_id)) {
-          logger.warn(
-            `[Sync] Orphan found: ${resource.public_id}. Enqueueing for deletion.`
-          );
-          await mainQueue.add(
-            'cleanup_cloudinary_asset_task',
-            { publicId: resource.public_id },
-            { attempts: 3, backoff: 30000 }
-          );
-          orphanedCount++;
+      do {
+        const resources = await cloudinary.api.resources({
+          type: 'upload',
+          prefix: 'pms_uploads/',
+          max_results: 500,
+          next_cursor: nextCursor,
+        });
+
+        for (const resource of resources.resources) {
+          const createdDate = new Date(resource.created_at).getTime();
+
+          // Skip newly uploaded files (avoid race conditions with active requests)
+          if (createdDate > nowThreshold) continue;
+
+          if (!activePublicIds.has(resource.public_id)) {
+            logger.warn(
+              `[Sync] Orphan found: ${resource.public_id}. Enqueueing for deletion.`
+            );
+            await mainQueue.add(
+              'cleanup_cloudinary_asset_task',
+              { publicId: resource.public_id },
+              { attempts: 3, backoff: 30000 }
+            );
+            orphanedCount++;
+          }
         }
-      }
 
-      nextCursor = resources.next_cursor;
-    } while (nextCursor);
+        nextCursor = resources.next_cursor;
+      } while (nextCursor);
 
-    logger.info(
-      `[Sync] Reconciliation complete. ${orphanedCount} orphans identified.`
-    );
-  } catch (error) {
-    logger.error(
-      '[Sync] Critical error during Cloudinary reconciliation:',
-      error
-    );
-    throw error;
-  }
+      logger.info(
+        `[Sync] Reconciliation complete. ${orphanedCount} orphans identified.`
+      );
+    } catch (error) {
+      logger.error(
+        '[Sync] Critical error during Cloudinary reconciliation:',
+        error.message
+      );
+      throw error;
+    }
+  });
 };
 
 /**

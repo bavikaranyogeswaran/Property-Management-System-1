@@ -9,6 +9,9 @@ import auditLogger from '../utils/auditLogger.js';
 import { config } from '../config/config.js';
 import AppError from '../utils/AppError.js';
 
+import securityTokenService from './securityTokenService.js';
+import emailService from './emailService.js';
+
 const JWT_SECRET = config.jwt.secret;
 
 class AuthService {
@@ -48,40 +51,38 @@ class AuthService {
     };
   }
   async verifyEmail(token) {
-    try {
-      const decoded = jwt.verify(token, JWT_SECRET);
-      if (decoded.type !== 'verify_email') {
-        throw new Error('Invalid token type');
-      }
+    // [HARDENED] Use Opaque Token from Redis
+    const tokenData = await securityTokenService.consumeToken(token, 'verify');
 
-      await userModel.verifyEmail(decoded.id);
-      return { message: 'Email verified successfully' };
-    } catch (error) {
+    if (!tokenData) {
       throw new Error('Invalid or expired verification token');
     }
+
+    await userModel.verifyEmail(tokenData.userId);
+    return { message: 'Email verified successfully' };
   }
 
   async setupPassword(token, password, tenantData = null) {
+    // [HARDENED] Use Opaque Token from Redis
+    const tokenData = await securityTokenService.consumeToken(token, 'setup');
+
+    if (!tokenData) {
+      throw new Error('Invalid or expired setup token');
+    }
+
     try {
-      const decoded = jwt.verify(token, JWT_SECRET);
-
-      if (decoded.type !== 'setup_password' && decoded.type !== 'invite') {
-        throw new Error('Invalid token type');
-      }
-
       const hashedPassword = await bcrypt.hash(password, 10);
-      await userModel.setupPassword(decoded.id, hashedPassword);
-      await userModel.incrementTokenVersion(decoded.id);
+      await userModel.setupPassword(tokenData.userId, hashedPassword);
+      await userModel.incrementTokenVersion(tokenData.userId);
 
-      if (decoded.role === 'tenant' && tenantData) {
-        // tenantModel.updateProfile will only update provided fields
-        await tenantModel.updateProfile(decoded.id, tenantData);
+      if (tokenData.metadata?.role === 'tenant' && tenantData) {
+        await tenantModel.updateProfile(tokenData.userId, tenantData);
       }
 
       return { message: 'Password set successfully' };
     } catch (error) {
       console.error('Setup password error:', error.message);
-      throw new Error(error.message || 'Invalid or expired setup token');
+      throw new Error(error.message || 'Internal error during password setup');
     }
   }
 
@@ -91,9 +92,12 @@ class AuthService {
 
     // 2. If user exists, generate token and send email
     if (user) {
-      const resetToken = jwt.sign({ id: user.id, type: 'reset' }, JWT_SECRET, {
-        expiresIn: '1h',
-      });
+      // [HARDENED] Use Opaque Token (Random Bytes in Redis)
+      const resetToken = await securityTokenService.createToken(
+        user.id,
+        'reset',
+        3600 // 1 hour
+      );
 
       await emailService.sendPasswordResetEmail(user.email, resetToken);
 
@@ -116,15 +120,16 @@ class AuthService {
   }
 
   async resetPassword(token, newPassword) {
-    try {
-      // 1. Verify token
-      const decoded = jwt.verify(token, JWT_SECRET);
-      if (decoded.type !== 'reset') {
-        throw new Error('Invalid token type');
-      }
+    // [HARDENED] Use Opaque Token from Redis (Ensures one-time use)
+    const tokenData = await securityTokenService.consumeToken(token, 'reset');
 
+    if (!tokenData) {
+      throw new Error('Invalid or expired reset token');
+    }
+
+    try {
       // 2. Find user
-      const user = await userModel.findById(decoded.id);
+      const user = await userModel.findById(tokenData.userId);
       if (!user) {
         throw new Error('User not found');
       }
@@ -133,15 +138,15 @@ class AuthService {
       const hashedPassword = await bcrypt.hash(newPassword, 10);
 
       // 4. Update password
-      await userModel.updatePassword(decoded.id, hashedPassword);
-      await userModel.incrementTokenVersion(decoded.id);
+      await userModel.updatePassword(tokenData.userId, hashedPassword);
+      await userModel.incrementTokenVersion(tokenData.userId);
 
       // Log audit
       try {
         await auditLogger.log({
-          userId: decoded.id,
+          userId: tokenData.userId,
           actionType: 'PASSWORD_RESET_COMPLETED',
-          entityId: decoded.id,
+          entityId: tokenData.userId,
           entityType: 'user',
         });
       } catch (e) {
@@ -150,7 +155,7 @@ class AuthService {
 
       return { message: 'Password has been reset successfully' };
     } catch (error) {
-      throw new Error(error.message || 'Invalid or expired reset token');
+      throw new Error(error.message || 'Internal error during password reset');
     }
   }
 }
