@@ -61,7 +61,7 @@ class VisitService {
       const hasConflict = await visitModel.existsInSlot(unitId, scheduledDate);
       if (hasConflict) {
         throw new AppError(
-          'This time slot is already booked for this unit. Please select another time.',
+          'This time slot is already booked for this unit (within 30 mins). Please select another time.',
           409
         );
       }
@@ -74,7 +74,7 @@ class VisitService {
     );
     if (concurrentVisits >= 1) {
       throw new AppError(
-        'Property viewing capacity reached for this time slot (Max 1). Please select another time.',
+        'Property viewing capacity reached for this time slot (Max 1 within 30 mins). Please select another time.',
         409
       );
     }
@@ -305,18 +305,32 @@ class VisitService {
       scheduledDate.setMinutes(0, 0, 0);
     }
 
-    // 2. Conflict Detection (Relaxed unique key allows this, but we still check logic)
+    // 2. Conflict Detection (H24 FIX: Uses 30-min Proximity Logic)
     if (visit.unitId) {
       const hasConflict = await visitModel.existsInSlot(
         visit.unitId,
-        scheduledDate
+        scheduledDate,
+        id // Exclude self
       );
       if (hasConflict) {
         throw new AppError(
-          'The new time slot is already booked for this unit. Please select another time.',
+          'The new time slot is already booked for this unit (within 30 mins). Please select another time.',
           409
         );
       }
+    }
+
+    // 2b. Property-Wide Capacity Detection (Max 1 concurrent visit per property)
+    const concurrentVisits = await visitModel.countInSlotByProperty(
+      visit.propertyId,
+      scheduledDate,
+      id // Exclude self
+    );
+    if (concurrentVisits >= 1) {
+      throw new AppError(
+        'Property viewing capacity reached for this time slot (Max 1 within 30 mins). Please select another time.',
+        409
+      );
     }
 
     // 3. Update

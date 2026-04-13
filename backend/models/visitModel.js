@@ -178,23 +178,41 @@ class VisitModel {
     );
   }
 
-  async existsInSlot(unitId, scheduledDate) {
+  async existsInSlot(unitId, scheduledDate, excludeVisitId = null) {
     if (!unitId) return false;
-    const [rows] = await db.query(
-      `SELECT visit_id FROM property_visits 
-             WHERE unit_id = ? AND scheduled_date = ? AND status IN ('pending', 'confirmed')`,
-      [unitId, scheduledDate]
-    );
+    // [H24 FIX] Proximity Logic: Check if any visit exists within +/- 30 minutes of the target slot.
+    const query = `
+      SELECT visit_id FROM property_visits 
+      WHERE unit_id = ? 
+      AND scheduled_date BETWEEN DATE_SUB(?, INTERVAL 30 MINUTE) AND DATE_ADD(?, INTERVAL 30 MINUTE)
+      AND status IN ('pending', 'confirmed')
+      ${excludeVisitId ? 'AND visit_id != ?' : ''}
+    `;
+    const params = [unitId, scheduledDate, scheduledDate];
+    if (excludeVisitId) params.push(excludeVisitId);
+
+    const [rows] = await db.query(query, params);
     return rows.length > 0;
   }
 
-  async countInSlotByProperty(propertyId, scheduledDate) {
+  async countInSlotByProperty(
+    propertyId,
+    scheduledDate,
+    excludeVisitId = null
+  ) {
     if (!propertyId) return 0;
-    const [rows] = await db.query(
-      `SELECT COUNT(*) as count FROM property_visits 
-             WHERE property_id = ? AND scheduled_date = ? AND status IN ('pending', 'confirmed')`,
-      [propertyId, scheduledDate]
-    );
+    // [H24 FIX] Proximity Logic: Max 1 concurrent visit per property within a 30-minute window.
+    const query = `
+      SELECT COUNT(*) as count FROM property_visits 
+      WHERE property_id = ? 
+      AND scheduled_date BETWEEN DATE_SUB(?, INTERVAL 30 MINUTE) AND DATE_ADD(?, INTERVAL 30 MINUTE)
+      AND status IN ('pending', 'confirmed')
+      ${excludeVisitId ? 'AND visit_id != ?' : ''}
+    `;
+    const params = [propertyId, scheduledDate, scheduledDate];
+    if (excludeVisitId) params.push(excludeVisitId);
+
+    const [rows] = await db.query(query, params);
     return rows[0].count;
   }
 

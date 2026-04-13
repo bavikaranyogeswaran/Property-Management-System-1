@@ -497,7 +497,10 @@ class MaintenanceService {
       );
 
       await connection.commit();
-      return costId;
+      return {
+        costId,
+        billingSuccess: !!(targetLease && billTo === ROLES.TENANT),
+      };
     } catch (error) {
       await connection.rollback();
       throw error;
