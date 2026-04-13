@@ -5,19 +5,20 @@ import {
   authorizeRoles,
   authorizeResource,
 } from '../middleware/authMiddleware.js';
+import { ROLES } from '../utils/roleUtils.js';
 
 const router = Router();
 
 router.get(
   '/',
   authenticateToken,
-  authorizeRoles('owner', 'treasurer'),
+  authorizeRoles(ROLES.OWNER, ROLES.TREASURER),
   leaseController.getLeases
 );
 router.post(
   '/',
   authenticateToken,
-  authorizeRoles('owner', 'treasurer'),
+  authorizeRoles(ROLES.OWNER, ROLES.TREASURER),
   leaseController.createLease
 );
 
@@ -31,28 +32,28 @@ router.get(
 router.post(
   '/:id/instant-renew',
   authenticateToken,
-  authorizeRoles('owner', 'treasurer'),
+  authorizeRoles(ROLES.OWNER, ROLES.TREASURER),
   authorizeResource('lease', 'id', 'params'),
   leaseController.instantRenew
 );
 router.post(
   '/:id/refund',
   authenticateToken,
-  authorizeRoles('owner', 'treasurer'),
+  authorizeRoles(ROLES.OWNER, ROLES.TREASURER),
   authorizeResource('lease', 'id', 'params'),
   leaseController.refundDeposit
 );
 router.patch(
   '/:id/refund/approve',
   authenticateToken,
-  authorizeRoles('owner'),
+  authorizeRoles(ROLES.OWNER),
   authorizeResource('lease', 'id', 'params'),
   leaseController.approveRefund
 );
 router.patch(
   '/:id/refund/dispute',
   authenticateToken,
-  authorizeRoles('owner', 'treasurer'),
+  authorizeRoles(ROLES.OWNER, ROLES.TREASURER),
   authorizeResource('lease', 'id', 'params'),
   leaseController.disputeRefund
 );
@@ -71,14 +72,14 @@ router.post(
 router.patch(
   '/:id/document',
   authenticateToken,
-  authorizeRoles('owner', 'treasurer'),
+  authorizeRoles(ROLES.OWNER, ROLES.TREASURER),
   authorizeResource('lease', 'id', 'params'),
   leaseController.updateLeaseDocument
 );
 router.post(
   '/:id/terminate',
   authenticateToken,
-  authorizeRoles('owner', 'treasurer'),
+  authorizeRoles(ROLES.OWNER, ROLES.TREASURER),
   authorizeResource('lease', 'id', 'params'),
   leaseController.terminateLease
 );
@@ -103,7 +104,7 @@ router.post(
 router.post(
   '/:id/finalize-checkout',
   authenticateToken,
-  authorizeRoles('owner', 'treasurer'),
+  authorizeRoles(ROLES.OWNER, ROLES.TREASURER),
   authorizeResource('lease', 'id', 'params'),
   leaseController.finalizeCheckout
 );
@@ -122,14 +123,14 @@ router.patch(
 router.patch(
   '/:id/verify-documents',
   authenticateToken,
-  authorizeRoles('owner', 'treasurer'),
+  authorizeRoles(ROLES.OWNER, ROLES.TREASURER),
   authorizeResource('lease', 'id', 'params'),
   leaseController.verifyLeaseDocuments
 );
 router.patch(
   '/:id/reject-documents',
   authenticateToken,
-  authorizeRoles('owner', 'treasurer'),
+  authorizeRoles(ROLES.OWNER, ROLES.TREASURER),
   authorizeResource('lease', 'id', 'params'),
   leaseController.rejectLeaseDocuments
 );
@@ -142,7 +143,7 @@ router.post(
 router.delete(
   '/:id',
   authenticateToken,
-  authorizeRoles('owner', 'treasurer'),
+  authorizeRoles(ROLES.OWNER, ROLES.TREASURER),
   authorizeResource('lease', 'id', 'params'),
   leaseController.cancelLease
 );
@@ -155,7 +156,7 @@ router.post(
 router.post(
   '/:id/regenerate-token',
   authenticateToken,
-  authorizeRoles('owner', 'treasurer'),
+  authorizeRoles(ROLES.OWNER, ROLES.TREASURER),
   authorizeResource('lease'),
   leaseController.regenerateMagicToken
 );

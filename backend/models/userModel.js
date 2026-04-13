@@ -7,6 +7,7 @@
 
 import pool from '../config/db.js';
 import cacheService from '../services/cacheService.js';
+import { ROLES } from '../utils/roleUtils.js';
 
 class UserModel {
   async findByEmail(email, connection = null) {
@@ -66,12 +67,14 @@ class UserModel {
             JOIN units ut ON l.unit_id = ut.unit_id
             JOIN properties p ON ut.property_id = p.property_id
             
-            WHERE u.role = 'tenant' 
+            JOIN properties p ON ut.property_id = p.property_id
+            
+            WHERE u.role = ?
                 AND p.owner_id = ?
                 AND u.is_archived = FALSE
             ORDER BY u.created_at DESC
         `,
-      [ownerId]
+      [ROLES.TENANT, ownerId]
     );
     return rows.map((row) => ({
       ...row,
@@ -106,13 +109,13 @@ class UserModel {
             -- Filter by Assignment
             JOIN staff_property_assignments spa ON spa.user_id = ?
             
-            WHERE u.role = 'tenant' 
+            WHERE u.role = ?
                 AND ut.property_id = spa.property_id
                 AND l.status != 'cancelled'
                 AND u.is_archived = FALSE
             ORDER BY u.created_at DESC
         `,
-      [treasurerId]
+      [treasurerId, ROLES.TENANT]
     );
     return rows.map((row) => ({
       ...row,

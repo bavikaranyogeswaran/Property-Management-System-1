@@ -5,6 +5,7 @@ import {
   authorizeRoles,
   authorizeResource,
 } from '../middleware/authMiddleware.js';
+import { ROLES } from '../utils/roleUtils.js';
 
 const router = Router();
 
@@ -16,20 +17,20 @@ router.get('/:id', unitController.getUnitById);
 router.post(
   '/',
   authenticateToken,
-  authorizeRoles('owner'),
+  authorizeRoles(ROLES.OWNER),
   unitController.createUnit
 );
 router.put(
   '/:id',
   authenticateToken,
-  authorizeRoles('owner'),
+  authorizeRoles(ROLES.OWNER),
   authorizeResource('unit', 'id', 'params'),
   unitController.updateUnit
 );
 router.delete(
   '/:id',
   authenticateToken,
-  authorizeRoles('owner'),
+  authorizeRoles(ROLES.OWNER),
   authorizeResource('unit', 'id', 'params'),
   unitController.deleteUnit
 );
@@ -38,7 +39,7 @@ router.delete(
 router.patch(
   '/:id/mark-available',
   authenticateToken,
-  authorizeRoles('owner', 'treasurer'),
+  authorizeRoles(ROLES.OWNER, ROLES.TREASURER),
   authorizeResource('unit', 'id', 'params'),
   unitController.markAvailable
 );
@@ -46,7 +47,7 @@ router.patch(
 router.patch(
   '/:id/clear-turnover',
   authenticateToken,
-  authorizeRoles('owner', 'treasurer'),
+  authorizeRoles(ROLES.OWNER, ROLES.TREASURER),
   unitController.clearTurnover
 );
 

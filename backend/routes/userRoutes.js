@@ -4,6 +4,7 @@ import {
   authenticateToken,
   authorizeRoles,
 } from '../middleware/authMiddleware.js';
+import { ROLES } from '../utils/roleUtils.js';
 import validateRequest from '../middleware/validateRequest.js';
 import {
   createTreasurerSchema,
@@ -17,7 +18,7 @@ const router = Router();
 router.post(
   '/create-treasurer',
   authenticateToken,
-  authorizeRoles('owner'),
+  authorizeRoles(ROLES.OWNER),
   validateRequest(createTreasurerSchema),
   userController.createTreasurer
 );
@@ -35,7 +36,7 @@ router.put(
 router.put(
   '/:id',
   authenticateToken,
-  authorizeRoles('owner'),
+  authorizeRoles(ROLES.OWNER),
   validateRequest(updateTreasurerSchema),
   userController.updateTreasurer
 );
@@ -44,7 +45,7 @@ router.put(
 router.delete(
   '/:id',
   authenticateToken,
-  authorizeRoles('owner'),
+  authorizeRoles(ROLES.OWNER),
   userController.deleteTreasurer
 );
 
@@ -52,7 +53,7 @@ router.delete(
 router.get(
   '/treasurers',
   authenticateToken,
-  authorizeRoles('owner'),
+  authorizeRoles(ROLES.OWNER),
   userController.getTreasurers
 );
 
@@ -60,7 +61,7 @@ router.get(
 router.get(
   '/tenants',
   authenticateToken,
-  authorizeRoles('owner', 'treasurer'),
+  authorizeRoles(ROLES.OWNER, ROLES.TREASURER),
   userController.getTenants
 );
 
@@ -68,7 +69,7 @@ router.get(
 router.get(
   '/owners',
   authenticateToken,
-  authorizeRoles('owner', 'treasurer'),
+  authorizeRoles(ROLES.OWNER, ROLES.TREASURER),
   userController.getOwners
 );
 
@@ -79,19 +80,19 @@ router.get('/:id', authenticateToken, userController.getUserById);
 router.post(
   '/assign-property',
   authenticateToken,
-  authorizeRoles('owner'),
+  authorizeRoles(ROLES.OWNER),
   userController.assignProperty
 );
 router.delete(
   '/:userId/assign-property/:propertyId',
   authenticateToken,
-  authorizeRoles('owner'),
+  authorizeRoles(ROLES.OWNER),
   userController.removeProperty
 );
 router.get(
   '/:userId/assigned-properties',
   authenticateToken,
-  authorizeRoles('owner', 'treasurer'),
+  authorizeRoles(ROLES.OWNER, ROLES.TREASURER),
   userController.getAssignedProperties
 );
 
@@ -99,7 +100,7 @@ router.get(
 router.post(
   '/:id/force-logout',
   authenticateToken,
-  authorizeRoles('owner'),
+  authorizeRoles(ROLES.OWNER),
   userController.forceLogout
 );
 

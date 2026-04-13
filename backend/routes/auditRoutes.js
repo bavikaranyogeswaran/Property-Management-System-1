@@ -4,13 +4,14 @@ import {
   authenticateToken,
   authorizeRoles,
 } from '../middleware/authMiddleware.js';
+import { ROLES } from '../utils/roleUtils.js';
 
 const router = Router();
 
 router.get(
   '/',
   authenticateToken,
-  authorizeRoles('owner'),
+  authorizeRoles(ROLES.OWNER),
   auditController.getLogs
 );
 

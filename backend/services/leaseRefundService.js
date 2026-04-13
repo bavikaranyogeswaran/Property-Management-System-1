@@ -25,6 +25,7 @@ import renewalService from './renewalService.js';
 import notificationModel from '../models/notificationModel.js';
 import userModel from '../models/userModel.js';
 import AppError from '../utils/AppError.js';
+import { isAtLeast, ROLES } from '../utils/roleUtils.js';
 
 class LeaseRefundService {
   constructor(facade) {
@@ -323,7 +324,7 @@ class LeaseRefundService {
   }
 
   async confirmDisbursement(leaseId, data, user) {
-    if (user.role !== 'owner' && user.role !== 'treasurer') {
+    if (!isAtLeast(user.role, ROLES.TREASURER)) {
       throw new AppError(
         'Access denied. Only owners and treasurers can record disbursements.',
         403
@@ -407,7 +408,7 @@ class LeaseRefundService {
     if (!lease) throw new AppError('Lease not found', 404);
 
     // Only the tenant of this specific lease can file a dispute
-    if (user.role !== 'tenant') {
+    if (user.role !== ROLES.TENANT) {
       throw new AppError(
         'Access denied: Only tenants can dispute a refund.',
         403
@@ -459,12 +460,10 @@ class LeaseRefundService {
       });
     }
 
-    const treasurers = await pool
-      .query("SELECT user_id FROM users WHERE role = 'treasurer'")
-      .then(([rows]) => rows);
+    const treasurers = await userModel.findByRole(ROLES.TREASURER);
     for (const t of treasurers) {
       await notificationModel.create({
-        userId: t.user_id,
+        userId: t.id || t.user_id,
         message: `Tenant has disputed the refund offer for Lease #${leaseId}. Review required.`,
         type: 'lease',
         severity: 'warning',
@@ -542,7 +541,7 @@ class LeaseRefundService {
     if (adjustedAmount === undefined || adjustedAmount < 0) {
       throw new AppError('Valid adjustedAmount is required', 400);
     }
-    if (user.role !== 'owner' && user.role !== 'treasurer') {
+    if (!isAtLeast(user.role, ROLES.TREASURER)) {
       throw new AppError('Access denied', 403);
     }
 
@@ -607,7 +606,7 @@ class LeaseRefundService {
   }
 
   async updateDisbursementReference(leaseId, newReference, user) {
-    if (user.role !== 'owner' && user.role !== 'treasurer') {
+    if (!isAtLeast(user.role, ROLES.TREASURER)) {
       throw new AppError('Access denied', 403);
     }
 
@@ -637,7 +636,7 @@ class LeaseRefundService {
 
   async refundDeposit(leaseId, amount, user) {
     // This now acts as a shortcut for owners or a request for treasurers
-    if (user.role === 'owner') {
+    if (isAtLeast(user.role, ROLES.OWNER)) {
       // Owners can directly approve if they want, but usually they'll use approveRefund.
       // For backward compatibility or direct action, we'll make them request then immediately approve?
       // Or just call the request then they can approve later.

@@ -4,6 +4,7 @@ import {
   authenticateToken,
   authorizeRoles,
 } from '../middleware/authMiddleware.js';
+import { ROLES } from '../utils/roleUtils.js';
 
 const router = express.Router();
 
@@ -12,49 +13,49 @@ const router = express.Router();
 router.get(
   '/financial',
   authenticateToken,
-  authorizeRoles('owner', 'treasurer'),
+  authorizeRoles(ROLES.OWNER, ROLES.TREASURER),
   reportController.generateFinancialReport
 );
 router.get(
   '/occupancy',
   authenticateToken,
-  authorizeRoles('owner', 'treasurer'),
+  authorizeRoles(ROLES.OWNER, ROLES.TREASURER),
   reportController.generateOccupancyReport
 );
 router.get(
   '/tenant-risk',
   authenticateToken,
-  authorizeRoles('owner', 'treasurer'),
+  authorizeRoles(ROLES.OWNER, ROLES.TREASURER),
   reportController.generateTenantRiskReport
 );
 router.get(
   '/maintenance',
   authenticateToken,
-  authorizeRoles('owner', 'treasurer'),
+  authorizeRoles(ROLES.OWNER, ROLES.TREASURER),
   reportController.generateMaintenanceCategoryReport
 );
 router.get(
   '/leases',
   authenticateToken,
-  authorizeRoles('owner', 'treasurer'),
+  authorizeRoles(ROLES.OWNER, ROLES.TREASURER),
   reportController.generateLeaseExpirationReport
 );
 router.get(
   '/leads',
   authenticateToken,
-  authorizeRoles('owner', 'treasurer'),
+  authorizeRoles(ROLES.OWNER, ROLES.TREASURER),
   reportController.generateLeadConversionReport
 );
 router.get(
   '/ledger-summary',
   authenticateToken,
-  authorizeRoles('owner', 'treasurer'),
+  authorizeRoles(ROLES.OWNER, ROLES.TREASURER),
   reportController.getLedgerSummary
 );
 router.get(
   '/cash-flow',
   authenticateToken,
-  authorizeRoles('owner', 'treasurer'),
+  authorizeRoles(ROLES.OWNER, ROLES.TREASURER),
   reportController.getMonthlyCashFlow
 );
 

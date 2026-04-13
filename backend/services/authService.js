@@ -5,6 +5,7 @@ const { sign } = jwt;
 import userModel from '../models/userModel.js';
 import tenantModel from '../models/tenantModel.js';
 import auditLogger from '../utils/auditLogger.js';
+import { ROLES } from '../utils/roleUtils.js';
 
 import { config } from '../config/config.js';
 import AppError from '../utils/AppError.js';
@@ -75,7 +76,7 @@ class AuthService {
       await userModel.setupPassword(tokenData.userId, hashedPassword);
       await userModel.incrementTokenVersion(tokenData.userId);
 
-      if (tokenData.metadata?.role === 'tenant' && tenantData) {
+      if (tokenData.metadata?.role === ROLES.TENANT && tenantData) {
         await tenantModel.updateProfile(tokenData.userId, tenantData);
       }
 

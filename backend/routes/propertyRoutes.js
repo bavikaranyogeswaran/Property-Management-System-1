@@ -6,6 +6,7 @@ import {
   authorizeResource,
   optionalAuthenticateToken,
 } from '../middleware/authMiddleware.js';
+import { ROLES } from '../utils/roleUtils.js';
 
 import upload from '../middleware/upload.js';
 
@@ -28,7 +29,7 @@ router.get('/', optionalAuthenticateToken, propertyController.getProperties);
 router.post(
   '/',
   authenticateToken,
-  authorizeRoles('owner'),
+  authorizeRoles(ROLES.OWNER),
   validateRequest(propertySchema),
   propertyController.createProperty
 );
@@ -45,7 +46,7 @@ router.get('/:id/lease-terms', propertyController.getLeaseTermsByPropertyId);
 router.put(
   '/:id',
   authenticateToken,
-  authorizeRoles('owner'),
+  authorizeRoles(ROLES.OWNER),
   authorizeResource('property', 'id', 'params'),
   validateRequest(updatePropertySchema),
   propertyController.updateProperty
@@ -55,7 +56,7 @@ router.put(
 router.delete(
   '/:id',
   authenticateToken,
-  authorizeRoles('owner'),
+  authorizeRoles(ROLES.OWNER),
   authorizeResource('property', 'id', 'params'),
   propertyController.deleteProperty
 );
@@ -64,7 +65,7 @@ router.delete(
 router.post(
   '/:id/images',
   authenticateToken,
-  authorizeRoles('owner'),
+  authorizeRoles(ROLES.OWNER),
   authorizeResource('property', 'id', 'params'),
   upload.array('images', 10),
   propertyController.uploadImages

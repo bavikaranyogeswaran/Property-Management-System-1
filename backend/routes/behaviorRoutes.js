@@ -8,6 +8,7 @@ import {
   authenticateToken,
   authorizeRoles,
 } from '../middleware/authMiddleware.js';
+import { ROLES } from '../utils/roleUtils.js';
 
 const router = express.Router();
 
@@ -15,7 +16,7 @@ const router = express.Router();
 router.get(
   '/my-score',
   authenticateToken,
-  authorizeRoles('tenant'),
+  authorizeRoles(ROLES.TENANT),
   getMyBehavior
 );
 
@@ -23,13 +24,13 @@ router.get(
 router.post(
   '/:tenantId',
   authenticateToken,
-  authorizeRoles('owner', 'treasurer'),
+  authorizeRoles(ROLES.OWNER, ROLES.TREASURER),
   addBehaviorLog
 );
 router.get(
   '/:tenantId',
   authenticateToken,
-  authorizeRoles('owner', 'treasurer'),
+  authorizeRoles(ROLES.OWNER, ROLES.TREASURER),
   getTenantBehavior
 );
 

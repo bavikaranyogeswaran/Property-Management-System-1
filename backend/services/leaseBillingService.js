@@ -20,6 +20,7 @@ import { toCentsFromMajor, moneyMath, fromCents } from '../utils/moneyUtils.js';
 import renewalService from './renewalService.js';
 import auditLogger from '../utils/auditLogger.js';
 import AppError from '../utils/AppError.js';
+import { isAtLeast, ROLES } from '../utils/roleUtils.js';
 
 class LeaseBillingService {
   constructor(facade) {
@@ -29,7 +30,7 @@ class LeaseBillingService {
   async addRentAdjustment(leaseId, data, user) {
     const lease = await this.facade.getLeaseById(leaseId, user);
     if (!lease) throw new AppError('Lease not found', 404);
-    if (user.role !== 'owner')
+    if (!isAtLeast(user.role, ROLES.OWNER))
       throw new AppError(
         'Access denied: Only owners can perform rent adjustments',
         403

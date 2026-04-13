@@ -4,6 +4,7 @@ import {
   authenticateToken,
   authorizeRoles,
 } from '../middleware/authMiddleware.js';
+import { ROLES } from '../utils/roleUtils.js';
 
 const router = Router();
 
@@ -11,19 +12,19 @@ const router = Router();
 router.get(
   '/tenant/thread',
   authenticateToken,
-  authorizeRoles('tenant'),
+  authorizeRoles(ROLES.TENANT),
   messageController.getTenantMessages
 );
 router.post(
   '/tenant/thread',
   authenticateToken,
-  authorizeRoles('tenant'),
+  authorizeRoles(ROLES.TENANT),
   messageController.sendTenantMessage
 );
 router.put(
   '/tenant/thread/read',
   authenticateToken,
-  authorizeRoles('tenant'),
+  authorizeRoles(ROLES.TENANT),
   messageController.markTenantRead
 );
 
@@ -31,19 +32,19 @@ router.put(
 router.get(
   '/owner/tenant/:tenantId',
   authenticateToken,
-  authorizeRoles('owner', 'admin'),
+  authorizeRoles(ROLES.OWNER, ROLES.SYSTEM),
   messageController.getTenantMessages
 );
 router.post(
   '/owner/tenant/:tenantId',
   authenticateToken,
-  authorizeRoles('owner', 'admin'),
+  authorizeRoles(ROLES.OWNER, ROLES.SYSTEM),
   messageController.sendTenantMessage
 );
 router.put(
   '/owner/tenant/:tenantId/read',
   authenticateToken,
-  authorizeRoles('owner', 'admin'),
+  authorizeRoles(ROLES.OWNER, ROLES.SYSTEM),
   messageController.markTenantRead
 );
 
@@ -51,19 +52,19 @@ router.put(
 router.post(
   '/:leadId',
   authenticateToken,
-  authorizeRoles('owner', 'admin'),
+  authorizeRoles(ROLES.OWNER, ROLES.SYSTEM),
   messageController.sendMessage
 );
 router.get(
   '/:leadId',
   authenticateToken,
-  authorizeRoles('owner', 'admin', 'tenant'),
+  authorizeRoles(ROLES.OWNER, ROLES.SYSTEM, ROLES.TENANT),
   messageController.getMessages
 );
 router.put(
   '/:leadId/read',
   authenticateToken,
-  authorizeRoles('owner', 'admin', 'tenant'),
+  authorizeRoles(ROLES.OWNER, ROLES.SYSTEM, ROLES.TENANT),
   messageController.markRead
 );
 

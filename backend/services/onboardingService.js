@@ -3,6 +3,7 @@ import leaseModel from '../models/leaseModel.js';
 import unitLockService from '../services/unitLockService.js';
 import jwt from 'jsonwebtoken';
 import AppError from '../utils/AppError.js';
+import { ROLES } from '../utils/roleUtils.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'secret';
 
@@ -131,7 +132,7 @@ class OnboardingService {
         {
           id: Number(lease.tenantId),
           type: 'setup_password',
-          role: 'tenant',
+          role: ROLES.TENANT,
         },
         JWT_SECRET,
         { expiresIn: '1h' }

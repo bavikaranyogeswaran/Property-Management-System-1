@@ -4,6 +4,7 @@ import {
   authenticateToken,
   authorizeRoles,
 } from '../middleware/authMiddleware.js';
+import { ROLES } from '../utils/roleUtils.js';
 
 const router = express.Router();
 
@@ -11,7 +12,7 @@ const router = express.Router();
 router.get(
   '/preview',
   authenticateToken,
-  authorizeRoles('treasurer'),
+  authorizeRoles(ROLES.TREASURER),
   payoutController.previewPayout
 );
 
@@ -19,7 +20,7 @@ router.get(
 router.post(
   '/create',
   authenticateToken,
-  authorizeRoles('treasurer'),
+  authorizeRoles(ROLES.TREASURER),
   payoutController.createPayout
 );
 
@@ -27,7 +28,7 @@ router.post(
 router.get(
   '/history',
   authenticateToken,
-  authorizeRoles('owner', 'treasurer'),
+  authorizeRoles(ROLES.OWNER, ROLES.TREASURER),
   payoutController.getHistory
 );
 
@@ -35,7 +36,7 @@ router.get(
 router.put(
   '/:id/paid',
   authenticateToken,
-  authorizeRoles('treasurer'),
+  authorizeRoles(ROLES.TREASURER),
   payoutController.markAsPaid
 );
 
@@ -43,7 +44,7 @@ router.put(
 router.put(
   '/:id/acknowledge',
   authenticateToken,
-  authorizeRoles('owner'),
+  authorizeRoles(ROLES.OWNER),
   payoutController.acknowledgePayout
 );
 
@@ -51,7 +52,7 @@ router.put(
 router.put(
   '/:id/dispute',
   authenticateToken,
-  authorizeRoles('owner'),
+  authorizeRoles(ROLES.OWNER),
   payoutController.disputePayout
 );
 
@@ -59,7 +60,7 @@ router.put(
 router.get(
   '/:id/details',
   authenticateToken,
-  authorizeRoles('owner', 'treasurer'),
+  authorizeRoles(ROLES.OWNER, ROLES.TREASURER),
   payoutController.getPayoutDetails
 );
 
@@ -67,7 +68,7 @@ router.get(
 router.get(
   '/:id/export',
   authenticateToken,
-  authorizeRoles('owner', 'treasurer'),
+  authorizeRoles(ROLES.OWNER, ROLES.TREASURER),
   payoutController.exportPayoutCSV
 );
 

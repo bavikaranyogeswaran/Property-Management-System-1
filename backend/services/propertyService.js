@@ -4,6 +4,7 @@ import leaseModel from '../models/leaseModel.js';
 import pool from '../config/db.js';
 import { validatePropertyConfig } from '../utils/validators.js';
 import leaseTermModel from '../models/leaseTermModel.js';
+import { ROLES } from '../utils/roleUtils.js';
 
 class PropertyService {
   async createProperty(data) {
@@ -40,13 +41,13 @@ class PropertyService {
       throw new Error('Authentication required for private property view');
     }
 
-    if (user.role === 'treasurer') {
+    if (user.role === ROLES.TREASURER) {
       // Treasurer sees only assigned properties
       const staffModel = (await import('../models/staffModel.js')).default;
       return await staffModel.getAssignedProperties(user.id);
     }
 
-    if (user.role === 'owner') {
+    if (user.role === ROLES.OWNER) {
       // Owner sees only their own assets
       return await propertyModel.findAll(user.id);
     }
@@ -63,7 +64,7 @@ class PropertyService {
       throw error;
     }
 
-    if (role === 'owner' && String(property.ownerId) !== String(userId)) {
+    if (role === ROLES.OWNER && String(property.ownerId) !== String(userId)) {
       const error = new Error('You do not own this property');
       error.statusCode = 403;
       throw error;

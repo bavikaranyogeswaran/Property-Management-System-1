@@ -110,7 +110,7 @@ class MaintenanceService {
       if (!request) throw new Error('Request not found');
 
       // Treasurer RBAC: Check assigned property
-      if (user.role === 'treasurer') {
+      if (user.role === ROLES.TREASURER) {
         const unit = await unitModel.findById(request.unitId, connection);
         const staffModel = (await import('../models/staffModel.js')).default;
         const assigned = await staffModel.getAssignedProperties(user.id);
@@ -240,7 +240,7 @@ class MaintenanceService {
           }
 
           if (status === 'completed') {
-            const treasurers = await userModel.findByRole('treasurer');
+            const treasurers = await userModel.findByRole(ROLES.TREASURER);
             for (const treasurer of treasurers) {
               await notificationModel.create({
                 userId: treasurer.user_id,
@@ -421,7 +421,7 @@ class MaintenanceService {
           recordedDate: recordedDate || getLocalTime(),
           invoiceId: data.invoiceId || null,
           isReimbursable: data.isReimbursable || false,
-          billTo: billTo || 'owner',
+          billTo: billTo || ROLES.OWNER,
         },
         connection
       );
@@ -432,7 +432,7 @@ class MaintenanceService {
 
       if (targetLease) {
         // [F2.6] Route cost based on billTo field
-        if (billTo === 'tenant') {
+        if (billTo === ROLES.TENANT) {
           const { addDays, formatToLocalDate } =
             await import('../utils/dateUtils.js');
           const invoiceId = await invoiceModel.create(
@@ -469,11 +469,11 @@ class MaintenanceService {
             leaseId: targetLease.id,
             accountType: 'expense',
             category:
-              billTo === 'tenant'
+              billTo === ROLES.TENANT
                 ? 'reimbursable_maintenance'
                 : 'maintenance_repair',
             credit: toCentsFromMajor(amount),
-            description: `Maintenance Cost: ${description || request.title} (Req #${requestId})${billTo === 'tenant' ? ' [REIMBURSABLE]' : ''}`,
+            description: `Maintenance Cost: ${description || request.title} (Req #${requestId})${billTo === ROLES.TENANT ? ' [REIMBURSABLE]' : ''}`,
             entryDate: recordedDate || getCurrentDateString(),
           },
           connection
@@ -540,11 +540,13 @@ class MaintenanceService {
   }
 
   async getRequests(user) {
-    if (user.role === 'tenant') {
+    if (user.role === ROLES.SYSTEM) {
+      return await maintenanceRequestModel.findAll();
+    } else if (user.role === ROLES.TENANT) {
       return await maintenanceRequestModel.findByTenantId(user.id);
-    } else if (user.role === 'owner') {
+    } else if (user.role === ROLES.OWNER) {
       return await maintenanceRequestModel.findByOwnerId(user.id);
-    } else if (user.role === 'treasurer') {
+    } else if (user.role === ROLES.TREASURER) {
       return await maintenanceRequestModel.findByTreasurerId(user.id);
     } else {
       throw new Error('Access denied');

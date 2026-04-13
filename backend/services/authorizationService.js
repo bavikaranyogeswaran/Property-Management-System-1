@@ -87,7 +87,7 @@ class AuthorizationService {
     const row = rows[0];
 
     // 1. Tenant Check
-    if (role === 'tenant' && row.tenant_id.toString() === userId.toString())
+    if (role === ROLES.TENANT && row.tenant_id.toString() === userId.toString())
       return true;
 
     // 2. Owner Check
@@ -122,7 +122,7 @@ class AuthorizationService {
     if (rows.length === 0) return false;
     const row = rows[0];
 
-    if (role === 'tenant' && row.tenant_id.toString() === userId.toString())
+    if (role === ROLES.TENANT && row.tenant_id.toString() === userId.toString())
       return true;
     if (row.owner_id.toString() === userId.toString()) return true;
     if (isAtLeast(role, ROLES.TREASURER) && row.assigned_staff_id !== null)
@@ -154,7 +154,7 @@ class AuthorizationService {
     if (rows.length === 0) return false;
     const row = rows[0];
 
-    if (role === 'tenant' && row.tenant_id.toString() === userId.toString())
+    if (role === ROLES.TENANT && row.tenant_id.toString() === userId.toString())
       return true;
     if (row.owner_id.toString() === userId.toString()) return true;
     if (isAtLeast(role, ROLES.TREASURER) && row.assigned_staff_id !== null)
@@ -184,7 +184,7 @@ class AuthorizationService {
     if (rows.length === 0) return false;
     const row = rows[0];
 
-    if (role === 'tenant' && row.tenant_id.toString() === userId.toString())
+    if (role === ROLES.TENANT && row.tenant_id.toString() === userId.toString())
       return true;
     if (row.owner_id.toString() === userId.toString()) return true;
     if (isAtLeast(role, ROLES.TREASURER) && row.assigned_staff_id !== null)

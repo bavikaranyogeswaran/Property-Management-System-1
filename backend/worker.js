@@ -17,6 +17,7 @@ import logger from './utils/logger.js';
 import auditLogger from './utils/auditLogger.js';
 import notificationModel from './models/notificationModel.js';
 import userModel from './models/userModel.js';
+import { ROLES } from './utils/roleUtils.js';
 
 // Validate Configuration on Startup (Fail Fast)
 validateConfig();
@@ -67,8 +68,8 @@ const initWorker = async () => {
 
         // 2. Notify Assigned Staff (Treasurers & Owners)
         // We broadcast to all staff as background failures often indicate infra issues (SMTP, etc.)
-        const treasurers = await userModel.findByRole('treasurer');
-        const owners = await userModel.findByRole('owner');
+        const treasurers = await userModel.findByRole(ROLES.TREASURER);
+        const owners = await userModel.findByRole(ROLES.OWNER);
         const staffToNotify = [...treasurers, ...owners];
 
         for (const staff of staffToNotify) {

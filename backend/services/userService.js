@@ -27,6 +27,7 @@ import leadTokenModel from '../models/leadTokenModel.js';
 import leadStageHistoryModel from '../models/leadStageHistoryModel.js';
 import { toCentsFromMajor, fromCents } from '../utils/moneyUtils.js';
 import auditLogger from '../utils/auditLogger.js';
+import { ROLES } from '../utils/roleUtils.js';
 
 const SALT_ROUNDS = 10;
 
@@ -62,7 +63,7 @@ class UserService {
           email,
           phone,
           passwordHash: hashedPassword,
-          role: 'treasurer',
+          role: ROLES.TREASURER,
           status: 'active',
         },
         connection
@@ -83,7 +84,7 @@ class UserService {
           actionType: 'STAFF_ACCOUNT_CREATED',
           entityId: userId,
           entityType: 'user',
-          details: { name, email, role: 'treasurer' },
+          details: { name, email, role: ROLES.TREASURER },
         },
         null,
         connection
@@ -93,13 +94,13 @@ class UserService {
 
       // Setup Token & Email (Outside transaction as side effect)
       const token = jwt.sign(
-        { id: userId, type: 'setup_password', role: 'treasurer' },
+        { id: userId, type: 'setup_password', role: ROLES.TREASURER },
         JWT_SECRET,
         { expiresIn: '48h' }
       );
-      await emailService.sendInvitationEmail(email, 'treasurer', token);
+      await emailService.sendInvitationEmail(email, ROLES.TREASURER, token);
 
-      return { id: userId, name, email, phone, role: 'treasurer' };
+      return { id: userId, name, email, phone, role: ROLES.TREASURER };
     } catch (error) {
       await connection.rollback();
       throw error;
@@ -163,7 +164,7 @@ class UserService {
       }
 
       // 3. Update tenants table if user is a tenant (E7)
-      if (currentUser.role === 'tenant') {
+      if (currentUser.role === ROLES.TENANT) {
         const tenantUpdateData = {
           emergencyContactName,
           emergencyContactPhone,
@@ -219,7 +220,7 @@ class UserService {
   }
 
   async getTreasurers() {
-    return await userModel.findByRole('treasurer');
+    return await userModel.findByRole(ROLES.TREASURER);
   }
 
   async getTenants(ownerId = null, treasurerId = null) {
@@ -229,11 +230,11 @@ class UserService {
     if (treasurerId) {
       return await userModel.findTenantsByTreasurer(treasurerId);
     }
-    return await userModel.findByRole('tenant');
+    return await userModel.findByRole(ROLES.TENANT);
   }
 
   async getOwners() {
-    return await userModel.findByRole('owner');
+    return await userModel.findByRole(ROLES.OWNER);
   }
 
   async getUserById(id) {
@@ -308,7 +309,7 @@ class UserService {
 
       let invitationToken = null;
       if (existingUser) {
-        if (existingUser.role === 'tenant') {
+        if (existingUser.role === ROLES.TENANT) {
           // User is already an active tenant applying for another property.
           // They already have an account and password, so we just proceed with lease creation.
           userId = existingUser.id;
@@ -331,14 +332,14 @@ class UserService {
             email: lead.email,
             phone: lead.phone,
             passwordHash: hashedPassword,
-            role: 'tenant',
+            role: ROLES.TENANT,
             status: 'active',
           },
           connection
         );
 
         invitationToken = jwt.sign(
-          { id: userId, type: 'setup_password', role: 'tenant' },
+          { id: userId, type: 'setup_password', role: ROLES.TENANT },
           JWT_SECRET,
           { expiresIn: '48h' }
         );
@@ -516,7 +517,7 @@ class UserService {
             if (invitationToken) {
               await emailService.sendInvitationEmail(
                 mailData.email,
-                'tenant',
+                ROLES.TENANT,
                 invitationToken
               );
             }
@@ -568,13 +569,13 @@ class UserService {
 
     // Generate token for password setup (invitation)
     const token = sign(
-      { id: userId, type: 'setup_password', role: 'tenant' },
+      { id: userId, type: 'setup_password', role: ROLES.TENANT },
       JWT_SECRET,
       { expiresIn: '48h' }
     );
 
     try {
-      await emailService.sendInvitationEmail(user.email, 'tenant', token);
+      await emailService.sendInvitationEmail(user.email, ROLES.TENANT, token);
     } catch (err) {
       console.error(
         `[UserService] Failed to send onboarding email to ${user.email}:`,

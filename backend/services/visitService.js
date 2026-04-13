@@ -6,6 +6,7 @@ import notificationModel from '../models/notificationModel.js';
 import emailService from '../utils/emailService.js';
 import auditLogger from '../utils/auditLogger.js';
 import AppError from '../utils/AppError.js';
+import { isAtLeast, ROLES } from '../utils/roleUtils.js';
 
 class VisitService {
   async scheduleVisit(data) {
@@ -185,9 +186,12 @@ class VisitService {
   }
 
   async getVisits(user) {
-    if (user.role === 'owner') {
+    if (user.role === ROLES.SYSTEM) {
+      return await visitModel.findAll({});
+    }
+    if (user.role === ROLES.OWNER) {
       return await visitModel.findAll({ ownerId: user.id });
-    } else if (user.role === 'treasurer') {
+    } else if (user.role === ROLES.TREASURER) {
       const staffModel = (await import('../models/staffModel.js')).default;
       const assigned = await staffModel.getAssignedProperties(user.id);
       const propertyIds = assigned.map((p) => p.property_id);
@@ -203,7 +207,7 @@ class VisitService {
   }
 
   async updateStatus(id, status, user) {
-    if (!user || (user.role !== 'owner' && user.role !== 'treasurer')) {
+    if (!user || !isAtLeast(user.role, ROLES.TREASURER)) {
       throw new AppError(
         'Access denied. Only owners and treasurers can update visit status.',
         403
@@ -287,7 +291,7 @@ class VisitService {
 
     // Security check: Only owner/staff or the visitor themselves (if we had a token)
     // For now, owner/staff only as per the controller routes
-    if (!user || (user.role !== 'owner' && user.role !== 'treasurer')) {
+    if (!user || !isAtLeast(user.role, ROLES.TREASURER)) {
       throw new AppError('Access denied.', 403);
     }
 

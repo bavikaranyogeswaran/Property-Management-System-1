@@ -4,6 +4,7 @@ import {
   authenticateToken,
   authorizeRoles,
 } from '../middleware/authMiddleware.js';
+import { ROLES } from '../utils/roleUtils.js';
 
 const router = express.Router();
 
@@ -11,13 +12,13 @@ const router = express.Router();
 router.get(
   '/cron-logs',
   authenticateToken,
-  authorizeRoles('owner'),
+  authorizeRoles(ROLES.OWNER),
   systemController.getCronLogs
 );
 router.post(
   '/cron-run',
   authenticateToken,
-  authorizeRoles('owner'),
+  authorizeRoles(ROLES.OWNER),
   systemController.triggerCron
 );
 

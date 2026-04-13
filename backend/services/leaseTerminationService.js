@@ -22,6 +22,7 @@ import {
 import { toCentsFromMajor, moneyMath, fromCents } from '../utils/moneyUtils.js';
 import renewalService from './renewalService.js';
 import AppError from '../utils/AppError.js';
+import { ROLES } from '../utils/roleUtils.js';
 
 class LeaseTerminationService {
   constructor(facade) {
@@ -126,7 +127,7 @@ class LeaseTerminationService {
         connection
       );
 
-      const treasurers = await userModel.findByRole('treasurer');
+      const treasurers = await userModel.findByRole(ROLES.TREASURER);
       for (const t of treasurers) {
         await notificationModel.create(
           {
@@ -263,7 +264,7 @@ class LeaseTerminationService {
           conn
         );
 
-        const treasurers = await userModel.findByRole('treasurer');
+        const treasurers = await userModel.findByRole(ROLES.TREASURER);
         for (const t of treasurers) {
           await notificationModel.create(
             {
@@ -363,7 +364,7 @@ class LeaseTerminationService {
           conn
         );
 
-        const treasurers = await userModel.findByRole('treasurer');
+        const treasurers = await userModel.findByRole(ROLES.TREASURER);
         for (const t of treasurers) {
           await notificationModel.create(
             {
@@ -508,7 +509,10 @@ class LeaseTerminationService {
   async updateNoticeStatus(leaseId, status, user) {
     const lease = await leaseModel.findById(leaseId);
     if (!lease) throw new AppError('Lease not found', 404);
-    if (user.role === 'tenant' && String(lease.tenantId) !== String(user.id))
+    if (
+      user.role === ROLES.TENANT &&
+      String(lease.tenantId) !== String(user.id)
+    )
       throw new AppError('Access denied', 403);
     if (!['undecided', 'vacating', 'renewing'].includes(status))
       throw new AppError('Invalid notice status', 400);

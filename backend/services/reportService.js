@@ -7,18 +7,23 @@ import leadModel from '../models/leadModel.js';
 import ledgerModel from '../models/ledgerModel.js';
 import { getLocalTime, parseLocalDate, addDays } from '../utils/dateUtils.js';
 import { moneyMath } from '../utils/moneyUtils.js';
+import { ROLES } from '../utils/roleUtils.js';
 
 class ReportService {
   // Helper: Get property IDs accessible by a user based on role
   async _getAccessiblePropertyIds(user) {
-    if (user.role === 'owner') {
+    if (user.role === ROLES.SYSTEM) {
+      const [rows] = await pool.query('SELECT property_id FROM properties');
+      return rows.map((r) => r.property_id);
+    }
+    if (user.role === ROLES.OWNER) {
       const [rows] = await pool.query(
         'SELECT property_id FROM properties WHERE owner_id = ?',
         [user.id]
       );
       return rows.map((r) => r.property_id);
     }
-    if (user.role === 'treasurer') {
+    if (user.role === ROLES.TREASURER) {
       const [rows] = await pool.query(
         'SELECT property_id FROM staff_property_assignments WHERE user_id = ?',
         [user.id]
@@ -583,7 +588,7 @@ class ReportService {
   }
 
   async getLeadConversionStats(user) {
-    const ownerId = user?.role === 'owner' ? user.id : null;
+    const ownerId = user?.role === ROLES.OWNER ? user.id : null;
     const stats = await leadModel.getLeadConversionStats(ownerId);
     return {
       Total: Number(stats.Total || 0),

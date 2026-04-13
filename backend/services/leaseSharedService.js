@@ -24,6 +24,7 @@ import {
 import { toCentsFromMajor, moneyMath, fromCents } from '../utils/moneyUtils.js';
 import renewalService from './renewalService.js';
 import AppError from '../utils/AppError.js';
+import { isAtLeast, ROLES } from '../utils/roleUtils.js';
 
 class LeaseSharedService {
   constructor(facade) {
@@ -31,30 +32,40 @@ class LeaseSharedService {
   }
 
   async getLeases(user) {
-    if (user.role === 'owner') return await leaseModel.findAll(user.id);
-    if (user.role === 'treasurer') {
+    if (user.role === ROLES.SYSTEM) {
+      return await leaseModel.findAll({});
+    }
+    if (user.role === ROLES.OWNER) return await leaseModel.findAll(user.id);
+    if (user.role === ROLES.TREASURER) {
       return await leaseModel.findAll(null, user.id);
     }
-    if (user.role === 'tenant') return await leaseModel.findByTenantId(user.id);
+    if (user.role === ROLES.TENANT)
+      return await leaseModel.findByTenantId(user.id);
     throw new AppError('Access denied', 403);
   }
 
   async getLeaseById(id, user) {
     const lease = await leaseModel.findById(id);
     if (!lease) throw new AppError('Lease not found', 404);
-    if (user.role === 'owner') {
+
+    if (user.role === ROLES.SYSTEM) return lease;
+
+    if (user.role === ROLES.OWNER) {
       const property = await propertyModel.findById(lease.propertyId);
       if (property && String(property.ownerId) === String(user.id))
         return lease;
     }
-    if (user.role === 'treasurer') {
+    if (user.role === ROLES.TREASURER) {
       const assigned = await staffModel.getAssignedProperties(user.id);
       if (
         assigned.some((p) => String(p.property_id) === String(lease.propertyId))
       )
         return lease;
     }
-    if (user.role === 'tenant' && String(lease.tenantId) === String(user.id))
+    if (
+      user.role === ROLES.TENANT &&
+      String(lease.tenantId) === String(user.id)
+    )
       return lease;
     throw new AppError('Access denied', 403);
   }

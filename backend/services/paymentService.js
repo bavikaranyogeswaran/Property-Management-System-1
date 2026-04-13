@@ -11,6 +11,7 @@ import ledgerService from './ledgerService.js';
 import receiptService from './receiptService.js';
 import paymentSideEffectService from './paymentSideEffectService.js';
 import paymentOperationalService from './paymentOperationalService.js';
+import { ROLES } from '../utils/roleUtils.js';
 
 // Restored for un-refactored methods
 import notificationModel from '../models/notificationModel.js';
@@ -78,7 +79,10 @@ class PaymentService {
       );
 
       // Notify Treasurers
-      const treasurers = await userModel.findByRole('treasurer', connection);
+      const treasurers = await userModel.findByRole(
+        ROLES.TREASURER,
+        connection
+      );
       for (const t of treasurers) {
         if (t.status === 'active') {
           await notificationModel.create(
@@ -247,7 +251,7 @@ class PaymentService {
 
       // 3. Notify Treasurers
       const guestTreasurers = await userModel.findByRole(
-        'treasurer',
+        ROLES.TREASURER,
         connection
       );
       for (const t of guestTreasurers) {
@@ -430,7 +434,7 @@ class PaymentService {
 
       // [NEW] Notify Treasurer of gateway underpayment
       if (isUnderpayment) {
-        const treasurers = await userModel.findByRole('treasurer', conn);
+        const treasurers = await userModel.findByRole(ROLES.TREASURER, conn);
         for (const t of treasurers) {
           if (t.status === 'active') {
             await notificationModel.create(
@@ -813,11 +817,11 @@ class PaymentService {
   }
 
   async getPayments(user) {
-    if (user.role === 'tenant') {
+    if (user.role === ROLES.TENANT) {
       return await paymentModel.findByTenantId(user.id);
-    } else if (user.role === 'treasurer') {
+    } else if (user.role === ROLES.TREASURER) {
       return await paymentModel.findByTreasurerId(user.id);
-    } else if (user.role === 'owner') {
+    } else if (user.role === ROLES.OWNER) {
       return await paymentModel.findByOwnerId(user.id);
     } else {
       throw new Error('Access denied');

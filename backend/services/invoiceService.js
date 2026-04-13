@@ -18,14 +18,15 @@ import {
   now,
 } from '../utils/dateUtils.js';
 import { runWithLock } from '../utils/distributionLock.js';
+import { isAtLeast, ROLES } from '../utils/roleUtils.js';
 
 class InvoiceService {
   async getInvoices(user) {
-    if (user.role === 'tenant') {
+    if (user.role === ROLES.TENANT) {
       return await invoiceModel.findByTenantId(user.id);
-    } else if (user.role === 'treasurer') {
+    } else if (user.role === ROLES.TREASURER) {
       return await invoiceModel.findByTreasurerId(user.id);
-    } else if (user.role === 'owner') {
+    } else if (user.role === ROLES.OWNER) {
       return await invoiceModel.findByOwnerId(user.id);
     } else {
       throw new Error('Access denied');
@@ -33,7 +34,7 @@ class InvoiceService {
   }
 
   async createInvoice(data, user) {
-    if (user.role !== 'treasurer') {
+    if (!isAtLeast(user.role, ROLES.TREASURER)) {
       throw new Error('Denied. Only Treasurers can create invoices.');
     }
 
@@ -103,7 +104,7 @@ class InvoiceService {
   }
 
   async generateMonthlyInvoices(year, month, user) {
-    if (user.role !== 'treasurer') {
+    if (!isAtLeast(user.role, ROLES.TREASURER)) {
       throw new Error('Access denied. Only Treasurers can generate invoices.');
     }
 
@@ -239,7 +240,7 @@ class InvoiceService {
   }
 
   async correctInvoice(invoiceId, newAmount, reason, user) {
-    if (user.role !== 'treasurer')
+    if (!isAtLeast(user.role, ROLES.TREASURER))
       throw new Error('Only treasurers can correct invoices.');
 
     const invoice = await invoiceModel.findById(invoiceId);
@@ -296,7 +297,7 @@ class InvoiceService {
   }
 
   async updateStatus(id, status, user) {
-    if (user.role !== 'treasurer') {
+    if (!isAtLeast(user.role, ROLES.TREASURER)) {
       throw new Error(
         'Access denied. Only Treasurers can update invoice status.'
       );

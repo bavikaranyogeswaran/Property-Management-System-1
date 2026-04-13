@@ -14,6 +14,7 @@ import {
 import { toCentsFromMajor } from '../utils/moneyUtils.js';
 import auditLogger from '../utils/auditLogger.js';
 import AppError from '../utils/AppError.js';
+import { isAtLeast, ROLES } from '../utils/roleUtils.js';
 
 /**
  * [ARCHITECTURAL SEMANTICS]
@@ -41,11 +42,11 @@ class RenewalService {
       currentMonthlyRent: lease.monthlyRent,
       status: 'pending',
       requestedBy:
-        user?.role === 'tenant'
-          ? 'tenant'
-          : user?.role === 'treasurer'
+        user?.role === ROLES.TENANT
+          ? ROLES.TENANT
+          : user?.role === ROLES.TREASURER
             ? 'staff'
-            : 'system', // [H19]
+            : ROLES.SYSTEM, // [H19]
     });
 
     await auditLogger.log({
@@ -81,7 +82,7 @@ class RenewalService {
     }
 
     // RBAC: Treasurer assignment check
-    if (user.role === 'treasurer') {
+    if (user.role === ROLES.TREASURER) {
       const staffModel = (await import('../models/staffModel.js')).default;
       const assigned = await staffModel.getAssignedProperties(user.id);
       if (
@@ -146,7 +147,7 @@ class RenewalService {
     }
 
     // RBAC: Treasurer assignment check
-    if (user.role === 'treasurer') {
+    if (user.role === ROLES.TREASURER) {
       const staffModel = (await import('../models/staffModel.js')).default;
       const assigned = await staffModel.getAssignedProperties(user.id);
       if (
@@ -279,7 +280,7 @@ class RenewalService {
     if (!request) throw new AppError('Renewal request not found', 404);
 
     // RBAC: Treasurer assignment check
-    if (user.role === 'treasurer') {
+    if (user.role === ROLES.TREASURER) {
       const staffModel = (await import('../models/staffModel.js')).default;
       const assigned = await staffModel.getAssignedProperties(user.id);
       if (
@@ -370,7 +371,8 @@ class RenewalService {
     // Notify Treasurer
     try {
       const [treasurers] = await pool.query(
-        "SELECT user_id FROM users WHERE role = 'treasurer' AND status = 'active'"
+        'SELECT user_id FROM users WHERE role = ? AND status = "active"',
+        [ROLES.TREASURER]
       );
       const notificationModel = (await import('../models/notificationModel.js'))
         .default;
@@ -427,7 +429,8 @@ class RenewalService {
     // Notify Treasurer that tenant declined
     try {
       const [treasurers] = await pool.query(
-        "SELECT user_id FROM users WHERE role = 'treasurer' AND status = 'active'"
+        'SELECT user_id FROM users WHERE role = ? AND status = "active"',
+        [ROLES.TREASURER]
       );
       const notificationModel = (await import('../models/notificationModel.js'))
         .default;
@@ -479,11 +482,14 @@ class RenewalService {
   }
 
   async getRequests(user) {
-    if (user.role === 'owner')
+    if (user.role === ROLES.SYSTEM) {
+      return await renewalRequestModel.findAll({});
+    }
+    if (user.role === ROLES.OWNER)
       return await renewalRequestModel.findAll({ ownerId: user.id });
-    if (user.role === 'treasurer')
+    if (user.role === ROLES.TREASURER)
       return await renewalRequestModel.findAll({ treasurerId: user.id });
-    if (user.role === 'tenant') {
+    if (user.role === ROLES.TENANT) {
       // Find renewal requests for this tenant's leases
       const tenantLeases = await leaseModel.findByTenantId(user.id);
       const allRequests = [];

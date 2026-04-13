@@ -97,10 +97,20 @@ export const optionalAuthenticateToken = async (req, res, next) => {
 
 export const authorizeRoles = (...roles) => {
   return (req, res, next) => {
-    if (!req.user || !roles.includes(req.user.role)) {
-      return res
-        .status(403)
-        .json({ error: `Access denied. Required role: ${roles.join(' or ')}` });
+    if (!req.user) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    // [HARDENED] Hierarchy-Aware Authorization
+    // Instead of simple inclusion, we check if the user's role satisfies the required level
+    const isAuthorized = roles.some((role) =>
+      authorizationService.isAtLeast(req.user.role, role)
+    );
+
+    if (!isAuthorized) {
+      return res.status(403).json({
+        error: `Access denied. Required role level: ${roles.join(' or ')}`,
+      });
     }
     next();
   };

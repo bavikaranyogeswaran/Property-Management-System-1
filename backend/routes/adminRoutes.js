@@ -1,6 +1,7 @@
 import express from 'express';
 import { applyLateFees } from '../utils/cronJobs.js';
 import { authenticateToken } from '../middleware/authMiddleware.js';
+import { ROLES } from '../utils/roleUtils.js';
 
 const router = express.Router();
 
@@ -8,7 +9,7 @@ const router = express.Router();
 // Restricted to Owners and Treasurers
 router.post('/trigger-late-fees', authenticateToken, async (req, res) => {
   try {
-    if (req.user.role !== 'owner' && req.user.role !== 'treasurer') {
+    if (req.user.role !== ROLES.OWNER && req.user.role !== ROLES.TREASURER) {
       return res.status(403).json({
         error:
           'Access denied. Only Owners or Treasurers can trigger late fees.',

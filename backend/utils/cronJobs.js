@@ -20,6 +20,7 @@ import {
 } from './dateUtils.js';
 import { moneyMath, fromCents } from './moneyUtils.js';
 import { v2 as cloudinary } from 'cloudinary';
+import { ROLES } from './roleUtils.js';
 
 // Configure Cloudinary for background cleanup
 cloudinary.config({
@@ -243,7 +244,7 @@ export const checkLeaseExpiration = async () => {
 
         // Notify Treasurers (Refund Alert)
         const treasurers = await db
-          .query("SELECT user_id FROM users WHERE role = 'treasurer'")
+          .query('SELECT user_id FROM users WHERE role = ?', [ROLES.TREASURER])
           .then(([rows]) => rows);
         for (const t of treasurers) {
           await notificationModel.create({
@@ -312,7 +313,7 @@ export const sendLeaseExpiryWarnings = async () => {
             endDate: lease.end_date,
             propertyName: lease.property_name,
             unitNumber: lease.unit_number,
-            role: 'tenant',
+            role: ROLES.TENANT,
           });
         }
 
@@ -332,7 +333,7 @@ export const sendLeaseExpiryWarnings = async () => {
               endDate: lease.end_date,
               propertyName: lease.property_name,
               unitNumber: lease.unit_number,
-              role: 'owner',
+              role: ROLES.OWNER,
             });
           }
         }
@@ -877,7 +878,7 @@ export const deactivateFormerTenants = async (targetDate = null) => {
     const [formerTenants] = await db.query(
       `SELECT u.user_id, u.email
        FROM users u
-       WHERE u.role = 'tenant' AND u.status = 'active'
+       WHERE u.role = ? AND u.status = 'active'
        AND NOT EXISTS (
          SELECT 1 FROM leases l 
          WHERE l.tenant_id = u.user_id 
@@ -892,7 +893,7 @@ export const deactivateFormerTenants = async (targetDate = null) => {
          GROUP BY l2.tenant_id
          HAVING MAX(l2.end_date) < DATE_SUB(?, INTERVAL p2.tenant_deactivation_days DAY)
        )`,
-      [referenceDate]
+      [ROLES.TENANT, referenceDate]
     );
 
     if (formerTenants.length > 0) {
@@ -1052,7 +1053,8 @@ export const escalateOverdueMaintenance = async () => {
           });
 
           const [treasurers] = await db.query(
-            `SELECT user_id FROM users WHERE role = 'treasurer'`
+            'SELECT user_id FROM users WHERE role = ?',
+            [ROLES.TREASURER]
           );
           for (const t of treasurers) {
             await notificationModel.create({

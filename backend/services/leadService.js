@@ -17,6 +17,7 @@ import {
   isBefore,
   isToday,
 } from '../utils/dateUtils.js';
+import { isAtLeast, ROLES } from '../utils/roleUtils.js';
 
 class LeadService {
   async registerInterest(data) {
@@ -78,7 +79,7 @@ class LeadService {
     // Check if email belongs to a staff/owner — reject if so
     const existingUser = await userModel.findByEmail(email);
     if (existingUser) {
-      const allowedRoles = ['tenant'];
+      const allowedRoles = [ROLES.TENANT];
       if (!allowedRoles.includes(existingUser.role)) {
         throw new Error(
           'This email is already associated with a staff/owner account. Please use a different email or log in.'
@@ -198,9 +199,12 @@ class LeadService {
   }
 
   async getLeads(user) {
-    if (user.role === 'owner') {
+    if (user.role === ROLES.SYSTEM) {
+      return await leadModel.findAll(null);
+    }
+    if (user.role === ROLES.OWNER) {
       return await leadModel.findAll(user.id);
-    } else if (user.role === 'treasurer') {
+    } else if (user.role === ROLES.TREASURER) {
       return await leadModel.findByTreasurerId(user.id);
     }
     throw new Error('Access denied.');
@@ -211,7 +215,7 @@ class LeadService {
   }
 
   async updateLead(id, data, user) {
-    if (user.role !== 'owner') {
+    if (!isAtLeast(user.role, ROLES.OWNER)) {
       throw new Error('Access denied.');
     }
 
@@ -265,14 +269,14 @@ class LeadService {
   }
 
   async getLeadStageHistory(user) {
-    if (user.role !== 'owner') {
+    if (!isAtLeast(user.role, ROLES.OWNER)) {
       throw new Error('Access denied.');
     }
     return await leadStageHistoryModel.findAll(user.id);
   }
 
   async resendPortalLink(leadId, user) {
-    if (user.role !== 'owner' && user.role !== 'treasurer') {
+    if (!isAtLeast(user.role, ROLES.TREASURER)) {
       throw new Error('Access denied.');
     }
 
@@ -335,7 +339,7 @@ class LeadService {
 
   // --- Follow-up Management ---
   async getFollowups(leadId, user) {
-    if (user.role !== 'owner' && user.role !== 'treasurer') {
+    if (!isAtLeast(user.role, ROLES.TREASURER)) {
       throw new Error('Access denied.');
     }
     const isOwnerOrAuth = await leadModel.verifyOwnership(leadId, user.id);
@@ -345,7 +349,7 @@ class LeadService {
   }
 
   async createFollowup(leadId, data, user) {
-    if (user.role !== 'owner' && user.role !== 'treasurer') {
+    if (!isAtLeast(user.role, ROLES.TREASURER)) {
       throw new Error('Access denied.');
     }
     const isOwnerOrAuth = await leadModel.verifyOwnership(leadId, user.id);
@@ -359,7 +363,7 @@ class LeadService {
   }
 
   async getUpcomingFollowups(user) {
-    if (user.role !== 'owner') return []; // For now owner only for dashboard
+    if (!isAtLeast(user.role, ROLES.OWNER)) return []; // For now owner only for dashboard
     return await leadFollowupModel.findUpcoming(user.id);
   }
 }
