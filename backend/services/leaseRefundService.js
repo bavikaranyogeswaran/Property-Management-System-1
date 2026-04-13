@@ -539,6 +539,9 @@ class LeaseRefundService {
   }
 
   async resolveRefundDispute(leaseId, user, adjustedAmount) {
+    if (adjustedAmount === undefined || adjustedAmount < 0) {
+      throw new AppError('Valid adjustedAmount is required', 400);
+    }
     if (user.role !== 'owner' && user.role !== 'treasurer') {
       throw new AppError('Access denied', 403);
     }

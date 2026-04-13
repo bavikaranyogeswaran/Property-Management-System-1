@@ -27,10 +27,6 @@ class LeaseController {
   rejectLeaseDocuments = catchAsync(async (req, res) => {
     const { id } = req.params;
     const { reason } = req.body;
-    if (!reason) {
-      return res.status(400).json({ error: 'Rejection reason is required' });
-    }
-
     const result = await leaseService.rejectLeaseDocuments(
       id,
       reason,
@@ -107,7 +103,7 @@ class LeaseController {
 
   terminateLease = catchAsync(async (req, res) => {
     const { id } = req.params;
-    const { terminationDate, terminationFee } = req.body; // Fee optional
+    const { terminationDate, terminationFee } = req.body;
 
     const result = await leaseService.terminateLease(
       id,
@@ -121,10 +117,6 @@ class LeaseController {
   updateLeaseDocument = catchAsync(async (req, res) => {
     const { id } = req.params;
     const { documentUrl } = req.body;
-
-    if (!documentUrl) {
-      return res.status(400).json({ error: 'documentUrl is required' });
-    }
 
     await leaseService.updateLeaseDocument(id, documentUrl, req.user);
     res.json({ message: 'Lease document updated successfully', documentUrl });
@@ -141,12 +133,6 @@ class LeaseController {
   addRentAdjustment = catchAsync(async (req, res) => {
     const { id } = req.params;
     const { effectiveDate, newMonthlyRent, notes } = req.body;
-
-    if (!effectiveDate || !newMonthlyRent) {
-      return res
-        .status(400)
-        .json({ error: 'effectiveDate and newMonthlyRent are required' });
-    }
 
     const adjustmentId = await leaseService.addRentAdjustment(
       id,
@@ -179,11 +165,6 @@ class LeaseController {
   resolveRefundDispute = catchAsync(async (req, res) => {
     const { id } = req.params;
     const { adjustedAmount } = req.body;
-    if (adjustedAmount === undefined || adjustedAmount < 0) {
-      return res
-        .status(400)
-        .json({ error: 'Valid adjustedAmount is required' });
-    }
     const result = await leaseService.resolveRefundDispute(
       id,
       req.user,

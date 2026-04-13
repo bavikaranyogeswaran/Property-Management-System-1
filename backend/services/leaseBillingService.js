@@ -36,6 +36,13 @@ class LeaseBillingService {
       );
 
     const { effectiveDate, newMonthlyRent, notes } = data;
+    if (
+      !effectiveDate ||
+      newMonthlyRent === undefined ||
+      newMonthlyRent === null
+    ) {
+      throw new AppError('effectiveDate and newMonthlyRent are required', 400);
+    }
     const start = parseLocalDate(lease.startDate);
     const eff = parseLocalDate(effectiveDate);
 

@@ -113,6 +113,9 @@ class LeaseSharedService {
   }
 
   async updateLeaseDocument(id, documentUrl, user = null) {
+    if (!documentUrl) {
+      throw new AppError('documentUrl is required', 400);
+    }
     const lease = await leaseModel.findById(id);
     if (!lease) throw new AppError('Lease not found', 404);
 

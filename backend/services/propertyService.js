@@ -3,6 +3,7 @@ import unitModel from '../models/unitModel.js';
 import leaseModel from '../models/leaseModel.js';
 import pool from '../config/db.js';
 import { validatePropertyConfig } from '../utils/validators.js';
+import leaseTermModel from '../models/leaseTermModel.js';
 
 class PropertyService {
   async createProperty(data) {
@@ -26,8 +27,49 @@ class PropertyService {
     return await propertyModel.findById(id);
   }
 
-  async getProperties(ownerId = null) {
-    return await propertyModel.findAll(ownerId);
+  async getProperties(user, query = {}) {
+    const isPublic = query.public === 'true';
+
+    // 1. Logic for Public Browse
+    if (isPublic) {
+      return await propertyModel.findAll(null);
+    }
+
+    // 2. Logic for Logged-in Users
+    if (!user) {
+      throw new Error('Authentication required for private property view');
+    }
+
+    if (user.role === 'treasurer') {
+      // Treasurer sees only assigned properties
+      const staffModel = (await import('../models/staffModel.js')).default;
+      return await staffModel.getAssignedProperties(user.id);
+    }
+
+    if (user.role === 'owner') {
+      // Owner sees only their own assets
+      return await propertyModel.findAll(user.id);
+    }
+
+    // Default: Anyone else (e.g., Tenants) sees all active properties to find their building
+    return await propertyModel.findAll(null);
+  }
+
+  async verifyOwnership(propertyId, userId, role) {
+    const property = await propertyModel.findById(propertyId);
+    if (!property) {
+      const error = new Error('Property not found');
+      error.statusCode = 404;
+      throw error;
+    }
+
+    if (role === 'owner' && String(property.ownerId) !== String(userId)) {
+      const error = new Error('You do not own this property');
+      error.statusCode = 403;
+      throw error;
+    }
+
+    return property;
   }
 
   async getPropertyById(id) {
@@ -118,6 +160,16 @@ class PropertyService {
     }
 
     return addedImages;
+  }
+
+  async getLeaseTermsByPropertyId(propertyId) {
+    const property = await propertyModel.findById(propertyId);
+    if (!property) {
+      const error = new Error('Property not found');
+      error.statusCode = 404;
+      throw error;
+    }
+    return await leaseTermModel.findAllByOwner(property.ownerId);
   }
 }
 

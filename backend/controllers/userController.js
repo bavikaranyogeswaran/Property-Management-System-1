@@ -8,288 +8,194 @@
 import userService from '../services/userService.js';
 import staffModel from '../models/staffModel.js';
 import { validateEmail } from '../utils/validators.js';
-import auditLogger from '../utils/auditLogger.js';
+import catchAsync from '../utils/catchAsync.js';
+import AppError from '../utils/AppError.js';
 
 class UserController {
   //  HIRE TREASURER: Owner adds a new staff member to handle money.
-  async createTreasurer(req, res) {
-    try {
-      const {
-        name,
-        email,
-        phone,
-        nic,
-        employeeId,
-        jobTitle,
-        shiftStart,
-        shiftEnd,
-      } = req.body;
-      if (!name || !email || !phone) {
-        return res.status(400).json({ error: 'All fields are required' });
-      }
+  createTreasurer = catchAsync(async (req, res) => {
+    const {
+      name,
+      email,
+      phone,
+      nic,
+      employeeId,
+      jobTitle,
+      shiftStart,
+      shiftEnd,
+    } = req.body;
 
-      // Email validation
+    if (!name || !email || !phone) {
+      throw new AppError('All fields are required', 400);
+    }
+
+    // Email validation
+    const emailValidation = validateEmail(email);
+    if (!emailValidation.isValid) {
+      throw new AppError(emailValidation.error, 400);
+    }
+
+    const staffData = { nic, employeeId, jobTitle, shiftStart, shiftEnd };
+
+    const result = await userService.createTreasurer(
+      name,
+      email,
+      phone,
+      null,
+      staffData,
+      req.user
+    );
+    res.status(201).json(result);
+  });
+
+  updateTreasurer = catchAsync(async (req, res) => {
+    const { id } = req.params;
+    const { name, email, phone, status } = req.body;
+
+    // Email validation if email is being updated
+    if (email) {
       const emailValidation = validateEmail(email);
       if (!emailValidation.isValid) {
-        return res.status(400).json({ error: emailValidation.error });
+        throw new AppError(emailValidation.error, 400);
       }
-
-      const staffData = { nic, employeeId, jobTitle, shiftStart, shiftEnd };
-
-      // Password is NOT required here as we send an invite link.
-      // We pass 'null' or empty string to service, which generates a random temp password.
-      const result = await userService.createTreasurer(
-        name,
-        email,
-        phone,
-        null,
-        staffData,
-        req.user
-      );
-      res.status(201).json(result);
-    } catch (error) {
-      res.status(400).json({ error: error.message });
     }
-  }
 
-  async updateTreasurer(req, res) {
-    try {
-      const { id } = req.params;
-      const { name, email, phone, status } = req.body;
+    const result = await userService.updateTreasurer(id, {
+      name,
+      email,
+      phone,
+      status,
+    });
+    res.json(result);
+  });
 
-      // Email validation if email is being updated
-      if (email) {
-        const emailValidation = validateEmail(email);
-        if (!emailValidation.isValid) {
-          return res.status(400).json({ error: emailValidation.error });
-        }
+  updateProfile = catchAsync(async (req, res) => {
+    // Self-update only
+    const id = req.user.id;
+    const {
+      name,
+      email,
+      phone,
+      emergencyContactName,
+      emergencyContactPhone,
+      employmentStatus,
+      permanentAddress,
+    } = req.body;
+
+    if (email) {
+      const emailValidation = validateEmail(email);
+      if (!emailValidation.isValid) {
+        throw new AppError(emailValidation.error, 400);
       }
-
-      // Explicitly DO NOT extract password from body, preventing update.
-
-      const result = await userService.updateTreasurer(id, {
-        name,
-        email,
-        phone,
-        status,
-      });
-      res.json(result);
-    } catch (error) {
-      res.status(400).json({ error: error.message });
     }
-  }
 
-  async updateProfile(req, res) {
-    try {
-      // Self-update only
-      const id = req.user.id;
-      const {
-        name,
-        email,
-        phone,
-        emergencyContactName,
-        emergencyContactPhone,
-        employmentStatus,
-        permanentAddress,
-      } = req.body;
+    const result = await userService.updateUserProfile(id, {
+      name,
+      email,
+      phone,
+      emergencyContactName,
+      emergencyContactPhone,
+      employmentStatus,
+      permanentAddress,
+    });
+    res.json(result);
+  });
 
-      // Email validation if email is being updated
-      if (email) {
-        const emailValidation = validateEmail(email);
-        if (!emailValidation.isValid) {
-          return res.status(400).json({ error: emailValidation.error });
-        }
-      }
-
-      const result = await userService.updateUserProfile(id, {
-        name,
-        email,
-        phone,
-        emergencyContactName,
-        emergencyContactPhone,
-        employmentStatus,
-        permanentAddress,
-      });
-      res.json(result);
-    } catch (error) {
-      res.status(400).json({ error: error.message || error });
+  getProfile = catchAsync(async (req, res) => {
+    const id = req.user.id;
+    const user = await userService.getUserById(id);
+    if (!user) {
+      throw new AppError('User not found', 404);
     }
-  }
+    res.json(user);
+  });
 
-  async getProfile(req, res) {
-    try {
-      const id = req.user.id;
-      const user = await userService.getUserById(id);
-      if (!user) {
-        return res.status(404).json({ error: 'User not found' });
-      }
-      res.json(user);
-    } catch (error) {
-      res.status(500).json({ error: error.message });
-    }
-  }
+  deleteTreasurer = catchAsync(async (req, res) => {
+    const { id } = req.params;
+    const result = await userService.deleteTreasurer(id);
+    res.json(result);
+  });
 
-  async deleteTreasurer(req, res) {
-    try {
-      const { id } = req.params;
-      const result = await userService.deleteTreasurer(id);
-      res.json(result);
-    } catch (error) {
-      res.status(400).json({ error: error.message });
-    }
-  }
+  getTreasurers = catchAsync(async (req, res) => {
+    const result = await userService.getTreasurers();
+    res.json(result);
+  });
 
-  async getTreasurers(req, res) {
-    try {
-      const result = await userService.getTreasurers();
-      res.json(result);
-    } catch (error) {
-      res.status(500).json({ error: error.message });
-    }
-  }
-
-  async getOwners(req, res) {
-    try {
-      const result = await userService.getOwners();
-      res.json(result);
-    } catch (error) {
-      res.status(500).json({ error: error.message });
-    }
-  }
+  getOwners = catchAsync(async (req, res) => {
+    const result = await userService.getOwners();
+    res.json(result);
+  });
 
   //  GET TENANTS: Fetches the list of people living in the properties.
-  //  - Owner sees EVERYONE.
-  //  - Treasurer sees only tenants in properties assigned to them.
-  async getTenants(req, res) {
-    try {
-      let result;
-      if (req.user.role === 'owner') {
-        result = await userService.getTenants(req.user.id);
-      } else if (req.user.role === 'treasurer') {
-        result = await userService.getTenants(null, req.user.id);
-      }
-
-      res.json(result);
-    } catch (error) {
-      res.status(500).json({ error: error.message });
+  getTenants = catchAsync(async (req, res) => {
+    let result;
+    if (req.user.role === 'owner') {
+      result = await userService.getTenants(req.user.id);
+    } else if (req.user.role === 'treasurer') {
+      result = await userService.getTenants(null, req.user.id);
     }
-  }
 
-  async getUserById(req, res) {
-    try {
-      const { id } = req.params;
-      // RBAC: Owner can view anyone, Users can view themselves.
-      // Simplified: Owner only for now as requested feature is for Owner view.
-      if (req.user.role !== 'owner' && req.user.id !== parseInt(id)) {
-        return res.status(403).json({ error: 'Access denied.' });
-      }
+    res.json(result);
+  });
 
-      const user = await userService.getUserById(id);
-      if (!user) {
-        return res.status(404).json({ error: 'User not found' });
-      }
-      res.json(user);
-    } catch (error) {
-      res.status(500).json({ error: error.message });
+  getUserById = catchAsync(async (req, res) => {
+    const { id } = req.params;
+    if (req.user.role !== 'owner' && req.user.id !== parseInt(id)) {
+      throw new AppError('Access denied.', 403);
     }
-  }
+
+    const user = await userService.getUserById(id);
+    if (!user) {
+      throw new AppError('User not found', 404);
+    }
+    res.json(user);
+  });
 
   //  ASSIGN PROPERTY: Owner tells a Treasurer "You are responsible for this Building".
-  async assignProperty(req, res) {
-    try {
-      const { userId, propertyId } = req.body;
-      await staffModel.assignProperty(userId, propertyId);
+  assignProperty = catchAsync(async (req, res) => {
+    const { userId, propertyId } = req.body;
+    const actorId = req.user.id || req.user.user_id;
 
-      await auditLogger.log(
-        {
-          userId: req.user.id || req.user.user_id,
-          actionType: 'PROPERTY_ASSIGNED_TO_STAFF',
-          entityId: propertyId,
-          entityType: 'property',
-          details: { staffUserId: userId },
-        },
-        req
-      );
+    const result = await userService.assignProperty(
+      userId,
+      propertyId,
+      actorId
+    );
+    res.json(result);
+  });
 
-      res.json({ message: 'Property assigned successfully' });
-    } catch (error) {
-      if (error.message.includes('already assigned')) {
-        return res.status(400).json({ error: error.message });
-      }
-      res.status(500).json({ error: error.message });
+  removeProperty = catchAsync(async (req, res) => {
+    const { userId, propertyId } = req.params;
+    const actorId = req.user.id || req.user.user_id;
+
+    const result = await userService.removeProperty(
+      userId,
+      propertyId,
+      actorId
+    );
+    res.json(result);
+  });
+
+  getAssignedProperties = catchAsync(async (req, res) => {
+    if (req.user.role !== 'owner' && req.user.role !== 'treasurer') {
+      throw new AppError('Access denied.', 403);
     }
-  }
-
-  async removeProperty(req, res) {
-    try {
-      const { userId, propertyId } = req.params;
-      await staffModel.removePropertyAssignment(userId, propertyId);
-
-      await auditLogger.log(
-        {
-          userId: req.user.id || req.user.user_id,
-          actionType: 'PROPERTY_REMOVED_FROM_STAFF',
-          entityId: propertyId,
-          entityType: 'property',
-          details: { staffUserId: userId },
-        },
-        req
-      );
-
-      res.json({ message: 'Property assignment removed' });
-    } catch (error) {
-      res.status(500).json({ error: error.message });
+    const { userId } = req.params;
+    if (req.user.role === 'treasurer' && parseInt(userId) !== req.user.id) {
+      throw new AppError('Access denied.', 403);
     }
-  }
 
-  async getAssignedProperties(req, res) {
-    try {
-      if (req.user.role !== 'owner' && req.user.role !== 'treasurer') {
-        // Treasurers can see their own assignments? Maybe. Owner is key.
-        return res.status(403).json({ error: 'Access denied.' });
-      }
-      const { userId } = req.params;
-      // Access control: Owner can see anyone's. Treasurer can only see their own.
-      if (req.user.role === 'treasurer' && parseInt(userId) !== req.user.id) {
-        return res.status(403).json({ error: 'Access denied.' });
-      }
+    const properties = await staffModel.getAssignedProperties(userId);
+    res.json(properties);
+  });
 
-      const properties = await staffModel.getAssignedProperties(userId);
-      res.json(properties);
-    } catch (error) {
-      console.error('Error fetching assignments:', error);
-      res.status(500).json({ error: error.message });
-    }
-  }
+  forceLogout = catchAsync(async (req, res) => {
+    const { id } = req.params;
+    const actorId = req.user.id || req.user.user_id;
 
-  async forceLogout(req, res) {
-    try {
-      const { id } = req.params;
-      const success = await userService.incrementTokenVersion(id);
-
-      if (!success) {
-        return res.status(404).json({ error: 'User not found' });
-      }
-
-      await auditLogger.log(
-        {
-          userId: req.user.id || req.user.user_id,
-          actionType: 'SECURITY_FORCE_LOGOUT',
-          entityId: id,
-          entityType: 'user',
-          details: {
-            targetUserId: id,
-            reason: req.body.reason || 'Administrative action',
-          },
-        },
-        req
-      );
-
-      res.json({ message: 'User sessions invalidated successfully.' });
-    } catch (error) {
-      res.status(500).json({ error: error.message });
-    }
-  }
+    const result = await userService.forceLogout(id, actorId, req.body.reason);
+    res.json(result);
+  });
 }
 
 export default new UserController();

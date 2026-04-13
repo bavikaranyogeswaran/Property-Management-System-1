@@ -309,6 +309,9 @@ class LeaseCreationService {
   }
 
   async rejectLeaseDocuments(leaseId, reason, user) {
+    if (!reason) {
+      throw new AppError('Rejection reason is required', 400);
+    }
     const connection = await pool.getConnection();
     try {
       await connection.beginTransaction();

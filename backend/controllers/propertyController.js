@@ -6,8 +6,6 @@
 // ============================================================================
 
 import propertyService from '../services/propertyService.js';
-import propertyModel from '../models/propertyModel.js';
-import leaseTermModel from '../models/leaseTermModel.js';
 import catchAsync from '../utils/catchAsync.js';
 import AppError from '../utils/AppError.js';
 
@@ -24,68 +22,34 @@ class PropertyController {
   });
 
   //  LIST PROPERTIES: Shows all the buildings we manage.
-  //  - Public: Shows available units to potential tenants.
-  //  - Owner: Shows all their assets.
   getProperties = catchAsync(async (req, res, next) => {
-    const userId = req.user ? req.user.id : null;
-    const isPublic = req.query.public === 'true';
-
-    let properties;
-    if (!isPublic && req.user && req.user.role === 'treasurer') {
-      // Treasurer sees only assigned properties (unless browsing public)
-      const staffModel = (await import('../models/staffModel.js')).default;
-      properties = await staffModel.getAssignedProperties(req.user.id);
-    } else if (!isPublic && req.user && req.user.role === 'owner') {
-      // Owner sees only their own properties
-      properties = await propertyService.getProperties(userId);
-    } else {
-      // Public view, Guest, or Tenant (tenants need to see all properties to look up their unit's info)
-      properties = await propertyService.getProperties(null);
-    }
-
+    const properties = await propertyService.getProperties(req.user, req.query);
     res.json(properties);
   });
 
   getPropertyById = catchAsync(async (req, res, next) => {
     const property = await propertyService.getPropertyById(req.params.id);
     if (!property) {
-      return next(new AppError('Property not found', 404));
+      throw new AppError('Property not found', 404);
     }
     res.json(property);
   });
 
   updateProperty = catchAsync(async (req, res, next) => {
-    const property = await propertyModel.findById(req.params.id);
-    if (!property) {
-      return next(new AppError('Property not found', 404));
-    }
-    if (
-      req.user.role === 'owner' &&
-      String(property.ownerId) !== String(req.user.id)
-    ) {
-      return next(new AppError('You do not own this property', 403));
-    }
+    const { id } = req.params;
+    // Ownership check moved to service
+    await propertyService.verifyOwnership(id, req.user.id, req.user.role);
 
-    const updated = await propertyService.updateProperty(
-      req.params.id,
-      req.body
-    );
+    const updated = await propertyService.updateProperty(id, req.body);
     res.json(updated);
   });
 
   deleteProperty = catchAsync(async (req, res, next) => {
-    const property = await propertyModel.findById(req.params.id);
-    if (!property) {
-      return next(new AppError('Property not found', 404));
-    }
-    if (
-      req.user.role === 'owner' &&
-      String(property.ownerId) !== String(req.user.id)
-    ) {
-      return next(new AppError('You do not own this property', 403));
-    }
+    const { id } = req.params;
+    // Ownership check moved to service
+    await propertyService.verifyOwnership(id, req.user.id, req.user.role);
 
-    await propertyService.deleteProperty(req.params.id);
+    await propertyService.deleteProperty(id);
     res.json({ message: 'Property deleted successfully' });
   });
 
@@ -94,7 +58,7 @@ class PropertyController {
     const files = req.files;
 
     if (!files || files.length === 0) {
-      return next(new AppError('No images uploaded', 400));
+      throw new AppError('No images uploaded', 400);
     }
 
     const images = await propertyService.addImages(propertyId, files);
@@ -107,11 +71,9 @@ class PropertyController {
   });
 
   getLeaseTermsByPropertyId = catchAsync(async (req, res, next) => {
-    const property = await propertyModel.findById(req.params.id);
-    if (!property) {
-      return next(new AppError('Property not found', 404));
-    }
-    const terms = await leaseTermModel.findAllByOwner(property.ownerId);
+    const terms = await propertyService.getLeaseTermsByPropertyId(
+      req.params.id
+    );
     res.json(terms);
   });
 }

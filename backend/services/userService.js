@@ -599,6 +599,38 @@ class UserService {
       console.error('[UserService] Failed to log onboarding audit:', err);
     }
   }
+
+  // ============================================================================
+  //  STAFF MANAGEMENT
+  // ============================================================================
+
+  async assignProperty(userId, propertyId, actorId) {
+    await staffModel.assignProperty(userId, propertyId);
+
+    await auditLogger.log({
+      userId: actorId,
+      actionType: 'PROPERTY_ASSIGNED_TO_STAFF',
+      entityId: propertyId,
+      entityType: 'property',
+      details: { staffUserId: userId },
+    });
+
+    return { message: 'Property assigned successfully' };
+  }
+
+  async removeProperty(userId, propertyId, actorId) {
+    await staffModel.removePropertyAssignment(userId, propertyId);
+
+    await auditLogger.log({
+      userId: actorId,
+      actionType: 'PROPERTY_REMOVED_FROM_STAFF',
+      entityId: propertyId,
+      entityType: 'property',
+      details: { staffUserId: userId },
+    });
+
+    return { message: 'Property assignment removed' };
+  }
 }
 
 export default new UserService();
