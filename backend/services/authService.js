@@ -10,7 +10,7 @@ import { config } from '../config/config.js';
 import AppError from '../utils/AppError.js';
 
 import securityTokenService from './securityTokenService.js';
-import emailService from './emailService.js';
+import emailService from '../utils/emailService.js';
 
 const JWT_SECRET = config.jwt.secret;
 

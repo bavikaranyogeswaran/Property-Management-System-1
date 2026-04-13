@@ -10,6 +10,38 @@ vi.mock('../config/db.js', () => ({
   },
 }));
 
+// Mock Redis to avoid hangs during tests
+vi.mock('../config/redis.js', () => ({
+  default: {
+    on: vi.fn(),
+    call: vi.fn().mockResolvedValue('OK'),
+    get: vi.fn(),
+    set: vi.fn(),
+    del: vi.fn(),
+  },
+  redisConfig: {
+    host: 'mock-redis',
+    port: 6379,
+  },
+}));
+
+// Mock rate limiters to avoid Redis calls during app initialization
+vi.mock('../utils/rateLimiters.js', () => {
+  const mockLimiter = (req, res, next) => next();
+  return {
+    apiLimiter: mockLimiter,
+    loginLimiter: mockLimiter,
+    sensitiveActionLimiter: mockLimiter,
+    publicPortalLimiter: mockLimiter,
+    default: {
+      apiLimiter: mockLimiter,
+      loginLimiter: mockLimiter,
+      sensitiveActionLimiter: mockLimiter,
+      publicPortalLimiter: mockLimiter,
+    },
+  };
+});
+
 describe('API Health & Stability', () => {
   it('should return 200 and connected status when database is online', async () => {
     // Mock successful DB response

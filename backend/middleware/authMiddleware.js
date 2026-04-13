@@ -1,5 +1,9 @@
+import jwt from 'jsonwebtoken';
+import userModel from '../models/userModel.js';
+import authorizationService from '../services/authorizationService.js';
 import securityTokenService from '../services/securityTokenService.js';
 import cacheService from '../services/cacheService.js';
+
 const { verify } = jwt;
 
 export const authenticateToken = async (req, res, next) => {

@@ -1,13 +1,14 @@
 import { Queue, Worker } from 'bullmq';
 import IORedis from 'ioredis';
-import { config } from './config.js';
+import { redisConfig } from './redis.js';
 import logger from '../utils/logger.js';
+import { config } from './config.js';
 
 // Connection Configuration (Shared)
+// BullMQ requires maxRetriesPerRequest: null
 const connection = new IORedis({
-  host: process.env.REDIS_HOST || 'redis',
-  port: process.env.REDIS_PORT || 6379,
-  maxRetriesPerRequest: null, // Required by BullMQ
+  ...redisConfig,
+  maxRetriesPerRequest: null,
 });
 
 connection.on('connect', () => {
