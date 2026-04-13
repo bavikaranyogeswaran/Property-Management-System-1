@@ -209,6 +209,16 @@ export const checkLeaseExpiration = async () => {
         console.log(`Found ${expiredLeases.length} expired leases.`);
 
         for (const lease of expiredLeases) {
+          // [HARDENED] Deterministic Locking Order (Unit -> Lease) to prevent deadlocks
+          await connection.query(
+            'SELECT unit_id FROM units WHERE unit_id = ? FOR UPDATE',
+            [lease.unit_id]
+          );
+          await connection.query(
+            'SELECT lease_id FROM leases WHERE lease_id = ? FOR UPDATE',
+            [lease.lease_id]
+          );
+
           // Update Lease to 'expired' (System Auto-Expiry)
           await connection.query(
             "UPDATE leases SET status = 'expired' WHERE lease_id = ?",

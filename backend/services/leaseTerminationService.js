@@ -59,6 +59,11 @@ class LeaseTerminationService {
     try {
       await connection.beginTransaction();
 
+      // [HARDENED] Deterministic Locking Order (Unit -> Lease)
+      // Lock Unit first (Parent) then Lease (Child) to prevent deadlocks with Payment flows.
+      await unitModel.findByIdForUpdate(lease.unitId, connection);
+      await leaseModel.findByIdForUpdate(leaseId, connection);
+
       const todayDate = getLocalTime();
       const start = parseLocalDate(lease.startDate);
 
@@ -181,6 +186,10 @@ class LeaseTerminationService {
 
     try {
       await connection.beginTransaction();
+
+      // [HARDENED] Deterministic Locking Order (Unit -> Lease)
+      await unitModel.findByIdForUpdate(lease.unitId, connection);
+      await leaseModel.findByIdForUpdate(leaseId, connection);
 
       const today = getLocalTime();
       const actualCheckoutAt = today
