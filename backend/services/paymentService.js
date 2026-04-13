@@ -15,27 +15,14 @@ import { today, now, parseLocalDate } from '../utils/dateUtils.js';
 import authorizationService from './authorizationService.js';
 import { ROLES } from '../utils/roleUtils.js';
 import { fromCents, toCentsFromMajor } from '../utils/moneyUtils.js';
-import unitModel from '../models/unitModel.js';
-import leadModel from '../models/leadModel.js';
 import staffModel from '../models/staffModel.js';
+import ledgerService from './ledgerService.js';
+import receiptService from './receiptService.js';
 
 /**
  * Maps an invoice_type to the correct accounting ledger classification.
  */
-function getLedgerClassification(invoiceType) {
-  switch (invoiceType) {
-    case 'deposit':
-      return { accountType: 'liability', category: 'deposit_held' };
-    case 'rent':
-      return { accountType: 'revenue', category: 'rent' };
-    case 'late_fee':
-      return { accountType: 'revenue', category: 'late_fee' };
-    case 'maintenance':
-      return { accountType: 'revenue', category: 'maintenance' };
-    default:
-      return { accountType: 'revenue', category: 'other' };
-  }
-}
+// [REMOVED] getLedgerClassification is now encapsulated within LedgerService.js
 
 class PaymentService {
   async submitPayment(data, tenantId, file) {
@@ -311,26 +298,7 @@ class PaymentService {
     }
   }
 
-  async _postToLedger(paymentId, invoice, amount, description, connection) {
-    const { accountType, category } = getLedgerClassification(
-      invoice.invoiceType || invoice.invoice_type
-    );
-    return await ledgerModel.create(
-      {
-        paymentId: Number(paymentId),
-        invoiceId: invoice.id || invoice.invoice_id,
-        leaseId: invoice.leaseId || invoice.lease_id,
-        accountType,
-        category,
-        credit: Number(amount),
-        description:
-          description ||
-          `Payment for ${invoice.description || invoice.invoice_type}`,
-        entryDate: getCurrentDateString(),
-      },
-      connection
-    );
-  }
+  // [REMOVED] _postToLedger is now encapsulated within LedgerService.js
 
   /**
    * Records a payment that has already been verified by an automated gateway (e.g. PayHere).
@@ -884,145 +852,101 @@ class PaymentService {
       );
     }
 
-    // Generate Receipt
-    const existingReceipt = await receiptModel.findByPaymentId(
-      paymentId,
+    // 7. Generate Receipt & Post Ledger
+    await receiptService.generateReceipt(
+      { id: paymentId, amount: payment.amount },
+      invoice,
       connection
     );
-    if (!existingReceipt) {
-      await receiptModel.create(
-        {
-          paymentId: paymentId,
-          invoiceId: payment.invoiceId,
-          tenantId: invoice.tenantId || invoice.tenant_id,
-          amount: payment.amount,
-          generatedDate: today(),
-          receiptNumber: `REC-${randomUUID()}`,
-        },
-        connection
-      );
 
-      // [CRITICAL FIX] Post Ledger Entry BEFORE activation
-      // This ensures that lease status checks (deposit balance) can see the verified funds.
-      await this._postToLedger(
-        paymentId,
-        invoice,
-        payment.amount,
-        `Payment verified for ${invoice.description || invoice.invoiceType}`,
-        connection
-      );
+    // [CRITICAL FIX] Post Ledger Entry (Delegated to LedgerService)
+    await ledgerService.postPayment(
+      paymentId,
+      invoice,
+      payment.amount,
+      `Payment verified for ${invoice.description || invoice.invoiceType}`,
+      connection
+    );
 
-      // Deposit Status Logic
-      if (
-        invoice.invoiceType === 'deposit' ||
-        invoice.invoice_type === 'deposit'
-      ) {
-        const finalInvoice = await invoiceModel.findById(
-          payment.invoiceId,
-          connection
-        );
-        const finalStatus = finalInvoice.status === 'paid' ? 'paid' : 'pending';
-
-        // [NEW] Extend reservation to 7 days from creation once deposit is paid (to allow doc verification)
-        const extendedExpiry = formatToLocalDate(
-          addDays(new Date(lease.createdAt), 7)
-        );
-
-        await leaseModel.update(
-          invoice.leaseId,
-          {
-            depositStatus: finalStatus,
-            reservationExpiresAt: extendedExpiry, // Give them 7 full days from creation
-          },
-          connection
-        );
-
-        await auditLogger.log(
-          {
-            userId: null,
-            actionType: 'RESERVATION_EXTENDED',
-            entityId: invoice.leaseId,
-            entityType: 'lease',
-            details: {
-              newExpiry: extendedExpiry,
-              reason: 'Deposit payment received',
-            },
-          },
-          null,
-          connection
-        );
-      }
-
-      // Notify Tenant
-      await notificationModel.create(
-        {
-          userId: invoice.tenantId || invoice.tenant_id,
-          message: `Payment of ${fromCents(payment.amount).toFixed(2)} for Invoice #${payment.invoiceId} has been verified.`,
-          type: 'payment',
-          entityType: 'payment',
-          entityId: paymentId,
-        },
-        connection
-      );
-
-      // [AUTO-ACTIVATION] If full deposit is paid on a draft lease, activate it immediately.
+    // Deposit Status Logic
+    if (
+      invoice.invoiceType === 'deposit' ||
+      invoice.invoice_type === 'deposit'
+    ) {
       const finalInvoice = await invoiceModel.findById(
         payment.invoiceId,
         connection
       );
-      if (
-        finalInvoice.status === 'paid' &&
-        (invoice.invoiceType === 'deposit' ||
-          invoice.invoice_type === 'deposit')
-      ) {
-        const lease = await leaseModel.findById(invoice.leaseId, connection);
-        if (lease && lease.status === 'draft') {
-          if (lease.isDocumentsVerified) {
-            try {
-              const leaseService = (await import('./leaseService.js')).default;
-              await leaseService.signLease(lease.id, user, connection);
+      const finalStatus = finalInvoice.status === 'paid' ? 'paid' : 'pending';
 
-              // Trigger Onboarding (Set Password email)
-              const userService = (await import('./userService.js')).default;
-              await userService.triggerOnboarding(lease.tenantId, connection);
-            } catch (activationErr) {
-              console.error(
-                `[PaymentService] Auto-activation blocked for Lease #${lease.id}:`,
-                activationErr.message
-              );
+      // [NEW] Extend reservation to 7 days from creation once deposit is paid (to allow doc verification)
+      const extendedExpiry = formatToLocalDate(
+        addDays(new Date(lease.createdAt), 7)
+      );
 
-              // Notify Staff that payment is received but activation is blocked by unit status
-              const [propertyInfo] = await connection.query(
-                'SELECT owner_id FROM properties WHERE property_id = ?',
-                [lease.propertyId]
-              );
-              const ownerId = propertyInfo[0]?.owner_id;
+      await leaseModel.update(
+        invoice.leaseId,
+        {
+          depositStatus: finalStatus,
+          reservationExpiresAt: extendedExpiry, // Give them 7 full days from creation
+        },
+        connection
+      );
 
-              const [assignedStaff] = await connection.query(
-                'SELECT user_id FROM staff_property_assignments WHERE property_id = ?',
-                [lease.propertyId]
-              );
+      await auditLogger.log(
+        {
+          userId: null,
+          actionType: 'RESERVATION_EXTENDED',
+          entityId: invoice.leaseId,
+          entityType: 'lease',
+          details: {
+            newExpiry: extendedExpiry,
+            reason: 'Deposit payment received',
+          },
+        },
+        null,
+        connection
+      );
+    }
 
-              const userIdsToNotify = new Set();
-              if (ownerId) userIdsToNotify.add(ownerId);
-              assignedStaff.forEach((s) => userIdsToNotify.add(s.user_id));
+    // Notify Tenant
+    await notificationModel.create(
+      {
+        userId: invoice.tenantId || invoice.tenant_id,
+        message: `Payment of ${fromCents(payment.amount).toFixed(2)} for Invoice #${payment.invoiceId} has been verified.`,
+        type: 'payment',
+        entityType: 'payment',
+        entityId: paymentId,
+      },
+      connection
+    );
 
-              for (const userId of userIdsToNotify) {
-                await notificationModel.create(
-                  {
-                    userId: userId,
-                    message: `URGENT: Deposit Paid for Lease #${lease.id} (Unit ${lease.unitNumber}), but AUTO-ACTIVATION was BLOCKED by Unit Status (${activationErr.message}). Manual check required.`,
-                    type: 'lease',
-                    severity: 'urgent',
-                    entityType: 'lease',
-                    entityId: lease.id,
-                  },
-                  connection
-                );
-              }
-            }
-          } else {
-            // Notify Treasurers and Owners that payment is done but documents need review
+    // [AUTO-ACTIVATION] If full deposit is paid on a draft lease, activate it immediately.
+    const finalInvoice = await invoiceModel.findById(
+      payment.invoiceId,
+      connection
+    );
+    if (
+      finalInvoice.status === 'paid' &&
+      (invoice.invoiceType === 'deposit' || invoice.invoice_type === 'deposit')
+    ) {
+      const lease = await leaseModel.findById(invoice.leaseId, connection);
+      if (lease && lease.status === 'draft') {
+        if (lease.isDocumentsVerified) {
+          try {
+            const leaseService = (await import('./leaseService.js')).default;
+            await leaseService.signLease(lease.id, user, connection);
+
+            // Trigger Onboarding (Set Password email)
+            const userService = (await import('./userService.js')).default;
+            await userService.triggerOnboarding(lease.tenantId, connection);
+          } catch (activationErr) {
+            console.error(
+              `[PaymentService] Auto-activation blocked for Lease #${lease.id}:`,
+              activationErr.message
+            );
+
+            // Notify Staff that payment is received but activation is blocked by unit status
             const [propertyInfo] = await connection.query(
               'SELECT owner_id FROM properties WHERE property_id = ?',
               [lease.propertyId]
@@ -1042,55 +966,85 @@ class PaymentService {
               await notificationModel.create(
                 {
                   userId: userId,
-                  message: `URGENT: Deposit Paid for Lease #${lease.id} (Unit ${lease.unitNumber}). Documents are PENDING verification. Please review and activate.`,
+                  message: `URGENT: Deposit Paid for Lease #${lease.id} (Unit ${lease.unitNumber}), but AUTO-ACTIVATION was BLOCKED by Unit Status (${activationErr.message}). Manual check required.`,
                   type: 'lease',
                   severity: 'urgent',
+                  entityType: 'lease',
+                  entityId: lease.id,
                 },
                 connection
               );
             }
           }
+        } else {
+          // Notify Treasurers and Owners that payment is done but documents need review
+          const [propertyInfo] = await connection.query(
+            'SELECT owner_id FROM properties WHERE property_id = ?',
+            [lease.propertyId]
+          );
+          const ownerId = propertyInfo[0]?.owner_id;
+
+          const [assignedStaff] = await connection.query(
+            'SELECT user_id FROM staff_property_assignments WHERE property_id = ?',
+            [lease.propertyId]
+          );
+
+          const userIdsToNotify = new Set();
+          if (ownerId) userIdsToNotify.add(ownerId);
+          assignedStaff.forEach((s) => userIdsToNotify.add(s.user_id));
+
+          for (const userId of userIdsToNotify) {
+            await notificationModel.create(
+              {
+                userId: userId,
+                message: `URGENT: Deposit Paid for Lease #${lease.id} (Unit ${lease.unitNumber}). Documents are PENDING verification. Please review and activate.`,
+                type: 'lease',
+                severity: 'urgent',
+              },
+              connection
+            );
+          }
         }
       }
+    }
 
-      await auditLogger.log(
-        {
-          userId: user?.user_id || user?.id || null,
-          actionType: 'PAYMENT_VERIFIED',
-          entityId: paymentId,
-          entityType: 'payment',
-          details: {
-            invoiceId: payment.invoiceId,
-            amount: payment.amount,
-            automated: user.role === 'system',
-          },
+    await auditLogger.log(
+      {
+        userId: user?.user_id || user?.id || null,
+        actionType: 'PAYMENT_VERIFIED',
+        entityId: paymentId,
+        entityType: 'payment',
+        details: {
+          invoiceId: payment.invoiceId,
+          amount: payment.amount,
+          automated: user.role === 'system',
         },
-        null,
-        connection
-      );
+      },
+      null,
+      connection
+    );
 
-      // Behavior Score
-      try {
-        const paymentDate = parseLocalDate(payment.paymentDate || today());
-        const dueDate = parseLocalDate(invoice.dueDate);
-        const payStr = formatToLocalDate(paymentDate);
-        const dueStr = formatToLocalDate(dueDate);
+    // Behavior Score
+    try {
+      const paymentDate = parseLocalDate(payment.paymentDate || today());
+      const dueDate = parseLocalDate(invoice.dueDate);
+      const payStr = formatToLocalDate(paymentDate);
+      const dueStr = formatToLocalDate(dueDate);
 
-        if (payStr <= dueStr) {
-          await behaviorLogModel.logPositivePayment(
-            invoice.tenantId || invoice.tenant_id,
-            5,
-            connection
-          );
-          await tenantModel.incrementBehaviorScore(
-            invoice.tenantId || invoice.tenant_id,
-            5,
-            connection
-          );
-        }
-      } catch (scoreErr) {
-        console.error('Failed to update positive score:', scoreErr);
+      if (payStr <= dueStr) {
+        await behaviorLogModel.logPositivePayment(
+          invoice.tenantId || invoice.tenant_id,
+          5,
+          connection
+        );
+        await tenantModel.incrementBehaviorScore(
+          invoice.tenantId || invoice.tenant_id,
+          5,
+          connection
+        );
       }
+    } catch (scoreErr) {
+      console.error('Failed to update positive score:', scoreErr);
     }
   }
 
@@ -1183,20 +1137,14 @@ class PaymentService {
       }
 
       // 7. Generate Receipt
-      await receiptModel.create(
-        {
-          paymentId: payId,
-          invoiceId,
-          tenantId: invoice.tenantId,
-          amount: amountToApply,
-          generatedDate: today(),
-          receiptNumber: `REC-CREDIT-${randomUUID()}`,
-        },
+      await receiptService.generateReceipt(
+        { id: payId, amount: amountToApply },
+        invoice,
         conn
       );
 
-      // 8. Post Ledger Entry (Centralized classification)
-      await this._postToLedger(
+      // 8. Post Ledger Entry (Delegated to LedgerService)
+      await ledgerService.postPayment(
         payId,
         invoice,
         amountToApply,

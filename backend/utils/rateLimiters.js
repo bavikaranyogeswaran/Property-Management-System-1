@@ -84,8 +84,9 @@ export const sensitiveActionLimiter = rateLimit({
 export const publicPortalLimiter = rateLimit({
   windowMs: 30 * 60 * 1000, // 30 minutes
   max: 20,
+  keyGenerator: (req) => req.params.token || req.ip,
   message: {
-    error: 'Public portal access threshold reached. Please try again later.',
+    error: 'Too many requests for this portal. Please try again later.',
   },
   handler: limitHandler,
   store: new RedisStore({
