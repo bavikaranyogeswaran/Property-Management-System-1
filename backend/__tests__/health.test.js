@@ -13,6 +13,7 @@ vi.mock('../config/db.js', () => ({
 // Mock Redis to avoid hangs during tests
 vi.mock('../config/redis.js', () => ({
   default: {
+    ping: vi.fn().mockResolvedValue('PONG'),
     on: vi.fn(),
     call: vi.fn().mockResolvedValue('OK'),
     get: vi.fn(),

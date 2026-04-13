@@ -186,8 +186,8 @@ app.get('/api/health', async (req, res) => {
     const healthData = {
       status: isHealthy ? 'ok' : 'degraded',
       app: 'up',
-      database: databaseOk ? 'connected' : 'error',
-      redis: redisOk ? 'connected' : 'error',
+      database: databaseOk ? 'connected' : 'disconnected',
+      redis: redisOk ? 'connected' : 'disconnected',
       environment: config.env,
       uptime: process.uptime(),
       memory: process.memoryUsage().rss,
@@ -195,11 +195,20 @@ app.get('/api/health', async (req, res) => {
     };
 
     if (!isHealthy) {
+      const dbError =
+        results[0].status === 'rejected' ? results[0].reason?.message : null;
+      const redisError =
+        results[1].status === 'rejected' ? results[1].reason?.message : null;
+
       logger.warn('[Health Check] System DEGRADED:', {
-        database: results[0].reason?.message || 'ok',
-        redis: results[1].reason?.message || 'ok',
+        database: dbError || 'ok',
+        redis: redisError || 'ok',
       });
-      return res.status(503).json(healthData);
+
+      return res.status(503).json({
+        ...healthData,
+        error: dbError || redisError || 'Unknown error',
+      });
     }
 
     res.json(healthData);
@@ -208,6 +217,8 @@ app.get('/api/health', async (req, res) => {
     res.status(503).json({
       status: 'error',
       app: 'up',
+      database: 'disconnected',
+      redis: 'disconnected',
       error: error.message,
       timestamp: new Date().toISOString(),
     });
