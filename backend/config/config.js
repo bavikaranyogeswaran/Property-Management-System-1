@@ -66,6 +66,9 @@ export const validateConfig = () => {
     if (!config.db.password) errors.push('DB_PASSWORD is missing');
     if (!config.db.name) errors.push('DB_NAME is missing');
 
+    // Redis Requirements
+    if (!process.env.REDIS_HOST) errors.push('REDIS_HOST is missing');
+
     // Cloudinary is required for image uploads in production
     if (!config.cloudinary.cloudName)
       errors.push('CLOUDINARY_CLOUD_NAME is missing');
