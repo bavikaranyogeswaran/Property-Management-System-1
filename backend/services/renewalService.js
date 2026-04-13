@@ -207,17 +207,16 @@ class RenewalService {
         );
       }
 
-      // [F2.4] Carry forward deposit status — no new deposit for renewals
-      const carriedDepositStatus = [
-        'paid',
-        'partially_refunded',
-        'refunded',
-      ].includes(lease.depositStatus)
-        ? 'paid'
-        : lease.depositStatus || 'not_applicable';
+      // [F2.4] Financial Rollover — Move existing deposit to the new lease ledger
+      const oldDepositBalance = await leaseModel.getDepositBalance(
+        request.lease_id,
+        connection
+      );
 
-      // [C2 FIX - Problem 1] Auto-activate renewal lease.
-      // Renewal tenants are already verified — no deposit or document re-check needed.
+      const targetDeposit =
+        request.proposedMonthlyRent || request.proposed_monthly_rent;
+
+      // Create the new active lease with correct financial context
       const newLeaseId = await leaseModel.create(
         {
           tenantId: lease.tenantId,
@@ -227,14 +226,38 @@ class RenewalService {
           monthlyRent:
             request.proposedMonthlyRent || request.proposed_monthly_rent,
           status: 'active',
-          depositStatus: carriedDepositStatus,
+          // Automatically determine status based on carried balance vs new target
+          depositStatus:
+            oldDepositBalance >= targetDeposit ? 'paid' : 'pending',
+          targetDeposit: targetDeposit,
           documentUrl: lease.documentUrl, // Carry forward from previous lease
           isDocumentsVerified: true,
           signedAt: getLocalTime(),
-          reservationExpiresAt: null, // Not needed for active lease
+          reservationExpiresAt: null,
         },
         connection
       );
+
+      // [F2.4] Atomic Ledger Transfer
+      if (oldDepositBalance > 0) {
+        await connection.query(
+          `INSERT INTO accounting_ledger 
+           (lease_id, account_type, category, debit, credit, description, entry_date)
+           VALUES 
+           (?, 'liability', 'deposit_held', ?, 0, ?, ?),
+           (?, 'liability', 'deposit_held', 0, ?, ?, ?)`,
+          [
+            request.lease_id,
+            oldDepositBalance,
+            `Deposit Rollover to Renewal Lease #${newLeaseId}`,
+            nextStartDateStr,
+            newLeaseId,
+            oldDepositBalance,
+            `Deposit Rollover from Previous Lease #${request.lease_id}`,
+            nextStartDateStr,
+          ]
+        );
+      }
 
       await auditLogger.log(
         {
