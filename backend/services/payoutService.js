@@ -48,6 +48,8 @@ class PayoutService {
         totalCommission,
         totalExpenses,
         netPayout,
+        deficit,
+        deficitPayoutIds,
         incomeIds,
         expenseIds,
         leaseCommissions,
@@ -69,6 +71,7 @@ class PayoutService {
           grossAmount: totalGross,
           commissionAmount: totalCommission,
           expensesAmount: totalExpenses,
+          deficitAmount: deficit,
           periodStart: startDate,
           periodEnd: endDate,
         },
@@ -81,6 +84,15 @@ class PayoutService {
         expenseIds,
         connection
       );
+
+      // [NEW] Deficit Recovery Recovery: Mark old deficits as settled by this payout
+      if (deficitPayoutIds && deficitPayoutIds.length > 0) {
+        await payoutModel.markDeficitsAsOffset(
+          payoutId,
+          deficitPayoutIds,
+          connection
+        );
+      }
 
       // [NEW] Accounting Integration: Record Management Fee Revenue in Ledger
       // We process each lease's portion of the commission to maintain ledger granularity.

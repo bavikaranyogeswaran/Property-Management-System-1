@@ -1,4 +1,5 @@
 import pool from '../config/db.js';
+import { moneyMath } from '../utils/moneyUtils.js';
 
 class PayoutModel {
   async create(data, connection) {
@@ -7,6 +8,7 @@ class PayoutModel {
       grossAmount,
       commissionAmount,
       expensesAmount,
+      deficitAmount = 0,
       periodStart,
       periodEnd,
     } = data;
@@ -21,6 +23,7 @@ class PayoutModel {
           grossAmount,
           commissionAmount,
           expensesAmount,
+          deficitAmount,
           periodStart,
           periodEnd,
         ]
@@ -135,6 +138,24 @@ class PayoutModel {
     selection = null
   ) {
     const db = connection || pool;
+    const isSelective = !!(
+      selection?.incomeIds?.length || selection?.expenseIds?.length
+    );
+    let totalExpenses = 0;
+
+    // 0. Detect and include existing deficits (ONLY if not doing a selective payout)
+    let deficitPayoutIds = [];
+    if (!isSelective) {
+      const [payoutsWithDeficit] = await db.query(
+        'SELECT payout_id, deficit_amount FROM owner_payouts WHERE owner_id = ? AND deficit_amount > 0 AND deficit_offset_payout_id IS NULL',
+        [ownerId]
+      );
+      deficitPayoutIds = payoutsWithDeficit.map((p) => p.payout_id);
+      totalExpenses = payoutsWithDeficit.reduce(
+        (sum, p) => moneyMath(sum).add(p.deficit_amount).value(),
+        0
+      );
+    }
 
     // 1. Snapshot Income IDs and Total
     let incomeQuery = `
@@ -208,19 +229,25 @@ class PayoutModel {
     const [expenseRows] = await db.query(expenseQuery, expenseParams);
 
     const expenseIds = expenseRows.map((r) => r.costId);
-    const totalExpenses = expenseRows.reduce(
+    const currentExpenses = expenseRows.reduce(
       (sum, r) => moneyMath(sum).add(r.amount).value(),
       0
     );
+
+    totalExpenses = moneyMath(totalExpenses).add(currentExpenses).value();
+
+    const rawNet = moneyMath(totalGross)
+      .sub(totalCommission)
+      .sub(totalExpenses)
+      .value();
 
     return {
       totalGross,
       totalCommission,
       totalExpenses,
-      netPayout: moneyMath(totalGross)
-        .sub(totalCommission)
-        .sub(totalExpenses)
-        .value(),
+      netPayout: Math.max(0, rawNet),
+      deficit: rawNet < 0 ? Math.abs(rawNet) : 0,
+      deficitPayoutIds,
       incomeIds,
       expenseIds,
       leaseCommissions, // New: for ledger integration
@@ -303,6 +330,15 @@ class PayoutModel {
     );
 
     return { income, expenses };
+  }
+
+  async markDeficitsAsOffset(newPayoutId, oldDeficitPayoutIds, connection) {
+    if (!oldDeficitPayoutIds || oldDeficitPayoutIds.length === 0) return;
+    const db = connection || pool;
+    await db.query(
+      'UPDATE owner_payouts SET deficit_offset_payout_id = ? WHERE payout_id IN (?)',
+      [newPayoutId, oldDeficitPayoutIds]
+    );
   }
 }
 
