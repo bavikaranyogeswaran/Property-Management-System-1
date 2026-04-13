@@ -17,6 +17,7 @@ import globalErrorHandler from './controllers/errorController.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import db from './config/db.js';
+import redis from './config/redis.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -165,25 +166,48 @@ import guestPaymentRoutes from './routes/guestPaymentRoutes.js';
 app.use('/api/lead-portal', publicPortalLimiter, leadPortalRoutes);
 
 app.get('/api/health', async (req, res) => {
-  try {
-    // 1. Verify Database Connectivity
-    await db.query('SELECT 1');
+  const timeout = (ms) =>
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Timeout')), ms)
+    );
 
-    res.json({
-      status: 'ok',
+  try {
+    // Perform parallel checks for core dependencies
+    const results = await Promise.allSettled([
+      db.query('SELECT 1'),
+      Promise.race([redis.ping(), timeout(2000)]),
+    ]);
+
+    const databaseOk = results[0].status === 'fulfilled';
+    const redisOk = results[1].status === 'fulfilled';
+
+    const isHealthy = databaseOk && redisOk;
+
+    const healthData = {
+      status: isHealthy ? 'ok' : 'degraded',
       app: 'up',
-      database: 'connected',
+      database: databaseOk ? 'connected' : 'error',
+      redis: redisOk ? 'connected' : 'error',
       environment: config.env,
       uptime: process.uptime(),
       memory: process.memoryUsage().rss,
       timestamp: new Date().toISOString(),
-    });
+    };
+
+    if (!isHealthy) {
+      logger.warn('[Health Check] System DEGRADED:', {
+        database: results[0].reason?.message || 'ok',
+        redis: results[1].reason?.message || 'ok',
+      });
+      return res.status(503).json(healthData);
+    }
+
+    res.json(healthData);
   } catch (error) {
-    logger.error('[Health Check] System health check failed:', error.message);
+    logger.error('[Health Check] UNEXPECTED FAILURE:', error.message);
     res.status(503).json({
       status: 'error',
       app: 'up',
-      database: 'disconnected',
       error: error.message,
       timestamp: new Date().toISOString(),
     });
