@@ -8,6 +8,7 @@ import paymentService from './paymentService.js';
 import { toCents, fromCents } from '../utils/moneyUtils.js';
 import pool from '../config/db.js';
 import dotenv from 'dotenv';
+import paymentModel from '../models/paymentModel.js';
 
 dotenv.config();
 
@@ -33,6 +34,16 @@ class PayHereService {
     }
     if (!invoice) throw new Error('Invoice not found');
     if (invoice.status === 'paid') throw new Error('Invoice is already paid');
+
+    // [SCENARIO C FIX] Check for existing manual/pending payments to prevent duplicates
+    const existingPayments = await paymentModel.findByInvoiceId(
+      invoice.id || invoice.invoice_id
+    );
+    if (existingPayments.some((p) => p.status === 'pending')) {
+      throw new Error(
+        'A payment for this invoice is already awaiting verification. Please wait for staff approval or contact support.'
+      );
+    }
 
     const tenant = await userModel.findById(
       invoice.tenantId || invoice.tenant_id
