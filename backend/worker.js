@@ -14,6 +14,9 @@ import { registerRepeatableJobs } from './utils/cronJobs.js';
 import { jobProcessor } from './queues/taskProcessor.js';
 import { config, validateConfig } from './config/config.js';
 import logger from './utils/logger.js';
+import auditLogger from './utils/auditLogger.js';
+import notificationModel from './models/notificationModel.js';
+import userModel from './models/userModel.js';
 
 // Validate Configuration on Startup (Fail Fast)
 validateConfig();
@@ -33,8 +36,61 @@ const initWorker = async () => {
       concurrency: 1, // High-integrity tasks should run sequentially per worker
     });
 
-    worker.on('failed', (job, err) => {
-      logger.error(`[Queue] FATAL Job ${job.id} failed:`, err);
+    worker.on('failed', async (job, err) => {
+      logger.error(
+        `[Queue] FATAL Job ${job.id} failed after ${job.attemptsMade} attempts:`,
+        err
+      );
+
+      try {
+        const { name, data, id } = job;
+        const details = {
+          jobName: name,
+          jobId: id,
+          attempts: job.attemptsMade,
+          errorMessage: err.message,
+          data: data, // Useful for identifying the specific record (e.g., invoiceId)
+        };
+
+        // 1. Log a persistent Audit Entry for System Failure
+        await auditLogger.log({
+          userId: null, // System action
+          actionType: 'BACKGROUND_TASK_FAILURE',
+          entityId: data.invoiceId || data.leaseId || null,
+          entityType: data.invoiceId
+            ? 'invoice'
+            : data.leaseId
+              ? 'lease'
+              : 'system',
+          details,
+        });
+
+        // 2. Notify Assigned Staff (Treasurers & Owners)
+        // We broadcast to all staff as background failures often indicate infra issues (SMTP, etc.)
+        const treasurers = await userModel.findByRole('treasurer');
+        const owners = await userModel.findByRole('owner');
+        const staffToNotify = [...treasurers, ...owners];
+
+        for (const staff of staffToNotify) {
+          await notificationModel.create({
+            userId: staff.id,
+            message: `URGENT: Background task [${name}] failed after ${job.attemptsMade} retries. Reason: ${err.message}`,
+            type: 'system',
+            severity: 'error',
+            entityType: 'system',
+            entityId: id,
+          });
+        }
+
+        logger.info(
+          `[Worker] Staff notification dispatched for failed job ${id}`
+        );
+      } catch (alertErr) {
+        logger.error(
+          '[Worker] Failed to dispatch staff alert for background failure:',
+          alertErr
+        );
+      }
     });
 
     logger.info('[Worker] BullMQ Processor is active and listening.');
