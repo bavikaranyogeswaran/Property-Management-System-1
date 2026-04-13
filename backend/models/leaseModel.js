@@ -124,28 +124,34 @@ class LeaseModel {
     return result.affectedRows > 0;
   }
 
+  /**
+   * [BASE QUERY] Centralized definition of what a "Rich Lease Object" looks like.
+   * Includes Unit details, Property details, Tenant name, and Real-time Deposit Balance.
+   */
+  _getBaseQuery() {
+    return `
+      SELECT l.*, 
+             u.unit_number,
+             u.property_id,
+             p.name as property_name,
+             t_usr.name as tenant_name,
+             COALESCE(dep_bal.deposit_balance, 0) AS real_deposit_balance
+      FROM leases l
+      JOIN units u ON l.unit_id = u.unit_id
+      JOIN properties p ON u.property_id = p.property_id
+      JOIN users t_usr ON l.tenant_id = t_usr.user_id
+      LEFT JOIN (
+        SELECT lease_id,
+               COALESCE(SUM(credit), 0) - COALESCE(SUM(debit), 0) AS deposit_balance
+        FROM accounting_ledger
+        WHERE category IN ('deposit_held', 'deposit_withheld', 'deposit_refund')
+        GROUP BY lease_id
+      ) dep_bal ON dep_bal.lease_id = l.lease_id
+    `;
+  }
+
   async findAll(ownerId = null, treasurerId = null) {
-    // [H7 FIX] Replaced correlated subquery with a single derived-table LEFT JOIN.
-    // This aggregates the full accounting_ledger once instead of once-per-lease-row.
-    let query = `
-             SELECT l.*, 
-                    u.unit_number,
-                    u.property_id,
-                    p.name as property_name,
-                    t_usr.name as tenant_name,
-                    COALESCE(dep_bal.deposit_balance, 0) AS real_deposit_balance
-             FROM leases l
-             JOIN units u ON l.unit_id = u.unit_id
-             JOIN properties p ON u.property_id = p.property_id
-             JOIN users t_usr ON l.tenant_id = t_usr.user_id
-             LEFT JOIN (
-               SELECT lease_id,
-                      COALESCE(SUM(credit), 0) - COALESCE(SUM(debit), 0) AS deposit_balance
-               FROM accounting_ledger
-               WHERE category IN ('deposit_held', 'deposit_withheld', 'deposit_refund')
-               GROUP BY lease_id
-             ) dep_bal ON dep_bal.lease_id = l.lease_id
-             LEFT JOIN rent_invoices ri ON l.lease_id = ri.lease_id AND ri.invoice_type = 'deposit'`;
+    let query = `${this._getBaseQuery()} WHERE 1=1 `;
     const params = [];
 
     if (ownerId) {
@@ -169,28 +175,11 @@ class LeaseModel {
 
   async findById(id, connection = null) {
     const dbConn = connection || db;
-    // [H7 FIX] Derived-table JOIN replaces correlated subquery.
     const [rows] = await dbConn.query(
       `
-            SELECT l.*, 
-                   u.unit_number,
-                   u.property_id,
-                   p.name as property_name,
-                   t_usr.name as tenant_name,
-                   COALESCE(dep_bal.deposit_balance, 0) AS real_deposit_balance
-            FROM leases l
-            JOIN units u ON l.unit_id = u.unit_id
-            JOIN properties p ON u.property_id = p.property_id
-            JOIN users t_usr ON l.tenant_id = t_usr.user_id
-            LEFT JOIN (
-              SELECT lease_id,
-                     COALESCE(SUM(credit), 0) - COALESCE(SUM(debit), 0) AS deposit_balance
-              FROM accounting_ledger
-              WHERE category IN ('deposit_held', 'deposit_withheld', 'deposit_refund')
-              GROUP BY lease_id
-            ) dep_bal ON dep_bal.lease_id = l.lease_id
-            WHERE l.lease_id = ?
-        `,
+      ${this._getBaseQuery()}
+      WHERE l.lease_id = ?
+    `,
       [id]
     );
     if (rows.length === 0) return null;
@@ -207,7 +196,11 @@ class LeaseModel {
         'findByIdForUpdate requires an active transaction connection.'
       );
     const [rows] = await connection.query(
-      'SELECT * FROM leases WHERE lease_id = ? FOR UPDATE',
+      `
+      ${this._getBaseQuery()}
+      WHERE l.lease_id = ?
+      FOR UPDATE
+    `,
       [id]
     );
     if (rows.length === 0) return null;
@@ -215,28 +208,11 @@ class LeaseModel {
   }
 
   async findByTenantId(tenantId) {
-    // [H7 FIX] Derived-table JOIN replaces correlated subquery.
     const [rows] = await db.query(
       `
-            SELECT l.*, 
-                   u.unit_number,
-                   u.property_id,
-                   p.name as property_name,
-                   t_usr.name as tenant_name,
-                   COALESCE(dep_bal.deposit_balance, 0) AS real_deposit_balance
-            FROM leases l
-            JOIN units u ON l.unit_id = u.unit_id
-            JOIN properties p ON u.property_id = p.property_id
-            JOIN users t_usr ON l.tenant_id = t_usr.user_id
-            LEFT JOIN (
-              SELECT lease_id,
-                     COALESCE(SUM(credit), 0) - COALESCE(SUM(debit), 0) AS deposit_balance
-              FROM accounting_ledger
-              WHERE category IN ('deposit_held', 'deposit_withheld', 'deposit_refund')
-              GROUP BY lease_id
-            ) dep_bal ON dep_bal.lease_id = l.lease_id
-            WHERE l.tenant_id = ?
-        `,
+      ${this._getBaseQuery()}
+      WHERE l.tenant_id = ?
+    `,
       [tenantId]
     );
     return this.mapRows(rows);
@@ -246,53 +222,20 @@ class LeaseModel {
     const dbConn = connection || db;
     const [rows] = await dbConn.query(
       `
-            SELECT l.*, 
-                   u.unit_number,
-                   u.property_id,
-                   p.name as property_name,
-                   t_usr.name as tenant_name,
-                   COALESCE(dep_bal.deposit_balance, 0) AS real_deposit_balance
-            FROM leases l
-            JOIN units u ON l.unit_id = u.unit_id
-            JOIN properties p ON u.property_id = p.property_id
-            JOIN users t_usr ON l.tenant_id = t_usr.user_id
-            LEFT JOIN (
-              SELECT lease_id,
-                     COALESCE(SUM(credit), 0) - COALESCE(SUM(debit), 0) AS deposit_balance
-              FROM accounting_ledger
-              WHERE category IN ('deposit_held', 'deposit_withheld', 'deposit_refund')
-              GROUP BY lease_id
-            ) dep_bal ON dep_bal.lease_id = l.lease_id
-            WHERE l.unit_id = ?
-            ORDER BY l.start_date DESC
-        `,
+      ${this._getBaseQuery()}
+      WHERE l.unit_id = ?
+      ORDER BY l.start_date DESC
+    `,
       [unitId]
     );
     return this.mapRows(rows);
   }
 
   async findActive() {
-    // [H7 FIX] Derived-table JOIN replaces correlated subquery.
     const [rows] = await db.query(`
-            SELECT l.*, 
-                   u.unit_number,
-                   u.property_id,
-                   p.name as property_name,
-                   t_usr.name as tenant_name,
-                   COALESCE(dep_bal.deposit_balance, 0) AS real_deposit_balance
-            FROM leases l
-            JOIN units u ON l.unit_id = u.unit_id
-            JOIN properties p ON u.property_id = p.property_id
-            JOIN users t_usr ON l.tenant_id = t_usr.user_id
-            LEFT JOIN (
-              SELECT lease_id,
-                     COALESCE(SUM(credit), 0) - COALESCE(SUM(debit), 0) AS deposit_balance
-              FROM accounting_ledger
-              WHERE category IN ('deposit_held', 'deposit_withheld', 'deposit_refund')
-              GROUP BY lease_id
-            ) dep_bal ON dep_bal.lease_id = l.lease_id
-            WHERE l.status = 'active'
-        `);
+      ${this._getBaseQuery()}
+      WHERE l.status = 'active'
+    `);
     return this.mapRows(rows);
   }
 

@@ -40,32 +40,25 @@ class PaymentService {
       await connection.beginTransaction();
 
       // Integrity Check: Is invoice already paid?
-      const [invoices] = await connection.query(
-        'SELECT * FROM rent_invoices WHERE invoice_id = ?',
-        [invoiceId]
-      );
-      const invoice = invoices[0];
+      const invoice = await invoiceModel.findById(invoiceId, connection);
 
       if (!invoice) throw new Error('Invoice not found');
-      if (String(invoice.lease_id) && invoice.status === 'paid') {
+      if (invoice.leaseId && invoice.status === 'paid') {
         throw new Error('This invoice has already been paid.');
       }
 
       // Authorization
-      const [leases] = await connection.query(
-        'SELECT tenant_id FROM leases WHERE lease_id = ?',
-        [invoice.lease_id]
-      );
-      if (!leases[0] || String(leases[0].tenant_id) !== String(tenantId)) {
+      const lease = await leaseModel.findById(invoice.leaseId, connection);
+      if (!lease || String(lease.tenantId) !== String(tenantId)) {
         throw new Error('Access denied. This invoice does not belong to you.');
       }
 
       // Concurrency Control: One pending payment at a time
-      const [pendingPayments] = await connection.query(
-        "SELECT payment_id FROM payments WHERE invoice_id = ? AND status = 'pending'",
-        [invoiceId]
+      const pendingPayments = await paymentModel.findByInvoiceId(
+        invoiceId,
+        connection
       );
-      if (pendingPayments.length > 0) {
+      if (pendingPayments.some((p) => p.status === 'pending')) {
         throw new Error(
           'You already have a pending payment for this invoice. Please wait for verification.'
         );
@@ -85,20 +78,20 @@ class PaymentService {
       );
 
       // Notify Treasurers
-      const [treasurers] = await connection.query(
-        "SELECT user_id FROM users WHERE role = 'treasurer' AND status = 'active'"
-      );
+      const treasurers = await userModel.findByRole('treasurer', connection);
       for (const t of treasurers) {
-        await notificationModel.create(
-          {
-            userId: t.user_id,
-            message: `New Payment submitted for Invoice #${invoiceId} (Amount: ${fromCents(centsAmount).toFixed(2)}).`,
-            type: 'payment',
-            entityType: 'payment',
-            entityId: paymentId,
-          },
-          connection
-        );
+        if (t.status === 'active') {
+          await notificationModel.create(
+            {
+              userId: t.id,
+              message: `New Payment submitted for Invoice #${invoiceId} (Amount: ${fromCents(centsAmount).toFixed(2)}).`,
+              type: 'payment',
+              entityType: 'payment',
+              entityId: paymentId,
+            },
+            connection
+          );
+        }
       }
 
       await connection.commit();
@@ -226,11 +219,11 @@ class PaymentService {
       }
 
       // 2. Concurrency Control: One pending payment at a time (for this specific invoice)
-      const [pendingPayments] = await connection.query(
-        "SELECT payment_id FROM payments WHERE invoice_id = ? AND status = 'pending'",
-        [invoiceId]
+      const invoicePending = await paymentModel.findByInvoiceId(
+        invoiceId,
+        connection
       );
-      if (pendingPayments.length > 0) {
+      if (invoicePending.some((p) => p.status === 'pending')) {
         throw new Error(
           'You already have a pending payment for this invoice. Please wait for verification.'
         );
@@ -253,20 +246,23 @@ class PaymentService {
       // await invoiceModel.clearMagicToken(invoiceId, connection);
 
       // 3. Notify Treasurers
-      const [treasurers] = await connection.query(
-        "SELECT user_id FROM users WHERE role = 'treasurer' AND status = 'active'"
+      const guestTreasurers = await userModel.findByRole(
+        'treasurer',
+        connection
       );
-      for (const t of treasurers) {
-        await notificationModel.create(
-          {
-            userId: t.user_id,
-            message: `GUEST PAYMENT: New Deposit submitted via Magic Link for Unit ${invoice.unitNumber} (Amount: ${fromCents(amount).toFixed(2)}).`,
-            type: 'payment',
-            entityType: 'payment',
-            entityId: paymentId,
-          },
-          connection
-        );
+      for (const t of guestTreasurers) {
+        if (t.status === 'active') {
+          await notificationModel.create(
+            {
+              userId: t.id,
+              message: `GUEST PAYMENT: New Deposit submitted via Magic Link for Unit ${invoice.unitNumber} (Amount: ${fromCents(amount).toFixed(2)}).`,
+              type: 'payment',
+              entityType: 'payment',
+              entityId: paymentId,
+            },
+            connection
+          );
+        }
       }
 
       await connection.commit();
@@ -434,21 +430,21 @@ class PaymentService {
 
       // [NEW] Notify Treasurer of gateway underpayment
       if (isUnderpayment) {
-        const [treasurers] = await conn.query(
-          "SELECT user_id FROM users WHERE role = 'treasurer' AND status = 'active'"
-        );
+        const treasurers = await userModel.findByRole('treasurer', conn);
         for (const t of treasurers) {
-          await notificationModel.create(
-            {
-              userId: t.user_id,
-              message: `Gateway Underpayment Alert: Invoice #${invoiceId} received ${fromCents(Number(amount)).toFixed(2)} but expected ${fromCents(expectedCents).toFixed(2)}. Shortfall: ${fromCents(expectedCents - Number(amount)).toFixed(2)}. Please follow up with tenant.`,
-              type: 'payment',
-              severity: 'urgent',
-              entityType: 'payment',
-              entityId: paymentId,
-            },
-            conn
-          );
+          if (t.status === 'active') {
+            await notificationModel.create(
+              {
+                userId: t.id,
+                message: `Gateway Underpayment Alert: Invoice #${invoiceId} received ${fromCents(Number(amount)).toFixed(2)} but expected ${fromCents(expectedCents).toFixed(2)}. Shortfall: ${fromCents(expectedCents - Number(amount)).toFixed(2)}. Please follow up with tenant.`,
+                type: 'payment',
+                severity: 'urgent',
+                entityType: 'payment',
+                entityId: paymentId,
+              },
+              conn
+            );
+          }
         }
       }
 
@@ -623,21 +619,18 @@ class PaymentService {
 
             // [FIX A] Release unit only if no verified funds remain for this deposit
             if (totalVerified === 0) {
-              const [otherClaims] = await conn.query(
-                `SELECT lease_id FROM leases 
-                 WHERE unit_id = ? AND lease_id != ? 
-                 AND status IN ('active', 'draft', 'pending')`,
-                [lease.unitId || lease.unit_id, invoice.lease_id]
+              const activeCount = await leaseModel.countActiveByUnitId(
+                unit.id,
+                conn
               );
-              if (otherClaims.length === 0) {
-                await conn.query(
-                  `UPDATE units SET status = 'available' WHERE unit_id = ? AND status = 'reserved'`,
-                  [lease.unitId || lease.unit_id]
-                );
+              if (activeCount === 0) {
+                await unitModel.update(unit.id, { status: 'available' }, conn);
+
                 // Collapse the expiry window to allow cron cleanup
-                await conn.query(
-                  `UPDATE leases SET reservation_expires_at = NOW() WHERE lease_id = ?`,
-                  [invoice.lease_id]
+                await leaseModel.update(
+                  invoice.leaseId,
+                  { reservationExpiresAt: { sql: 'NOW()' } },
+                  conn
                 );
               }
             }

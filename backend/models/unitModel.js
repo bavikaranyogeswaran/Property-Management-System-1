@@ -34,26 +34,38 @@ class UnitModel {
     return result.insertId;
   }
 
+  /**
+   * [BASE QUERY] Centralized definition of what a "Rich Unit Object" looks like.
+   * Includes Property details, Unit Type, primary image resolution, and lease occupancy counts.
+   */
+  _getBaseQuery() {
+    return `
+      SELECT u.*, 
+             p.name as property_name, 
+             p.status as property_status,
+             p.is_archived as property_archived,
+             ut.name as type_name,
+             COALESCE(
+               (SELECT ui.image_url FROM unit_images ui WHERE ui.unit_id = u.unit_id AND ui.is_primary = TRUE LIMIT 1),
+               u.image_url
+             ) AS resolved_image_url,
+             COUNT(DISTINCT CASE WHEN l.status = 'active' AND l.start_date <= CURRENT_DATE() AND (l.end_date IS NULL OR l.end_date >= CURRENT_DATE()) THEN l.lease_id END) as active_lease_count,
+             COUNT(DISTINCT CASE WHEN l.status IN ('active', 'pending') AND l.start_date > CURRENT_DATE() THEN l.lease_id END) as future_lease_count,
+             COUNT(DISTINCT CASE WHEN l.status IN ('draft', 'pending') AND (l.reservation_expires_at IS NULL OR l.reservation_expires_at >= CURRENT_DATE()) THEN l.lease_id END) as pending_application_count
+      FROM units u
+      JOIN properties p ON u.property_id = p.property_id
+      JOIN unit_types ut ON u.unit_type_id = ut.type_id
+      LEFT JOIN leases l ON u.unit_id = l.unit_id
+    `;
+  }
+
   async findAll() {
     const [rows] = await db.query(`
-            SELECT u.*, 
-                   p.name as property_name, 
-                   ut.name as type_name,
-                   COALESCE(
-                     (SELECT ui.image_url FROM unit_images ui WHERE ui.unit_id = u.unit_id AND ui.is_primary = TRUE LIMIT 1),
-                     u.image_url
-                   ) AS resolved_image_url,
-                   COUNT(DISTINCT CASE WHEN l.status = 'active' AND l.start_date <= CURRENT_DATE() AND (l.end_date IS NULL OR l.end_date >= CURRENT_DATE()) THEN l.lease_id END) as active_lease_count,
-                   COUNT(DISTINCT CASE WHEN l.status IN ('active', 'pending') AND l.start_date > CURRENT_DATE() THEN l.lease_id END) as future_lease_count,
-                   COUNT(DISTINCT CASE WHEN l.status IN ('draft', 'pending') AND (l.reservation_expires_at IS NULL OR l.reservation_expires_at >= CURRENT_DATE()) THEN l.lease_id END) as pending_application_count
-            FROM units u
-            JOIN properties p ON u.property_id = p.property_id
-            JOIN unit_types ut ON u.unit_type_id = ut.type_id
-            LEFT JOIN leases l ON u.unit_id = l.unit_id
-            WHERE u.is_archived = FALSE
-            GROUP BY u.unit_id
-            ORDER BY u.created_at DESC
-        `);
+      ${this._getBaseQuery()}
+      WHERE u.is_archived = FALSE
+      GROUP BY u.unit_id
+      ORDER BY u.created_at DESC
+    `);
     return this.mapRows(rows);
   }
 
@@ -61,23 +73,10 @@ class UnitModel {
     const dbConn = connection || db;
     const [rows] = await dbConn.query(
       `
-            SELECT u.*, 
-                   p.name as property_name, 
-                   ut.name as type_name,
-                   COALESCE(
-                     (SELECT ui.image_url FROM unit_images ui WHERE ui.unit_id = u.unit_id AND ui.is_primary = TRUE LIMIT 1),
-                     u.image_url
-                   ) AS resolved_image_url,
-                   COUNT(DISTINCT CASE WHEN l.status = 'active' AND l.start_date <= CURRENT_DATE() AND (l.end_date IS NULL OR l.end_date >= CURRENT_DATE()) THEN l.lease_id END) as active_lease_count,
-                   COUNT(DISTINCT CASE WHEN l.status IN ('active', 'pending') AND l.start_date > CURRENT_DATE() THEN l.lease_id END) as future_lease_count,
-                   COUNT(DISTINCT CASE WHEN l.status IN ('draft', 'pending') AND (l.reservation_expires_at IS NULL OR l.reservation_expires_at >= CURRENT_DATE()) THEN l.lease_id END) as pending_application_count
-            FROM units u
-            JOIN properties p ON u.property_id = p.property_id
-            JOIN unit_types ut ON u.unit_type_id = ut.type_id
-            LEFT JOIN leases l ON u.unit_id = l.unit_id
-            WHERE u.unit_id = ? AND u.is_archived = FALSE
-            GROUP BY u.unit_id
-        `,
+      ${this._getBaseQuery()}
+      WHERE u.unit_id = ? AND u.is_archived = FALSE
+      GROUP BY u.unit_id
+    `,
       [id]
     );
     if (rows.length === 0) return null;
@@ -85,29 +84,13 @@ class UnitModel {
   }
 
   async findByIdForUpdate(id, connection) {
-    // Must use the transaction connection
     const [rows] = await connection.query(
       `
-            SELECT u.*, 
-                   p.name as property_name, 
-                   p.status as property_status,
-                   p.is_archived as property_archived,
-                   ut.name as type_name,
-                   COALESCE(
-                     (SELECT ui.image_url FROM unit_images ui WHERE ui.unit_id = u.unit_id AND ui.is_primary = TRUE LIMIT 1),
-                     u.image_url
-                   ) AS resolved_image_url,
-                   COUNT(DISTINCT CASE WHEN l.status = 'active' AND l.start_date <= CURRENT_DATE() AND (l.end_date IS NULL OR l.end_date >= CURRENT_DATE()) THEN l.lease_id END) as active_lease_count,
-                   COUNT(DISTINCT CASE WHEN l.status IN ('active', 'pending') AND l.start_date > CURRENT_DATE() THEN l.lease_id END) as future_lease_count,
-                   COUNT(DISTINCT CASE WHEN l.status IN ('draft', 'pending') AND (l.reservation_expires_at IS NULL OR l.reservation_expires_at >= CURRENT_DATE()) THEN l.lease_id END) as pending_application_count
-            FROM units u
-            JOIN properties p ON u.property_id = p.property_id
-            JOIN unit_types ut ON u.unit_type_id = ut.type_id
-            LEFT JOIN leases l ON u.unit_id = l.unit_id
-            WHERE u.unit_id = ? AND u.is_archived = FALSE
-            GROUP BY u.unit_id
-            FOR UPDATE
-        `,
+      ${this._getBaseQuery()}
+      WHERE u.unit_id = ? AND u.is_archived = FALSE
+      GROUP BY u.unit_id
+      FOR UPDATE
+    `,
       [id]
     );
     if (rows.length === 0) return null;
@@ -117,24 +100,11 @@ class UnitModel {
   async findByPropertyId(propertyId) {
     const [rows] = await db.query(
       `
-            SELECT u.*, 
-                   p.name as property_name, 
-                   ut.name as type_name,
-                   COALESCE(
-                     (SELECT ui.image_url FROM unit_images ui WHERE ui.unit_id = u.unit_id AND ui.is_primary = TRUE LIMIT 1),
-                     u.image_url
-                   ) AS resolved_image_url,
-                   COUNT(DISTINCT CASE WHEN l.status = 'active' AND l.start_date <= CURRENT_DATE() AND (l.end_date IS NULL OR l.end_date >= CURRENT_DATE()) THEN l.lease_id END) as active_lease_count,
-                   COUNT(DISTINCT CASE WHEN l.status IN ('active', 'pending') AND l.start_date > CURRENT_DATE() THEN l.lease_id END) as future_lease_count,
-                   COUNT(DISTINCT CASE WHEN l.status IN ('draft', 'pending') AND (l.reservation_expires_at IS NULL OR l.reservation_expires_at >= CURRENT_DATE()) THEN l.lease_id END) as pending_application_count
-            FROM units u
-            JOIN properties p ON u.property_id = p.property_id
-            JOIN unit_types ut ON u.unit_type_id = ut.type_id
-            LEFT JOIN leases l ON u.unit_id = l.unit_id
-            WHERE u.property_id = ? AND u.is_archived = FALSE
-            GROUP BY u.unit_id
-            ORDER BY u.unit_number ASC
-        `,
+      ${this._getBaseQuery()}
+      WHERE u.property_id = ? AND u.is_archived = FALSE
+      GROUP BY u.unit_id
+      ORDER BY u.unit_number ASC
+    `,
       [propertyId]
     );
     return this.mapRows(rows);
