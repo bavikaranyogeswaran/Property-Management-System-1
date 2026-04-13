@@ -33,4 +33,38 @@ redis.on('error', (err) => {
   logger.error('[Redis] Connection error:', err);
 });
 
+/**
+ * [HARDENED] Distributed Locking Utilities
+ */
+
+/**
+ * Attempt to acquire a distributed lock.
+ * @param {string} key - The lock identifier
+ * @param {number} ttlMs - Time-to-live in milliseconds
+ * @returns {Promise<string|null>} - A unique token if acquired, null otherwise
+ */
+redis.acquireLock = async (key, ttlMs = 30000) => {
+  const token = randomUUID();
+  // NX: Only set if not exists, PX: Set expiry in ms
+  const result = await redis.set(key, token, 'NX', 'PX', ttlMs);
+  return result === 'OK' ? token : null;
+};
+
+/**
+ * Release a distributed lock safely.
+ * @param {string} key - The lock identifier
+ * @param {string} token - The unique token returned by acquireLock
+ */
+redis.releaseLock = async (key, token) => {
+  const luaScript = `
+    if redis.call("get", KEYS[1]) == ARGV[1] then
+      return redis.call("del", KEYS[1])
+    else
+      return 0
+    end
+  `;
+  await redis.eval(luaScript, 1, key, token);
+};
+
+import { randomUUID } from 'crypto';
 export default redis;

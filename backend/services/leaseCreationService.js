@@ -25,6 +25,7 @@ import emailService from '../utils/emailService.js';
 import billingEngine from '../utils/billingEngine.js';
 import userService from './userService.js';
 import AppError from '../utils/AppError.js';
+import redis from '../config/redis.js';
 
 class LeaseCreationService {
   constructor(facade) {
@@ -219,6 +220,15 @@ class LeaseCreationService {
   }
 
   async verifyLeaseDocuments(leaseId, user) {
+    const lockKey = `dist_lock:lease_activation:${leaseId}`;
+    const lockToken = await redis.acquireLock(lockKey, 30000);
+    if (!lockToken) {
+      throw new AppError(
+        'This lease is currently being processed. Please try again in 30 seconds.',
+        409
+      );
+    }
+
     const connection = await pool.getConnection();
     try {
       await connection.beginTransaction();
@@ -244,10 +254,6 @@ class LeaseCreationService {
 
       // [IDEMPOTENCY GUARD] Exit early if already verified to prevent redundant side effects
       if (lease.verificationStatus === 'verified') {
-        const depositStats = await leaseModel.getDepositStatus(
-          leaseId,
-          connection
-        );
         return {
           isDocumentsVerified: true,
           activated: lease.status === 'active',
@@ -290,7 +296,7 @@ class LeaseCreationService {
       );
       let activated = false;
       if (depositStats && depositStats.isFullyPaid) {
-        await this.facade.signLease(leaseId, user, connection);
+        await this.signLease(leaseId, user, connection);
         activated = true;
       }
 
@@ -316,6 +322,7 @@ class LeaseCreationService {
       throw error;
     } finally {
       connection.release();
+      await redis.releaseLock(lockKey, lockToken);
     }
   }
 
@@ -385,8 +392,22 @@ class LeaseCreationService {
   }
 
   async signLease(leaseId, user, connection = null) {
-    const conn = connection || (await pool.getConnection());
+    const lockKey = `dist_lock:lease_activation:${leaseId}`;
     const isOwnTransaction = !connection;
+    let lockToken = null;
+
+    // Only acquire distributed lock if this is the entry point (own transaction)
+    if (isOwnTransaction) {
+      lockToken = await redis.acquireLock(lockKey, 30000);
+      if (!lockToken) {
+        throw new AppError(
+          'Activation in progress. Please try again in 30 seconds.',
+          409
+        );
+      }
+    }
+
+    const conn = connection || (await pool.getConnection());
 
     try {
       if (isOwnTransaction) {
@@ -641,6 +662,7 @@ class LeaseCreationService {
     } finally {
       if (isOwnTransaction) {
         conn.release();
+        await redis.releaseLock(lockKey, lockToken);
       }
     }
   }
