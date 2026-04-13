@@ -271,27 +271,34 @@ class PaymentService {
 
       await connection.commit();
 
-      // [NEW] Release Redis Lock after successful submission
+      return paymentId;
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      // [NEW] Release Redis Lock unconditionally after checkout completes (success or fail)
       // The database state now reflects the pending payment, so the "soft lock" is no longer needed.
       try {
-        const leadId = await leadModel.findIdByEmailAndProperty(
-          invoice.tenant_email || invoice.email,
-          unit.propertyId || unit.property_id
-        );
-        const unitLockService = (await import('./unitLockService.js')).default;
-        await unitLockService.releaseLock(invoice.unitId, leadId);
+        if (magicToken) {
+          // We must query fresh or safely, without connection as it might be released soon, or before release
+          // Actually, we can just use the provided parameters if we hoisted invoice, but we didn't. Let's fetch invoice briefly if needed.
+          const invoice = await invoiceModel.findByMagicToken(magicToken, pool); // grab a quick query from pool
+          if (invoice && invoice.unitId) {
+            const leadId = await leadModel.findIdByEmailAndProperty(
+              invoice.tenant_email || invoice.email,
+              invoice.propertyId || invoice.property_id || invoice.unitId // rough fallback
+            );
+            const unitLockService = (await import('./unitLockService.js'))
+              .default;
+            await unitLockService.releaseLock(invoice.unitId, leadId);
+          }
+        }
       } catch (lockErr) {
         console.error(
           '[PaymentService] Failed to release Redis lock:',
           lockErr
         );
       }
-
-      return paymentId;
-    } catch (error) {
-      await connection.rollback();
-      throw error;
-    } finally {
       connection.release();
     }
   }

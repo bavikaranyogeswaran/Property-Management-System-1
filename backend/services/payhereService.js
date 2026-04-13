@@ -135,7 +135,7 @@ class PayHereService {
         amount: receivedCents,
         paymentMethod: 'payhere',
         referenceNumber: payment_id,
-        guaranteeFullSettlement: true,
+        guaranteeFullSettlement: false, // Allows the minor 1-cent variance enforced above
       });
 
       return { success: true, message: 'Payment recorded' };
