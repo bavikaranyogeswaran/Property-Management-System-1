@@ -3,7 +3,7 @@ export const up = async (knex) => {
   if (await knex.schema.hasTable('owner_payouts')) {
     await knex.schema.alterTable('owner_payouts', (table) => {
       table.bigInteger('deficit_amount').defaultTo(0).notNullable();
-      table.integer('deficit_offset_payout_id').unsigned().nullable();
+      table.integer('deficit_offset_payout_id').nullable();
       table
         .foreign('deficit_offset_payout_id')
         .references('owner_payouts.payout_id')

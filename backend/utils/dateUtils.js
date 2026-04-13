@@ -39,12 +39,9 @@ export const formatToLocalDate = (date, timezone = DEFAULT_TIMEZONE) => {
   return new Intl.DateTimeFormat('en-CA', options).format(new Date(date));
 };
 
-/**
- * Get the current local time as a Date object in the target timezone.
- * Useful for day/month/year extractions.
- */
 export const getLocalTime = (timezone = DEFAULT_TIMEZONE) => {
-  return new Date(new Date().toLocaleString('en-US', { timeZone: timezone }));
+  // Since process.env.TZ is set globally, new Date() is natively in the target timezone.
+  return new Date();
 };
 
 /**
@@ -82,17 +79,11 @@ export const parseLocalDate = (dateStr, timezone = DEFAULT_TIMEZONE) => {
     return null;
   }
 
-  // If it's YYYY-MM-DD, append time to ensure local interpretation
+  // If it's YYYY-MM-DD, append time to ensure local interpretation (midnight)
   if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-    return new Date(
-      new Date(`${dateStr}T00:00:00`).toLocaleString('en-US', {
-        timeZone: timezone,
-      })
-    );
+    return new Date(`${dateStr}T00:00:00`);
   }
-  return new Date(
-    new Date(dateStr).toLocaleString('en-US', { timeZone: timezone })
-  );
+  return new Date(dateStr);
 };
 
 /**

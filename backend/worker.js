@@ -1,3 +1,4 @@
+process.env.TZ = 'Asia/Colombo';
 /**
  * ============================================================================
  *  BACKGROUND WORKER ENTRY POINT

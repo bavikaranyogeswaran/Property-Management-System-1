@@ -20,6 +20,11 @@ export default {
       extension: 'js',
       loadExtensions: ['.js', '.mjs'],
     },
+    pool: {
+      afterCreate: (conn, cb) => {
+        conn.query("SET time_zone = '+05:30'", (err) => cb(err, conn));
+      },
+    },
     useNullAsDefault: true,
   },
   test: {
@@ -38,6 +43,11 @@ export default {
       extension: 'js',
       loadExtensions: ['.js', '.mjs'],
     },
+    pool: {
+      afterCreate: (conn, cb) => {
+        conn.query("SET time_zone = '+05:30'", (err) => cb(err, conn));
+      },
+    },
     useNullAsDefault: true,
   },
 
@@ -55,6 +65,9 @@ export default {
     pool: {
       min: 2,
       max: 10,
+      afterCreate: (conn, cb) => {
+        conn.query("SET time_zone = '+05:30'", (err) => cb(err, conn));
+      },
     },
     migrations: {
       directory: './migrations',
