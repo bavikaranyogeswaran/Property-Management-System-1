@@ -117,7 +117,7 @@ export const calculateMonthlyRent = (lease, year, month, adjustments = []) => {
     let currentRate = monthlyRent; // This is the rate at the START of the month
 
     // Note: We calculate segments up to each adjustment.
-    let totalSegmentRent = 0;
+    let totalSegmentRent = moneyMath(0);
 
     for (const adj of monthAdjustments) {
       const adjDate = parseLocalDate(adj.effective_date);
@@ -130,7 +130,7 @@ export const calculateMonthlyRent = (lease, year, month, adjustments = []) => {
           .mul(segmentDays)
           .round()
           .value();
-        totalSegmentRent += segmentRent;
+        totalSegmentRent = totalSegmentRent.add(segmentRent);
         prorationDetails.push(`${segmentDays}d@${fromCents(currentRate)}`);
       }
 
@@ -150,11 +150,11 @@ export const calculateMonthlyRent = (lease, year, month, adjustments = []) => {
         .mul(finalDays)
         .round()
         .value();
-      totalSegmentRent += finalRent;
+      totalSegmentRent = totalSegmentRent.add(finalRent);
       prorationDetails.push(`${finalDays}d@${fromCents(currentRate)}`);
     }
 
-    effectiveAmount = totalSegmentRent;
+    effectiveAmount = totalSegmentRent.value();
     description += ` (Composite Rate)`;
   }
 
@@ -163,7 +163,7 @@ export const calculateMonthlyRent = (lease, year, month, adjustments = []) => {
   }
 
   return {
-    amount: Math.round(effectiveAmount),
+    amount: effectiveAmount,
     dueDate,
     description,
     month,

@@ -47,8 +47,10 @@ export const roundToCents = (val) => {
 export const moneyMath = (amountInCents) => {
   const d = new Decimal(amountInCents);
   return {
-    add: (val) => moneyMath(d.add(val)),
-    sub: (val) => moneyMath(d.sub(val)),
+    add: (val) =>
+      moneyMath(d.add(val).toDecimalPlaces(0, Decimal.ROUND_HALF_UP)),
+    sub: (val) =>
+      moneyMath(d.sub(val).toDecimalPlaces(0, Decimal.ROUND_HALF_UP)),
     mul: (val) => moneyMath(d.mul(val)),
     div: (val) => moneyMath(d.div(val)),
     round: () => moneyMath(d.toDecimalPlaces(0, Decimal.ROUND_HALF_UP)),

@@ -67,8 +67,8 @@ class LedgerModel {
       leaseId: row.lease_id.toString(),
       accountType: row.account_type,
       category: row.category,
-      debit: Number(row.debit),
-      credit: Number(row.credit),
+      debit: roundToCents(row.debit),
+      credit: roundToCents(row.credit),
       description: row.description,
       entryDate: row.entry_date,
     };

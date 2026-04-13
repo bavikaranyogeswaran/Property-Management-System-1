@@ -161,19 +161,25 @@ class PayoutModel {
     const [incomeRows] = await db.query(incomeQuery, incomeParams);
 
     const incomeIds = incomeRows.map((r) => r.paymentId);
-    const totalGross = incomeRows.reduce((sum, r) => sum + Number(r.amount), 0);
+    const totalGross = incomeRows.reduce(
+      (sum, r) => moneyMath(sum).add(r.amount).value(),
+      0
+    );
 
     // Calculate commissions and group by lease for ledger consistency
     const leaseCommissions = {};
     const totalCommission = incomeRows.reduce((sum, r) => {
       if (['rent', 'late_fee'].includes(r.invoiceType)) {
         const fee = Number(r.fee || 0);
-        const comm = Math.round(Number(r.amount) * (fee / 100));
+        // [HARDENED] Use precision-safe division and rounding for commission
+        const comm = moneyMath(r.amount).div(100).mul(fee).round().value();
 
         const lid = r.leaseId;
-        leaseCommissions[lid] = (leaseCommissions[lid] || 0) + comm;
+        leaseCommissions[lid] = moneyMath(leaseCommissions[lid] || 0)
+          .add(comm)
+          .value();
 
-        return sum + comm;
+        return moneyMath(sum).add(comm).value();
       }
       return sum;
     }, 0);
@@ -203,7 +209,7 @@ class PayoutModel {
 
     const expenseIds = expenseRows.map((r) => r.costId);
     const totalExpenses = expenseRows.reduce(
-      (sum, r) => sum + Number(r.amount),
+      (sum, r) => moneyMath(sum).add(r.amount).value(),
       0
     );
 
@@ -211,7 +217,10 @@ class PayoutModel {
       totalGross,
       totalCommission,
       totalExpenses,
-      netPayout: totalGross - totalCommission - totalExpenses,
+      netPayout: moneyMath(totalGross)
+        .sub(totalCommission)
+        .sub(totalExpenses)
+        .value(),
       incomeIds,
       expenseIds,
       leaseCommissions, // New: for ledger integration

@@ -597,7 +597,7 @@ class PaymentService {
           );
           const totalVerified = allPayments
             .filter((p) => p.status === 'verified')
-            .reduce((sum, p) => sum + Number(p.amount), 0);
+            .reduce((sum, p) => moneyMath(sum).add(p.amount).value(), 0);
 
           if (totalVerified < invoice.amount) {
             let newStatus;
@@ -1091,7 +1091,7 @@ class PaymentService {
       const allPayments = await paymentModel.findByInvoiceId(invoiceId, conn);
       const totalVerified = allPayments
         .filter((p) => p.status === 'verified')
-        .reduce((sum, p) => sum + Number(p.amount), 0);
+        .reduce((sum, p) => moneyMath(sum).add(p.amount).value(), 0);
 
       const remainingDue = Math.max(0, invoice.amount - totalVerified);
       if (remainingDue <= 0) {
@@ -1129,7 +1129,9 @@ class PaymentService {
       );
 
       // 6. Update Invoice Status
-      const newTotalVerified = totalVerified + amountToApply;
+      const newTotalVerified = moneyMath(totalVerified)
+        .add(amountToApply)
+        .value();
       if (newTotalVerified >= invoice.amount) {
         await invoiceModel.updateStatus(invoiceId, 'paid', conn);
       } else {
