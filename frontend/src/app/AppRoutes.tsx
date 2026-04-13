@@ -1,0 +1,378 @@
+import React from 'react';
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { useAuth } from './context/AuthContext';
+import { ProtectedRoute, RoleRoute } from '../components/layout/RouteGuards';
+import {
+  LandingPageWrapper,
+  PublicPropertiesWrapper,
+} from '../components/layout/PublicLayout';
+
+// Auth Pages
+import { LoginPage } from '@/components/pages/auth/LoginPage';
+import { ForgotPasswordPage } from '@/components/pages/auth/ForgotPasswordPage';
+import { ResetPasswordPage } from '@/components/pages/auth/ResetPasswordPage';
+import { VerifyEmailPage } from '@/components/pages/auth/VerifyEmailPage';
+import { SetupPasswordPage } from '@/components/pages/auth/SetupPasswordPage';
+
+// Owner Pages
+import { OwnerDashboard } from '@/components/pages/owner/OwnerDashboard';
+import { PropertiesPage } from '@/components/pages/owner/PropertiesPage';
+import { UnitsPage } from '@/components/pages/owner/UnitsPage';
+import { LeadsPage } from '@/components/pages/owner/LeadsPage';
+import { TenantsPage } from '@/components/pages/owner/TenantsPage';
+import { TreasurersPage } from '@/components/pages/owner/TreasurersPage';
+import { LeasesPage } from '@/components/pages/owner/LeasesPage';
+import { OwnerInvoicesPage } from '@/components/pages/owner/OwnerInvoicesPage';
+import { OwnerMaintenancePage } from '@/components/pages/owner/OwnerMaintenancePage';
+import { OwnerReportsPage } from '@/components/pages/owner/OwnerReportsPage';
+import { VisitsPage } from '@/components/pages/owner/VisitsPage';
+import OwnerPayoutsPage from '@/components/pages/OwnerPayoutsPage';
+import TreasurerPayoutsPage from '@/components/pages/treasurer/TreasurerPayoutsPage';
+import { OwnerPaymentsPage } from '@/components/pages/owner/OwnerPaymentsPage';
+import { RefundRequestsPage } from '@/components/pages/owner/RefundRequestsPage';
+
+// Tenant Pages
+import { TenantDashboard } from '@/components/pages/tenant/TenantDashboard';
+import { TenantInvoicesPage } from '@/components/pages/tenant/TenantInvoicesPage';
+import { TenantMaintenancePage } from '@/components/pages/tenant/TenantMaintenancePage';
+import { TenantPaymentsPage } from '@/components/pages/tenant/TenantPaymentsPage';
+import { TenantLeasePage } from '@/components/pages/tenant/TenantLeasePage';
+import { TenantPaymentSummaryPage } from '@/components/pages/tenant/TenantPaymentSummaryPage';
+
+// Treasurer Pages
+import { TreasurerDashboard } from '@/components/pages/treasurer/TreasurerDashboard';
+import { PaymentVerificationPage } from '@/components/pages/treasurer/PaymentVerificationPage';
+import { MaintenanceExpensesPage } from '@/components/pages/treasurer/MaintenanceExpensesPage';
+
+// Shared Pages
+import { AnalyticsPage } from '@/components/reports/AnalyticsPage';
+import { SettingsPage } from '@/components/pages/common/SettingsPage';
+import { ReceiptsPage } from '@/components/pages/common/ReceiptsPage';
+import { NotificationsPage } from '@/components/pages/common/NotificationsPage';
+import { PublicListingPage } from '@/components/pages/public/PublicListingPage';
+import { PublicPropertyDetailsPage } from '@/components/pages/public/PublicPropertyDetailsPage';
+import CancelVisitPage from '@/components/pages/public/CancelVisitPage';
+import PaymentSuccessPage from '@/components/pages/public/PaymentSuccessPage';
+import AuditLogsPage from '@/components/pages/AuditLogsPage';
+import { GuestPaymentPage } from '@/components/pages/public/GuestPaymentPage';
+import { OnboardingStatusPage } from '@/components/pages/public/OnboardingStatusPage';
+import PayHereSimulationPage from '@/components/pages/public/PayHereSimulationPage';
+
+// Lead Pages
+import { LeadPortalPage } from '@/components/pages/lead/LeadPortalPage';
+
+/**
+ * Handles dashboard redirection based on the user's role.
+ */
+function DashboardRoute() {
+  const { user } = useAuth();
+  if (user?.role === 'owner') return <OwnerDashboard />;
+  if (user?.role === 'tenant') return <TenantDashboard />;
+  if (user?.role === 'treasurer') return <TreasurerDashboard />;
+  if (user?.role === 'lead') return <Navigate to="/" />;
+  return <Navigate to="/login" />;
+}
+
+/**
+ * Main routing table for the entire application.
+ */
+export function AppRoutes() {
+  const { user, isLoading } = useAuth();
+  const navigate = useNavigate();
+
+  const handleNavigate = (page: string) => {
+    navigate(page === 'login' ? '/login' : `/${page}`);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  return (
+    <Routes>
+      {/* Public Routes */}
+      <Route path="/" element={<LandingPageWrapper />} />
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
+      <Route path="/verify-email" element={<VerifyEmailPage />} />
+      <Route path="/setup-password" element={<SetupPasswordPage />} />
+      <Route path="/cancel-visit" element={<CancelVisitPage />} />
+      <Route path="/payment-success" element={<PaymentSuccessPage />} />
+      <Route
+        path="/pay/:token"
+        element={
+          <PublicPropertiesWrapper>
+            <GuestPaymentPage />
+          </PublicPropertiesWrapper>
+        }
+      />
+      <Route
+        path="/onboarding/:token"
+        element={
+          <PublicPropertiesWrapper>
+            <OnboardingStatusPage />
+          </PublicPropertiesWrapper>
+        }
+      />
+      <Route path="/payhere-simulation" element={<PayHereSimulationPage />} />
+
+      {/* Public Listings */}
+      <Route
+        path="/browse-properties"
+        element={
+          <PublicPropertiesWrapper>
+            <PublicListingPage onNavigate={(page) => handleNavigate(page)} />
+          </PublicPropertiesWrapper>
+        }
+      />
+      <Route
+        path="/property/:id"
+        element={
+          <PublicPropertiesWrapper>
+            <PublicPropertyDetailsPage />
+          </PublicPropertiesWrapper>
+        }
+      />
+      <Route
+        path="/lead/portal"
+        element={
+          <PublicPropertiesWrapper>
+            <LeadPortalPage />
+          </PublicPropertiesWrapper>
+        }
+      />
+      <Route
+        path="/properties"
+        element={
+          user ? (
+            <ProtectedRoute>
+              <PropertiesPage />
+            </ProtectedRoute>
+          ) : (
+            <Navigate to="/browse-properties" replace />
+          )
+        }
+      />
+
+      {/* Protected Routes */}
+      <Route
+        path="/dashboard"
+        element={
+          <ProtectedRoute>
+            <DashboardRoute />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/settings"
+        element={
+          <ProtectedRoute>
+            <SettingsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/notifications"
+        element={
+          <ProtectedRoute>
+            <NotificationsPage />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Owner Area */}
+      <Route
+        path="/units"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allowedRoles={['owner']}>
+              <UnitsPage />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/visits"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allowedRoles={['owner']}>
+              <VisitsPage />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/leads"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allowedRoles={['owner']}>
+              <LeadsPage />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/tenants"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allowedRoles={['owner']}>
+              <TenantsPage />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/treasurers"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allowedRoles={['owner']}>
+              <TreasurersPage />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/leases"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allowedRoles={['owner']}>
+              <LeasesPage />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/refund-requests"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allowedRoles={['owner']}>
+              <RefundRequestsPage />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/invoices"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allowedRoles={['owner', 'tenant', 'treasurer']}>
+              <OwnerInvoicesPage />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/maintenance"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allowedRoles={['owner', 'tenant', 'treasurer']}>
+              <OwnerMaintenancePage />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/reports"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allowedRoles={['owner']}>
+              <OwnerReportsPage />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/analytics"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allowedRoles={['owner', 'treasurer']}>
+              <AnalyticsPage />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/payouts"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allowedRoles={['owner', 'treasurer']}>
+              <OwnerPayoutsPage />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/payments"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allowedRoles={['owner', 'tenant', 'treasurer']}>
+              <OwnerPaymentsPage />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/audit-logs"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allowedRoles={['owner']}>
+              <AuditLogsPage />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Tenant Area */}
+      <Route
+        path="/receipts"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allowedRoles={['tenant']}>
+              <ReceiptsPage />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/my-lease"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allowedRoles={['tenant']}>
+              <TenantLeasePage />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/payment-summary"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allowedRoles={['tenant']}>
+              <TenantPaymentSummaryPage />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Treasurer Area */}
+      <Route
+        path="/expenses"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allowedRoles={['treasurer']}>
+              <MaintenanceExpensesPage />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Catch all */}
+      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+    </Routes>
+  );
+}
