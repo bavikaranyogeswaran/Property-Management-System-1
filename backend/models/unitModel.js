@@ -90,6 +90,8 @@ class UnitModel {
       `
             SELECT u.*, 
                    p.name as property_name, 
+                   p.status as property_status,
+                   p.is_archived as property_archived,
                    ut.name as type_name,
                    COALESCE(
                      (SELECT ui.image_url FROM unit_images ui WHERE ui.unit_id = u.unit_id AND ui.is_primary = TRUE LIMIT 1),
@@ -277,6 +279,8 @@ class UnitModel {
         isTurnoverCleared: Boolean(row.is_turnover_cleared),
         createdAt: row.created_at,
         propertyName: row.property_name,
+        propertyStatus: row.property_status,
+        propertyArchived: Boolean(row.property_archived),
         pendingApplicationsCount: Number(row.pending_application_count || 0),
       };
     });

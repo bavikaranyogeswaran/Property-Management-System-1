@@ -103,6 +103,14 @@ class LeaseCreationService {
         throw new AppError('Unit is no longer available (inactive).', 409);
       }
 
+      // [PROPERTY STATUS HARDENING] Prevent new draft leases in inactive buildings
+      if (unit.propertyStatus === 'inactive' || unit.propertyArchived) {
+        throw new AppError(
+          `Cannot create lease: The building (${unit.propertyName || 'Property'}) is currently inactive or archived.`,
+          409
+        );
+      }
+
       // 2a. [REMOVED] Same-tenant overlap check (Supporting Multi-Unit Leases)
       // We no longer block a single tenant from holding multiple active leases
       // across different units or properties. Unit-level availability is still
@@ -225,11 +233,28 @@ class LeaseCreationService {
       const lease = await leaseModel.findByIdForUpdate(leaseId, connection);
       if (!lease) throw new AppError('Lease not found', 404);
 
-      if (lease.status !== 'draft')
+      if (lease.status !== 'draft' && lease.status !== 'active') {
         throw new AppError(
           'Only draft leases can have documents verified',
           400
         );
+      }
+
+      // [IDEMPOTENCY GUARD] Exit early if already verified to prevent redundant side effects
+      if (lease.verificationStatus === 'verified') {
+        const depositStats = await leaseModel.getDepositStatus(
+          leaseId,
+          connection
+        );
+        return {
+          isDocumentsVerified: true,
+          activated: lease.status === 'active',
+          message:
+            lease.status === 'active'
+              ? 'Lease is already active and documents are verified.'
+              : 'Documents are already verified. Awaiting deposit payment for activation.',
+        };
+      }
 
       await leaseModel.update(
         leaseId,
@@ -360,6 +385,14 @@ class LeaseCreationService {
       const unit = await unitModel.findByIdForUpdate(baseLease.unitId, conn);
       if (!unit || unit.status === 'inactive') {
         throw new AppError('Unit is no longer available for occupancy.', 409);
+      }
+
+      // [PROPERTY STATUS HARDENING] Check parent property status
+      if (unit.propertyStatus === 'inactive' || unit.propertyArchived) {
+        throw new AppError(
+          `Cannot activate lease: The building (${unit.propertyName || 'Property'}) is currently inactive or archived.`,
+          409
+        );
       }
 
       // 3. Lock Child (Lease) second
