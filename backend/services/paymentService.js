@@ -1,23 +1,21 @@
 import pool from '../config/db.js';
-import { randomUUID } from 'crypto';
 import paymentModel from '../models/paymentModel.js';
 import invoiceModel from '../models/invoiceModel.js';
-import notificationModel from '../models/notificationModel.js';
-import userModel from '../models/userModel.js';
-import receiptModel from '../models/receiptModel.js';
-import behaviorLogModel from '../models/behaviorLogModel.js';
 import tenantModel from '../models/tenantModel.js';
 import leaseModel from '../models/leaseModel.js';
-import auditLogger from '../utils/auditLogger.js';
-import ledgerModel from '../models/ledgerModel.js';
-import emailService from '../utils/emailService.js';
-import { today, now, parseLocalDate } from '../utils/dateUtils.js';
-import authorizationService from './authorizationService.js';
-import { ROLES } from '../utils/roleUtils.js';
+import { today, parseLocalDate, moneyMath } from '../utils/dateUtils.js';
 import { fromCents, toCentsFromMajor } from '../utils/moneyUtils.js';
-import staffModel from '../models/staffModel.js';
+import unitModel from '../models/unitModel.js';
+import leadModel from '../models/leadModel.js';
 import ledgerService from './ledgerService.js';
 import receiptService from './receiptService.js';
+import paymentSideEffectService from './paymentSideEffectService.js';
+import paymentOperationalService from './paymentOperationalService.js';
+
+// Restored for un-refactored methods
+import notificationModel from '../models/notificationModel.js';
+import auditLogger from '../utils/auditLogger.js';
+import userModel from '../models/userModel.js';
 
 /**
  * Maps an invoice_type to the correct accounting ledger classification.
@@ -743,8 +741,7 @@ class PaymentService {
    * Shared logic for finalizing a verified payment.
    * Handles invoice status updates, ledger entries, receipts, notifications,
    * and auto-lease activation.
-   */
-  async _finalizeVerifiedPayment(
+   *  async _finalizeVerifiedPayment(
     paymentId,
     invoice,
     payment,
@@ -757,93 +754,17 @@ class PaymentService {
     );
     const thisPaymentAmount = Number(payment.amount);
 
-    // [ATOMIC FIX] Calculate overpayment using point-in-time snapshots from the DB-controlled counter.
-    // Logic: incrementalOverpayment = max(0, totalPaidAfter - totalAmount) - max(0, (totalPaidAfter - thisPaymentAmount) - totalAmount)
+    // 1. [CRITICAL] Calculate overpayment using atomic snapshots
     const currentSurplus = Math.max(0, totalPaidAfter - invAmount);
     const previousSurplus = Math.max(
       0,
       totalPaidAfter - thisPaymentAmount - invAmount
     );
-    const incrementalOverpayment = Math.max(
-      0,
-      currentSurplus - previousSurplus
-    );
+    const incrementalOverpayment = Math.max(0, currentSurplus - previousSurplus);
 
-    // Lease Status Warning
-    const lease = await leaseModel.findById(invoice.leaseId, connection);
-    if (lease && lease.status === 'ended') {
-      console.warn(
-        `Verified payment ${paymentId} for invoice linked to ENDED lease ${lease.id}`
-      );
-    }
-
+    // 2. [CRITICAL] Update Invoice Payment Status
     if (totalPaidAfter >= invAmount) {
       await invoiceModel.updateStatus(payment.invoiceId, 'paid', connection);
-
-      // [F2.12] Positive behavior scoring for on-time payment
-      try {
-        const invType =
-          invoice.type || invoice.invoiceType || invoice.invoice_type;
-        if (invType === 'rent') {
-          const { parseLocalDate } = await import('../utils/dateUtils.js');
-          const behaviorLogModel = (
-            await import('../models/behaviorLogModel.js')
-          ).default;
-
-          const dueDate = parseLocalDate(invoice.dueDate || invoice.due_date);
-          const paymentDate = parseLocalDate(
-            payment.paymentDate || payment.payment_date
-          );
-          const daysEarly = Math.floor(
-            (dueDate - paymentDate) / (1000 * 60 * 60 * 24)
-          );
-          const scoreChange = daysEarly >= 5 ? 10 : 5;
-
-          await behaviorLogModel.create(
-            {
-              tenantId: invoice.tenantId || invoice.tenant_id,
-              type: 'positive',
-              category: 'Payment',
-              scoreChange,
-              description: `On-time rent payment for invoice #${payment.invoiceId}`,
-              recordedBy: null,
-            },
-            connection
-          );
-
-          await tenantModel.incrementBehaviorScore(
-            invoice.tenantId || invoice.tenant_id,
-            scoreChange,
-            connection
-          );
-        }
-      } catch (scoreErr) {
-        console.warn(
-          'Failed to apply positive behavior score:',
-          scoreErr.message
-        );
-      }
-
-      // Overpayment Logic (Bug B5 Fix)
-      if (incrementalOverpayment > 0) {
-        await tenantModel.addCredit(
-          invoice.tenantId,
-          incrementalOverpayment,
-          connection,
-          'overpayment',
-          paymentId
-        );
-        await notificationModel.create(
-          {
-            userId: invoice.tenantId,
-            message: `Overpayment of ${fromCents(incrementalOverpayment).toFixed(2)} has been credited to your account balance.`,
-            type: 'payment',
-            entityType: 'payment',
-            entityId: paymentId,
-          },
-          connection
-        );
-      }
     } else if (totalPaidAfter > 0) {
       await invoiceModel.updateStatus(
         payment.invoiceId,
@@ -852,14 +773,24 @@ class PaymentService {
       );
     }
 
-    // 7. Generate Receipt & Post Ledger
+    // 3. [CRITICAL] Handle Credit Balance (Overpayment)
+    if (incrementalOverpayment > 0) {
+      await tenantModel.addCredit(
+        invoice.tenantId,
+        incrementalOverpayment,
+        connection,
+        'overpayment',
+        paymentId
+      );
+    }
+
+    // 4. [FINANCIAL] Generate Receipt & Post Ledger
     await receiptService.generateReceipt(
       { id: paymentId, amount: payment.amount },
       invoice,
       connection
     );
 
-    // [CRITICAL FIX] Post Ledger Entry (Delegated to LedgerService)
     await ledgerService.postPayment(
       paymentId,
       invoice,
@@ -868,184 +799,24 @@ class PaymentService {
       connection
     );
 
-    // Deposit Status Logic
-    if (
-      invoice.invoiceType === 'deposit' ||
-      invoice.invoice_type === 'deposit'
-    ) {
-      const finalInvoice = await invoiceModel.findById(
-        payment.invoiceId,
-        connection
-      );
-      const finalStatus = finalInvoice.status === 'paid' ? 'paid' : 'pending';
-
-      // [NEW] Extend reservation to 7 days from creation once deposit is paid (to allow doc verification)
-      const extendedExpiry = formatToLocalDate(
-        addDays(new Date(lease.createdAt), 7)
-      );
-
-      await leaseModel.update(
-        invoice.leaseId,
-        {
-          depositStatus: finalStatus,
-          reservationExpiresAt: extendedExpiry, // Give them 7 full days from creation
-        },
-        connection
-      );
-
-      await auditLogger.log(
-        {
-          userId: null,
-          actionType: 'RESERVATION_EXTENDED',
-          entityId: invoice.leaseId,
-          entityType: 'lease',
-          details: {
-            newExpiry: extendedExpiry,
-            reason: 'Deposit payment received',
-          },
-        },
-        null,
-        connection
-      );
-    }
-
-    // Notify Tenant
-    await notificationModel.create(
-      {
-        userId: invoice.tenantId || invoice.tenant_id,
-        message: `Payment of ${fromCents(payment.amount).toFixed(2)} for Invoice #${payment.invoiceId} has been verified.`,
-        type: 'payment',
-        entityType: 'payment',
-        entityId: paymentId,
-      },
+    // 5. [OPERATIONAL] Operational Side Effects (Lease state, Auto-activation)
+    // Delegated to Operational Service to keep this transaction lean.
+    await paymentOperationalService.handleDepositPayment(
+      invoice,
+      { ...payment, status: 'verified' },
+      user,
       connection
     );
 
-    // [AUTO-ACTIVATION] If full deposit is paid on a draft lease, activate it immediately.
-    const finalInvoice = await invoiceModel.findById(
-      payment.invoiceId,
+    // 6. [NON-CRITICAL] Secondary Side Effects (Notifications, Scoring, Audit)
+    // Delegated to SideEffect Service which ensures resilience (try/catch internal).
+    await paymentSideEffectService.handleVerifiedPaymentEffects(
+      paymentId,
+      invoice,
+      { ...payment, incrementalOverpayment },
+      user,
       connection
     );
-    if (
-      finalInvoice.status === 'paid' &&
-      (invoice.invoiceType === 'deposit' || invoice.invoice_type === 'deposit')
-    ) {
-      const lease = await leaseModel.findById(invoice.leaseId, connection);
-      if (lease && lease.status === 'draft') {
-        if (lease.isDocumentsVerified) {
-          try {
-            const leaseService = (await import('./leaseService.js')).default;
-            await leaseService.signLease(lease.id, user, connection);
-
-            // Trigger Onboarding (Set Password email)
-            const userService = (await import('./userService.js')).default;
-            await userService.triggerOnboarding(lease.tenantId, connection);
-          } catch (activationErr) {
-            console.error(
-              `[PaymentService] Auto-activation blocked for Lease #${lease.id}:`,
-              activationErr.message
-            );
-
-            // Notify Staff that payment is received but activation is blocked by unit status
-            const [propertyInfo] = await connection.query(
-              'SELECT owner_id FROM properties WHERE property_id = ?',
-              [lease.propertyId]
-            );
-            const ownerId = propertyInfo[0]?.owner_id;
-
-            const [assignedStaff] = await connection.query(
-              'SELECT user_id FROM staff_property_assignments WHERE property_id = ?',
-              [lease.propertyId]
-            );
-
-            const userIdsToNotify = new Set();
-            if (ownerId) userIdsToNotify.add(ownerId);
-            assignedStaff.forEach((s) => userIdsToNotify.add(s.user_id));
-
-            for (const userId of userIdsToNotify) {
-              await notificationModel.create(
-                {
-                  userId: userId,
-                  message: `URGENT: Deposit Paid for Lease #${lease.id} (Unit ${lease.unitNumber}), but AUTO-ACTIVATION was BLOCKED by Unit Status (${activationErr.message}). Manual check required.`,
-                  type: 'lease',
-                  severity: 'urgent',
-                  entityType: 'lease',
-                  entityId: lease.id,
-                },
-                connection
-              );
-            }
-          }
-        } else {
-          // Notify Treasurers and Owners that payment is done but documents need review
-          const [propertyInfo] = await connection.query(
-            'SELECT owner_id FROM properties WHERE property_id = ?',
-            [lease.propertyId]
-          );
-          const ownerId = propertyInfo[0]?.owner_id;
-
-          const [assignedStaff] = await connection.query(
-            'SELECT user_id FROM staff_property_assignments WHERE property_id = ?',
-            [lease.propertyId]
-          );
-
-          const userIdsToNotify = new Set();
-          if (ownerId) userIdsToNotify.add(ownerId);
-          assignedStaff.forEach((s) => userIdsToNotify.add(s.user_id));
-
-          for (const userId of userIdsToNotify) {
-            await notificationModel.create(
-              {
-                userId: userId,
-                message: `URGENT: Deposit Paid for Lease #${lease.id} (Unit ${lease.unitNumber}). Documents are PENDING verification. Please review and activate.`,
-                type: 'lease',
-                severity: 'urgent',
-              },
-              connection
-            );
-          }
-        }
-      }
-    }
-
-    await auditLogger.log(
-      {
-        userId: user?.user_id || user?.id || null,
-        actionType: 'PAYMENT_VERIFIED',
-        entityId: paymentId,
-        entityType: 'payment',
-        details: {
-          invoiceId: payment.invoiceId,
-          amount: payment.amount,
-          automated: user.role === 'system',
-        },
-      },
-      null,
-      connection
-    );
-
-    // Behavior Score
-    try {
-      const paymentDate = parseLocalDate(payment.paymentDate || today());
-      const dueDate = parseLocalDate(invoice.dueDate);
-      const payStr = formatToLocalDate(paymentDate);
-      const dueStr = formatToLocalDate(dueDate);
-
-      if (payStr <= dueStr) {
-        await behaviorLogModel.logPositivePayment(
-          invoice.tenantId || invoice.tenant_id,
-          5,
-          connection
-        );
-        await tenantModel.incrementBehaviorScore(
-          invoice.tenantId || invoice.tenant_id,
-          5,
-          connection
-        );
-      }
-    } catch (scoreErr) {
-      console.error('Failed to update positive score:', scoreErr);
-    }
   }
 
   async getPayments(user) {
