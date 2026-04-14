@@ -3,6 +3,7 @@ import React, {
   useContext,
   useState,
   useEffect,
+  useCallback,
   ReactNode,
 } from 'react';
 import apiClient from '../../services/api';
@@ -48,6 +49,7 @@ interface UserContextType {
   ) => void;
   updateTreasurer: (id: string, treasurer: Partial<Treasurer>) => void;
   deleteTreasurer: (id: string) => void;
+  refetchUsers: () => Promise<void>;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -58,7 +60,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const [treasurers, setTreasurers] = useState<Treasurer[]>([]);
   const [owners, setOwners] = useState<any[]>([]);
 
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     if (!user) return;
 
     // Fetch Treasurers (Only for Owner)
@@ -101,11 +103,11 @@ export function UserProvider({ children }: { children: ReactNode }) {
         console.error('Failed to fetch owners', e);
       }
     }
-  };
+  }, [user]);
 
   useEffect(() => {
     fetchUsers();
-  }, [user]);
+  }, [fetchUsers]);
 
   const addTenant = (tenant: Omit<Tenant, 'id' | 'createdAt'>) => {
     const newTenant: Tenant = {
@@ -147,6 +149,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
         addTreasurer,
         updateTreasurer,
         deleteTreasurer,
+        refetchUsers: fetchUsers,
       }}
     >
       {children}
