@@ -1,6 +1,8 @@
 import authService from '../services/authService.js';
 import catchAsync from '../utils/catchAsync.js';
 import AppError from '../utils/AppError.js';
+import userModel from '../models/userModel.js';
+import bcrypt from 'bcryptjs';
 
 class PasswordController {
   forgotPassword = catchAsync(async (req, res, next) => {
@@ -36,13 +38,11 @@ class PasswordController {
       return next(new AppError('Password must be at least 8 characters', 400));
     }
 
-    const userModel = (await import('../models/userModel.js')).default;
     const user = await userModel.findById(userId);
     if (!user) {
       return next(new AppError('User not found', 404));
     }
 
-    const bcrypt = (await import('bcryptjs')).default;
     const validPassword = await bcrypt.compare(
       currentPassword,
       user.passwordHash || user.password_hash

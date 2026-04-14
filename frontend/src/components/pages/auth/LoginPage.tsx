@@ -53,8 +53,12 @@ export function LoginPage() {
       navigate('/dashboard');
     } catch (error: any) {
       console.error(error);
+      const rawError = error.response?.data?.error;
+      // In dev mode the backend sends `error: AppErrorObject` (an object, not a string).
+      // Always fall back to .message to avoid passing an object to toast.error().
       const errorMessage =
-        error.response?.data?.error ||
+        (typeof rawError === 'string' ? rawError : null) ||
+        error.response?.data?.message ||
         error.message ||
         'An unexpected error occurred.';
       toast.error(errorMessage);

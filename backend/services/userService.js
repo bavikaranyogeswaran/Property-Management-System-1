@@ -1,5 +1,4 @@
 import bcrypt from 'bcryptjs';
-const { hash } = bcrypt;
 import userModel from '../models/userModel.js';
 import leadModel from '../models/leadModel.js';
 import tenantModel from '../models/tenantModel.js';
@@ -55,7 +54,7 @@ class UserService {
       }
 
       const tempPassword = password || Math.random().toString(36).slice(-8);
-      const hashedPassword = await hash(tempPassword, SALT_ROUNDS);
+      const hashedPassword = await bcrypt.hash(tempPassword, SALT_ROUNDS);
 
       const userId = await userModel.create(
         {
@@ -324,7 +323,7 @@ class UserService {
       } else {
         // Create new user account for the tenant
         const passwordToUse = Math.random().toString(36).slice(-8);
-        const hashedPassword = await hash(passwordToUse, SALT_ROUNDS);
+        const hashedPassword = await bcrypt.hash(passwordToUse, SALT_ROUNDS);
 
         userId = await userModel.create(
           {

@@ -1,5 +1,5 @@
 import bcrypt from 'bcryptjs';
-const { compare } = bcrypt;
+import logger from '../utils/logger.js';
 import jwt from 'jsonwebtoken';
 const { sign } = jwt;
 import userModel from '../models/userModel.js';
@@ -20,14 +20,25 @@ class AuthService {
     const user = await userModel.findByEmail(email);
 
     if (!user || user.status !== 'active') {
+      logger.warn('[AUTH] Login failed: User not found or inactive', {
+        email,
+        exists: !!user,
+        status: user?.status,
+      });
       throw new AppError('Invalid credentials', 401);
     }
 
-    const isValid = await compare(password, user.passwordHash);
+    const isValid = await bcrypt.compare(password, user.passwordHash);
 
     if (!isValid) {
+      logger.warn('[AUTH] Login failed: Invalid password', {
+        email,
+        userId: user.id,
+      });
       throw new AppError('Invalid credentials', 401);
     }
+
+    logger.info('[AUTH] Login successful', { email, userId: user.id });
 
     const token = sign(
       {
