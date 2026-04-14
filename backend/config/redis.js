@@ -1,6 +1,10 @@
 import IORedis from 'ioredis';
 import logger from '../utils/logger.js';
 
+// Ensure dotenv has been loaded before reading env vars
+// (config.js calls dotenv.config() at import time)
+import '../config/config.js';
+
 const REDIS_HOST = process.env.REDIS_HOST || 'redis';
 const REDIS_PORT = process.env.REDIS_PORT || 6379;
 

@@ -1224,7 +1224,7 @@ export const executeNightlyPayload = async () => {
   });
 };
 
-import { mainQueue } from '../config/queue.js';
+import { mainQueue, isQueueRedisReady } from '../config/queue.js';
 
 /**
  * Execute Cloudinary Asset Deletion (Called by BullMQ Worker)
@@ -1332,8 +1332,16 @@ export const reconcileCloudinaryAssets = async () => {
 
 /**
  * Registers repeatable jobs with the BullMQ scheduler.
+ * Gracefully skips if Redis is unavailable (jobs will register on next restart).
  */
 export const registerRepeatableJobs = async () => {
+  if (!isQueueRedisReady) {
+    logger.warn(
+      '[Queue] Redis is not available. Skipping repeatable job registration. Jobs will be registered on next restart when Redis is reachable.'
+    );
+    return;
+  }
+
   logger.info('[Queue] Registering repeatable background tasks...');
 
   // 1. Nightly Payload (1:00 AM)

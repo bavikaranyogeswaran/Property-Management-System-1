@@ -296,6 +296,23 @@ if (config.env !== 'test') {
 
   // 2. Monitor for Unhandled Rejections (e.g., Database connection failures)
   process.on('unhandledRejection', (err) => {
+    // Redis disconnection is a degradation, not a reason to crash.
+    // The ResilientStore and queue guards handle this gracefully.
+    const isRedisError =
+      err?.code === 'ECONNREFUSED' ||
+      err?.code === 'ENOTFOUND' ||
+      err?.name === 'MaxRetriesPerRequestError' ||
+      err?.message?.includes('Redis') ||
+      err?.message?.includes('redis');
+
+    if (isRedisError) {
+      logger.warn('Redis-related rejection (non-fatal, suppressed):', {
+        name: err.name,
+        message: err.message,
+      });
+      return; // Do NOT crash the server
+    }
+
     logger.error('UNHANDLED REJECTION! 💥 Shutting down...', {
       name: err.name,
       message: err.message,
