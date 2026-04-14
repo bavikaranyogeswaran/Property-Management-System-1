@@ -66,9 +66,7 @@ class UserModel {
             JOIN leases l ON u.user_id = l.tenant_id
             JOIN units ut ON l.unit_id = ut.unit_id
             JOIN properties p ON ut.property_id = p.property_id
-            
-            JOIN properties p ON ut.property_id = p.property_id
-            
+
             WHERE u.role = ?
                 AND p.owner_id = ?
                 AND u.is_archived = FALSE

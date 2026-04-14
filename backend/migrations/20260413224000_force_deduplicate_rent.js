@@ -22,9 +22,18 @@ export const up = async (knex) => {
 
   if (existingIndex.length > 0) {
     // Add temp index to support foreign keys if needed
-    await knex.raw(
-      'ALTER TABLE rent_invoices ADD INDEX temp_idx_lease_id (lease_id)'
-    );
+    const [tempIndex] = await knex.raw(`
+      SELECT INDEX_NAME FROM INFORMATION_SCHEMA.STATISTICS
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME = 'rent_invoices'
+        AND INDEX_NAME = 'temp_idx_lease_id'
+    `);
+
+    if (tempIndex.length === 0) {
+      await knex.raw(
+        'ALTER TABLE rent_invoices ADD INDEX temp_idx_lease_id (lease_id)'
+      );
+    }
     await knex.raw(
       'ALTER TABLE rent_invoices DROP INDEX unique_periodic_invoice'
     );

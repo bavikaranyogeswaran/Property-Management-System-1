@@ -7,7 +7,7 @@
 
 import pool from '../config/db.js';
 import { getCurrentDateString, parseLocalDate } from '../utils/dateUtils.js';
-import { fromCents } from '../utils/moneyUtils.js';
+import { fromCents, roundToCents } from '../utils/moneyUtils.js';
 
 class InvoiceModel {
   //  CREATE: Writing a new bill to the ledger.
