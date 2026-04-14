@@ -31,7 +31,8 @@ const emailKeyGenerator = (req, res) => {
  */
 export const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 1000,
+  max: 2000, // Increased to tolerate ~15-20 requests per boot across multiple contexts
+  skipFailedRequests: true, // Don't count 4xx/5xx against the quota
   message: {
     error: 'Too many requests from this IP, please try again after 15 minutes',
   },

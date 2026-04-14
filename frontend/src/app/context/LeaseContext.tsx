@@ -10,6 +10,7 @@ import { useAuth } from './AuthContext';
 import { useProperty } from './PropertyContext';
 import { toast } from 'sonner';
 import { toLKRFromCents, toCentsFromLKR } from '../../utils/formatters';
+import { enqueueFetch } from '../../utils/fetchQueue';
 
 export interface Lease {
   id: string;
@@ -167,10 +168,11 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (user) {
-      fetchLeases();
-      fetchRenewalRequests();
+      // Sequential fetch via shared queue to prevent request storms on mount
+      enqueueFetch(fetchLeases);
+      enqueueFetch(fetchRenewalRequests);
       if (user.role === 'owner' || user.role === 'treasurer') {
-        fetchLeaseTerms();
+        enqueueFetch(fetchLeaseTerms);
       }
     }
   }, [user]);

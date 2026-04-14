@@ -8,6 +8,7 @@ import React, {
 import apiClient from '../../services/api';
 import { useAuth } from './AuthContext';
 import { toast } from 'sonner';
+import { enqueueFetch } from '../../utils/fetchQueue';
 
 export interface Lead {
   id: string;
@@ -126,9 +127,10 @@ export function LeadProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (user) {
-      fetchLeads();
-      fetchStageHistory();
-      fetchVisits();
+      // Sequential fetch via shared queue to prevent request storms on mount
+      enqueueFetch(fetchLeads);
+      enqueueFetch(fetchStageHistory);
+      enqueueFetch(fetchVisits);
     }
   }, [user]);
 

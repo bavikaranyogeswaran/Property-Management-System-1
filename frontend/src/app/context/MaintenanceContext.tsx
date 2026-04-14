@@ -10,6 +10,7 @@ import { useAuth } from './AuthContext';
 import { useFinancial } from './FinancialContext';
 import { toast } from 'sonner';
 import { toLKRFromCents, toCentsFromLKR } from '../../utils/formatters';
+import { enqueueFetch } from '../../utils/fetchQueue';
 
 export interface MaintenanceRequest {
   id: string;
@@ -100,7 +101,7 @@ export function MaintenanceProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    if (user) fetchMaintenanceData();
+    if (user) enqueueFetch(fetchMaintenanceData);
   }, [user]);
 
   const addMaintenanceRequest = async (

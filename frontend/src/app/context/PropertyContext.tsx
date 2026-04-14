@@ -9,6 +9,7 @@ import apiClient from '../../services/api';
 import { useAuth } from './AuthContext';
 import { toast } from 'sonner';
 import { toLKRFromCents, toCentsFromLKR } from '../../utils/formatters';
+import { enqueueFetch } from '../../utils/fetchQueue';
 
 export interface Property {
   id: string;
@@ -150,10 +151,12 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    fetchProperties();
-    fetchPropertyTypes();
-    fetchUnitTypes();
-    fetchUnits();
+    if (!user) return;
+    // Sequential fetch via shared queue to prevent request storms on mount
+    enqueueFetch(fetchPropertyTypes);
+    enqueueFetch(fetchProperties);
+    enqueueFetch(fetchUnitTypes);
+    enqueueFetch(fetchUnits);
   }, [user]);
 
   const addProperty = async (

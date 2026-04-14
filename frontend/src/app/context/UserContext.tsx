@@ -10,6 +10,7 @@ import apiClient from '../../services/api';
 import { useAuth } from './AuthContext';
 import { toast } from 'sonner';
 import { toLKRFromCents } from '../../utils/formatters';
+import { enqueueFetch } from '../../utils/fetchQueue';
 
 export interface Tenant {
   id: string;
@@ -106,7 +107,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
   }, [user]);
 
   useEffect(() => {
-    fetchUsers();
+    if (user) enqueueFetch(fetchUsers);
   }, [fetchUsers]);
 
   const addTenant = (tenant: Omit<Tenant, 'id' | 'createdAt'>) => {

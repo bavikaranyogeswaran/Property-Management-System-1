@@ -13,6 +13,7 @@ import apiClient, {
 import { useAuth } from './AuthContext';
 import { toast } from 'sonner';
 import { toLKRFromCents, toCentsFromLKR } from '../../utils/formatters';
+import { enqueueFetch } from '../../utils/fetchQueue';
 
 export interface RentInvoice {
   id: string;
@@ -146,7 +147,7 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (user) fetchFinancialData();
+    if (user) enqueueFetch(fetchFinancialData);
   }, [user]);
 
   const fetchLedgerSummary = async (year: number): Promise<LedgerSummary> => {
