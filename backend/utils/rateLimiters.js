@@ -1,7 +1,28 @@
-import { rateLimit, ipKeyGenerator } from 'express-rate-limit';
+import { rateLimit, MemoryStore, ipKeyGenerator } from 'express-rate-limit';
 import { RedisStore } from 'rate-limit-redis';
 import redis from '../config/redis.js';
 import logger from './logger.js';
+
+/**
+ * Creates a fail-open Redis sendCommand wrapper.
+ * If Redis is not reachable, returns an empty array so express-rate-limit
+ * falls back to in-memory tracking instead of throwing a 500.
+ */
+const makeResilientSendCommand =
+  (prefix) =>
+  async (...args) => {
+    try {
+      return await redis.call(...args);
+    } catch (err) {
+      logger.warn(
+        `[RateLimit] Redis unavailable for store '${prefix}', falling back to no-op:`,
+        err.message
+      );
+      // Returning an empty result causes the store to treat this as a cache miss,
+      // which effectively allows the request through (fail-open).
+      return [];
+    }
+  };
 
 /**
  * Standard Rate Limit Handler
@@ -38,7 +59,7 @@ export const apiLimiter = rateLimit({
   },
   handler: limitHandler,
   store: new RedisStore({
-    sendCommand: (...args) => redis.call(...args),
+    sendCommand: makeResilientSendCommand('rl:api:'),
     prefix: 'rl:api:',
   }),
 });
@@ -55,7 +76,7 @@ export const loginLimiter = rateLimit({
   },
   handler: limitHandler,
   store: new RedisStore({
-    sendCommand: (...args) => redis.call(...args),
+    sendCommand: makeResilientSendCommand('rl:login:'),
     prefix: 'rl:login:',
   }),
 });
@@ -73,7 +94,7 @@ export const sensitiveActionLimiter = rateLimit({
   },
   handler: limitHandler,
   store: new RedisStore({
-    sendCommand: (...args) => redis.call(...args),
+    sendCommand: makeResilientSendCommand('rl:sensitive:'),
     prefix: 'rl:sensitive:',
   }),
 });
@@ -85,13 +106,13 @@ export const sensitiveActionLimiter = rateLimit({
 export const publicPortalLimiter = rateLimit({
   windowMs: 30 * 60 * 1000, // 30 minutes
   max: 20,
-  keyGenerator: (req) => req.params.token || req.ip,
+  keyGenerator: (req, res) => req.params.token || ipKeyGenerator(req, res),
   message: {
     error: 'Too many requests for this portal. Please try again later.',
   },
   handler: limitHandler,
   store: new RedisStore({
-    sendCommand: (...args) => redis.call(...args),
+    sendCommand: makeResilientSendCommand('rl:public:'),
     prefix: 'rl:public:',
   }),
 });

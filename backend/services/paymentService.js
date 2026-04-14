@@ -3,7 +3,7 @@ import paymentModel from '../models/paymentModel.js';
 import invoiceModel from '../models/invoiceModel.js';
 import tenantModel from '../models/tenantModel.js';
 import leaseModel from '../models/leaseModel.js';
-import { today, parseLocalDate } from '../utils/dateUtils.js';
+import { today, parseLocalDate, now } from '../utils/dateUtils.js';
 import { fromCents, toCentsFromMajor, moneyMath } from '../utils/moneyUtils.js';
 import unitModel from '../models/unitModel.js';
 import leadModel from '../models/leadModel.js';
@@ -11,12 +11,15 @@ import ledgerService from './ledgerService.js';
 import receiptService from './receiptService.js';
 import paymentSideEffectService from './paymentSideEffectService.js';
 import paymentOperationalService from './paymentOperationalService.js';
-import { ROLES } from '../utils/roleUtils.js';
+import { ROLES, isAtLeast } from '../utils/roleUtils.js';
+import authorizationService from './authorizationService.js';
+import staffModel from '../models/staffModel.js';
 
 // Restored for un-refactored methods
 import notificationModel from '../models/notificationModel.js';
 import auditLogger from '../utils/auditLogger.js';
 import userModel from '../models/userModel.js';
+import emailService from '../utils/emailService.js';
 
 /**
  * Maps an invoice_type to the correct accounting ledger classification.
@@ -745,7 +748,8 @@ class PaymentService {
    * Shared logic for finalizing a verified payment.
    * Handles invoice status updates, ledger entries, receipts, notifications,
    * and auto-lease activation.
-   *  async _finalizeVerifiedPayment(
+   */
+  async _finalizeVerifiedPayment(
     paymentId,
     invoice,
     payment,
@@ -764,7 +768,10 @@ class PaymentService {
       0,
       totalPaidAfter - thisPaymentAmount - invAmount
     );
-    const incrementalOverpayment = Math.max(0, currentSurplus - previousSurplus);
+    const incrementalOverpayment = Math.max(
+      0,
+      currentSurplus - previousSurplus
+    );
 
     // 2. [CRITICAL] Update Invoice Payment Status
     if (totalPaidAfter >= invAmount) {

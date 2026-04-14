@@ -1,5 +1,4 @@
 import db from '../config/db.js';
-import { getLocalTime } from '../utils/dateUtils.js';
 
 class LeadStageHistoryModel {
   /**
@@ -12,32 +11,11 @@ class LeadStageHistoryModel {
   async create(leadId, fromStatus, toStatus, notes = '', connection = null) {
     const dbConn = connection || db;
     try {
-      // Calculate duration in previous stage if there was a previous stage
-      let durationInPreviousStage = null;
-
-      if (fromStatus !== null) {
-        // Find the most recent history entry for this lead
-        const [previousHistory] = await dbConn.query(
-          `SELECT changed_at FROM lead_stage_history 
-                     WHERE lead_id = ? 
-                     ORDER BY changed_at DESC 
-                     LIMIT 1`,
-          [leadId]
-        );
-
-        if (previousHistory.length > 0) {
-          const previousDate = new Date(previousHistory[0].changed_at);
-          const now = getLocalTime();
-          const diffTime = Math.abs(now - previousDate);
-          durationInPreviousStage = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); // Convert to days
-        }
-      }
-
       const [result] = await dbConn.query(
         `INSERT INTO lead_stage_history 
-                 (lead_id, from_status, to_status, changed_at, notes, duration_in_previous_stage) 
-                 VALUES (?, ?, ?, NOW(), ?, ?)`,
-        [leadId, fromStatus, toStatus, notes, durationInPreviousStage]
+                 (lead_id, from_status, to_status, changed_at, notes) 
+                 VALUES (?, ?, ?, NOW(), ?)`,
+        [leadId, fromStatus, toStatus, notes]
       );
 
       return result.insertId;
@@ -59,8 +37,7 @@ class LeadStageHistoryModel {
                 from_status as fromStatus,
                 to_status as toStatus,
                 changed_at as changedAt,
-                notes,
-                duration_in_previous_stage as durationInPreviousStage
+                notes
              FROM lead_stage_history 
              WHERE lead_id = ?
              ORDER BY changed_at DESC`,
@@ -83,8 +60,7 @@ class LeadStageHistoryModel {
                     h.from_status as fromStatus,
                     h.to_status as toStatus,
                     h.changed_at as changedAt,
-                    h.notes,
-                    h.duration_in_previous_stage as durationInPreviousStage
+                    h.notes
                  FROM lead_stage_history h
                  INNER JOIN leads l ON h.lead_id = l.lead_id
                  INNER JOIN properties p ON l.property_id = p.property_id
@@ -103,8 +79,7 @@ class LeadStageHistoryModel {
                 from_status as fromStatus,
                 to_status as toStatus,
                 changed_at as changedAt,
-                notes,
-                duration_in_previous_stage as durationInPreviousStage
+                notes
              FROM lead_stage_history 
              ORDER BY changed_at DESC`
     );
