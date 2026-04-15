@@ -4,16 +4,12 @@ import leadModel from '../models/leadModel.js';
 import tenantModel from '../models/tenantModel.js';
 import ownerModel from '../models/ownerModel.js';
 import staffModel from '../models/staffModel.js';
-import jwt from 'jsonwebtoken';
-const { sign } = jwt;
-const JWT_SECRET = process.env.JWT_SECRET;
-if (!JWT_SECRET)
-  throw new Error('FATAL: JWT_SECRET is not set in the environment variables.');
 import unitModel from '../models/unitModel.js';
 import leaseModel from '../models/leaseModel.js';
 import leaseService from '../services/leaseService.js';
 import emailService from '../utils/emailService.js';
 import leaseTermModel from '../models/leaseTermModel.js';
+import securityTokenService from '../services/securityTokenService.js';
 import {
   getLocalTime,
   parseLocalDate,
@@ -91,11 +87,14 @@ class UserService {
 
       await connection.commit();
 
-      // Setup Token & Email (Outside transaction as side effect)
-      const token = jwt.sign(
-        { id: userId, type: 'setup_password', role: ROLES.TREASURER },
-        JWT_SECRET,
-        { expiresIn: '48h' }
+      // [FIXED] Use opaque Redis token (securityTokenService) to match what
+      // authService.setupPassword() expects. The old jwt.sign() approach was
+      // incompatible and caused "link expired" errors on the setup page.
+      const token = await securityTokenService.createToken(
+        userId,
+        'setup',
+        172800, // 48 hours in seconds
+        { role: ROLES.TREASURER }
       );
       await emailService.sendInvitationEmail(email, ROLES.TREASURER, token);
 
@@ -337,10 +336,12 @@ class UserService {
           connection
         );
 
-        invitationToken = jwt.sign(
-          { id: userId, type: 'setup_password', role: ROLES.TENANT },
-          JWT_SECRET,
-          { expiresIn: '48h' }
+        // [FIXED] Use opaque Redis token to match authService.setupPassword() consumer
+        invitationToken = await securityTokenService.createToken(
+          userId,
+          'setup',
+          172800, // 48 hours in seconds
+          { role: ROLES.TENANT }
         );
       }
 
@@ -566,11 +567,12 @@ class UserService {
       return;
     }
 
-    // Generate token for password setup (invitation)
-    const token = sign(
-      { id: userId, type: 'setup_password', role: ROLES.TENANT },
-      JWT_SECRET,
-      { expiresIn: '48h' }
+    // [FIXED] Use opaque Redis token to match authService.setupPassword() consumer
+    const token = await securityTokenService.createToken(
+      userId,
+      'setup',
+      172800, // 48 hours in seconds
+      { role: ROLES.TENANT }
     );
 
     try {
@@ -603,6 +605,46 @@ class UserService {
   // ============================================================================
   //  STAFF MANAGEMENT
   // ============================================================================
+
+  async resendInvitation(userId) {
+    const user = await userModel.findById(userId);
+    if (!user) throw new Error('User not found');
+
+    if (user.isEmailVerified) {
+      throw new Error(
+        'This user has already completed their account setup. Use "Forgot Password" instead.'
+      );
+    }
+
+    // Generate a fresh opaque Redis-backed setup token (48h)
+    const token = await securityTokenService.createToken(
+      userId,
+      'setup',
+      172800,
+      { role: user.role }
+    );
+
+    await emailService.sendInvitationEmail(user.email, user.role, token);
+
+    return { message: `Invitation re-sent to ${user.email}` };
+  }
+
+  async forceLogout(id, actorId, reason = null) {
+    const user = await userModel.findById(id);
+    if (!user) throw new Error('User not found');
+
+    await userModel.incrementTokenVersion(id);
+
+    await auditLogger.log({
+      userId: actorId,
+      actionType: 'FORCE_LOGOUT',
+      entityId: id,
+      entityType: 'user',
+      details: { reason },
+    });
+
+    return { message: 'User session invalidated successfully' };
+  }
 
   async assignProperty(userId, propertyId, actorId) {
     await staffModel.assignProperty(userId, propertyId);

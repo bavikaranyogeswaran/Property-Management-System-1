@@ -180,7 +180,9 @@ class EmailService {
   }
 
   async sendInvitationEmail(email, role, token) {
-    const link = `${config.frontendUrl}/setup-password?token=${token}`;
+    // [FIXED] Include role in URL so frontend can detect it without JWT decoding.
+    // The token is now an opaque Redis-backed token, not a JWT.
+    const link = `${config.frontendUrl}/setup-password?token=${token}&role=${role}`;
     const subject =
       role === 'treasurer'
         ? 'Treasurer Invitation'

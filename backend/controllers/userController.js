@@ -196,6 +196,12 @@ class UserController {
     const result = await userService.forceLogout(id, actorId, req.body.reason);
     res.json(result);
   });
+
+  resendInvitation = catchAsync(async (req, res) => {
+    const { id } = req.params;
+    const result = await userService.resendInvitation(id);
+    res.json(result);
+  });
 }
 
 export default new UserController();

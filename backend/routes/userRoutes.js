@@ -104,4 +104,12 @@ router.post(
   userController.forceLogout
 );
 
+// Resend invitation email (Owner only) — for users who haven't set up yet
+router.post(
+  '/:id/resend-invitation',
+  authenticateToken,
+  authorizeRoles(ROLES.OWNER),
+  userController.resendInvitation
+);
+
 export default router;

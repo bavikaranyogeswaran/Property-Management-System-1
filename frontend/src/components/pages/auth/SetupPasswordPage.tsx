@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   Card,
@@ -13,7 +13,6 @@ import { Label } from '@/components/ui/label';
 import { Loader2, Lock, ArrowRight, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 import authService from '@/services/auth';
-import { jwtDecode } from 'jwt-decode';
 
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -33,30 +32,14 @@ import {
 } from '@/components/ui/form';
 import { Separator } from '@/components/ui/separator';
 
-interface TokenPayload {
-  id: number;
-  type: string;
-  role?: string;
-  iat: number;
-  exp: number;
-}
-
 export function SetupPasswordPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const token = searchParams.get('token');
 
-  // Decode role synchronously so the form initializes with the correct schema
-  const role = useMemo(() => {
-    if (!token) return null;
-    try {
-      const decoded = jwtDecode<TokenPayload>(token);
-      return decoded.role ?? null;
-    } catch (err) {
-      console.error('Failed to decode token:', err);
-      return null;
-    }
-  }, [token]);
+  // [FIXED] Read role directly from the URL query param (?role=...) instead of
+  // decoding the token. The token is now an opaque string, not a JWT.
+  const role = searchParams.get('role');
 
   const isTenant = role === 'tenant';
 
