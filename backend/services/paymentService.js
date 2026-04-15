@@ -68,7 +68,7 @@ class PaymentService {
         );
       }
 
-      const centsAmount = toCentsFromMajor(amount);
+      const centsAmount = Number(amount);
       const paymentId = await paymentModel.create(
         {
           invoiceId,

@@ -66,7 +66,7 @@ class LeaseController {
     const result = await renewalService.instantRenew(
       id,
       newEndDate,
-      toCentsFromMajor(newMonthlyRent),
+      Number(newMonthlyRent),
       req.user
     );
     res.json({ message: 'Lease instantly renewed successfully', ...result });
@@ -78,7 +78,7 @@ class LeaseController {
 
     const result = await leaseService.requestRefund(
       id,
-      toCentsFromMajor(amount),
+      Number(amount),
       notes,
       req.user
     );
@@ -108,7 +108,7 @@ class LeaseController {
     const result = await leaseService.terminateLease(
       id,
       terminationDate,
-      toCentsFromMajor(terminationFee),
+      Number(terminationFee),
       req.user
     );
     res.json({ message: 'Lease terminated successfully', ...result });
@@ -138,7 +138,7 @@ class LeaseController {
       id,
       {
         effectiveDate,
-        newMonthlyRent: toCentsFromMajor(newMonthlyRent),
+        newMonthlyRent: Number(newMonthlyRent),
         notes,
       },
       req.user
@@ -168,7 +168,7 @@ class LeaseController {
     const result = await leaseService.resolveRefundDispute(
       id,
       req.user,
-      toCentsFromMajor(adjustedAmount)
+      Number(adjustedAmount)
     );
     res.json(result);
   });

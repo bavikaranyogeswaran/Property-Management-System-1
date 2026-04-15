@@ -98,7 +98,7 @@ class RenewalService {
     }
 
     await renewalRequestModel.updateTerms(requestId, {
-      proposedMonthlyRent: toCentsFromMajor(data.proposedMonthlyRent),
+      proposedMonthlyRent: Number(data.proposedMonthlyRent),
       proposedEndDate: data.proposedEndDate,
       notes: data.notes,
       status: 'negotiating',
@@ -126,7 +126,7 @@ class RenewalService {
         await emailService.sendRenewalProposed(
           tenantUser.email,
           property.name,
-          toCentsFromMajor(data.proposedMonthlyRent)
+          Number(data.proposedMonthlyRent)
         );
       }
     } catch (err) {

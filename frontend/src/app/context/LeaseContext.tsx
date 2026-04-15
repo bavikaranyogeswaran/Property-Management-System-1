@@ -181,8 +181,8 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
     try {
       const response = await apiClient.post('/leases', {
         ...lease,
-        monthlyRent: lease.monthlyRent,
-        targetDeposit: lease.targetDeposit || 0,
+        monthlyRent: toCentsFromLKR(lease.monthlyRent),
+        targetDeposit: toCentsFromLKR(lease.targetDeposit || 0),
       });
       const constructedLease: Lease = {
         ...lease,
@@ -228,7 +228,9 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
     try {
       await apiClient.post(`/leases/${id}/instant-renew`, {
         newEndDate,
-        newMonthlyRent: newMonthlyRent ? newMonthlyRent : undefined,
+        newMonthlyRent: newMonthlyRent
+          ? toCentsFromLKR(newMonthlyRent)
+          : undefined,
       });
       await fetchLeases();
       toast.success('Renewal approved. A new draft lease is ready.');
@@ -242,7 +244,7 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
   const refundDeposit = async (id: string, amount: number, notes?: string) => {
     try {
       await apiClient.post(`/leases/${id}/refund`, {
-        amount: amount,
+        amount: toCentsFromLKR(amount),
         notes,
       });
       await fetchLeases(); // Easier to refetch instead of manual mapping
@@ -474,8 +476,7 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
   ) => {
     try {
       await apiClient.post(`/renewal-requests/${id}/propose`, {
-        ...data,
-        proposedMonthlyRent: data.proposedMonthlyRent,
+        proposedMonthlyRent: toCentsFromLKR(data.proposedMonthlyRent),
       });
       toast.success('Renewal terms proposed successfully');
       fetchRenewalRequests();

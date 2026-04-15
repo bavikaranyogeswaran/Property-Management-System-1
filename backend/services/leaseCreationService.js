@@ -137,9 +137,9 @@ class LeaseCreationService {
         unitId,
         startDate,
         endDate,
-        monthlyRent: toCentsFromMajor(monthlyRent),
+        monthlyRent: Number(monthlyRent),
         status: 'draft',
-        targetDeposit: toCentsFromMajor(targetDeposit || 0.0),
+        targetDeposit: Number(targetDeposit || 0),
         documentUrl: documentUrl || null,
         leaseTermId: data.leaseTermId || null,
         reservationExpiresInDays: 2, // [HARDENED] Use DB-native math

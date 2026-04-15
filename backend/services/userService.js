@@ -366,7 +366,7 @@ class UserService {
             emergencyContactName: tenantData.emergencyContactName || null,
             emergencyContactPhone: tenantData.emergencyContactPhone || null,
             employmentStatus: 'Employed',
-            monthlyIncome: toCentsFromMajor(tenantData.monthlyIncome || 0),
+            monthlyIncome: Number(tenantData.monthlyIncome || 0),
           },
           connection
         );

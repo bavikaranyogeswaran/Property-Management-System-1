@@ -259,7 +259,7 @@ class InvoiceService {
       const newInvoiceId = await invoiceModel.create(
         {
           leaseId: invoice.leaseId || invoice.lease_id,
-          amount: toCentsFromMajor(newAmount),
+          amount: Number(newAmount),
           dueDate: invoice.dueDate || invoice.due_date,
           description: `[CORRECTED] ${invoice.description}`,
           type: invoice.invoiceType || invoice.invoice_type,
@@ -277,7 +277,7 @@ class InvoiceService {
           entityType: 'invoice',
           details: {
             originalAmount: invoice.amount,
-            newAmount: toCentsFromMajor(newAmount),
+            newAmount: Number(newAmount),
             newInvoiceId,
             reason,
           },

@@ -416,7 +416,7 @@ class MaintenanceService {
       const costId = await maintenanceCostModel.create(
         {
           requestId,
-          amount: toCentsFromMajor(amount),
+          amount: Number(amount),
           description,
           recordedDate: recordedDate || getLocalTime(),
           invoiceId: data.invoiceId || null,
@@ -438,7 +438,7 @@ class MaintenanceService {
           const invoiceId = await invoiceModel.create(
             {
               leaseId: targetLease.id,
-              amount: toCentsFromMajor(amount),
+              amount: Number(amount),
               dueDate: formatToLocalDate(addDays(now(), 7)),
               description: `Maintenance charge: ${request.title}`,
               type: 'maintenance',
@@ -472,7 +472,7 @@ class MaintenanceService {
               billTo === ROLES.TENANT
                 ? 'reimbursable_maintenance'
                 : 'maintenance_repair',
-            credit: toCentsFromMajor(amount),
+            credit: Number(amount),
             description: `Maintenance Cost: ${description || request.title} (Req #${requestId})${billTo === ROLES.TENANT ? ' [REIMBURSABLE]' : ''}`,
             entryDate: recordedDate || getCurrentDateString(),
           },
