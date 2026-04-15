@@ -106,8 +106,8 @@ export function VisitsPage() {
             <Card key={visit.id} className="overflow-hidden">
               <div className="p-6 flex flex-col lg:flex-row flex-wrap gap-6 items-start lg:items-center justify-between">
                 {/* Visitor Info */}
-                <div className="flex items-start gap-4 min-w-[200px] flex-1">
-                  <div className="bg-gray-100 p-3 rounded-full">
+                <div className="flex items-start gap-4 min-w-[200px] flex-[1.2]">
+                  <div className="bg-gray-100 p-3 rounded-full shrink-0">
                     <User className="size-6 text-gray-600" />
                   </div>
                   <div>
@@ -126,10 +126,10 @@ export function VisitsPage() {
                 </div>
 
                 {/* Property Info */}
-                <div className="flex flex-col gap-2 min-w-[200px] flex-1">
+                <div className="flex flex-col gap-2 min-w-[180px] flex-1">
                   <div className="flex items-center gap-2 text-gray-700">
                     <MapPin className="size-4 text-blue-500" />
-                    <span className="font-medium">
+                    <span className="font-medium truncate">
                       {visit.propertyName || 'Unknown Property'}
                     </span>
                   </div>
@@ -141,7 +141,7 @@ export function VisitsPage() {
                 </div>
 
                 {/* Schedule Info */}
-                <div className="flex flex-col gap-2 min-w-[150px] flex-1">
+                <div className="flex flex-col gap-2 min-w-[140px] flex-[0.8]">
                   <div className="flex items-center gap-2 text-gray-700">
                     <Calendar className="size-4 text-purple-500" />
                     <span>
@@ -157,9 +157,9 @@ export function VisitsPage() {
                 </div>
 
                 {/* Status & Actions */}
-                <div className="flex items-center gap-4 flex-1 justify-start lg:justify-end min-w-[180px]">
+                <div className="flex flex-col lg:items-end items-start gap-3 flex-[1.5] min-w-[240px]">
                   <Badge
-                    className={`${getStatusColor(visit.status)} capitalize`}
+                    className={`${getStatusColor(visit.status)} capitalize px-3 py-1 text-xs font-semibold`}
                   >
                     {visit.status}
                   </Badge>
@@ -189,41 +189,48 @@ export function VisitsPage() {
                   )}
 
                   {visit.status === 'confirmed' && (
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-2 lg:justify-end">
                       <Button
                         size="sm"
-                        className="bg-blue-600 hover:bg-blue-700 text-white"
+                        className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
                         onClick={() =>
                           handleStatusUpdate(visit.id, 'completed')
                         }
                       >
-                        <CheckCircle className="size-4 mr-1" /> Complete
+                        <CheckCircle className="size-4 mr-1.5" /> Complete
                       </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="text-orange-600 hover:bg-orange-50 border-orange-100 border"
-                        onClick={() => handleStatusUpdate(visit.id, 'no-show')}
-                      >
-                        No-Show
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setRescheduleData({ open: true, visit })}
-                      >
-                        Reschedule
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="text-red-600 hover:bg-red-50"
-                        onClick={() =>
-                          handleStatusUpdate(visit.id, 'cancelled')
-                        }
-                      >
-                        Cancel
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-orange-600 hover:bg-orange-50 border-orange-100 border h-8"
+                          onClick={() =>
+                            handleStatusUpdate(visit.id, 'no-show')
+                          }
+                        >
+                          No-Show
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8"
+                          onClick={() =>
+                            setRescheduleData({ open: true, visit })
+                          }
+                        >
+                          Reschedule
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-red-600 hover:bg-red-50 h-8"
+                          onClick={() =>
+                            handleStatusUpdate(visit.id, 'cancelled')
+                          }
+                        >
+                          Cancel
+                        </Button>
+                      </div>
                     </div>
                   )}
                 </div>
