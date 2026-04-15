@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp, Visit } from '@/app/context/AppContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -18,12 +18,17 @@ import { format } from 'date-fns';
 import { RescheduleVisitDialog } from './RescheduleVisitDialog';
 
 export function VisitsPage() {
+  console.log('!!! VISITS PAGE LOADED (Property Management System 2) !!!');
   const { visits, updateVisitStatus, fetchVisits } = useApp();
   const [filter, setFilter] = useState<Visit['status'] | 'all'>('all');
   const [rescheduleData, setRescheduleData] = useState<{
     open: boolean;
     visit: Visit | null;
   }>({ open: false, visit: null });
+
+  useEffect(() => {
+    console.log('!!! VISITS PAGE LOADED (Property Management System 2) !!!');
+  }, []);
 
   const filteredVisits = visits
     .filter((v) => (filter === 'all' ? true : v.status === filter))
@@ -58,7 +63,9 @@ export function VisitsPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Property Visits</h2>
+          <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+            Property Visits
+          </h2>
           <p className="text-sm text-gray-500">
             Manage scheduled property viewings
           </p>
@@ -97,9 +104,9 @@ export function VisitsPage() {
         ) : (
           filteredVisits.map((visit) => (
             <Card key={visit.id} className="overflow-hidden">
-              <div className="p-6 flex flex-col lg:flex-row gap-6 items-start lg:items-center justify-between">
+              <div className="p-6 flex flex-col lg:flex-row flex-wrap gap-6 items-start lg:items-center justify-between">
                 {/* Visitor Info */}
-                <div className="flex items-start gap-4 min-w-[250px]">
+                <div className="flex items-start gap-4 min-w-[200px] flex-1">
                   <div className="bg-gray-100 p-3 rounded-full">
                     <User className="size-6 text-gray-600" />
                   </div>
@@ -119,7 +126,7 @@ export function VisitsPage() {
                 </div>
 
                 {/* Property Info */}
-                <div className="flex flex-col gap-2 min-w-[250px]">
+                <div className="flex flex-col gap-2 min-w-[200px] flex-1">
                   <div className="flex items-center gap-2 text-gray-700">
                     <MapPin className="size-4 text-blue-500" />
                     <span className="font-medium">
@@ -134,7 +141,7 @@ export function VisitsPage() {
                 </div>
 
                 {/* Schedule Info */}
-                <div className="flex flex-col gap-2 min-w-[200px]">
+                <div className="flex flex-col gap-2 min-w-[150px] flex-1">
                   <div className="flex items-center gap-2 text-gray-700">
                     <Calendar className="size-4 text-purple-500" />
                     <span>
@@ -150,7 +157,7 @@ export function VisitsPage() {
                 </div>
 
                 {/* Status & Actions */}
-                <div className="flex items-center gap-4 flex-1 justify-end min-w-[200px]">
+                <div className="flex items-center gap-4 flex-1 justify-start lg:justify-end min-w-[180px]">
                   <Badge
                     className={`${getStatusColor(visit.status)} capitalize`}
                   >
@@ -158,10 +165,10 @@ export function VisitsPage() {
                   </Badge>
 
                   {visit.status === 'pending' && (
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2 shrink-0">
                       <Button
                         size="sm"
-                        className="bg-green-600 hover:bg-green-700 text-white"
+                        className="bg-green-600 hover:bg-green-700 text-white shrink-0 whitespace-nowrap"
                         onClick={() =>
                           handleStatusUpdate(visit.id, 'confirmed')
                         }
@@ -171,18 +178,18 @@ export function VisitsPage() {
                       <Button
                         size="sm"
                         variant="outline"
-                        className="text-red-600 hover:bg-red-50 hover:text-red-700 border-red-200"
+                        className="text-red-600 hover:bg-red-50 hover:text-red-700 border-red-200 shrink-0 whitespace-nowrap min-w-[100px]"
                         onClick={() =>
                           handleStatusUpdate(visit.id, 'cancelled')
                         }
                       >
-                        <X className="size-4 mr-1" /> Rej
+                        <X className="size-4 mr-1" /> Reject
                       </Button>
                     </div>
                   )}
 
                   {visit.status === 'confirmed' && (
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
                       <Button
                         size="sm"
                         className="bg-blue-600 hover:bg-blue-700 text-white"
