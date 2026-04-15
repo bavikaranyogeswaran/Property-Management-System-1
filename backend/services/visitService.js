@@ -80,18 +80,7 @@ class VisitService {
     }
 
     let leadId = await leadModel.findIdByEmailAndProperty(email, propertyId);
-    if (!leadId) {
-      leadId = await leadModel.create({
-        propertyId,
-        unitId: unitId || null,
-        interestedUnit: unitId || null,
-        name,
-        phone,
-        email,
-        notes: `Auto-created via Schedule Visit`,
-        status: 'interested',
-      });
-    } else {
+    if (leadId) {
       await leadModel.update(leadId, { lastContactedAt: new Date() });
     }
 
