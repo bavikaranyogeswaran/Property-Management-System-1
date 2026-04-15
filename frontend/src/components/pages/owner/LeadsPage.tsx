@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp, Lead, Visit } from '@/app/context/AppContext';
+import { useAuth } from '@/app/context/AuthContext';
 import { useLease } from '@/app/context/LeaseContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -49,6 +50,7 @@ import apiClient from '@/services/api';
 
 export function LeadsPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const {
     leads,
     units,
@@ -664,7 +666,8 @@ export function LeadsPage() {
                     >
                       <UserPlus className="size-4 text-purple-600" />
                     </Button>
-                    {lead.status !== 'converted' &&
+                    {user?.role === 'owner' &&
+                      lead.status !== 'converted' &&
                       lead.status !== 'dropped' && (
                         <>
                           <Button

@@ -71,6 +71,8 @@ interface LeadContextType {
     data?: any
   ) => Promise<string>;
   fetchVisits: () => Promise<void>;
+  fetchLeads: () => Promise<void>;
+  fetchStageHistory: () => Promise<void>;
   scheduleVisit: (visitData: any) => Promise<any>;
   updateVisitStatus: (id: string, status: Visit['status']) => Promise<void>;
 }
@@ -87,7 +89,7 @@ export function LeadProvider({ children }: { children: ReactNode }) {
 
   const fetchLeads = async () => {
     try {
-      if (user?.role !== 'owner') return;
+      if (user?.role !== 'owner' && user?.role !== 'treasurer') return;
       const response = await apiClient.get('/leads');
       if (response.data) {
         setLeads(
@@ -107,7 +109,7 @@ export function LeadProvider({ children }: { children: ReactNode }) {
 
   const fetchStageHistory = async () => {
     try {
-      if (user?.role !== 'owner') return;
+      if (user?.role !== 'owner' && user?.role !== 'treasurer') return;
       const response = await apiClient.get('/leads/stage-history');
       if (response.data) setLeadStageHistory(response.data);
     } catch (error) {
@@ -117,7 +119,7 @@ export function LeadProvider({ children }: { children: ReactNode }) {
 
   const fetchVisits = async () => {
     try {
-      if (user?.role !== 'owner') return;
+      if (user?.role !== 'owner' && user?.role !== 'treasurer') return;
       const response = await apiClient.get('/visits');
       setVisits(response.data);
     } catch (error) {
@@ -162,42 +164,20 @@ export function LeadProvider({ children }: { children: ReactNode }) {
   const updateLead = async (id: string, updates: Partial<Lead>) => {
     try {
       await apiClient.put(`/leads/${id}`, updates);
-      const currentLead = leads.find((l) => l.id === id);
-      if (
-        currentLead &&
-        updates.status &&
-        updates.status !== currentLead.status
-      ) {
-        const history = leadStageHistory
-          .filter((h) => h.leadId === id)
-          .sort(
-            (a, b) =>
-              new Date(b.changedAt).getTime() - new Date(a.changedAt).getTime()
-          )[0];
-        const duration = history
-          ? Math.floor(
-              (new Date().getTime() - new Date(history.changedAt).getTime()) /
-                (1000 * 60 * 60 * 24)
-            )
-          : 0;
-        const toStatus = updates.status as Lead['status'];
-        setLeadStageHistory((prev) => [
-          ...prev,
-          {
-            id: `history-${Date.now()}`,
-            leadId: id,
-            fromStatus: currentLead.status,
-            toStatus,
-            changedAt: new Date().toISOString(),
-            durationInPreviousStage: duration,
-          },
-        ]);
-      }
+
+      // Optimistic local update for instant UI feedback
       setLeads((prev) =>
         prev.map((l) => (l.id === id ? { ...l, ...updates } : l))
       );
+
+      // Re-fetch all relevant data in the background to ensure frontend is perfectly in sync
+      // with backend side effects (e.g. cancelled visits, new history records, etc.)
+      // Note: We don't await this if we want absolute instant response, but awaiting ensures
+      // we don't finish the function until the data is "officially" refreshed.
+      await Promise.all([fetchLeads(), fetchVisits(), fetchStageHistory()]);
     } catch (error) {
       console.error('Failed to update lead:', error);
+      throw error;
     }
   };
 
@@ -257,6 +237,8 @@ export function LeadProvider({ children }: { children: ReactNode }) {
         updateLead,
         convertLeadToTenant,
         fetchVisits,
+        fetchLeads,
+        fetchStageHistory,
         scheduleVisit,
         updateVisitStatus,
       }}
