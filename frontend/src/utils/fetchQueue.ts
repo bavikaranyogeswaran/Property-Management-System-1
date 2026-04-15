@@ -32,22 +32,33 @@ async function processQueue() {
   if (isRunning) return;
   isRunning = true;
 
-  while (queue.length > 0) {
-    const entry = queue.shift()!;
-    try {
-      await entry.task();
-      entry.resolve();
-    } catch (err) {
-      entry.reject(err);
-    }
+  try {
+    while (queue.length > 0) {
+      const entry = queue.shift()!;
+      if (!entry) continue; // Safety check
 
-    // Stagger: small delay between requests to avoid bursting the rate limiter
+      const taskName = entry.task.name || 'Anonymous Task';
+
+      try {
+        await entry.task();
+        entry.resolve();
+      } catch (err) {
+        entry.reject(err);
+      }
+
+      // Stagger: small delay between requests to avoid bursting the rate limiter
+      if (queue.length > 0) {
+        await new Promise((res) => setTimeout(res, STAGGER_DELAY_MS));
+      }
+    }
+  } finally {
+    isRunning = false;
+
+    // [RACE CONDITION FIX] Check if anything was added while we were cleaning up
     if (queue.length > 0) {
-      await new Promise((res) => setTimeout(res, STAGGER_DELAY_MS));
+      processQueue();
     }
   }
-
-  isRunning = false;
 }
 
 /**

@@ -108,7 +108,7 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
   const fetchProperties = async () => {
     try {
       const response = await apiClient.get('/properties');
-      if (response.status === 200) {
+      if (response.data) {
         setProperties(response.data);
       }
     } catch (e) {
@@ -119,7 +119,7 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
   const fetchPropertyTypes = async () => {
     try {
       const response = await apiClient.get('/property-types');
-      if (response.status === 200) setPropertyTypes(response.data);
+      if (response.data) setPropertyTypes(response.data);
     } catch (e) {
       console.error('Failed to fetch property types', e);
     }
@@ -128,7 +128,7 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
   const fetchUnitTypes = async () => {
     try {
       const response = await apiClient.get('/unit-types');
-      if (response.status === 200) setUnitTypes(response.data);
+      if (response.data) setUnitTypes(response.data);
     } catch (e) {
       console.error('Failed to fetch unit types', e);
     }
@@ -137,7 +137,7 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
   const fetchUnits = async () => {
     try {
       const response = await apiClient.get('/units');
-      if (response.status === 200) {
+      if (response.data) {
         setUnits(
           response.data.map((u: any) => ({
             ...u,

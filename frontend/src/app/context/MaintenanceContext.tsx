@@ -24,6 +24,8 @@ export interface MaintenanceRequest {
   submittedDate: string;
   completedDate?: string;
   images?: string[];
+  unitNumber?: string;
+  propertyName?: string;
 }
 
 export interface MaintenanceCost {
@@ -78,6 +80,8 @@ export function MaintenanceProvider({ children }: { children: ReactNode }) {
           mRes.data.map((r: any) => ({
             ...r,
             submittedDate: (r.createdAt || '').split('T')[0],
+            unitNumber: r.unitNumber,
+            propertyName: r.propertyName,
           }))
         );
       }

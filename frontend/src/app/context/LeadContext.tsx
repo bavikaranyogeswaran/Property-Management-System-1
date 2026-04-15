@@ -89,7 +89,7 @@ export function LeadProvider({ children }: { children: ReactNode }) {
     try {
       if (user?.role !== 'owner') return;
       const response = await apiClient.get('/leads');
-      if (response.status === 200) {
+      if (response.data) {
         setLeads(
           response.data.map((l: any) => ({
             ...l,
@@ -109,7 +109,7 @@ export function LeadProvider({ children }: { children: ReactNode }) {
     try {
       if (user?.role !== 'owner') return;
       const response = await apiClient.get('/leads/stage-history');
-      if (response.status === 200) setLeadStageHistory(response.data);
+      if (response.data) setLeadStageHistory(response.data);
     } catch (error) {
       console.error('Failed to fetch lead stage history:', error);
     }

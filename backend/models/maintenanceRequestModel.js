@@ -41,6 +41,8 @@ class MaintenanceRequestModel {
     const [rows] = await pool.query(
       `
             SELECT mr.*, 
+            u.unit_number,
+            p.name as property_name,
             COALESCE(
                 (SELECT JSON_ARRAYAGG(JSON_OBJECT('id', mi.image_id, 'url', mi.image_url)) 
                  FROM maintenance_images mi 
@@ -58,6 +60,8 @@ class MaintenanceRequestModel {
     return rows.map((row) => ({
       id: row.request_id.toString(),
       unitId: row.unit_id.toString(),
+      unitNumber: row.unit_number,
+      propertyName: row.property_name,
       tenantId: row.tenant_id.toString(),
       title: row.title,
       description: row.description,
