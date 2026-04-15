@@ -21,7 +21,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Building2, Plus, Edit, Trash2, Eye } from 'lucide-react';
+import { Building2, Plus, Edit, Trash2, Eye, Star } from 'lucide-react';
 import { toast } from 'sonner';
 import { MultiImageUpload } from '@/components/ui/multi-image-upload';
 import { formatLKR } from '@/utils/formatters';
@@ -381,9 +381,9 @@ export function PropertiesPage() {
       if (images && images.length > 0) {
         setExistingImages(
           images.map((img: any) => ({
-            id: img.id?.toString(),
+            id: img.id,
             url: img.imageUrl,
-            isPrimary: Boolean(img.isPrimary),
+            isPrimary: img.isPrimary,
           }))
         );
       }
@@ -539,7 +539,12 @@ export function PropertiesPage() {
     }
   };
 
+  const [selectedGalleryPropertyId, setSelectedGalleryPropertyId] = useState<
+    string | null
+  >(null);
+
   const handleViewGallery = async (property: Property) => {
+    setSelectedGalleryPropertyId(property.id);
     setViewPropertyTitle(property.name);
     setGalleryImages([]);
     setViewGalleryOpen(true);
@@ -548,6 +553,19 @@ export function PropertiesPage() {
       if (images) setGalleryImages(images);
     } catch (e) {
       toast.error('Failed to load images');
+    }
+  };
+
+  const handleDeleteGalleryImage = async (imageId: string) => {
+    if (!selectedGalleryPropertyId) return;
+    try {
+      await deletePropertyImage(selectedGalleryPropertyId, imageId);
+      toast.success('Image removed from gallery');
+      // Refresh
+      const images = await getPropertyImages(selectedGalleryPropertyId);
+      setGalleryImages(images || []);
+    } catch (e) {
+      toast.error('Failed to remove image');
     }
   };
 
@@ -1488,29 +1506,41 @@ export function PropertiesPage() {
             {galleryImages.length > 0 ? (
               galleryImages.map((img, idx) => (
                 <div
-                  key={idx}
+                  key={img.id || idx}
                   className="relative aspect-square rounded-lg overflow-hidden border border-gray-100 group"
                 >
                   <img
                     src={img.imageUrl}
-                    alt={`Gallery ${idx}`}
+                    alt={`${viewPropertyTitle} ${idx}`}
                     className="w-full h-full object-cover"
                   />
                   {img.isPrimary && (
-                    <div className="absolute top-2 right-2 bg-blue-600 text-white text-xs px-2 py-1 rounded-full shadow-sm">
+                    <div className="absolute top-2 left-2 bg-blue-600 text-white text-xs px-2 py-1 rounded shadow-sm flex items-center gap-1">
+                      <Star className="size-3 fill-white" />
                       Primary
                     </div>
                   )}
-                  <a
-                    href={img.image_url || img.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100"
-                  >
-                    <span className="bg-white/90 text-gray-900 px-3 py-1 rounded-full text-sm font-medium shadow-sm">
+
+                  {user?.role === 'owner' && (
+                    <button
+                      onClick={() => handleDeleteGalleryImage(img.id)}
+                      className="absolute top-2 right-2 p-1.5 bg-red-600/90 text-white rounded-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-700 shadow-sm"
+                      title="Remove image"
+                    >
+                      <Trash2 className="size-3.5" />
+                    </button>
+                  )}
+
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 pointer-events-none">
+                    <a
+                      href={img.imageUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="bg-white/90 text-gray-900 px-3 py-1 rounded-full text-xs font-semibold shadow-sm pointer-events-auto hover:bg-white"
+                    >
                       View Full
-                    </span>
-                  </a>
+                    </a>
+                  </div>
                 </div>
               ))
             ) : (

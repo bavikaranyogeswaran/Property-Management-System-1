@@ -229,7 +229,17 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
   const getPropertyImages = async (propertyId: string) => {
     try {
       const response = await apiClient.get(`/properties/${propertyId}/images`);
-      return response.data.images;
+      if (response.data && response.data.images) {
+        return response.data.images.map((img: any) => ({
+          id: img.image_id?.toString(),
+          propertyId: img.property_id?.toString(),
+          imageUrl: img.image_url,
+          isPrimary: Boolean(img.is_primary),
+          displayOrder: img.display_order,
+          createdAt: img.created_at,
+        }));
+      }
+      return [];
     } catch (e) {
       console.error('Failed to fetch property images', e);
       throw e;
@@ -354,7 +364,17 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
   const getUnitImages = async (unitId: string) => {
     try {
       const response = await apiClient.get(`/units/${unitId}/images`);
-      return response.data.images;
+      if (response.data && response.data.images) {
+        return response.data.images.map((img: any) => ({
+          id: img.image_id?.toString(),
+          unitId: img.unit_id?.toString(),
+          imageUrl: img.image_url,
+          isPrimary: Boolean(img.is_primary),
+          displayOrder: img.display_order,
+          createdAt: img.created_at,
+        }));
+      }
+      return [];
     } catch (e) {
       console.error('Failed to fetch unit images', e);
       return [];
