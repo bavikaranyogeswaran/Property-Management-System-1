@@ -8,11 +8,14 @@
  */
 
 export async function up(knex) {
-  await knex.schema.alterTable('tenants', (table) => {
-    // Making NIC nullable but keeping it UNIQUE
-    table.string('nic', 20).nullable().alter();
-  });
-  console.log('[Migration] tenants.nic is now nullable.');
+  // Check if column exists before altering to avoid redundancy or errors
+  if (await knex.schema.hasColumn('tenants', 'nic')) {
+    await knex.schema.alterTable('tenants', (table) => {
+      // Making NIC nullable but keeping it UNIQUE
+      table.string('nic', 20).nullable().alter();
+    });
+    console.log('[Migration] tenants.nic is now nullable.');
+  }
 }
 
 export async function down(knex) {
