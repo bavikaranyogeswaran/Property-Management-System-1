@@ -124,7 +124,7 @@ class UserModel {
   async findById(id, connection = null) {
     const db = connection || pool;
     const query = `
-            SELECT u.user_id as id, u.name, u.email, u.phone, u.role, u.status, u.token_version as tokenVersion, u.created_at as createdAt,
+            SELECT u.user_id as id, u.name, u.email, u.phone, u.role, u.status, u.is_email_verified as isEmailVerified, u.token_version as tokenVersion, u.created_at as createdAt,
                    t.nic, t.nic_url as nicUrl, t.permanent_address as permanentAddress, 
                    t.employment_status as employmentStatus, t.monthly_income as monthlyIncome, 
                    t.behavior_score as behaviorScore, t.credit_balance as creditBalance,

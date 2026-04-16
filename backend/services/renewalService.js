@@ -15,6 +15,8 @@ import { toCentsFromMajor } from '../utils/moneyUtils.js';
 import auditLogger from '../utils/auditLogger.js';
 import AppError from '../utils/AppError.js';
 import { isAtLeast, ROLES } from '../utils/roleUtils.js';
+import staffModel from '../models/staffModel.js';
+import notificationModel from '../models/notificationModel.js';
 
 /**
  * [ARCHITECTURAL SEMANTICS]
@@ -83,7 +85,6 @@ class RenewalService {
 
     // RBAC: Treasurer assignment check
     if (user.role === ROLES.TREASURER) {
-      const staffModel = (await import('../models/staffModel.js')).default;
       const assigned = await staffModel.getAssignedProperties(user.id);
       if (
         !assigned.some(
@@ -148,7 +149,6 @@ class RenewalService {
 
     // RBAC: Treasurer assignment check
     if (user.role === ROLES.TREASURER) {
-      const staffModel = (await import('../models/staffModel.js')).default;
       const assigned = await staffModel.getAssignedProperties(user.id);
       if (
         !assigned.some(
@@ -304,7 +304,6 @@ class RenewalService {
 
     // RBAC: Treasurer assignment check
     if (user.role === ROLES.TREASURER) {
-      const staffModel = (await import('../models/staffModel.js')).default;
       const assigned = await staffModel.getAssignedProperties(user.id);
       if (
         !assigned.some(
@@ -397,8 +396,6 @@ class RenewalService {
         'SELECT user_id FROM users WHERE role = ? AND status = "active"',
         [ROLES.TREASURER]
       );
-      const notificationModel = (await import('../models/notificationModel.js'))
-        .default;
       for (const t of treasurers) {
         await notificationModel.create({
           userId: t.user_id,
@@ -455,8 +452,6 @@ class RenewalService {
         'SELECT user_id FROM users WHERE role = ? AND status = "active"',
         [ROLES.TREASURER]
       );
-      const notificationModel = (await import('../models/notificationModel.js'))
-        .default;
       for (const t of treasurers) {
         await notificationModel.create({
           userId: t.user_id,

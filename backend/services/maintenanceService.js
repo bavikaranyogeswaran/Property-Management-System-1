@@ -14,6 +14,8 @@ import {
   getLocalTime,
   today,
   now,
+  addDays,
+  formatToLocalDate,
 } from '../utils/dateUtils.js';
 import { toCentsFromMajor, fromCents } from '../utils/moneyUtils.js';
 import authorizationService from './authorizationService.js';
@@ -112,7 +114,6 @@ class MaintenanceService {
       // Treasurer RBAC: Check assigned property
       if (user.role === ROLES.TREASURER) {
         const unit = await unitModel.findById(request.unitId, connection);
-        const staffModel = (await import('../models/staffModel.js')).default;
         const assigned = await staffModel.getAssignedProperties(user.id);
         const assignedPropertyIds = assigned.map((p) =>
           p.property_id.toString()
@@ -433,8 +434,6 @@ class MaintenanceService {
       if (targetLease) {
         // [F2.6] Route cost based on billTo field
         if (billTo === ROLES.TENANT) {
-          const { addDays, formatToLocalDate } =
-            await import('../utils/dateUtils.js');
           const invoiceId = await invoiceModel.create(
             {
               leaseId: targetLease.id,

@@ -6,6 +6,7 @@ import unitModel from '../models/unitModel.js';
 import leaseTermModel from '../models/leaseTermModel.js';
 import db from '../config/db.js';
 import AppError from '../utils/AppError.js';
+import leaseModel from '../models/leaseModel.js';
 
 class LeadPortalService {
   /**
@@ -51,7 +52,6 @@ class LeadPortalService {
     // Fetch associated draft lease if it exists
     let activeLease = null;
     if (lead.email) {
-      const leaseModel = (await import('../models/leaseModel.js')).default;
       const [leases] = await db.query(
         "SELECT * FROM leases WHERE tenant_id = (SELECT user_id FROM users WHERE email = ? LIMIT 1) AND status = 'draft' ORDER BY created_at DESC LIMIT 1",
         [lead.email]

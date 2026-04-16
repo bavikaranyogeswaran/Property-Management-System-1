@@ -1,5 +1,7 @@
 import leadService from '../services/leadService.js';
 import userService from '../services/userService.js';
+import leadModel from '../models/leadModel.js';
+import unitModel from '../models/unitModel.js';
 
 class LeadController {
   async convertLead(req, res) {
@@ -13,7 +15,6 @@ class LeadController {
       const { id } = req.params;
 
       // Verify the lead belongs to this owner's property
-      const leadModel = (await import('../models/leadModel.js')).default;
       const isOwner = await leadModel.verifyOwnership(id, req.user.id);
       if (!isOwner) {
         return res.status(403).json({
@@ -33,9 +34,9 @@ class LeadController {
       } = req.body;
 
       // [HARDENING] Verify target unit belongs to the lead's property
-      const targetUnitId = unitId || lead.interestedUnit;
+      const targetUnitId =
+        unitId || (await leadModel.findById(id))?.interestedUnit;
       if (targetUnitId) {
-        const unitModel = (await import('../models/unitModel.js')).default;
         const unit = await unitModel.findById(targetUnitId);
         if (!unit) {
           return res.status(404).json({ error: 'Target unit not found.' });

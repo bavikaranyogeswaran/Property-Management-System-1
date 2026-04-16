@@ -20,6 +20,7 @@ import notificationModel from '../models/notificationModel.js';
 import auditLogger from '../utils/auditLogger.js';
 import userModel from '../models/userModel.js';
 import emailService from '../utils/emailService.js';
+import unitLockService from './unitLockService.js';
 
 /**
  * Maps an invoice_type to the correct accounting ledger classification.
@@ -291,8 +292,6 @@ class PaymentService {
               invoice.tenant_email || invoice.email,
               invoice.propertyId || invoice.property_id || invoice.unitId // rough fallback
             );
-            const unitLockService = (await import('./unitLockService.js'))
-              .default;
             await unitLockService.releaseLock(invoice.unitId, leadId);
           }
         }

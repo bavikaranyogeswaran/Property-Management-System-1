@@ -140,7 +140,6 @@ class LeaseService {
   }
 
   async getDepositStatus(leaseId) {
-    const leaseModel = (await import('../models/leaseModel.js')).default;
     return await leaseModel.getDepositStatus(leaseId);
   }
 }

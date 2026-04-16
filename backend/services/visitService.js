@@ -7,6 +7,8 @@ import emailService from '../utils/emailService.js';
 import auditLogger from '../utils/auditLogger.js';
 import AppError from '../utils/AppError.js';
 import { isAtLeast, ROLES } from '../utils/roleUtils.js';
+import leadService from './leadService.js';
+import staffModel from '../models/staffModel.js';
 
 class VisitService {
   async scheduleVisit(data) {
@@ -181,7 +183,6 @@ class VisitService {
     if (user.role === ROLES.OWNER) {
       return await visitModel.findAll({ ownerId: user.id });
     } else if (user.role === ROLES.TREASURER) {
-      const staffModel = (await import('../models/staffModel.js')).default;
       const assigned = await staffModel.getAssignedProperties(user.id);
       const propertyIds = assigned.map((p) => p.property_id);
 
@@ -223,7 +224,6 @@ class VisitService {
       if (status === 'completed') {
         // [Flow 2] Automatically progress lead to 'viewed'
         try {
-          const leadService = (await import('./leadService.js')).default;
           await leadService.updateLead(
             visit.leadId,
             { status: 'viewed' },
