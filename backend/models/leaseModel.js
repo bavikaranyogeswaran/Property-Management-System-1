@@ -83,6 +83,7 @@ class LeaseModel {
     actualCheckoutAt: 'actual_checkout_at',
     targetDeposit: 'target_deposit',
     signedAt: 'signed_at',
+    isDocumentsVerified: 'is_documents_verified',
     verificationStatus: 'verification_status',
     verificationRejectionReason: 'verification_rejection_reason',
     reservationExpiresAt: 'reservation_expires_at',

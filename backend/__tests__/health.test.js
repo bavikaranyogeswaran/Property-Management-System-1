@@ -19,6 +19,8 @@ vi.mock('../config/redis.js', () => ({
     get: vi.fn(),
     set: vi.fn(),
     del: vi.fn(),
+    acquireLock: vi.fn().mockResolvedValue('mock-token'),
+    releaseLock: vi.fn().mockResolvedValue(true),
   },
   redisConfig: {
     host: 'mock-redis',
