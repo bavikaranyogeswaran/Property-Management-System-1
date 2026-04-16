@@ -12,7 +12,7 @@ const router = Router();
 router.get(
   '/',
   authenticateToken,
-  authorizeRoles(ROLES.OWNER, ROLES.TREASURER),
+  authorizeRoles(ROLES.OWNER, ROLES.TREASURER, ROLES.TENANT),
   leaseController.getLeases
 );
 router.post(

@@ -112,6 +112,7 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
         setProperties(
           response.data.map((p: any) => ({
             ...p,
+            id: p.id.toString(),
             lateFeeAmount: toLKRFromCents(p.lateFeeAmount),
           }))
         );
@@ -146,6 +147,8 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
         setUnits(
           response.data.map((u: any) => ({
             ...u,
+            id: u.id.toString(),
+            propertyId: u.propertyId.toString(),
             monthlyRent: toLKRFromCents(u.monthlyRent),
           }))
         );

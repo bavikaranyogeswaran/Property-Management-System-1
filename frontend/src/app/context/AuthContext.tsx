@@ -64,12 +64,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       setIsLoadingLeases(true);
       const res = await leaseApi.getLeases();
-      const activeOnly = res.data.filter(
-        (l: Lease) =>
-          l.status === 'active' ||
-          l.status === 'draft' ||
-          l.status === 'pending'
-      );
+      const activeOnly = res.data
+        .map((l: Lease) => ({
+          ...l,
+          id: String(l.id),
+          unitId: String(l.unitId),
+          tenantId: String(l.tenantId),
+        }))
+        .filter(
+          (l: Lease) =>
+            l.status === 'active' ||
+            l.status === 'draft' ||
+            l.status === 'pending'
+        );
       setTenantLeases(activeOnly);
 
       // Select active lease: Persisted > First Active > First found

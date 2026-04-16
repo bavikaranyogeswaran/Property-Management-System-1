@@ -84,6 +84,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
           setTenants(
             tRes.data.map((t: any) => ({
               ...t,
+              id: t.id ? t.id.toString() : t.user_id?.toString(),
               monthlyIncome: t.monthlyIncome
                 ? toLKRFromCents(t.monthlyIncome)
                 : undefined,

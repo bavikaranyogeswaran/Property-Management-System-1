@@ -103,6 +103,10 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
         setInvoices(
           invRes.data.map((i: any) => ({
             ...i,
+            id: String(i.id || i.invoice_id),
+            leaseId: i.leaseId ? String(i.leaseId) : undefined,
+            tenantId: i.tenantId ? String(i.tenantId) : undefined,
+            unitId: i.unitId ? String(i.unitId) : undefined,
             amount: toLKRFromCents(i.amount),
             amountPaid: toLKRFromCents(i.amountPaid || 0),
             dueDate: i.dueDate
@@ -121,6 +125,9 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
         setPayments(
           payRes.data.map((p: any) => ({
             ...p,
+            id: String(p.id || p.payment_id),
+            invoiceId: p.invoiceId ? String(p.invoiceId) : undefined,
+            tenantId: p.tenantId ? String(p.tenantId) : undefined,
             amount: toLKRFromCents(p.amount),
             paymentDate: (p.paymentDate || '').split('T')[0],
             submittedAt: p.createdAt || '',
@@ -135,6 +142,10 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
         setReceipts(
           receiptRes.data.map((r: any) => ({
             ...r,
+            id: String(r.id || r.receipt_id),
+            paymentId: r.paymentId ? String(r.paymentId) : undefined,
+            invoiceId: r.invoiceId ? String(r.invoiceId) : undefined,
+            tenantId: r.tenantId ? String(r.tenantId) : undefined,
             amount: toLKRFromCents(r.amount),
             generatedDate: r.receiptDate || r.createdAt,
             paymentDate: (r.paymentDate || '').split('T')[0] || r.receiptDate,

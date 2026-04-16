@@ -79,6 +79,9 @@ export function MaintenanceProvider({ children }: { children: ReactNode }) {
         setMaintenanceRequests(
           mRes.data.map((r: any) => ({
             ...r,
+            id: String(r.id || r.request_id),
+            tenantId: r.tenantId ? String(r.tenantId) : undefined,
+            unitId: r.unitId ? String(r.unitId) : undefined,
             submittedDate: (r.createdAt || '').split('T')[0],
             unitNumber: r.unitNumber,
             propertyName: r.propertyName,
@@ -92,6 +95,8 @@ export function MaintenanceProvider({ children }: { children: ReactNode }) {
           setMaintenanceCosts(
             mcRes.data.map((c: any) => ({
               ...c,
+              id: String(c.id || c.cost_id),
+              requestId: c.requestId ? String(c.requestId) : undefined,
               amount: toLKRFromCents(c.amount),
               recordedDate: (c.recordedDate || '').split('T')[0],
               billTo: c.billTo || 'owner',

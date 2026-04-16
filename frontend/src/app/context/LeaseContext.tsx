@@ -153,6 +153,10 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
         setLeases(
           lRes.data.map((l: any) => ({
             ...l,
+            id: String(l.id),
+            tenantId: String(l.tenantId),
+            unitId: String(l.unitId),
+            propertyId: l.propertyId ? String(l.propertyId) : undefined,
             monthlyRent: toLKRFromCents(l.monthlyRent),
             currentDepositBalance: toLKRFromCents(l.currentDepositBalance || 0),
             proposedRefundAmount: toLKRFromCents(l.proposedRefundAmount || 0),
