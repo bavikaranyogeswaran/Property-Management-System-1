@@ -408,7 +408,7 @@ class InvoiceModel {
     );
     return rows.map((row) => ({
       propertyName: row.property_name,
-      totalIncome: fromCents(row.total_income || 0),
+      totalIncome: Number(row.total_income || 0),
     }));
   }
 }

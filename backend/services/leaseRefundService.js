@@ -61,7 +61,7 @@ class LeaseRefundService {
     // [B2 FIX] Removed duplicate getDepositBalance call that reassigned a const
     if (amount > ledgerBalance) {
       throw new AppError(
-        `Refund amount (LKR ${amount.toLocaleString()}) cannot exceed verified ledger balance (LKR ${ledgerBalance.toLocaleString()}).`,
+        `Refund amount (LKR ${fromCents(amount).toLocaleString()}) cannot exceed verified ledger balance (LKR ${fromCents(ledgerBalance).toLocaleString()}).`,
         400
       );
     }
@@ -108,7 +108,7 @@ class LeaseRefundService {
       );
       if (amount > ledgerBalance) {
         throw new AppError(
-          `Refund amount (LKR ${amount.toLocaleString()}) cannot exceed verified ledger balance (LKR ${ledgerBalance.toLocaleString()}).`,
+          `Refund amount (LKR ${fromCents(amount).toLocaleString()}) cannot exceed verified ledger balance (LKR ${fromCents(ledgerBalance).toLocaleString()}).`,
           400
         );
       }
@@ -555,7 +555,7 @@ class LeaseRefundService {
     const ledgerBalance = await leaseModel.getDepositBalance(leaseId);
     if (adjustedAmount > ledgerBalance) {
       throw new AppError(
-        `Adjusted refund amount (LKR ${adjustedAmount.toLocaleString()}) cannot exceed verified ledger balance (LKR ${ledgerBalance.toLocaleString()}).`,
+        `Adjusted refund amount (LKR ${fromCents(adjustedAmount).toLocaleString()}) cannot exceed verified ledger balance (LKR ${fromCents(ledgerBalance).toLocaleString()}).`,
         400
       );
     }
@@ -579,7 +579,7 @@ class LeaseRefundService {
     // [FLOW 8 FIX] Notify Tenant of revised offer
     await notificationModel.create({
       userId: lease.tenantId,
-      message: `A revised security deposit refund offer has been made for your lease. New proposed amount: LKR ${adjustedAmount.toLocaleString()}.`,
+      message: `A revised security deposit refund offer has been made for your lease. New proposed amount: LKR ${fromCents(adjustedAmount).toLocaleString()}.`,
       type: 'lease',
       severity: 'info',
       entityType: 'lease',
@@ -592,7 +592,7 @@ class LeaseRefundService {
         const emailService = (await import('../utils/emailService.js')).default;
         await emailService.sendGenericNotification(tenant.email, {
           subject: 'Revised Refund Offer',
-          message: `Your landlord has updated the security deposit refund offer for your lease. Please log in to acknowledge the new amount: LKR ${adjustedAmount.toLocaleString()}.`,
+          message: `Your landlord has updated the security deposit refund offer for your lease. Please log in to acknowledge the new amount: LKR ${fromCents(adjustedAmount).toLocaleString()}.`,
         });
       } catch (err) {
         console.error('Failed to send refund resolution email:', err);

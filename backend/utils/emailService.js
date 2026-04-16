@@ -541,7 +541,7 @@ class EmailService {
     const formattedAmount = new Intl.NumberFormat('en-LK', {
       style: 'currency',
       currency: 'LKR',
-    }).format(amount);
+    }).format(fromCents(amount));
 
     if (!this.transporter) {
       console.log('==================================================');
@@ -590,7 +590,7 @@ class EmailService {
     const formattedAmount = new Intl.NumberFormat('en-LK', {
       style: 'currency',
       currency: 'LKR',
-    }).format(amount);
+    }).format(fromCents(amount));
 
     if (!this.transporter) {
       console.log('==================================================');
@@ -698,7 +698,7 @@ class EmailService {
     const formattedAmount = new Intl.NumberFormat('en-LK', {
       style: 'currency',
       currency: 'LKR',
-    }).format(amount);
+    }).format(fromCents(amount));
 
     if (!this.transporter) {
       console.log('==================================================');

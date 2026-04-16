@@ -1,6 +1,7 @@
 import reportService from '../services/reportService.js';
 import { getLocalTime, parseLocalDate } from '../utils/dateUtils.js';
 import ReportGenerator from '../utils/pdfGenerator.js';
+import { fromCents } from '../utils/moneyUtils.js';
 import catchAsync from '../utils/catchAsync.js';
 
 class ReportController {
@@ -24,17 +25,17 @@ class ReportController {
     gen.drawKpiPanel([
       {
         label: 'TOTAL REVENUE',
-        value: `LKR ${data.totalIncome.toLocaleString()}`,
+        value: `LKR ${fromCents(data.totalIncome).toLocaleString()}`,
         color: '#22c55e',
       },
       {
         label: 'TOTAL EXPENSES',
-        value: `LKR ${data.totalExpense.toLocaleString()}`,
+        value: `LKR ${fromCents(data.totalExpense).toLocaleString()}`,
         color: '#ef4444',
       },
       {
         label: 'NET INCOME',
-        value: `LKR ${data.totalNet.toLocaleString()}`,
+        value: `LKR ${fromCents(data.totalNet).toLocaleString()}`,
         color: data.totalNet >= 0 ? '#2563eb' : '#ef4444',
       },
       {
@@ -65,20 +66,21 @@ class ReportController {
       gen.checkPageBreak(20);
       const isLoss = p.net < 0;
       gen.doc.fillColor('#334155').text(p.name, 50, gen.y, { width: 145 });
-      gen.doc.text(`LKR ${p.income.toLocaleString()}`, 200, gen.y, {
+      gen.doc.text(`LKR ${fromCents(p.income).toLocaleString()}`, 200, gen.y, {
         width: 85,
         align: 'right',
       });
-      gen.doc.text(`LKR ${p.expense.toLocaleString()}`, 285, gen.y, {
+      gen.doc.text(`LKR ${fromCents(p.expense).toLocaleString()}`, 285, gen.y, {
         width: 85,
         align: 'right',
       });
       gen.doc
         .fillColor(isLoss ? '#ef4444' : '#22c55e')
-        .text(`LKR ${p.net.toLocaleString()}`, 370, gen.y, {
+        .text(`LKR ${fromCents(p.net).toLocaleString()}`, 370, gen.y, {
           width: 110,
           align: 'right',
         });
+
       gen.doc
         .fillColor(
           p.margin < 10 ? '#ef4444' : p.margin < 30 ? '#f59e0b' : '#22c55e'
@@ -96,17 +98,27 @@ class ReportController {
     gen.y += 8;
     gen.doc.font('Helvetica-Bold').fontSize(9);
     gen.doc.text('TOTAL', 50, gen.y);
-    gen.doc.text(`LKR ${data.totalIncome.toLocaleString()}`, 200, gen.y, {
-      width: 85,
-      align: 'right',
-    });
-    gen.doc.text(`LKR ${data.totalExpense.toLocaleString()}`, 285, gen.y, {
-      width: 85,
-      align: 'right',
-    });
+    gen.doc.text(
+      `LKR ${fromCents(data.totalIncome).toLocaleString()}`,
+      200,
+      gen.y,
+      {
+        width: 85,
+        align: 'right',
+      }
+    );
+    gen.doc.text(
+      `LKR ${fromCents(data.totalExpense).toLocaleString()}`,
+      285,
+      gen.y,
+      {
+        width: 85,
+        align: 'right',
+      }
+    );
     gen.doc
       .fillColor(data.totalNet >= 0 ? '#22c55e' : '#ef4444')
-      .text(`LKR ${data.totalNet.toLocaleString()}`, 370, gen.y, {
+      .text(`LKR ${fromCents(data.totalNet).toLocaleString()}`, 370, gen.y, {
         width: 110,
         align: 'right',
       });
@@ -344,7 +356,7 @@ class ReportController {
         label: 'TOTAL SPEND',
         value:
           data.totalCost > 0
-            ? `LKR ${data.totalCost.toLocaleString()}`
+            ? `LKR ${fromCents(data.totalCost).toLocaleString()}`
             : 'LKR 0',
         color: data.totalCost > 0 ? '#ef4444' : '#22c55e',
       },
@@ -396,7 +408,7 @@ class ReportController {
         const barColor = barColors[index % barColors.length];
 
         gen.doc.fillColor('#334155').text(cat, 50, gen.y, { width: 145 });
-        gen.doc.text(amount.toLocaleString(), 200, gen.y, {
+        gen.doc.text(fromCents(amount).toLocaleString(), 200, gen.y, {
           width: 90,
           align: 'right',
         });
@@ -450,7 +462,7 @@ class ReportController {
       },
       {
         label: 'REVENUE AT RISK',
-        value: `LKR ${data.revenueAtRisk.toLocaleString()}`,
+        value: `LKR ${fromCents(data.revenueAtRisk).toLocaleString()}`,
         color: '#ef4444',
       },
     ]);
@@ -485,7 +497,7 @@ class ReportController {
         gen.y
       );
       gen.doc.text(
-        `LKR ${(lease.monthlyRent || 0).toLocaleString()}`,
+        `LKR ${fromCents(lease.monthlyRent || 0).toLocaleString()}`,
         410,
         gen.y,
         { width: 70, align: 'right' }

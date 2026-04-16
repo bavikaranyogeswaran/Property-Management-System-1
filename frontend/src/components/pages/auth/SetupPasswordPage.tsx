@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2, Lock, ArrowRight, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
+import { toCentsFromLKR } from '@/utils/formatters';
 import authService from '@/services/auth';
 
 import { useForm } from 'react-hook-form';
@@ -77,6 +78,14 @@ export function SetupPasswordPage() {
       if (isTenant) {
         // Send tenant data along with password
         const { password, confirmPassword, ...tenantData } = data;
+
+        // Convert monthlyIncome to cents before submission
+        if (tenantData.monthlyIncome) {
+          tenantData.monthlyIncome = toCentsFromLKR(
+            Number(tenantData.monthlyIncome)
+          );
+        }
+
         await authService.setupPassword(token, password, tenantData);
       } else {
         await authService.setupPassword(token, data.password);

@@ -36,7 +36,7 @@ import {
   validateName,
 } from '@/utils/validators';
 import apiClient from '@/services/api';
-import { formatLKR } from '@/utils/formatters';
+import { formatLKR, toLKRFromCents } from '@/utils/formatters';
 
 export function PublicPropertyDetailsPage() {
   const { id } = useParams<{ id: string }>();
@@ -89,24 +89,40 @@ export function PublicPropertyDetailsPage() {
   };
 
   useEffect(() => {
-    if (id && properties.length > 0) {
-      const foundProperty = properties.find((p) => p.id === id);
-      if (foundProperty) {
-        setProperty(foundProperty);
-        setPropertyUnits(units.filter((u) => u.propertyId === id));
-        setInterestFormData((prev) => ({ ...prev, propertyId: id }));
+    const fetchPropertyAndUnits = async () => {
+      if (!id) return;
+      try {
+        // Fetch property directly (supports guest view)
+        const propRes = await apiClient.get(`/properties/${id}`);
+        if (propRes.data) {
+          setProperty(propRes.data);
+          setInterestFormData((prev) => ({ ...prev, propertyId: id }));
+        }
+
+        // Fetch units directly (supports guest view)
+        const unitsRes = await apiClient.get(
+          `/units?public=true&propertyId=${id}`
+        );
+        if (unitsRes.data) {
+          // Filter manually just in case, though API should handle it
+          setPropertyUnits(
+            unitsRes.data.filter((u: any) => u.propertyId === id)
+          );
+        }
+
+        const images = await getPropertyImages(id);
+        if (images) setGalleryImages(images);
+
         // Scroll to top on load
         window.scrollTo(0, 0);
-
-        // Fetch gallery images
-        getPropertyImages(id)
-          .then((images) => {
-            if (images) setGalleryImages(images);
-          })
-          .catch((err) => console.error('Failed to load gallery images', err));
+      } catch (err) {
+        console.error('Failed to load property or units', err);
+        toast.error('Failed to load property details');
       }
-    }
-  }, [id, properties, units, getPropertyImages]);
+    };
+
+    fetchPropertyAndUnits();
+  }, [id, getPropertyImages]);
 
   useEffect(() => {
     if (id) {
@@ -237,6 +253,7 @@ export function PublicPropertyDetailsPage() {
     propertyUnits.length > 0
       ? Math.min(...propertyUnits.map((u) => u.monthlyRent))
       : 0;
+  // Note: minRent is in Cents here because API returned raw data.
 
   return (
     <>
@@ -339,7 +356,9 @@ export function PublicPropertyDetailsPage() {
                   Starting Price
                 </p>
                 <p className="text-2xl font-bold text-gray-900">
-                  {minRent > 0 ? `${formatLKR(minRent)}` : 'N/A'}
+                  {minRent > 0
+                    ? `${formatLKR(toLKRFromCents(minRent))}`
+                    : 'N/A'}
                   <span className="text-sm font-normal text-gray-400 ml-1">
                     /mo
                   </span>
@@ -545,7 +564,7 @@ export function PublicPropertyDetailsPage() {
                               <p className="text-gray-500">{unit.type}</p>
                             </div>
                             <p className="text-xl font-bold text-blue-600">
-                              {formatLKR(unit.monthlyRent)}
+                              {formatLKR(toLKRFromCents(unit.monthlyRent))}
                               <span className="text-sm font-normal text-gray-500">
                                 /mo
                               </span>
@@ -726,7 +745,7 @@ export function PublicPropertyDetailsPage() {
                 <div>
                   <p className="text-sm text-gray-500">Monthly Rent</p>
                   <p className="text-xl font-bold text-blue-600">
-                    {formatLKR(selectedUnit.monthlyRent)}
+                    {formatLKR(toLKRFromCents(selectedUnit.monthlyRent))}
                   </p>
                 </div>
                 <div>

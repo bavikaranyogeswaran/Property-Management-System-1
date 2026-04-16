@@ -25,7 +25,7 @@ import {
   Construction,
 } from 'lucide-react';
 import { payoutApi } from '@/services/api';
-import { formatLKR } from '@/utils/formatters';
+import { formatLKR, toLKRFromCents } from '@/utils/formatters';
 import { toast } from 'sonner';
 
 interface PayoutDetailModalProps {
@@ -126,7 +126,7 @@ export function PayoutDetailModal({
                     Gross Rent
                   </span>
                   <p className="text-xl md:text-2xl font-bold text-gray-900 break-all">
-                    {formatLKR(data.summary.totalGross)}
+                    {formatLKR(toLKRFromCents(data.summary.totalGross))}
                   </p>
                 </div>
                 <div className="sm:border-l sm:pl-6 space-y-1 text-center sm:text-left border-gray-200">
@@ -134,7 +134,7 @@ export function PayoutDetailModal({
                     Agency Fee
                   </span>
                   <p className="text-xl md:text-2xl font-bold text-red-500 break-all">
-                    -{formatLKR(data.summary.totalCommission)}
+                    -{formatLKR(toLKRFromCents(data.summary.totalCommission))}
                   </p>
                 </div>
                 <div className="lg:border-l lg:pl-6 space-y-1 text-center sm:text-left border-gray-200">
@@ -142,7 +142,7 @@ export function PayoutDetailModal({
                     Maintenance
                   </span>
                   <p className="text-xl md:text-2xl font-bold text-red-600 break-all">
-                    -{formatLKR(data.summary.totalExpenses)}
+                    -{formatLKR(toLKRFromCents(data.summary.totalExpenses))}
                   </p>
                 </div>
                 <div className="lg:border-l lg:pl-6 space-y-1 border-gray-200 bg-white sm:bg-transparent rounded-xl p-4 sm:p-0 shadow-sm sm:shadow-none border border-blue-100 sm:border-0 grow text-center sm:text-left">
@@ -150,7 +150,7 @@ export function PayoutDetailModal({
                     Final Net Payout
                   </span>
                   <p className="text-2xl md:text-3xl font-black text-gray-900 break-all">
-                    {formatLKR(data.summary.netPayout)}
+                    {formatLKR(toLKRFromCents(data.summary.netPayout))}
                   </p>
                 </div>
               </div>
@@ -275,7 +275,7 @@ export function PayoutDetailModal({
                             </div>
                           </TableCell>
                           <TableCell className="font-bold text-green-600 text-right whitespace-nowrap font-mono">
-                            {formatLKR(item.amount)}
+                            {formatLKR(toLKRFromCents(item.amount))}
                           </TableCell>
                         </TableRow>
                       ))}
@@ -345,7 +345,7 @@ export function PayoutDetailModal({
                             {new Date(item.recorded_date).toLocaleDateString()}
                           </TableCell>
                           <TableCell className="font-bold text-red-600 text-right whitespace-nowrap font-mono">
-                            -{formatLKR(item.amount)}
+                            -{formatLKR(toLKRFromCents(item.amount))}
                           </TableCell>
                         </TableRow>
                       ))}

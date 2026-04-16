@@ -6,7 +6,7 @@ import leaseModel from '../models/leaseModel.js';
 import leadModel from '../models/leadModel.js';
 import ledgerModel from '../models/ledgerModel.js';
 import { getLocalTime, parseLocalDate, addDays } from '../utils/dateUtils.js';
-import { moneyMath } from '../utils/moneyUtils.js';
+import { moneyMath, fromCents } from '../utils/moneyUtils.js';
 import { ROLES } from '../utils/roleUtils.js';
 
 class ReportService {
@@ -559,7 +559,7 @@ class ReportService {
       if (critical.length > 0) {
         const critRent = critical.reduce((s, l) => s + (l.monthlyRent || 0), 0);
         insights.push({
-          message: `${critical.length} lease(s) expire within 14 days (LKR ${critRent.toLocaleString()}/mo risk). contact tenants immediately.`,
+          message: `${critical.length} lease(s) expire within 14 days (LKR ${fromCents(critRent).toLocaleString()}/mo risk). contact tenants immediately.`,
           urgency: 'critical',
         });
       }

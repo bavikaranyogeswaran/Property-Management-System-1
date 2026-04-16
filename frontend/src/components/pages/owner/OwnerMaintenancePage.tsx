@@ -53,7 +53,7 @@ import {
   FileText,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { formatLKR } from '@/utils/formatters';
+import { formatLKR, toLKRFromCents, toCentsFromLKR } from '@/utils/formatters';
 
 export function OwnerMaintenancePage() {
   const {
@@ -138,7 +138,7 @@ export function OwnerMaintenancePage() {
 
     addMaintenanceCost({
       requestId: selectedRequest.id,
-      amount: parseFloat(costFormData.amount),
+      amount: toCentsFromLKR(parseFloat(costFormData.amount)),
       description: costFormData.description,
       billTo: costFormData.billTo,
     });
@@ -160,7 +160,7 @@ export function OwnerMaintenancePage() {
     try {
       await createMaintenanceInvoice(
         selectedRequest.id,
-        parseFloat(billFormData.amount),
+        toCentsFromLKR(parseFloat(billFormData.amount)),
         billFormData.description,
         billFormData.dueDate
       );
@@ -230,7 +230,7 @@ export function OwnerMaintenancePage() {
     },
     {
       label: 'Total Cost',
-      value: formatLKR(totalMaintenanceCost),
+      value: formatLKR(toLKRFromCents(totalMaintenanceCost)),
       icon: DollarSign,
       color: 'bg-purple-50 text-purple-700',
     },
@@ -300,7 +300,7 @@ export function OwnerMaintenancePage() {
                   {costs.length > 0 ? (
                     <div>
                       <span className="font-semibold">
-                        {formatLKR(totalCost)}
+                        {formatLKR(toLKRFromCents(totalCost))}
                       </span>
                       <span className="text-xs text-gray-500 ml-1">
                         ({costs.length})
@@ -621,7 +621,7 @@ export function OwnerMaintenancePage() {
                             {cost.billTo === 'tenant' ? 'Tenant' : 'Owner'}
                           </Badge>
                           <span className="font-semibold">
-                            {formatLKR(cost.amount)}
+                            {formatLKR(toLKRFromCents(cost.amount))}
                           </span>
                           <button
                             type="button"
@@ -639,7 +639,11 @@ export function OwnerMaintenancePage() {
                     ))}
                     <div className="pt-2 border-t flex justify-between font-semibold">
                       <span>Total:</span>
-                      <span>{formatLKR(getTotalCost(selectedRequest.id))}</span>
+                      <span>
+                        {formatLKR(
+                          toLKRFromCents(getTotalCost(selectedRequest.id))
+                        )}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -852,7 +856,9 @@ export function OwnerMaintenancePage() {
                 <div className="flex justify-between items-center mb-2">
                   <h4 className="font-medium">Maintenance Costs</h4>
                   <span className="font-semibold">
-                    {formatLKR(getTotalCost(selectedRequest.id))}
+                    {formatLKR(
+                      toLKRFromCents(getTotalCost(selectedRequest.id))
+                    )}
                   </span>
                 </div>
                 {getRequestCosts(selectedRequest.id).length > 0 ? (
@@ -866,7 +872,7 @@ export function OwnerMaintenancePage() {
                           {cost.description}
                         </span>
                         <span className="font-medium">
-                          {formatLKR(cost.amount)}
+                          {formatLKR(toLKRFromCents(cost.amount))}
                         </span>
                       </div>
                     ))}
@@ -935,7 +941,9 @@ export function OwnerMaintenancePage() {
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Total Recorded Cost:</span>
                   <span className="font-semibold">
-                    {formatLKR(getTotalCost(selectedRequest.id))}
+                    {formatLKR(
+                      toLKRFromCents(getTotalCost(selectedRequest.id))
+                    )}
                   </span>
                 </div>
               </div>

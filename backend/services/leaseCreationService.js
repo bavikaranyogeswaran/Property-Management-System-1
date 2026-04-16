@@ -488,7 +488,7 @@ class LeaseCreationService {
       const depositStats = await leaseModel.getDepositStatus(leaseId, conn);
       if (depositStats && !depositStats.isFullyPaid) {
         throw new AppError(
-          `Cannot activate lease: Security Deposit of LKR ${depositStats.targetAmount.toLocaleString()} is not fully paid. Current ledger balance: LKR ${depositStats.paidAmount.toLocaleString()}.`,
+          `Cannot activate lease: Security Deposit of LKR ${fromCents(depositStats.targetAmount).toLocaleString()} is not fully paid. Current ledger balance: LKR ${fromCents(depositStats.paidAmount).toLocaleString()}.`,
           400
         );
       }

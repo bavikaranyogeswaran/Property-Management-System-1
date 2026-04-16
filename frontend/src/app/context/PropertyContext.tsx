@@ -109,7 +109,12 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
     try {
       const response = await apiClient.get('/properties');
       if (response.data) {
-        setProperties(response.data);
+        setProperties(
+          response.data.map((p: any) => ({
+            ...p,
+            lateFeeAmount: toLKRFromCents(p.lateFeeAmount),
+          }))
+        );
       }
     } catch (e) {
       console.error('Failed to fetch properties', e);
@@ -163,7 +168,12 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
     property: Omit<Property, 'id' | 'createdAt'>
   ): Promise<Property | undefined> => {
     try {
-      const response = await apiClient.post('/properties', property);
+      const response = await apiClient.post('/properties', {
+        ...property,
+        lateFeeAmount: property.lateFeeAmount
+          ? toCentsFromLKR(property.lateFeeAmount)
+          : 0,
+      });
       if (response.status === 201) {
         const mapped = response.data;
         setProperties((prev) => [...prev, mapped]);
@@ -177,7 +187,12 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
 
   const updateProperty = async (id: string, updates: Partial<Property>) => {
     try {
-      await apiClient.put(`/properties/${id}`, updates);
+      await apiClient.put(`/properties/${id}`, {
+        ...updates,
+        lateFeeAmount: updates.lateFeeAmount
+          ? toCentsFromLKR(updates.lateFeeAmount)
+          : undefined,
+      });
       if (updates.propertyTypeId) {
         const type = propertyTypes.find((t) => t.id === updates.propertyTypeId);
         if (type) updates.typeName = type.name;
