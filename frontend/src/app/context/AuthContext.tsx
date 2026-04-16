@@ -10,6 +10,7 @@ import authService from '../../services/auth';
 import { leaseApi } from '../../services/api';
 import storage from '../../services/storage';
 import { Lease } from './AppContext';
+import { toLKRFromCents } from '../../utils/formatters';
 
 export type UserRole = 'owner' | 'tenant' | 'treasurer' | 'lead';
 
@@ -64,12 +65,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       setIsLoadingLeases(true);
       const res = await leaseApi.getLeases();
+      console.log(
+        '[AuthContext] Fetched leases, normalizing amounts...',
+        res.data
+      );
       const activeOnly = res.data
-        .map((l: Lease) => ({
+        .map((l: any) => ({
           ...l,
           id: String(l.id),
           unitId: String(l.unitId),
           tenantId: String(l.tenantId),
+          monthlyRent: toLKRFromCents(l.monthlyRent),
+          targetDeposit: toLKRFromCents(l.targetDeposit || 0),
+          currentDepositBalance: toLKRFromCents(l.currentDepositBalance || 0),
+          proposedRefundAmount: toLKRFromCents(l.proposedRefundAmount || 0),
+          refundedAmount: toLKRFromCents(l.refundedAmount || 0),
         }))
         .filter(
           (l: Lease) =>

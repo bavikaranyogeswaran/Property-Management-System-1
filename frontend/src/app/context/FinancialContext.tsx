@@ -99,6 +99,7 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
     try {
       // Invoices
       const invRes = await invoiceApi.getInvoices();
+      console.log('[FinancialContext] Fetched invoices:', invRes.data);
       if (invRes.data) {
         setInvoices(
           invRes.data.map((i: any) => ({

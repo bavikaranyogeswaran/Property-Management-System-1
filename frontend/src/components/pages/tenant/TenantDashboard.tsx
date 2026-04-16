@@ -95,6 +95,9 @@ export function TenantDashboard() {
     ? units.find((u) => u.id === currentLease.unitId)
     : null;
 
+  console.log('[TenantDashboard] currentLease:', currentLease);
+  console.log('[TenantDashboard] tenantInvoices:', tenantInvoices);
+
   // Fix: Compare dates strictly (YYYY-MM-DD string comparison works if format is ISO)
   // Use local date to avoid UTC shifts marking today's invoices as overdue
   const d = new Date();
