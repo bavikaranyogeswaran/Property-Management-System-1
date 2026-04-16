@@ -81,6 +81,14 @@ export const LeaseSwitcher: React.FC = () => {
                         Pending Setup
                       </Badge>
                     )}
+                    {lease.status === 'pending' && (
+                      <Badge
+                        variant="outline"
+                        className="bg-amber-50 text-amber-600 border-amber-200 text-[8px] h-3.5 px-1 uppercase"
+                      >
+                        Upcoming
+                      </Badge>
+                    )}
                   </span>
                   <span className="text-[10px] text-gray-500 font-normal leading-none">
                     {lease.propertyName}

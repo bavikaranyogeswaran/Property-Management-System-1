@@ -110,7 +110,8 @@ export function TenantDashboard() {
 
   const stats = [
     {
-      title: 'Current Rent',
+      title:
+        currentLease?.status === 'pending' ? 'Upcoming Rent' : 'Current Rent',
       value: currentLease ? formatLKR(currentLease.monthlyRent) : 'N/A',
       subtitle: 'Monthly',
       icon: Home,
@@ -168,7 +169,18 @@ export function TenantDashboard() {
       {currentLease && currentUnit && (
         <Card>
           <CardHeader>
-            <CardTitle>Current Lease Information</CardTitle>
+            <div className="flex justify-between items-center">
+              <CardTitle>
+                {currentLease.status === 'pending'
+                  ? 'Upcoming Lease Information'
+                  : 'Current Lease Information'}
+              </CardTitle>
+              {currentLease.status === 'pending' && (
+                <div className="px-2 py-1 bg-amber-100 text-amber-800 text-xs font-bold rounded-full uppercase tracking-wider">
+                  Pending Activation
+                </div>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

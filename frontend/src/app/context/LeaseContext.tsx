@@ -19,7 +19,7 @@ export interface Lease {
   startDate: string;
   endDate: string | null;
   monthlyRent: number;
-  status: 'draft' | 'active' | 'expired' | 'ended' | 'cancelled';
+  status: 'draft' | 'pending' | 'active' | 'expired' | 'ended' | 'cancelled';
   currentDepositBalance?: number;
   depositStatus?:
     | 'pending'

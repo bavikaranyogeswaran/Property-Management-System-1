@@ -38,7 +38,9 @@ export function TenantLeasePage() {
 
   // Separate active and past leases
   const activeLeases = leases.filter(
-    (l) => l.status === 'active' && l.id === activeLeaseId
+    (l) =>
+      (l.status === 'active' || l.status === 'pending') &&
+      l.id === activeLeaseId
   );
   const pastLeases = leases.filter(
     (l) => l.status !== 'active' && leasesFromAuth.some((tl) => tl.id === l.id)
@@ -96,6 +98,7 @@ export function TenantLeasePage() {
 
   const statusColors: Record<string, string> = {
     active: 'bg-green-100 text-green-800',
+    pending: 'bg-amber-100 text-amber-800',
     ended: 'bg-gray-100 text-gray-800',
     cancelled: 'bg-red-100 text-red-800',
   };
@@ -127,11 +130,11 @@ export function TenantLeasePage() {
               <AlertTriangle className="size-5 text-yellow-600" />
               <div>
                 <p className="font-medium text-yellow-900">
-                  No Active Lease Found
+                  No Current Lease Found
                 </p>
                 <p className="text-sm text-yellow-700">
-                  You don't currently have an active lease. Contact your
-                  property owner for more information.
+                  You don't currently have an active or upcoming lease. Contact
+                  your property owner for more information.
                 </p>
               </div>
             </div>

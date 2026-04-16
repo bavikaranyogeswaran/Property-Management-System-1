@@ -9,6 +9,7 @@ import React, {
 import authService from '../../services/auth';
 import { leaseApi } from '../../services/api';
 import storage from '../../services/storage';
+import { Lease } from './AppContext';
 
 export type UserRole = 'owner' | 'tenant' | 'treasurer' | 'lead';
 
@@ -38,7 +39,7 @@ interface AuthContextType {
   refreshUser: () => Promise<void>;
 
   // Multi-Unit (E19)
-  tenantLeases: any[];
+  tenantLeases: Lease[];
   activeLeaseId: string | null;
   setActiveLeaseId: (id: string) => void;
   isLoadingLeases: boolean;
@@ -49,7 +50,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [tenantLeases, setTenantLeases] = useState<any[]>([]);
+  const [tenantLeases, setTenantLeases] = useState<Lease[]>([]);
   const [activeLeaseId, setActiveLeaseIdState] = useState<string | null>(null);
   const [isLoadingLeases, setIsLoadingLeases] = useState(false);
   const logoutTimerRef = useRef<number | null>(null);
@@ -64,7 +65,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsLoadingLeases(true);
       const res = await leaseApi.getLeases();
       const activeOnly = res.data.filter(
-        (l: any) => l.status === 'active' || l.status === 'draft'
+        (l: Lease) =>
+          l.status === 'active' ||
+          l.status === 'draft' ||
+          l.status === 'pending'
       );
       setTenantLeases(activeOnly);
 
