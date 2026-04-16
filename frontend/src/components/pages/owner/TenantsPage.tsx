@@ -30,6 +30,8 @@ import {
 import { ChatInterface } from '@/components/common/ChatInterface';
 import { TenantDetailsDialog } from '@/components/tenants/TenantDetailsDialog';
 import { MessageSquare } from 'lucide-react';
+import { toast } from 'sonner';
+import apiClient from '@/services/api';
 
 export function TenantsPage() {
   const { tenants, leases, units, properties } = useApp();
@@ -39,6 +41,16 @@ export function TenantsPage() {
   const [filterStatus, setFilterStatus] = useState<
     'all' | 'active' | 'inactive'
   >('all');
+
+  const handleResendPortal = async (tenantId: string) => {
+    try {
+      // Using the user invitation resend endpoint as it handles invitation/onboarding resend
+      await apiClient.post(`/users/${tenantId}/resend-invitation`);
+      toast.success('Access link resent successfully');
+    } catch (e) {
+      toast.error('Failed to resend access link');
+    }
+  };
 
   const getTenantLease = (tenantId: string) => {
     return leases.find((l) => l.tenantId === tenantId && l.status === 'active');
@@ -243,6 +255,15 @@ export function TenantsPage() {
                             onClick={() => setSelectedTenant(tenant)}
                           >
                             View Details
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                            onClick={() => handleResendPortal(tenant.id)}
+                            title="Resend Portal / Invitation"
+                          >
+                            <Mail className="size-4" />
                           </Button>
                         </div>
                       </TableCell>

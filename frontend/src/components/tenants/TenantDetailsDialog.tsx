@@ -16,6 +16,8 @@ import { AddBehaviorModal, BehaviorLogFormData } from './AddBehaviorModal';
 import { formatLKR } from '@/utils/formatters';
 import { useApp } from '@/app/context/AppContext';
 import { useAuth } from '@/app/context/AuthContext';
+import { toast } from 'sonner';
+import apiClient from '@/services/api';
 
 interface TenantDetailsDialogProps {
   tenant: Tenant | null;
@@ -92,6 +94,16 @@ export const TenantDetailsDialog: React.FC<TenantDetailsDialogProps> = ({
     }
   };
 
+  const handleResendPortal = async () => {
+    if (!tenant) return;
+    try {
+      await apiClient.post(`/users/${tenant.id}/resend-invitation`);
+      toast.success('Access link resent successfully');
+    } catch (e) {
+      toast.error('Failed to resend access link');
+    }
+  };
+
   if (!tenant) return null;
 
   const lease = leases.find(
@@ -147,19 +159,39 @@ export const TenantDetailsDialog: React.FC<TenantDetailsDialogProps> = ({
                       </div>
                     </div>
                     {lease ? (
-                      <Badge
-                        variant="secondary"
-                        className="bg-green-100 text-green-700 whitespace-nowrap"
-                      >
-                        Active Tenant
-                      </Badge>
+                      <div className="flex flex-col items-end gap-2">
+                        <Badge
+                          variant="secondary"
+                          className="bg-green-100 text-green-700 whitespace-nowrap"
+                        >
+                          Active Tenant
+                        </Badge>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-xs h-7 text-blue-600 border-blue-200 hover:bg-blue-50"
+                          onClick={handleResendPortal}
+                        >
+                          Resend Portal Link
+                        </Button>
+                      </div>
                     ) : (
-                      <Badge
-                        variant="outline"
-                        className="text-gray-500 whitespace-nowrap"
-                      >
-                        Inactive
-                      </Badge>
+                      <div className="flex flex-col items-end gap-2">
+                        <Badge
+                          variant="outline"
+                          className="text-gray-500 whitespace-nowrap"
+                        >
+                          Inactive
+                        </Badge>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-xs h-7 text-blue-600 border-blue-200 hover:bg-blue-50"
+                          onClick={handleResendPortal}
+                        >
+                          Resend Invitation
+                        </Button>
+                      </div>
                     )}
                   </div>
 

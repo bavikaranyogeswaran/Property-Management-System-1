@@ -611,9 +611,9 @@ class UserService {
     if (!user) throw new Error('User not found');
 
     if (user.isEmailVerified) {
-      throw new Error(
-        'This user has already completed their account setup. Use "Forgot Password" instead.'
-      );
+      // If already verified, send a "Welcome Back / Access Your Portal" email instead of an invitation
+      await emailService.sendTenantConfirmation(user.email, user.name);
+      return { message: `Login instructions re-sent to ${user.email}` };
     }
 
     // Generate a fresh opaque Redis-backed setup token (48h)

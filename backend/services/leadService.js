@@ -289,6 +289,55 @@ class LeadService {
     // But here we need a check.
     // For simplicity, LeadModel.verifyOwnership can be updated to include treasurer check or we do it here.
 
+    // [NEW] Handle converted leads by resending tenant-level access
+    if (lead.status === 'converted') {
+      const userService = (await import('./userService.js')).default;
+      const existingUser = await (
+        await import('../models/userModel.js')
+      ).default.findByEmail(lead.email);
+
+      if (existingUser) {
+        // 1. If there's an active draft lease with an unpaid deposit, resend the deposit link
+        const leaseModel = (await import('../models/leaseModel.js')).default;
+        const tenantLeases = await leaseModel.findByTenantId(existingUser.id);
+        const draftLease = tenantLeases.find((l) => l.status === 'draft');
+
+        if (draftLease) {
+          const depositStatus = await leaseModel.getDepositStatus(
+            draftLease.id
+          );
+          if (depositStatus && !depositStatus.isFullyPaid) {
+            // Check for existing valid deposit token
+            const [tokens] = await (
+              await import('../config/db.js')
+            ).default.query(
+              "SELECT token FROM security_tokens WHERE entity_id = ? AND type = 'deposit_access' AND expires_at > NOW() AND is_revoked = FALSE ORDER BY created_at DESC LIMIT 1",
+              [draftLease.id]
+            );
+
+            if (tokens.length > 0) {
+              const property = await propertyModel.findById(lead.propertyId);
+              await emailService.sendDepositMagicLink(
+                lead.email,
+                lead.name,
+                property?.name || 'Property',
+                draftLease.unitNumber || 'N/A',
+                draftLease.targetDeposit,
+                tokens[0].token
+              );
+              return {
+                success: true,
+                message: 'Deposit payment link resent successfully.',
+              };
+            }
+          }
+        }
+
+        // 2. Otherwise, resend the account invitation (setup link)
+        return await userService.resendInvitation(existingUser.id);
+      }
+    }
+
     // Rotate token
     await leadTokenModel.invalidateForLead(leadId);
     const portalToken = await leadTokenModel.create(leadId);
