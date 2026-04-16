@@ -1140,6 +1140,98 @@ export const escalateOverdueMaintenance = async () => {
 };
 
 /**
+ * [NEW] Lease Activation Automation
+ * Transitions 'pending' leases to 'active' on their start_date.
+ */
+export const activateUpcomingLeases = async () => {
+  const currentToday = now();
+  const dateStr = formatToLocalDate(currentToday);
+  const lockName = `activate_pending_leases_${currentToday.getFullYear()}_${currentToday.getMonth() + 1}_${currentToday.getDate()}`;
+
+  return await runWithLock(lockName, 1800, async () => {
+    console.log('Running pending lease activation check...');
+    const connection = await db.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      // 1. Find pending leases that should be active today or earlier (backfill safety)
+      const [pendingLeases] = await connection.query(
+        `SELECT l.lease_id, l.unit_id, l.tenant_id, l.start_date
+         FROM leases l
+         WHERE l.status = 'pending' AND l.start_date <= ?`,
+        [dateStr]
+      );
+
+      if (pendingLeases.length > 0) {
+        console.log(
+          `[Cron] Found ${pendingLeases.length} pending leases for activation.`
+        );
+
+        for (const lease of pendingLeases) {
+          // Update Lease Status
+          await connection.query(
+            "UPDATE leases SET status = 'active' WHERE lease_id = ?",
+            [lease.lease_id]
+          );
+
+          // Update Unit Status to 'occupied'
+          await connection.query(
+            "UPDATE units SET status = 'occupied' WHERE unit_id = ?",
+            [lease.unit_id]
+          );
+
+          // Convert Leads (Hardened Fuzzy Match)
+          try {
+            const [tenantRows] = await connection.query(
+              'SELECT email FROM users WHERE user_id = ?',
+              [lease.tenant_id]
+            );
+            if (tenantRows.length > 0 && tenantRows[0].email) {
+              const email = tenantRows[0].email;
+              await connection.query(
+                `UPDATE leads SET status = 'converted' 
+                 WHERE (LOWER(TRIM(email)) = LOWER(TRIM(?)) OR (unit_id = ? AND status = 'interested'))
+                 AND status = 'interested'`,
+                [email, lease.unit_id]
+              );
+            }
+          } catch (leadErr) {
+            console.error(
+              'Failed to convert leads during cron activation:',
+              leadErr
+            );
+          }
+
+          // Trigger Onboarding
+          try {
+            const userService = (await import('../services/userService.js'))
+              .default;
+            await userService.triggerOnboarding(lease.tenant_id);
+          } catch (usrErr) {
+            console.error(
+              'Failed to trigger onboarding during cron activation:',
+              usrErr
+            );
+          }
+
+          console.log(
+            `[Cron] Lease #${lease.lease_id} successfully activated.`
+          );
+        }
+      }
+
+      await connection.commit();
+    } catch (error) {
+      await connection.rollback();
+      console.error('Error in pending lease activation check:', error);
+      throw error;
+    } finally {
+      connection.release();
+    }
+  });
+};
+
+/**
  * Unified Nightly Cron Job (Locking + Backfill)
  */
 export const runNightlyCron = async (targetDate = null) => {
@@ -1150,6 +1242,7 @@ export const runNightlyCron = async (targetDate = null) => {
     // 1. Warnings & Expiries
     await sendLeaseExpiryWarnings();
     await checkLeaseExpiration();
+    await activateUpcomingLeases();
     await leaseService.processAutomatedEscalations();
 
     // 2. Billing (Rent)

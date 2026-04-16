@@ -453,13 +453,13 @@ class LeaseCreationService {
 
       // [FIX B] Allow idempotent re-entry — lease may have been activated in a previous
       // crashed transaction that the gateway is retrying.
-      if (lease.status === 'active') {
+      if (lease.status === 'active' || lease.status === 'pending') {
         console.log(
-          `[LeaseService] Idempotent signLease: Lease #${leaseId} is already active. Skipping.`
+          `[LeaseService] Idempotent signLease: Lease #${leaseId} is already ${lease.status}. Skipping.`
         );
         if (isOwnTransaction) await conn.commit();
         return {
-          status: 'active',
+          status: lease.status,
           signedAt: lease.signedAt || getLocalTime(),
           alreadyActivated: true,
         };
@@ -516,10 +516,13 @@ class LeaseCreationService {
         );
       }
 
+      const isFutureLease = parseLocalDate(lease.startDate) > getLocalTime();
+      const initialStatus = isFutureLease ? 'pending' : 'active';
+
       await leaseModel.update(
         leaseId,
         {
-          status: 'active',
+          status: initialStatus,
           signedAt: getLocalTime(),
           reservationExpiresAt: { sql: 'NULL' }, // [HARDENED] Clear expiry using DB logic
         },

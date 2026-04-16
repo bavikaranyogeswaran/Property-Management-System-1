@@ -20,6 +20,7 @@ export function LeaseStats({ leases }: LeaseStatsProps) {
   const endedLeases = leases.filter(
     (l) => l.status === 'ended' || l.status === 'cancelled'
   );
+  const pendingLeases = leases.filter((l) => l.status === 'pending');
 
   const today = new Date();
   const thirtyDaysFromNow = new Date(
@@ -58,6 +59,12 @@ export function LeaseStats({ leases }: LeaseStatsProps) {
       color: 'bg-amber-50 text-amber-700',
     },
     {
+      label: 'Pending Move-in',
+      value: pendingLeases.length,
+      icon: Calendar,
+      color: 'bg-indigo-50 text-indigo-700',
+    },
+    {
       label: 'Ended Leases',
       value: endedLeases.length,
       icon: XCircle,
@@ -66,7 +73,7 @@ export function LeaseStats({ leases }: LeaseStatsProps) {
   ];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
       {stats.map((stat, idx) => (
         <Card
           key={idx}

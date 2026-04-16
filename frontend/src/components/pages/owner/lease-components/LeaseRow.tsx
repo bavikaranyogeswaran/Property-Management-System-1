@@ -155,14 +155,18 @@ export function LeaseRow({
                 ? 'bg-amber-100 text-amber-700 border-amber-200'
                 : lease.status === 'draft'
                   ? 'bg-gray-100 text-gray-700 border-gray-200'
-                  : ''
+                  : lease.status === 'pending'
+                    ? 'bg-blue-100 text-blue-700 border-blue-200'
+                    : ''
           }
         >
           {lease.status === 'draft'
             ? lease.depositStatus === 'paid'
               ? 'Awaiting Verification'
               : 'Awaiting Deposit'
-            : lease.status}
+            : lease.status === 'pending'
+              ? 'Pending Move-in'
+              : lease.status}
         </Badge>
         {lease.status === 'draft' &&
           lease.verificationStatus === 'verified' && (

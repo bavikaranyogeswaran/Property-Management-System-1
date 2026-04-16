@@ -309,6 +309,7 @@ export function LeasesPage() {
     (l) => l.status === 'ended' || l.status === 'cancelled'
   );
   const draftLeases = leases.filter((l) => l.status === 'draft');
+  const pendingLeases = leases.filter((l) => l.status === 'pending');
 
   const today = new Date();
   const thirtyDaysFromNow = new Date(
@@ -363,7 +364,7 @@ export function LeasesPage() {
         <CardContent className="p-0">
           <Tabs defaultValue="active" className="w-full">
             <div className="border-b px-6 pt-6">
-              <TabsList className="grid w-full grid-cols-6 mb-6">
+              <TabsList className="grid w-full grid-cols-7 mb-6">
                 <TabsTrigger value="active">
                   <FileText className="size-4 mr-2" />
                   Active ({activeLeases.length})
@@ -383,6 +384,10 @@ export function LeasesPage() {
                 <TabsTrigger value="draft">
                   <FileText className="size-4 mr-2" />
                   Draft ({draftLeases.length})
+                </TabsTrigger>
+                <TabsTrigger value="pending">
+                  <Calendar className="size-4 mr-2" />
+                  Pending ({pendingLeases.length})
                 </TabsTrigger>
                 <TabsTrigger value="renewals" className="relative">
                   <RotateCcw className="size-4 mr-2" />
@@ -439,6 +444,16 @@ export function LeasesPage() {
                 leases={draftLeases}
                 emptyIcon={FileText}
                 emptyMessage="No draft leases"
+                {...tableProps}
+              />
+            </TabsContent>
+
+            <TabsContent value="pending" className="m-0">
+              <LeaseTable
+                leases={pendingLeases}
+                emptyIcon={Calendar}
+                emptyMessage="No pending leases"
+                emptySubMessage="Leases signed for future dates will appear here."
                 {...tableProps}
               />
             </TabsContent>
