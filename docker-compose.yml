@@ -68,6 +68,8 @@ services:
       - REDIS_HOST=redis
       - PORT=3000
       - FRONTEND_URL=${FRONTEND_URL:-http://localhost:5173}
+      - VITE_ENABLE_PAYMENT_SIMULATION=${VITE_ENABLE_PAYMENT_SIMULATION:-false}
+      - ENABLE_PAYMENT_SIMULATION=${ENABLE_PAYMENT_SIMULATION:-false}
     ports:
       - "3000:3000"
     volumes:

@@ -40,10 +40,18 @@ export default function PaymentSuccessPage() {
   // Potential tokens from URL (sent by PayHere or our Simulator)
   const token = searchParams.get('token');
   const orderId = searchParams.get('order_id');
+  const setupToken = searchParams.get('setupToken');
 
   // Logic to determine where to send the user back
   const handleReturnAction = () => {
-    // [ONBOARDING FIX] Check for guest token first to redirect to status tracker
+    // [PRIORITY FIX] If a setupToken exists, always go to password setup first.
+    // This allows the tenant to set up their portal account before visiting the status tracker.
+    if (setupToken) {
+      navigate(`/setup-password?token=${setupToken}&role=tenant`);
+      return;
+    }
+
+    // [ONBOARDING FIX] Check for guest token next to redirect to status tracker
     const guestToken = localStorage.getItem('guestToken') || token;
 
     if (guestToken && !user) {
@@ -127,9 +135,11 @@ export default function PaymentSuccessPage() {
               className="w-full h-12 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl shadow-lg shadow-green-100 transition-all flex items-center justify-center gap-2"
             >
               <LayoutDashboard className="w-5 h-5" />
-              {user?.role === 'tenant'
-                ? 'Go to My Invoices'
-                : 'Go to Dashboard'}
+              {setupToken
+                ? 'Complete Account Setup'
+                : user?.role === 'tenant'
+                  ? 'Go to My Invoices'
+                  : 'Go to Dashboard'}
               <ArrowRight className="w-4 h-4 ml-1 opacity-50" />
             </Button>
 

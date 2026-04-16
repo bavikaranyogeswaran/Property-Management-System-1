@@ -67,11 +67,12 @@ class PayHereController {
    * but prevents unauthorized users from activating arbitrary invoices.
    */
   simulateWebhook = catchAsync(async (req, res) => {
-    // [HARDENED] 1. Environment Guard: Disable simulation in production
-    if (
-      process.env.NODE_ENV === 'production' &&
-      process.env.ENABLE_PAYMENT_SIMULATION !== 'true'
-    ) {
+    // [HARDENED] 1. Environment Guard: Disable simulation in production unless explicitly enabled
+    const SIM_ENABLED =
+      process.env.ENABLE_PAYMENT_SIMULATION === 'true' ||
+      process.env.VITE_ENABLE_PAYMENT_SIMULATION === 'true';
+
+    if (process.env.NODE_ENV === 'production' && !SIM_ENABLED) {
       console.warn(
         '[PayHereController] Simulation Attempt Denied. Simulations are disabled in production.'
       );
@@ -81,32 +82,62 @@ class PayHereController {
       });
     }
 
-    const { order_id, status_code, amount, payment_id } = req.body;
+    const { order_id, status_code, amount, payment_id, magic_token } = req.body;
 
     if (!order_id) throw new Error('Order ID is required for simulation');
-
-    // [HARDENED] 2. Strict RBAC Strategy: Only Staff (Treasurer/Owner) can trigger simulations
-    // This prevents applicants or tenants from bypassing the gateway to self-authorize payments.
-    const user = req.user;
-    if (!user || (user.role !== 'owner' && user.role !== 'treasurer')) {
-      console.error(
-        `[PayHereController] Simulation Authorization Failed: Unauthorized actor role ${user?.role || 'Guest'}`
-      );
-      return res.status(403).json({
-        status: 'error',
-        message:
-          'Access denied: Only Property Owners or Treasurers can simulate payments.',
-      });
-    }
 
     // Parse Invoice ID from Format: INV-ID-TIMESTAMP
     const parts = order_id.split('-');
     const invoiceId = Number(parts[1]);
     if (isNaN(invoiceId)) throw new Error('Invalid Order ID format');
 
+    // [HARDENED] 2. Flexible Authorization Strategy
+    let authorized = false;
+    const user = req.user;
+
+    // A. Staff Authorization (Always allowed in non-prod or if SIM_ENABLED)
+    if (user && (user.role === 'owner' || user.role === 'treasurer')) {
+      authorized = true;
+    }
+
+    // B. Magic Token Authorization (Guests/Leads)
+    if (!authorized && magic_token) {
+      const invoice = await invoiceModel.findByMagicToken(magic_token);
+      if (
+        invoice &&
+        (Number(invoice.id) === invoiceId ||
+          Number(invoice.invoice_id) === invoiceId)
+      ) {
+        authorized = true;
+      }
+    }
+
+    // C. Tenant Authorization
+    if (!authorized && user && user.role === 'tenant') {
+      const invoice = await invoiceModel.findById(invoiceId);
+      if (
+        invoice &&
+        (Number(invoice.tenantId) === user.id ||
+          Number(invoice.tenant_id) === user.id)
+      ) {
+        authorized = true;
+      }
+    }
+
+    if (!authorized) {
+      console.error(
+        `[PayHereController] Simulation Authorization Failed: Actor ${user?.id || 'Guest'} (${user?.role || 'None'}) for Invoice #${invoiceId}`
+      );
+      return res.status(403).json({
+        status: 'error',
+        message:
+          'Access denied: You are not authorized to simulate this payment.',
+      });
+    }
+
     // 3. Verify Invoice Existence
     const invoice = await invoiceModel.findById(invoiceId);
-    if (!invoice || Number(invoice.id || invoice.invoice_id) !== invoiceId) {
+    if (!invoice) {
       console.error(
         `[PayHereController] Simulation Failed: Invoice #${invoiceId} not found.`
       );
@@ -127,13 +158,17 @@ class PayHereController {
     };
 
     console.log(
-      `[PayHereController] STAFF-AUTHORIZED SIMULATION: Actor ${user.id} (${user.role}) trigged for Order ID: ${order_id}`
+      `[PayHereController] AUTHORIZED SIMULATION: Actor ${user?.id || 'Guest'} (${user?.role || 'Guest'}) triggered for Order ID: ${order_id}`
     );
     const result = await payhereService.processNotification(mockPayload, true); // skipHash = true
+    console.log(
+      `[PayHereController] Simulation complete. setupToken: ${result.setupToken ? 'present' : 'absent'}`
+    );
 
     res.status(200).json({
       status: 'success',
-      message: 'Staff-authorized simulation recorded',
+      message: 'Simulation recorded successfully',
+      setupToken: result.setupToken,
       result,
     });
   });

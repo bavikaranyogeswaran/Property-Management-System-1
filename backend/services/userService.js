@@ -565,9 +565,18 @@ class UserService {
       console.error(
         `[UserService] Onboarding failed: User ${userId} not found.`
       );
-      return;
+      return null;
     }
 
+    // [IDEMPOTENCY] If already verified, skip token generation and email
+    if (user.isEmailVerified) {
+      console.log(
+        `[UserService] Skipping onboarding: User ${userId} is already verified.`
+      );
+      return null;
+    }
+
+    console.log(`[UserService] Generating setupToken for user ${userId}`);
     // [FIXED] Use opaque Redis token to match authService.setupPassword() consumer
     const token = await securityTokenService.createToken(
       userId,
@@ -601,6 +610,8 @@ class UserService {
     } catch (err) {
       console.error('[UserService] Failed to log onboarding audit:', err);
     }
+
+    return token;
   }
 
   // ============================================================================

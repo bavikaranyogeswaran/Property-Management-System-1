@@ -16,6 +16,7 @@ class ReceiptModel {
       ? parseLocalDate(generatedDate)
       : getLocalTime();
 
+    const db = connection || pool;
     const [result] = await db.query(
       'INSERT INTO receipts (payment_id, receipt_date, receipt_number) VALUES (?, ?, ?)',
       [paymentId, dateValue, receiptNumber]

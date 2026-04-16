@@ -66,7 +66,7 @@ export default function PayHereSimulationPage() {
       // Call the backend simulation endpoint
       console.log(`[Simulation] Triggering success for Order: ${order_id}`);
 
-      await apiClient.post('/payhere/simulate-webhook', {
+      const response = await apiClient.post('/payhere/simulate-webhook', {
         order_id,
         amount,
         status_code: '2', // Success
@@ -74,13 +74,19 @@ export default function PayHereSimulationPage() {
         magic_token: custom_1, // Pass authorization token
       });
 
+      const setupToken = response.data?.setupToken;
+
       setStatus('success');
       toast.success('Simulated success signal sent to backend.');
 
       // Redirect to return_url after a delay
       setTimeout(() => {
         if (return_url) {
-          window.location.href = return_url;
+          // [NEW] If a setupToken was generated (onboarding), pass it to the success page
+          const finalUrl = setupToken
+            ? `${return_url}&setupToken=${setupToken}`
+            : return_url;
+          window.location.href = finalUrl;
         } else {
           navigate('/payment-success');
         }

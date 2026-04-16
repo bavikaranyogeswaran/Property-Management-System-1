@@ -433,7 +433,7 @@ class PaymentService {
       // 2. Finalize actions (ledger, receipt, activation, notifications)
       // Use a dummy system user for automated actions
       const systemUser = { id: null, role: 'system' };
-      await this._finalizeVerifiedPayment(
+      const setupToken = await this._finalizeVerifiedPayment(
         paymentId,
         freshInvoice || invoice, // Fallback to stale if something went critically wrong
         payment,
@@ -490,8 +490,7 @@ class PaymentService {
           conn
         );
       }
-
-      return paymentId;
+      return { paymentId, setupToken };
     } catch (error) {
       if (!isExternalConn) {
         await conn.rollback();
@@ -811,7 +810,7 @@ class PaymentService {
 
     // 5. [OPERATIONAL] Operational Side Effects (Lease state, Auto-activation)
     // Delegated to Operational Service to keep this transaction lean.
-    await paymentOperationalService.handleDepositPayment(
+    const setupToken = await paymentOperationalService.handleDepositPayment(
       invoice,
       { ...payment, status: 'verified' },
       user,
@@ -827,6 +826,8 @@ class PaymentService {
       user,
       connection
     );
+
+    return setupToken;
   }
 
   async getPayments(user) {

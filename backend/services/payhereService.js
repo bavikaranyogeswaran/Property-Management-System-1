@@ -141,15 +141,21 @@ class PayHereService {
       }
 
       // 3. Record the payment (Hardened with Atomic Idempotency and Locking)
-      await paymentService.recordAutomatedPayment({
-        invoiceId: invoiceId,
-        amount: receivedCents,
-        paymentMethod: 'payhere',
-        referenceNumber: payment_id,
-        guaranteeFullSettlement: false, // Allows the minor 1-cent variance enforced above
-      });
+      const { paymentId, setupToken } =
+        await paymentService.recordAutomatedPayment({
+          invoiceId: invoiceId,
+          amount: receivedCents,
+          paymentMethod: 'payhere',
+          referenceNumber: payment_id,
+          guaranteeFullSettlement: false, // Allows the minor 1-cent variance enforced above
+        });
 
-      return { success: true, message: 'Payment recorded' };
+      return {
+        success: true,
+        message: 'Payment recorded',
+        paymentId,
+        setupToken,
+      };
     } else {
       console.warn(
         `[PayHereService] Payment status for Invoice #${invoiceId} is ${status_code}`

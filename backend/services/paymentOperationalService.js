@@ -52,8 +52,13 @@ class PaymentOperationalService {
 
     // 4. Auto-Lease Activation
     if (isFullyPaid) {
-      await this._attemptAutoActivation(invoice.leaseId, user, connection);
+      return await this._attemptAutoActivation(
+        invoice.leaseId,
+        user,
+        connection
+      );
     }
+    return null;
   }
 
   /**
@@ -61,16 +66,24 @@ class PaymentOperationalService {
    */
   async _attemptAutoActivation(leaseId, user, connection) {
     const lease = await leaseModel.findById(leaseId, connection);
-    if (!lease || lease.status !== 'draft') return;
+    if (!lease || lease.status !== 'draft') return null;
+
+    // [SCENARIO D FIX] Always trigger onboarding upon deposit payment, regardless of documents.
+    // This generates the setupToken so the tenant can set their password immediately.
+    const userService = (await import('./userService.js')).default;
+    const setupToken = await userService.triggerOnboarding(
+      lease.tenantId,
+      connection
+    );
+    console.log(
+      `[PaymentOperationalService] Onboarding result for Lease #${leaseId}: ${setupToken ? 'Token generated' : 'No token'}`
+    );
 
     if (lease.isDocumentsVerified) {
       try {
         // [RESILIENCE] Dynamic imports to avoid circular dependencies
         const leaseService = (await import('./leaseService.js')).default;
         await leaseService.signLease(lease.id, user, connection);
-
-        const userService = (await import('./userService.js')).default;
-        await userService.triggerOnboarding(lease.tenantId, connection);
       } catch (activationErr) {
         console.error(
           `[PaymentOperationalService] Auto-activation blocked for Lease #${leaseId}:`,
@@ -90,6 +103,8 @@ class PaymentOperationalService {
         connection
       );
     }
+
+    return setupToken;
   }
 
   async _notifyStaffOfBlockedActivation(lease, reason, connection) {
