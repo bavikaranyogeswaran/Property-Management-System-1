@@ -392,7 +392,10 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
       await fetchLeases();
       toast.success(response.data.message);
     } catch (e: any) {
-      const msg = e.response?.data?.error || 'Failed to verify documents';
+      const msg =
+        e.response?.data?.error ||
+        e.response?.data?.message ||
+        'Failed to verify documents';
       toast.error(msg);
       throw new Error(msg);
     }
@@ -404,7 +407,10 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
       await fetchLeases();
       toast.success('Documents rejected. Feedback sent to tenant.');
     } catch (e: any) {
-      const msg = e.response?.data?.error || 'Failed to reject documents';
+      const msg =
+        e.response?.data?.error ||
+        e.response?.data?.message ||
+        'Failed to reject documents';
       toast.error(msg);
       throw new Error(msg);
     }

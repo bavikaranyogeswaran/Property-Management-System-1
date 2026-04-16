@@ -33,7 +33,7 @@ interface LeaseRowProps {
   thirtyDaysFromNow: Date;
   today: Date;
   setSelectedLease: (lease: Lease) => void;
-  verifyLeaseDocuments: (leaseId: string) => Promise<void>;
+  setConfirmVerifyLeaseId: (leaseId: string) => void;
   setRejectionLeaseId: (leaseId: string) => void;
   setActivateLeaseId: (leaseId: string) => void;
   setCancelReservationId: (leaseId: string) => void;
@@ -58,7 +58,7 @@ export function LeaseRow({
   thirtyDaysFromNow,
   today,
   setSelectedLease,
-  verifyLeaseDocuments,
+  setConfirmVerifyLeaseId,
   setRejectionLeaseId,
   setActivateLeaseId,
   setCancelReservationId,
@@ -190,15 +190,7 @@ export function LeaseRow({
                 <Button
                   size="sm"
                   variant="ghost"
-                  onClick={async () => {
-                    if (
-                      window.confirm(
-                        'Have you reviewed and verified all required documents for this tenant?'
-                      )
-                    ) {
-                      await verifyLeaseDocuments(lease.id);
-                    }
-                  }}
+                  onClick={() => setConfirmVerifyLeaseId(lease.id)}
                   className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                   title="Verify Documents"
                 >

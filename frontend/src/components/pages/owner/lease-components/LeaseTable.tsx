@@ -22,7 +22,7 @@ interface LeaseTableProps {
   thirtyDaysFromNow: Date;
   today: Date;
   setSelectedLease: (lease: Lease) => void;
-  verifyLeaseDocuments: (leaseId: string) => Promise<void>;
+  setConfirmVerifyLeaseId: (leaseId: string) => void;
   setRejectionLeaseId: (leaseId: string) => void;
   setActivateLeaseId: (leaseId: string) => void;
   setCancelReservationId: (leaseId: string) => void;

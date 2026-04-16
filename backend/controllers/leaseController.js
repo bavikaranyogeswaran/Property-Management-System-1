@@ -138,7 +138,7 @@ class LeaseController {
       id,
       {
         effectiveDate,
-        newMonthlyRent: Number(newMonthlyRent),
+        newMonthlyRent: toCentsFromMajor(newMonthlyRent),
         notes,
       },
       req.user

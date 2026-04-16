@@ -22,6 +22,16 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   FileText,
   Calendar,
   XCircle,
@@ -96,6 +106,9 @@ export function LeasesPage() {
     null
   );
   const [rejectionLeaseId, setRejectionLeaseId] = useState<string | null>(null);
+  const [confirmVerifyLeaseId, setConfirmVerifyLeaseId] = useState<
+    string | null
+  >(null);
 
   // --- Helper Functions ---
   const handleDocumentUpdate = async (
@@ -259,6 +272,15 @@ export function LeasesPage() {
     } catch (e) {}
   };
 
+  const confirmVerifyDocuments = async () => {
+    if (confirmVerifyLeaseId) {
+      try {
+        await verifyLeaseDocuments(confirmVerifyLeaseId);
+        setConfirmVerifyLeaseId(null);
+      } catch (e) {}
+    }
+  };
+
   useEffect(() => {
     if (activateLeaseId) {
       const fetchDepositStatus = async () => {
@@ -306,7 +328,7 @@ export function LeasesPage() {
     thirtyDaysFromNow,
     today,
     setSelectedLease,
-    verifyLeaseDocuments,
+    setConfirmVerifyLeaseId,
     setRejectionLeaseId,
     setActivateLeaseId,
     setCancelReservationId,
@@ -696,6 +718,34 @@ export function LeasesPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog
+        open={!!confirmVerifyLeaseId}
+        onOpenChange={(open) => !open && setConfirmVerifyLeaseId(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-blue-600">
+              <ShieldCheck className="size-5" />
+              Verify Lease Documents
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Have you reviewed and verified all required documents for this
+              tenant? This action confirms that the tenant's ID and supporting
+              documents are valid.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmVerifyDocuments}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              Confirm Verification
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

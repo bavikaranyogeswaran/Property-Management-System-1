@@ -294,28 +294,43 @@ class LeaseCreationService {
         leaseId,
         connection
       );
+
       let activated = false;
+      let activationWarning = null;
+
       if (depositStats && depositStats.isFullyPaid) {
-        await this.signLease(leaseId, user, connection);
-        activated = true;
+        try {
+          // [GRACEFUL ACTIVATION] Attempt to sign/activate, but don't crash verification if it fails.
+          // This ensures documents stay verified even if the house isn't ready.
+          await this.signLease(leaseId, user, connection);
+          activated = true;
+        } catch (actErr) {
+          console.warn(
+            `[LeaseCreationService] Auto-activation deferred during verification for Lease #${leaseId}:`,
+            actErr.message
+          );
+          activationWarning = actErr.message;
+        }
       }
 
       await connection.commit();
 
       // [POST-COMMIT] Trigger Onboarding (Resilient)
-      // Side effects like email/JWT generation happen only after DB is persisted.
       if (activated) {
         await this._safelyExecute('TRIGGER_ONBOARDING', async () => {
           await userService.triggerOnboarding(lease.tenantId);
         });
       }
 
+      const baseMsg = 'Documents verified successfully.';
       return {
         isDocumentsVerified: true,
         activated,
         message: activated
-          ? 'Documents verified and lease activated (deposit was already paid).'
-          : 'Documents verified. Awaiting deposit payment for activation.',
+          ? `${baseMsg} Lease auto-activated (deposit found).`
+          : activationWarning
+            ? `${baseMsg} Note: Auto-activation deferred: ${activationWarning}`
+            : `${baseMsg} Awaiting deposit payment for activation.`,
       };
     } catch (error) {
       await connection.rollback();

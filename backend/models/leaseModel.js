@@ -252,14 +252,15 @@ class LeaseModel {
             WHERE unit_id = ? 
             AND status IN ('active', 'pending', 'draft')
             AND start_date <= ? 
-            AND (end_date IS NULL OR end_date >= ?)
-            FOR UPDATE`;
+            AND (end_date IS NULL OR end_date >= ?)`;
     const params = [unitId, endDate || '2099-12-31', startDate];
 
     if (excludeLeaseId) {
       query += ` AND lease_id != ?`;
       params.push(excludeLeaseId);
     }
+
+    query += ` FOR UPDATE`;
 
     const [rows] = await dbConn.query(query, params);
     return rows.length > 0;

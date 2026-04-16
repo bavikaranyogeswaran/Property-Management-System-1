@@ -44,6 +44,10 @@ class LeaseBillingService {
     ) {
       throw new AppError('effectiveDate and newMonthlyRent are required', 400);
     }
+
+    if (newMonthlyRent < 0) {
+      throw new AppError('Monthly rent cannot be negative', 400);
+    }
     const start = parseLocalDate(lease.startDate);
     const eff = parseLocalDate(effectiveDate);
 
