@@ -185,9 +185,10 @@ class InvoiceModel {
     const [rows] = await db.query(
       `
              SELECT ri.*, l.tenant_id, l.unit_id,
-                    p.name as property_name, un.unit_number, un.status as unit_status
+                    u.name as tenant_name, p.name as property_name, un.unit_number, un.status as unit_status
              FROM rent_invoices ri 
              JOIN leases l ON ri.lease_id = l.lease_id 
+             JOIN users u ON l.tenant_id = u.user_id
              JOIN units un ON l.unit_id = un.unit_id
              JOIN properties p ON un.property_id = p.property_id
              WHERE ri.magic_token_hash = ? 
@@ -225,9 +226,10 @@ class InvoiceModel {
     const [rows] = await db.query(
       `
               SELECT ri.*, l.tenant_id, l.unit_id,
-                     p.name as property_name, un.unit_number, un.status as unit_status
+                     u.name as tenant_name, p.name as property_name, un.unit_number, un.status as unit_status
               FROM rent_invoices ri 
               JOIN leases l ON ri.lease_id = l.lease_id 
+              JOIN users u ON l.tenant_id = u.user_id
               JOIN units un ON l.unit_id = un.unit_id
               JOIN properties p ON un.property_id = p.property_id
               WHERE ri.last_order_id = ?
@@ -240,9 +242,12 @@ class InvoiceModel {
   async findByTenantId(tenantId) {
     const [rows] = await pool.query(
       `
-            SELECT ri.*, l.tenant_id, l.unit_id
+            SELECT ri.*, l.tenant_id, l.unit_id, u.name as tenant_name, p.name as property_name, un.unit_number
             FROM rent_invoices ri
             JOIN leases l ON ri.lease_id = l.lease_id
+            JOIN users u ON l.tenant_id = u.user_id
+            JOIN units un ON l.unit_id = un.unit_id
+            JOIN properties p ON un.property_id = p.property_id
             WHERE l.tenant_id = ? 
             ORDER BY ri.due_date ASC
         `,

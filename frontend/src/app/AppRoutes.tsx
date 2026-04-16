@@ -261,7 +261,11 @@ export function AppRoutes() {
         element={
           <ProtectedRoute>
             <RoleRoute allowedRoles={['owner', 'tenant', 'treasurer']}>
-              <OwnerInvoicesPage />
+              {user?.role === 'tenant' ? (
+                <TenantInvoicesPage />
+              ) : (
+                <OwnerInvoicesPage />
+              )}
             </RoleRoute>
           </ProtectedRoute>
         }
@@ -271,7 +275,11 @@ export function AppRoutes() {
         element={
           <ProtectedRoute>
             <RoleRoute allowedRoles={['owner', 'tenant', 'treasurer']}>
-              <OwnerMaintenancePage />
+              {user?.role === 'tenant' ? (
+                <TenantMaintenancePage />
+              ) : (
+                <OwnerMaintenancePage />
+              )}
             </RoleRoute>
           </ProtectedRoute>
         }
@@ -311,7 +319,11 @@ export function AppRoutes() {
         element={
           <ProtectedRoute>
             <RoleRoute allowedRoles={['owner', 'tenant', 'treasurer']}>
-              <OwnerPaymentsPage />
+              {user?.role === 'tenant' ? (
+                <TenantPaymentsPage />
+              ) : (
+                <OwnerPaymentsPage />
+              )}
             </RoleRoute>
           </ProtectedRoute>
         }

@@ -134,15 +134,17 @@ export function OwnerInvoicesPage() {
         </TableHeader>
         <TableBody>
           {invoicesList.map((invoice) => {
-            const tenantName = invoice.tenantName || 'Unknown';
-            const propertyName = invoice.propertyName || 'Unknown';
-            const unitNumber = invoice.unitNumber || 'Unknown';
-
             const tenant = tenants.find((t) => t.id === invoice.tenantId);
             const unit = units.find((u) => u.id === invoice.unitId);
             const property = unit
               ? properties.find((p) => p.id === unit.propertyId)
               : null;
+
+            const tenantName = invoice.tenantName || tenant?.name || 'Unknown';
+            const propertyName =
+              invoice.propertyName || property?.name || 'Unknown';
+            const unitNumber =
+              invoice.unitNumber || unit?.unitNumber || 'Unknown';
 
             const isOverdue =
               invoice.status === 'pending' && invoice.dueDate < todayStr;
