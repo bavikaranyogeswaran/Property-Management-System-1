@@ -34,8 +34,12 @@ class LeadController {
       } = req.body;
 
       // [HARDENING] Verify target unit belongs to the lead's property
-      const targetUnitId =
-        unitId || (await leadModel.findById(id))?.interestedUnit;
+      const lead = await leadModel.findById(id);
+      if (!lead) {
+        return res.status(404).json({ error: 'Lead not found.' });
+      }
+
+      const targetUnitId = unitId || lead.interestedUnit;
       if (targetUnitId) {
         const unit = await unitModel.findById(targetUnitId);
         if (!unit) {

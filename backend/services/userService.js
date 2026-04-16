@@ -453,11 +453,12 @@ class UserService {
           }
 
           // [C1.3 FIX] Make security deposit configurable
-          const monthlyRent = fromCents(unit.monthlyRent);
-          const securityDepositLKR =
+          // [FIXED] Enforce Cent-First Architecture: Ensure values passed to LeaseService/EmailService are CENTS.
+          const monthlyRentCents = unit.monthlyRent;
+          const securityDepositCents =
             tenantData.securityDeposit !== undefined
-              ? parseFloat(tenantData.securityDeposit)
-              : monthlyRent; // Fallback to 1 month
+              ? toCentsFromMajor(tenantData.securityDeposit)
+              : monthlyRentCents; // Fallback to 1 month rent
 
           // Use LeaseService with the existing transaction connection
           const { leaseId, magicToken: internalMagicToken } =
@@ -468,8 +469,8 @@ class UserService {
                 startDate: leaseStart,
                 endDate: leaseEnd,
                 leaseTermId: leaseTermId,
-                monthlyRent: monthlyRent,
-                targetDeposit: securityDepositLKR,
+                monthlyRent: monthlyRentCents,
+                targetDeposit: securityDepositCents,
                 documentUrl: tenantData.documentUrl || null,
               },
               connection,
@@ -481,7 +482,7 @@ class UserService {
           mailData.magicToken = internalMagicToken;
           mailData.propertyName = unit.propertyName;
           mailData.unitNumber = unit.unitNumber;
-          mailData.depositAmount = securityDepositLKR;
+          mailData.depositAmount = securityDepositCents;
         }
       }
 

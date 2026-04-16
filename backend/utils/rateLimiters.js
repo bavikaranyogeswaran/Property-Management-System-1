@@ -217,8 +217,8 @@ export const sensitiveActionLimiter = rateLimit({
  */
 export const publicPortalLimiter = rateLimit({
   windowMs: 30 * 60 * 1000, // 30 minutes
-  max: 20,
-  keyGenerator: (req, res) => req.params.token || ipKeyGenerator(req, res),
+  max: 100, // Increased to accommodate multiple API calls per portal session
+  keyGenerator: (req, res) => req.query.token || ipKeyGenerator(req, res),
   message: {
     error: 'Too many requests for this portal. Please try again later.',
   },

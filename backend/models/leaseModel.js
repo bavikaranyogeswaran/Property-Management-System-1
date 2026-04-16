@@ -45,7 +45,7 @@ class LeaseModel {
 
     const [result] = await dbConn.query(
       `INSERT INTO leases (tenant_id, unit_id, lease_term_id, start_date, end_date, monthly_rent, status, deposit_status, document_url, target_deposit, reservation_expires_at, escalation_percentage, escalation_period_months, last_escalation_date)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${expiryExpr}, ?, ?, ?)`,
       [
         tenantId,
         unitId,
