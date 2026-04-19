@@ -116,41 +116,46 @@ export function OwnerMaintenancePage() {
     (r) => r.status === 'completed'
   );
 
-  const handleUpdateStatus = (
+  const handleUpdateStatus = async (
     request: MaintenanceRequest,
     newStatus: MaintenanceRequest['status']
   ) => {
-    updateMaintenanceRequest(request.id, {
-      status: newStatus,
-      completedDate:
-        newStatus === 'completed'
-          ? new Date().toISOString().split('T')[0]
-          : undefined,
-    });
-    toast.success('Request status updated');
-    setIsStatusDialogOpen(false);
-    setSelectedRequest(null);
+    try {
+      await updateMaintenanceRequest(request.id, {
+        status: newStatus,
+        completedDate:
+          newStatus === 'completed'
+            ? new Date().toISOString().split('T')[0]
+            : undefined,
+      });
+      setIsStatusDialogOpen(false);
+      setSelectedRequest(null);
+    } catch (error) {
+      // Error is handled inside context
+    }
   };
 
-  const handleAddCost = (e: React.FormEvent) => {
+  const handleAddCost = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedRequest) return;
 
-    addMaintenanceCost({
-      requestId: selectedRequest.id,
-      amount: toCentsFromLKR(parseFloat(costFormData.amount)),
-      description: costFormData.description,
-      billTo: costFormData.billTo,
-    });
-
-    toast.success('Maintenance cost recorded');
-    setIsCostDialogOpen(false);
-    setSelectedRequest(null);
-    setCostFormData({
-      amount: '',
-      description: '',
-      billTo: 'owner',
-    });
+    try {
+      await addMaintenanceCost({
+        requestId: selectedRequest.id,
+        amount: toCentsFromLKR(parseFloat(costFormData.amount)),
+        description: costFormData.description,
+        billTo: costFormData.billTo,
+      });
+      setIsCostDialogOpen(false);
+      setSelectedRequest(null);
+      setCostFormData({
+        amount: '',
+        description: '',
+        billTo: 'owner',
+      });
+    } catch (error) {
+      // Error handled in context
+    }
   };
 
   const handleBillTenant = async (e: React.FormEvent) => {
@@ -384,12 +389,15 @@ export function OwnerMaintenancePage() {
     </div>
   );
 
-  const confirmDeleteCost = () => {
+  const confirmDeleteCost = async () => {
     if (!costToDelete) return;
-    deleteMaintenanceCost(costToDelete.id);
-    toast.success('Maintenance cost deleted');
-    setIsDeleteCostDialogOpen(false);
-    setCostToDelete(null);
+    try {
+      await deleteMaintenanceCost(costToDelete.id);
+      setIsDeleteCostDialogOpen(false);
+      setCostToDelete(null);
+    } catch (error) {
+      // Error handled in context
+    }
   };
 
   return (

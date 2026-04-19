@@ -140,8 +140,10 @@ export function MaintenanceProvider({ children }: { children: ReactNode }) {
         toast.success('Status updated');
         await fetchMaintenanceData();
       }
-    } catch (e) {
-      toast.error('Failed to update status');
+    } catch (e: any) {
+      const errorMessage =
+        e.response?.data?.message || e.message || 'Failed to update status';
+      toast.error(errorMessage);
     }
   };
 

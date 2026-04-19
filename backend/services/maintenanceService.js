@@ -23,6 +23,7 @@ import paymentService from './paymentService.js';
 import { ROLES } from '../utils/roleUtils.js';
 import auditLogger from '../utils/auditLogger.js';
 import staffModel from '../models/staffModel.js';
+import AppError from '../utils/AppError.js';
 
 class MaintenanceService {
   async createRequest(data, tenantId) {
@@ -35,8 +36,9 @@ class MaintenanceService {
     );
 
     if (!isLeased) {
-      throw new Error(
-        'Access denied. You do not have an active lease for this unit.'
+      throw new AppError(
+        'Access denied. You do not have an active lease for this unit.',
+        403
       );
     }
 
@@ -48,16 +50,18 @@ class MaintenanceService {
       description
     );
     if (isDuplicate) {
-      throw new Error(
-        'A maintenance request with this exact content was already submitted recently. Please wait a few minutes before trying again.'
+      throw new AppError(
+        'A maintenance request with this exact content was already submitted recently. Please wait a few minutes before trying again.',
+        400
       );
     }
 
     // Flood Protection: Max 5 open requests per unit
     const openCount = await maintenanceRequestModel.countOpenByUnitId(unitId);
     if (openCount >= 5) {
-      throw new Error(
-        'Maximum number of open maintenance requests (5) reached for this unit.'
+      throw new AppError(
+        'Maximum number of open maintenance requests (5) reached for this unit.',
+        400
       );
     }
 
@@ -97,10 +101,12 @@ class MaintenanceService {
     return requestId;
   }
 
-  async updateStatus(id, status, user) {
+  async updateStatus(id, data, user) {
+    const { status } = data;
     if (!authorizationService.isAtLeast(user.role, ROLES.TREASURER)) {
-      throw new Error(
-        'Only Treasurers (or Owners) can update maintenance status'
+      throw new AppError(
+        'Only Treasurers (or Owners) can update maintenance status',
+        403
       );
     }
 
@@ -109,19 +115,22 @@ class MaintenanceService {
       await connection.beginTransaction();
 
       const request = await maintenanceRequestModel.findById(id);
-      if (!request) throw new Error('Request not found');
+      if (!request) throw new AppError('Request not found', 404);
 
       // Treasurer RBAC: Check assigned property
       if (user.role === ROLES.TREASURER) {
         const unit = await unitModel.findById(request.unitId, connection);
-        const assigned = await staffModel.getAssignedProperties(user.id);
-        const assignedPropertyIds = assigned.map((p) =>
-          p.property_id.toString()
+        if (!unit) throw new AppError('Unit not found', 404);
+
+        const isAssigned = await staffModel.isAssignedToProperty(
+          user.id,
+          unit.propertyId
         );
 
-        if (!assignedPropertyIds.includes(unit.propertyId.toString())) {
-          throw new Error(
-            'Access denied. You are not assigned to this property.'
+        if (!isAssigned) {
+          throw new AppError(
+            'Access denied. You are not assigned to the property for this unit.',
+            403
           );
         }
       }
@@ -129,14 +138,16 @@ class MaintenanceService {
       // State Machine Guardrails
       if (request.status === 'completed' || request.status === 'closed') {
         if (status !== request.status) {
-          throw new Error(
-            `Cannot update status of a ${request.status} request.`
+          throw new AppError(
+            `Cannot update status of a ${request.status} request.`,
+            400
           );
         }
       }
       if (request.status === 'in_progress' && status === 'submitted') {
-        throw new Error(
-          'Cannot move a request backwards from in_progress to submitted.'
+        throw new AppError(
+          'Cannot move a request backwards from in_progress to submitted.',
+          400
         );
       }
 
@@ -169,7 +180,7 @@ class MaintenanceService {
           request.unitId,
           connection
         );
-        if (!unitLock) throw new Error('Unit reference not found.');
+        if (!unitLock) throw new AppError('Unit reference not found.', 404);
 
         const openCount = await maintenanceRequestModel.countOpenByUnitId(
           request.unitId,
@@ -271,8 +282,9 @@ class MaintenanceService {
 
   async createInvoice(data, user) {
     if (!authorizationService.isAtLeast(user.role, ROLES.TREASURER)) {
-      throw new Error(
-        'Access denied. Only Treasurers (or Owners) can create maintenance invoices.'
+      throw new AppError(
+        'Access denied. Only Treasurers (or Owners) can create maintenance invoices.',
+        403
       );
     }
 
@@ -286,15 +298,16 @@ class MaintenanceService {
         requestId,
         connection
       );
-      if (!request) throw new Error('Maintenance Request not found');
+      if (!request) throw new AppError('Maintenance Request not found', 404);
 
       // [HARDENED] Historical Context Discovery:
       // Find the lease that was active when the request was created, regardless of time elapsed.
       const targetLease = await this._getLeaseForRequest(requestId, connection);
 
       if (!targetLease) {
-        throw new Error(
-          `Critical Integrity Error: No historical or active lease found for Tenant ID ${request.tenantId} at Unit ${request.unitId}. Maintenance cannot be billed without a ledger recipient.`
+        throw new AppError(
+          `Critical Integrity Error: No historical or active lease found for Tenant ID ${request.tenantId} at Unit ${request.unitId}. Maintenance cannot be billed without a ledger recipient.`,
+          409
         );
       }
 
@@ -304,8 +317,9 @@ class MaintenanceService {
       );
 
       if (unbilledCosts.length === 0) {
-        throw new Error(
-          'No unbilled costs found for this maintenance request to invoice.'
+        throw new AppError(
+          'No unbilled costs found for this maintenance request to invoice.',
+          400
         );
       }
 
@@ -396,17 +410,21 @@ class MaintenanceService {
 
   async recordCost(data, user) {
     if (!authorizationService.isAtLeast(user.role, ROLES.TREASURER)) {
-      throw new Error(
-        'Access denied. Only Treasurers (or Owners) can record maintenance costs.'
+      throw new AppError(
+        'Access denied. Only Treasurers (or Owners) can record maintenance costs.',
+        403
       );
     }
 
     const { requestId, amount, description, recordedDate, billTo } = data;
     const request = await maintenanceRequestModel.findById(requestId);
-    if (!request) throw new Error('Maintenance Request not found');
+    if (!request) throw new AppError('Maintenance Request not found', 404);
 
     if (request.status === 'closed') {
-      throw new Error('Cannot record costs for a closed maintenance request.');
+      throw new AppError(
+        'Cannot record costs for a closed maintenance request.',
+        400
+      );
     }
 
     const connection = await pool.getConnection();
@@ -551,7 +569,7 @@ class MaintenanceService {
     } else if (user.role === ROLES.TREASURER) {
       return await maintenanceRequestModel.findByTreasurerId(user.id);
     } else {
-      throw new Error('Access denied');
+      throw new AppError('Access denied', 403);
     }
   }
 }

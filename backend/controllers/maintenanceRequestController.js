@@ -27,9 +27,11 @@ class MaintenanceRequestController {
 
   updateStatus = catchAsync(async (req, res, next) => {
     const { id } = req.params;
-    const { status } = req.body;
-
-    const updated = await maintenanceService.updateStatus(id, status, req.user);
+    const updated = await maintenanceService.updateStatus(
+      id,
+      req.body,
+      req.user
+    );
     res.json(updated);
   });
 
