@@ -101,8 +101,7 @@ export function TenantMaintenancePage() {
       });
       setSelectedImages([]);
     } catch (error) {
-      console.error(error);
-      toast.error('Failed to submit maintenance request');
+      console.error('Submission failed:', error);
     }
   };
 

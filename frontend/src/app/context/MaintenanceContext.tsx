@@ -121,7 +121,12 @@ export function MaintenanceProvider({ children }: { children: ReactNode }) {
       toast.success('Maintenance request submitted');
       await fetchMaintenanceData();
     } catch (e: any) {
-      toast.error(e.response?.data?.error || 'Failed to submit request');
+      const errorMsg =
+        e.response?.data?.message ||
+        e.response?.data?.error ||
+        'Failed to submit request';
+      toast.error(errorMsg);
+      throw e;
     }
   };
 

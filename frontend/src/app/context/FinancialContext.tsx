@@ -132,7 +132,7 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
             amount: toLKRFromCents(p.amount),
             paymentDate: (p.paymentDate || '').split('T')[0],
             submittedAt: p.createdAt || '',
-            proofUrl: p.receiptUrl,
+            proofUrl: p.proofUrl,
           }))
         );
       }

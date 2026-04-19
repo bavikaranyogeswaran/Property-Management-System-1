@@ -141,25 +141,51 @@ export function PaymentVerificationPage() {
               {/* Payment Proof */}
               {payment.proofUrl && (
                 <div className="mt-4 p-3 bg-blue-50 border border-blue-100 rounded-md">
-                  <p className="text-xs font-medium text-blue-800 mb-2 uppercase tracking-wide">
-                    Payment Proof
-                  </p>
-                  <Button
-                    variant="outline"
-                    className="w-full bg-white hover:bg-blue-50 text-blue-700 border-blue-200"
-                    onClick={() => {
-                      if (payment.proofUrl)
-                        window.open(payment.proofUrl, '_blank');
-                    }}
-                  >
-                    <ExternalLink className="size-4 mr-2" />
-                    View Attached Proof
-                  </Button>
-                  <p className="text-xs text-blue-600 mt-2 text-center">
-                    Click to open the attached proof of payment in a new tab
-                  </p>
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs font-medium text-blue-800 uppercase tracking-wide">
+                      Payment Proof / Bank Slip
+                    </p>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-blue-700 hover:text-blue-900 h-7 px-2"
+                      onClick={() => window.open(payment.proofUrl!, '_blank')}
+                    >
+                      <ExternalLink className="size-3 mr-1" />
+                      Open
+                    </Button>
+                  </div>
+                  {/\.(jpg|jpeg|png|gif|webp)(\?|$)/i.test(payment.proofUrl) ? (
+                    <img
+                      src={payment.proofUrl}
+                      alt="Payment proof"
+                      className="w-full max-h-64 object-contain rounded border border-blue-200 bg-white cursor-pointer"
+                      onClick={() => window.open(payment.proofUrl!, '_blank')}
+                    />
+                  ) : (
+                    <Button
+                      variant="outline"
+                      className="w-full bg-white hover:bg-blue-50 text-blue-700 border-blue-200"
+                      onClick={() => window.open(payment.proofUrl!, '_blank')}
+                    >
+                      <ExternalLink className="size-4 mr-2" />
+                      View Attached Proof (PDF / Document)
+                    </Button>
+                  )}
                 </div>
               )}
+              {!payment.proofUrl &&
+                payment.paymentMethod?.toLowerCase().includes('bank') && (
+                  <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-md">
+                    <p className="text-xs font-medium text-amber-700 uppercase tracking-wide mb-1">
+                      No Proof Uploaded
+                    </p>
+                    <p className="text-xs text-amber-600">
+                      The tenant did not attach a bank slip. Contact them before
+                      approving.
+                    </p>
+                  </div>
+                )}
             </div>
 
             {/* Tenant Information */}

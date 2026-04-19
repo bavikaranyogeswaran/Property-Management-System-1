@@ -220,7 +220,7 @@ export function AppRoutes() {
         path="/tenants"
         element={
           <ProtectedRoute>
-            <RoleRoute allowedRoles={['owner']}>
+            <RoleRoute allowedRoles={['owner', 'treasurer']}>
               <TenantsPage />
             </RoleRoute>
           </ProtectedRoute>
@@ -240,7 +240,7 @@ export function AppRoutes() {
         path="/leases"
         element={
           <ProtectedRoute>
-            <RoleRoute allowedRoles={['owner']}>
+            <RoleRoute allowedRoles={['owner', 'treasurer']}>
               <LeasesPage />
             </RoleRoute>
           </ProtectedRoute>
@@ -309,7 +309,11 @@ export function AppRoutes() {
         element={
           <ProtectedRoute>
             <RoleRoute allowedRoles={['owner', 'treasurer']}>
-              <OwnerPayoutsPage />
+              {user?.role === 'treasurer' ? (
+                <TreasurerPayoutsPage />
+              ) : (
+                <OwnerPayoutsPage />
+              )}
             </RoleRoute>
           </ProtectedRoute>
         }
@@ -344,7 +348,7 @@ export function AppRoutes() {
         path="/receipts"
         element={
           <ProtectedRoute>
-            <RoleRoute allowedRoles={['tenant']}>
+            <RoleRoute allowedRoles={['tenant', 'treasurer']}>
               <ReceiptsPage />
             </RoleRoute>
           </ProtectedRoute>
@@ -378,6 +382,16 @@ export function AppRoutes() {
           <ProtectedRoute>
             <RoleRoute allowedRoles={['treasurer']}>
               <MaintenanceExpensesPage />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/payment-verification"
+        element={
+          <ProtectedRoute>
+            <RoleRoute allowedRoles={['treasurer']}>
+              <PaymentVerificationPage />
             </RoleRoute>
           </ProtectedRoute>
         }
