@@ -3,6 +3,10 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+# Add ARG for build-time environment variables
+ARG VITE_API_URL
+ENV VITE_API_URL=$VITE_API_URL
+
 # Copy dependency manifests
 COPY package*.json ./
 

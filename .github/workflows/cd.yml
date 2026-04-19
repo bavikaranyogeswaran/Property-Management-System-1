@@ -40,6 +40,8 @@ jobs:
           context: ./frontend
           push: true
           tags: ${{ secrets.ACR_NAME }}.azurecr.io/pms-frontend:${{ steps.set-tag.outputs.tag }}, ${{ secrets.ACR_NAME }}.azurecr.io/pms-frontend:latest
+          build-args: |
+            VITE_API_URL=${{ secrets.VITE_API_URL }}
 
   deploy:
     name: Deploy to Azure
