@@ -1,3 +1,11 @@
+// ============================================================================
+//  AUTH CONTEXT (The Identity Guard)
+// ============================================================================
+//  This is the source of truth for who is logged in.
+//  It holds the User profile, handles the logout timers, and manages
+//  the "Active Lease" context for tenants with multiple rooms.
+// ============================================================================
+
 import React, {
   createContext,
   useContext,

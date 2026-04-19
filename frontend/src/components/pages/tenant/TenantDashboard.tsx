@@ -28,6 +28,14 @@ import { TenantBehaviorHistory } from './TenantBehaviorHistory';
 import { Trophy } from 'lucide-react';
 import { formatLKR } from '@/utils/formatters';
 
+// ============================================================================
+//  TENANT DASHBOARD (The Tenant's Home)
+// ============================================================================
+//  This is the primary portal for the customer (tenant).
+//  It displays their active lease, upcoming rent, maintenance status,
+//  and their behavior gamification score.
+// ============================================================================
+
 export function TenantDashboard() {
   const { user, activeLeaseId, tenantLeases: leasesFromAuth } = useAuth();
   const {

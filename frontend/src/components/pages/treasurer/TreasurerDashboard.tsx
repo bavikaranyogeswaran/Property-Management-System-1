@@ -4,6 +4,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DollarSign, CheckCircle, Clock, AlertCircle } from 'lucide-react';
 import { formatLKR } from '@/utils/formatters';
 
+// ============================================================================
+//  TREASURER DASHBOARD (The Vault)
+// ============================================================================
+//  This dashboard focuses on cash collection efficiency.
+//  It shows pending bank slip verifications, monthly collection rates,
+//  and a summary of total receipts issued across the system.
+// ============================================================================
+
 export function TreasurerDashboard() {
   const { invoices, payments, receipts, leases } = useApp();
 

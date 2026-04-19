@@ -18,6 +18,14 @@ import {
 import { Button } from '@/components/ui/button';
 import { formatLKR } from '@/utils/formatters';
 
+// ============================================================================
+//  TENANT LEASE PAGE (The Contract Vault)
+// ============================================================================
+//  This page allows the tenant to see exactly what they signed.
+//  It includes the lease timeline, contractual rent, security deposit
+//  balance, and current renewal intents.
+// ============================================================================
+
 export function TenantLeasePage() {
   const { user, activeLeaseId, tenantLeases: leasesFromAuth } = useAuth();
   const {

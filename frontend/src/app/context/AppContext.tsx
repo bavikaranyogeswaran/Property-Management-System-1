@@ -1,3 +1,11 @@
+// ============================================================================
+//  APP CONTEXT (The Grand Orchestrator)
+// ============================================================================
+//  This file aggregates every single piece of logic (Properties, Leases, Payments)
+//  into one massive "Super Hook" (useApp).
+//  It ensures the entire frontend has easy access to all business logic.
+// ============================================================================
+
 import React, { ReactNode } from 'react';
 import { PropertyProvider, useProperty } from './PropertyContext';
 import { UserProvider, useUser } from './UserContext';

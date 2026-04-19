@@ -1,3 +1,11 @@
+// ============================================================================
+//  MAINTENANCE CONTEXT (The Repair Coordinator)
+// ============================================================================
+//  This context manages the "Fix-it" requests from tenants.
+//  It tracks the status of repairs and handles the complex billing logic for
+//  charging either the Owner or the Tenant for the work done.
+// ============================================================================
+
 import React, {
   createContext,
   useContext,

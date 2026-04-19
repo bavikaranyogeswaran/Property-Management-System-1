@@ -1,7 +1,10 @@
-/**
- * Global currency formatters for LKR.
- * All amounts passed should be in dollars/LKR (NOT cents).
- */
+// ============================================================================
+//  CURRENCY FORMATTERS (The Accountant)
+// ============================================================================
+//  This utility ensures that every price shown in the UI is formatted
+//  consistently for the Sri Lankan Rupee (LKR).
+//  It also handles the critical conversion between Backend Cents and Frontend Major units.
+// ============================================================================
 
 export const formatLKR = (amount: number): string => {
   return new Intl.NumberFormat('en-LK', {

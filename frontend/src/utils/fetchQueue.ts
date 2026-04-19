@@ -1,19 +1,11 @@
-/**
- * fetchQueue.ts
- *
- * A lightweight sequential fetch queue designed to prevent request storms
- * when multiple context providers initialize simultaneously on app boot.
- *
- * Instead of firing N requests in parallel, each enqueued fetch runs
- * only after the previous one completes, with a configurable stagger
- * delay between them.
- *
- * Usage:
- *   import { enqueueFetch } from '../../utils/fetchQueue';
- *
- *   // In a useEffect inside a context provider:
- *   enqueueFetch(() => fetchMyData());
- */
+// ============================================================================
+//  FETCH QUEUE (The Traffic Controller)
+// ============================================================================
+//  This utility prevents "Request Storms" during app startup.
+//  Instead of every Context Provider firing an API request in parallel,
+//  this queue staggers them to ensure the server isn't overwhelmed
+//  and the loading state transitions are smooth.
+// ============================================================================
 
 type FetchTask = () => Promise<void>;
 

@@ -2,7 +2,8 @@
 //  API SERVICE (The Messenger)
 // ============================================================================
 //  This file is the specific phone line that calls the Backend.
-//  It knows where the server is (localhost:3000) and attaches the Security Badge (Token) to every message.
+//  It knows where the server is and attaches the Security Badge (Token)
+//  to every message for secure communication.
 // ============================================================================
 
 // API configuration and axios instance

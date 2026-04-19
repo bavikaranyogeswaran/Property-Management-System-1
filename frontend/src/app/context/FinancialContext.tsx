@@ -1,3 +1,11 @@
+// ============================================================================
+//  FINANCIAL CONTEXT (The Virtual Banker)
+// ============================================================================
+//  This context treats the room list like a bank. It manages Invoices,
+//  manual Payment verifications (bank slips), and automated Late Fee audits.
+//  It ensures that every cent is accounted for across the properties.
+// ============================================================================
+
 import React, {
   createContext,
   useContext,

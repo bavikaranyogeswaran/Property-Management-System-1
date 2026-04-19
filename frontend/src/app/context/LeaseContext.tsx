@@ -1,3 +1,11 @@
+// ============================================================================
+//  LEASE CONTEXT (The Lease Lifecycle Manager)
+// ============================================================================
+//  This is the engine for all rental contracts. It handles the "Happy Path"
+//  (applications and signing) and the "Exit Path" (terminations, check-outs,
+//  and security deposit refunds).
+// ============================================================================
+
 import React, {
   createContext,
   useContext,

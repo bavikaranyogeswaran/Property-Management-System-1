@@ -1,3 +1,11 @@
+// ============================================================================
+//  PROPERTY CONTEXT (The Property Registrar)
+// ============================================================================
+//  This context manages the global state of buildings and units.
+//  It provides methods for adding houses, updating room details, and
+//  tracking vacancy rates across the portfolio.
+// ============================================================================
+
 import React, {
   createContext,
   useContext,

@@ -1,3 +1,11 @@
+// ============================================================================
+//  NOTIFICATION CONTEXT (The Alerts Hub)
+// ============================================================================
+//  This state manager collects important alerts for the user (Owner or Tenant).
+//  It tracks things like "Unpaid Invoices" or "Upcoming Visits" and ensures
+//  the user sees them immediately upon login.
+// ============================================================================
+
 import React, {
   createContext,
   useContext,

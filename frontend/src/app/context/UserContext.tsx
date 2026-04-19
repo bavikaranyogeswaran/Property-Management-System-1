@@ -1,3 +1,11 @@
+// ============================================================================
+//  USER CONTEXT (The Community Registry)
+// ============================================================================
+//  This context tracks the people in our system.
+//  It manages the list of Tenants, Treasurers, and Owners,
+//  handling the creation and removal of staff roles.
+// ============================================================================
+
 import React, {
   createContext,
   useContext,

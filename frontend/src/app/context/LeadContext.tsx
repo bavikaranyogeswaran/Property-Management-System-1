@@ -1,3 +1,11 @@
+// ============================================================================
+//  LEAD CONTEXT (The Marketing Desk)
+// ============================================================================
+//  This context manages raw prospects and potential tenants.
+//  It handles initial inquiries, scheduled viewing tours, and the
+//  conversion process to turn a Lead into a Paying Tenant.
+// ============================================================================
+
 import React, {
   createContext,
   useContext,

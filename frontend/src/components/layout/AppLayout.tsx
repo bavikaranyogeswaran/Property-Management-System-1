@@ -1,3 +1,11 @@
+// ============================================================================
+//  APP LAYOUT (The Framework)
+// ============================================================================
+//  This is the skeleton for the entire application.
+//  It handles the persistent Navigation Sidebar, the Page Header,
+//  and ensures the user's role-based permissions are respected in the UI.
+// ============================================================================
+
 import React, { ReactNode, useState } from 'react';
 import { useAuth } from '@/app/context/AuthContext';
 import { useApp } from '@/app/context/AppContext';

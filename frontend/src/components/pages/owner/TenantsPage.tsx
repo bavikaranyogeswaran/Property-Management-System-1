@@ -33,6 +33,14 @@ import { MessageSquare } from 'lucide-react';
 import { toast } from 'sonner';
 import apiClient from '@/services/api';
 
+// ============================================================================
+//  TENANTS PAGE (The Resident List)
+// ============================================================================
+//  This is the CRM directory for currently residing tenants and past residents.
+//  It allows staff to view profiles, message tenants directly, or
+//  resend account setup invitations.
+// ============================================================================
+
 export function TenantsPage() {
   const { tenants, leases, units, properties } = useApp();
   const [searchTerm, setSearchTerm] = useState('');

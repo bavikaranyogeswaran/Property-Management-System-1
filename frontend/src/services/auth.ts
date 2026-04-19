@@ -7,10 +7,10 @@ export interface LoginCredentials {
 }
 
 // ============================================================================
-//  AUTH SERVICE (The Login Helper)
+//  AUTH SERVICE (The Security Desk)
 // ============================================================================
-//  This file handles the actual Login process.
-//  It sends the Email/Password to the server and saves the "Key" (Token) if valid.
+//  Handles the low-level communication for logins, logout, token storage,
+//  and password resets.
 // ============================================================================
 
 export const authService = {
