@@ -1,3 +1,10 @@
+// ============================================================================
+//  PASSWORD CONTROLLER (The Locksmith)
+// ============================================================================
+//  This file handles user credentials securely.
+//  Manges forgotten passwords, resets, and manual password changes.
+// ============================================================================
+
 import authService from '../services/authService.js';
 import catchAsync from '../utils/catchAsync.js';
 import AppError from '../utils/AppError.js';
@@ -5,6 +12,7 @@ import userModel from '../models/userModel.js';
 import bcrypt from 'bcryptjs';
 
 class PasswordController {
+  // FORGOT PASSWORD: Sends a secure reset link to the user's email.
   forgotPassword = catchAsync(async (req, res, next) => {
     const { email } = req.body;
     if (!email) {
@@ -15,6 +23,7 @@ class PasswordController {
     res.json(result);
   });
 
+  // RESET PASSWORD: Uses the email token to set a new password.
   resetPassword = catchAsync(async (req, res, next) => {
     const { token, newPassword } = req.body;
 
@@ -26,6 +35,7 @@ class PasswordController {
     res.json(result);
   });
 
+  // CHANGE PASSWORD: User manually updates their password while logged in.
   changePassword = catchAsync(async (req, res, next) => {
     const { currentPassword, newPassword } = req.body;
     const userId = req.user.id;

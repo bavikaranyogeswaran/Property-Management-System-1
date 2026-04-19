@@ -1,6 +1,14 @@
 import unitTypeModel from '../models/unitTypeModel.js';
 
+// ============================================================================
+//  UNIT TYPE CONTROLLER (The Room Category Manager)
+// ============================================================================
+//  This file classifies specific rental spaces (e.g., "1BHK Suite", "Shared Room").
+//  It standardizes the kind of product the platform offers.
+// ============================================================================
+
 class UnitTypeController {
+  // GET ALL TYPES: Lists every unit category configured in the system.
   async getAllUnitTypes(req, res) {
     try {
       const types = await unitTypeModel.findAll();
@@ -10,6 +18,7 @@ class UnitTypeController {
     }
   }
 
+  // GET TYPE BY ID: Fetches details of a single category layout.
   async getUnitTypeById(req, res) {
     try {
       const type = await unitTypeModel.findById(req.params.id);
@@ -22,6 +31,7 @@ class UnitTypeController {
     }
   }
 
+  // CREATE UNIT TYPE: Adds a new classification to the system mapping.
   async createUnitType(req, res) {
     try {
       const { name, description } = req.body;
@@ -40,6 +50,7 @@ class UnitTypeController {
     }
   }
 
+  // UPDATE UNIT TYPE: Renames or describes an existing layout template.
   async updateUnitType(req, res) {
     try {
       const { name, description } = req.body;
@@ -64,6 +75,7 @@ class UnitTypeController {
     }
   }
 
+  // DELETE UNIT TYPE: Attempts to remove a unit type (blocks if associated units exist).
   async deleteUnitType(req, res) {
     try {
       const success = await unitTypeModel.delete(req.params.id);

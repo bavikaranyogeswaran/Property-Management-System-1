@@ -1,3 +1,9 @@
+// ============================================================================
+//  PAYOUT MODEL (The Dividend Record)
+// ============================================================================
+//  Saves the historical record of money distributed to owners.
+// ============================================================================
+
 import pool from '../config/db.js';
 import { moneyMath } from '../utils/moneyUtils.js';
 

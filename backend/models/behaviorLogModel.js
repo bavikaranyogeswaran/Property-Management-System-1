@@ -1,3 +1,9 @@
+// ============================================================================
+//  BEHAVIOR LOG MODEL (The Conduct Ledger)
+// ============================================================================
+//  Saves the history of good and bad scores for each tenant.
+// ============================================================================
+
 import pool from '../config/db.js';
 
 class BehaviorLogModel {

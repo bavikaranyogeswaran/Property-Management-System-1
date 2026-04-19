@@ -1,3 +1,9 @@
+// ============================================================================
+//  LEASE TERM MODEL (The Duration Configurator)
+// ============================================================================
+//  Stores the allowable lease lengths (e.g. 6 Months, 1 Year).
+// ============================================================================
+
 import db from '../config/db.js';
 
 class LeaseTermModel {

@@ -1,6 +1,14 @@
 import leaseTermService from '../services/leaseTermService.js';
 
+// ============================================================================
+//  LEASE TERM CONTROLLER (The Rule Creator)
+// ============================================================================
+//  This file manages the default lease length options (e.g., 6 months, 1 year).
+//  Owners configure these so tenants can choose when applying.
+// ============================================================================
+
 class LeaseTermController {
+  // GET LEASE TERMS: Lists all available lease durations.
   async getLeaseTerms(req, res) {
     try {
       const terms = await leaseTermService.getLeaseTerms(req.user);
@@ -10,6 +18,7 @@ class LeaseTermController {
     }
   }
 
+  // CREATE LEASE TERM: Owner adds a new duration option (e.g., "Month-to-Month").
   async createLeaseTerm(req, res) {
     try {
       const id = await leaseTermService.createLeaseTerm(req.body, req.user);
@@ -19,6 +28,7 @@ class LeaseTermController {
     }
   }
 
+  // UPDATE LEASE TERM: Modifies an existing duration rule.
   async updateLeaseTerm(req, res) {
     try {
       await leaseTermService.updateLeaseTerm(req.params.id, req.body, req.user);
@@ -31,6 +41,7 @@ class LeaseTermController {
     }
   }
 
+  // DELETE LEASE TERM: Removes an outdated option.
   async deleteLeaseTerm(req, res) {
     try {
       await leaseTermService.deleteLeaseTerm(req.params.id, req.user);

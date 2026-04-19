@@ -3,13 +3,15 @@ import catchAsync from '../utils/catchAsync.js';
 import invoiceModel from '../models/invoiceModel.js';
 import unitLockService from '../services/unitLockService.js';
 
-/**
- * Handles PayHere checkout and notification.
- */
+// ============================================================================
+//  PAYHERE CONTROLLER (The Payment Gateway)
+// ============================================================================
+//  Handles the hand-off to the Sri Lankan payment processor (PayHere).
+//  It prepares the checkout sessions and securely receives webhook notifications.
+// ============================================================================
+
 class PayHereController {
-  /**
-   * Prepares data for PayHere checkout (Authenticated).
-   */
+  // PREPARE CHECKOUT: Packages the bill info so PayHere knows how much to charge (Logged-in users).
   prepareCheckout = catchAsync(async (req, res) => {
     const { invoiceId } = req.body;
     if (!invoiceId) throw new Error('Invoice ID is required');
@@ -21,9 +23,7 @@ class PayHereController {
     });
   });
 
-  /**
-   * Prepares data for PayHere checkout using a Magic Token (Guest Payment).
-   */
+  // PREPARE PUBLIC CHECKOUT: Packages the bill info for guests using a secure token.
   preparePublicCheckout = catchAsync(async (req, res) => {
     const { token } = req.params;
     if (!token) throw new Error('Token is required');
@@ -52,20 +52,14 @@ class PayHereController {
     });
   });
 
-  /**
-   * Handles PayHere notification (Webhook).
-   */
+  // HANDLE NOTIFICATION: The webhook endpoint where PayHere says "Payment Success".
   handleNotification = catchAsync(async (req, res) => {
     const payload = req.body;
     const result = await payhereService.processNotification(payload);
     res.status(200).send('OK');
   });
 
-  /**
-   * Simulates a PayHere webhook notification (Authorized).
-   * This allows the system to process simulated payments without moving real money,
-   * but prevents unauthorized users from activating arbitrary invoices.
-   */
+  // SIMULATE WEBHOOK: For testing only. Pretends PayHere sent a success message.
   simulateWebhook = catchAsync(async (req, res) => {
     // [HARDENED] 1. Environment Guard: Disable simulation in production unless explicitly enabled
     const SIM_ENABLED =

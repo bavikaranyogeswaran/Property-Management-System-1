@@ -1,6 +1,14 @@
 import db from '../config/db.js';
 import { executeNightlyPayload } from '../utils/cronJobs.js';
 
+// ============================================================================
+//  SYSTEM CONTROLLER (The System Core)
+// ============================================================================
+//  This file handles the heartbeat operations of the platform.
+//  It triggers automated daily tasks like rent billing and penalty calculation.
+// ============================================================================
+
+// GET CRON LOGS: Returns a history of all background jobs executed.
 export const getCronLogs = async (req, res) => {
   try {
     const [logs] = await db.query(
@@ -13,6 +21,7 @@ export const getCronLogs = async (req, res) => {
   }
 };
 
+// TRIGGER CRON: Manually forces the daily automated checks to run (for testing/fixing).
 export const triggerCron = async (req, res) => {
   try {
     console.log(`[Admin] Manual cron trigger by User ${req.user.id}`);

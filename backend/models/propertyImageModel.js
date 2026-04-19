@@ -1,3 +1,9 @@
+// ============================================================================
+//  PROPERTY IMAGE MODEL (The Property Photo Album)
+// ============================================================================
+//  Connects properties with their Cloudinary hosted images.
+// ============================================================================
+
 import db from '../config/db.js';
 
 class PropertyImageModel {

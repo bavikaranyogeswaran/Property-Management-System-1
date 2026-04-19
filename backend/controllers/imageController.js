@@ -1,3 +1,10 @@
+// ============================================================================
+//  IMAGE CONTROLLER (The Photo Album)
+// ============================================================================
+//  This file handles uploading and deleting photos for properties and units.
+//  It manages the Cloudinary integration and tracks "primary" hero images.
+// ============================================================================
+
 import propertyImageModel from '../models/propertyImageModel.js';
 import propertyModel from '../models/propertyModel.js';
 import unitModel from '../models/unitModel.js';
@@ -40,6 +47,7 @@ class ImageController {
   });
 
   // Property Images
+  // UPLOAD PROPERTY IMAGES: Receives multiple files and saves them to a building profile.
   uploadPropertyImages = catchAsync(async (req, res, next) => {
     const { propertyId } = req.params;
 
@@ -105,6 +113,7 @@ class ImageController {
     res.json({ images });
   });
 
+  // SET PRIMARY IMAGE: Chooses which photo shows up first for a property.
   setPropertyPrimaryImage = catchAsync(async (req, res, next) => {
     const { propertyId, imageId } = req.params;
     const success = await propertyImageModel.setPrimary(imageId, propertyId);

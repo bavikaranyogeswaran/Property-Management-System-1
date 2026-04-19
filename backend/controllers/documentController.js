@@ -1,3 +1,10 @@
+// ============================================================================
+//  DOCUMENT CONTROLLER (The Filing Cabinet)
+// ============================================================================
+//  This file handles secure access to highly sensitive documents like
+//  signed leases and identity cards, ensuring only authorized people can see them.
+// ============================================================================
+
 import { v2 as cloudinary } from 'cloudinary';
 import leaseModel from '../models/leaseModel.js';
 import propertyModel from '../models/propertyModel.js';

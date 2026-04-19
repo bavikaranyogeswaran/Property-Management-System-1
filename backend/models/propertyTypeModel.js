@@ -1,3 +1,9 @@
+// ============================================================================
+//  PROPERTY TYPE MODEL (The Building Glossary)
+// ============================================================================
+//  Defines categories like Apartment, Commercial, etc.
+// ============================================================================
+
 import db from '../config/db.js';
 
 class PropertyTypeModel {

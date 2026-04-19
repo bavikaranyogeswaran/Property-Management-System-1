@@ -1,36 +1,29 @@
 import leadPortalService from '../services/leadPortalService.js';
 import catchAsync from '../utils/catchAsync.js';
 
-/**
- * LeadPortalController
- * Dedicated to guest applicant access to their inquiry status and chat.
- * Delegates all orchestration to leadPortalService.
- */
+// ============================================================================
+//  LEAD PORTAL CONTROLLER (The Prospect Dashboard)
+// ============================================================================
+//  Dedicated to guest applicant access to their inquiry status and chat.
+//  Delegates all orchestration to leadPortalService.
+// ============================================================================
+
 class LeadPortalController {
-  /**
-   * GET /api/lead-portal?token=xxx
-   * Returns lead profile, property details, unit details, and active lease.
-   */
+  // GET PORTAL DATA: Returns lead profile, property details, unit details, and active lease.
   getPortalData = catchAsync(async (req, res) => {
     const { token } = req.query;
     const data = await leadPortalService.getPortalContext(token);
     res.json(data);
   });
 
-  /**
-   * GET /api/lead-portal/messages?token=xxx
-   * Returns all messages for the lead's chat thread.
-   */
+  // GET MESSAGES: Returns all messages for the lead's chat thread.
   getMessages = catchAsync(async (req, res) => {
     const { token } = req.query;
     const messages = await leadPortalService.getMessages(token);
     res.json(messages);
   });
 
-  /**
-   * POST /api/lead-portal/messages?token=xxx
-   * Send a message as the lead.
-   */
+  // SEND MESSAGE: Send a message as the lead.
   sendMessage = catchAsync(async (req, res) => {
     const { token } = req.query;
     const { content } = req.body;
@@ -38,10 +31,7 @@ class LeadPortalController {
     res.status(201).json(result);
   });
 
-  /**
-   * PUT /api/lead-portal/preferences?token=xxx
-   * Updates lead's move-in date and preferred term.
-   */
+  // UPDATE PREFERENCES: Updates lead's move-in date and preferred term.
   updatePreferences = catchAsync(async (req, res) => {
     const { token } = req.query;
     const result = await leadPortalService.updatePreferences(token, req.body);

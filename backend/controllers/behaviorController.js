@@ -1,5 +1,13 @@
+// ============================================================================
+//  BEHAVIOR CONTROLLER (The Reputation Tracker)
+// ============================================================================
+//  This file manages the "social credit" score for tenants.
+//  It logs good behavior (early payments) and bad behavior (noise complaints).
+// ============================================================================
+
 import behaviorService from '../services/behaviorService.js';
 
+// ADD BEHAVIOR LOG: Staff records a positive or negative incident for a tenant.
 export const addBehaviorLog = async (req, res) => {
   const { tenantId } = req.params;
   const { type, category, scoreChange, description, recordedBy } = req.body;
@@ -26,6 +34,7 @@ export const addBehaviorLog = async (req, res) => {
   }
 };
 
+// GET TENANT BEHAVIOR: Staff views the full history of a tenant's behavior score.
 export const getTenantBehavior = async (req, res) => {
   const { tenantId } = req.params;
 
@@ -38,6 +47,7 @@ export const getTenantBehavior = async (req, res) => {
   }
 };
 
+// GET MY BEHAVIOR: Let's a tenant see their own standing and recent logs.
 export const getMyBehavior = async (req, res) => {
   const tenantId = req.user.user_id; // Identifies the authenticated tenant
 

@@ -1,3 +1,9 @@
+// ============================================================================
+//  RECEIPT MODEL (The Proof Drawer)
+// ============================================================================
+//  Records generated payment proofs for tenants.
+// ============================================================================
+
 import pool from '../config/db.js';
 import { getLocalTime, parseLocalDate } from '../utils/dateUtils.js';
 

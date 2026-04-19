@@ -1,3 +1,9 @@
+// ============================================================================
+//  UNIT IMAGE MODEL (The Unit Photo Album)
+// ============================================================================
+//  Connects individual rental units with their images.
+// ============================================================================
+
 import db from '../config/db.js';
 
 class UnitImageModel {

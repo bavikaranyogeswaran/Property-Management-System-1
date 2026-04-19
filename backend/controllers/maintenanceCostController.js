@@ -1,7 +1,16 @@
 import maintenanceCostModel from '../models/maintenanceCostModel.js';
 import { today } from '../utils/dateUtils.js';
 
+// ============================================================================
+//  MAINTENANCE COST CONTROLLER (The Repair Accountant)
+// ============================================================================
+//  This file handles the money side of fixing things.
+//  It records how much a repair cost, and decides whether the Owner or
+//  the Tenant should be billed for it.
+// ============================================================================
+
 class MaintenanceCostController {
+  // ADD COST: Records an expense and optionally creates an invoice for the tenant.
   async addCost(req, res) {
     try {
       const {
@@ -43,6 +52,7 @@ class MaintenanceCostController {
     }
   }
 
+  // GET COSTS: Shows all repair bills.
   async getCosts(req, res) {
     try {
       const { requestId } = req.query;
@@ -73,6 +83,7 @@ class MaintenanceCostController {
     }
   }
 
+  // DELETE COST: Voids an incorrect expense entry.
   async deleteCost(req, res) {
     try {
       const { id } = req.params;

@@ -1,3 +1,9 @@
+// ============================================================================
+//  MAINTENANCE COST MODEL (The Receipt Drawer)
+// ============================================================================
+//  Tracks the exact financial cost of repairs and who is paying.
+// ============================================================================
+
 import pool from '../config/db.js';
 import { getLocalTime } from '../utils/dateUtils.js';
 

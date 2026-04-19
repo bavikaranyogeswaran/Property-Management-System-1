@@ -1,6 +1,14 @@
 import propertyTypeModel from '../models/propertyTypeModel.js';
 
+// ============================================================================
+//  PROPERTY TYPE CONTROLLER (The Building Category Manager)
+// ============================================================================
+//  This file manages the different tags for properties (e.g., "Apartment",
+//  "Commercial Office", "Villa").
+// ============================================================================
+
 class PropertyTypeController {
+  // GET ALL TYPES: Lists every property category available.
   async getAllPropertyTypes(req, res) {
     try {
       const types = await propertyTypeModel.findAll();
@@ -10,6 +18,7 @@ class PropertyTypeController {
     }
   }
 
+  // GET BY ID: Retrieves a specific category definition.
   async getPropertyTypeById(req, res) {
     try {
       const type = await propertyTypeModel.findById(req.params.id);
@@ -21,6 +30,7 @@ class PropertyTypeController {
     }
   }
 
+  // CREATE TYPE: Adds a new property category format to the system.
   async createPropertyType(req, res) {
     try {
       const id = await propertyTypeModel.create(req.body);
@@ -31,6 +41,7 @@ class PropertyTypeController {
     }
   }
 
+  // UPDATE TYPE: Modifies an existing property category.
   async updatePropertyType(req, res) {
     try {
       const success = await propertyTypeModel.update(req.params.id, req.body);
@@ -43,6 +54,7 @@ class PropertyTypeController {
     }
   }
 
+  // DELETE TYPE: Removes a property category.
   async deletePropertyType(req, res) {
     try {
       const success = await propertyTypeModel.delete(req.params.id);

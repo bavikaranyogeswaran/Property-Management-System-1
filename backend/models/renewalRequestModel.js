@@ -1,3 +1,9 @@
+// ============================================================================
+//  RENEWAL REQUEST MODEL (The Negotiation Table)
+// ============================================================================
+//  Stores proposed lease extensions mapping old terms to new ones.
+// ============================================================================
+
 import pool from '../config/db.js';
 
 class RenewalRequestModel {

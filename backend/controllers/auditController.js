@@ -1,6 +1,14 @@
+// ============================================================================
+//  AUDIT CONTROLLER (The Historian)
+// ============================================================================
+//  This file exposes the system's unalterable audit logs.
+//  It helps Owners and System Admins see exactly who did what and when.
+// ============================================================================
+
 import db from '../config/db.js';
 
 class AuditController {
+  // GET LOGS: Retrieves a paginated list of the most recent system actions.
   async getLogs(req, res) {
     try {
       const limit = parseInt(req.query.limit) || 50;

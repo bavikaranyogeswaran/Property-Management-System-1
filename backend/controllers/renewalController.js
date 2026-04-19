@@ -1,12 +1,22 @@
 import renewalService from '../services/renewalService.js';
 import catchAsync from '../utils/catchAsync.js';
 
+// ============================================================================
+//  RENEWAL CONTROLLER (The Lease Renewer)
+// ============================================================================
+//  This file handles the negotiation process as a lease approaches its end.
+//  It facilitates back-and-forth between staff proposing terms and tenants
+//  accepting or declining them.
+// ============================================================================
+
 class RenewalController {
+  // GET REQUESTS: Lists all active lease renewal negotiations for a user.
   getRequests = catchAsync(async (req, res) => {
     const results = await renewalService.getRequests(req.user);
     res.json(results);
   });
 
+  // PROPOSE TERMS: Staff sends a new rent rate and duration to a tenant.
   proposeTerms = catchAsync(async (req, res) => {
     const { id } = req.params;
     const { proposedMonthlyRent, proposedEndDate, notes } = req.body;
@@ -30,6 +40,7 @@ class RenewalController {
     res.json({ message: 'Renewal terms proposed successfully' });
   });
 
+  // APPROVE RENEWAL: Final staff step. Turns the accepted terms into an active lease contract.
   approveRenewal = catchAsync(async (req, res) => {
     const { id } = req.params;
     const result = await renewalService.approve(id, req.user);
@@ -39,6 +50,7 @@ class RenewalController {
     });
   });
 
+  // TENANT ACCEPT: Tenant agrees to the newly proposed rent and duration.
   tenantAccept = catchAsync(async (req, res) => {
     const { id } = req.params;
     await renewalService.tenantAccept(id, req.user);
@@ -47,6 +59,7 @@ class RenewalController {
     });
   });
 
+  // TENANT DECLINE: Tenant rejects the offer, allowing staff to revise it.
   tenantDecline = catchAsync(async (req, res) => {
     const { id } = req.params;
     await renewalService.tenantDecline(id, req.user);
@@ -55,6 +68,7 @@ class RenewalController {
     });
   });
 
+  // REJECT RENEWAL: Staff abruptly terminates the negotiation process.
   rejectRenewal = catchAsync(async (req, res) => {
     const { id } = req.params;
     await renewalService.reject(id, req.user);

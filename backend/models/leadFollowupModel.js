@@ -1,3 +1,9 @@
+// ============================================================================
+//  LEAD FOLLOW-UP MODEL (The Prospect Diary)
+// ============================================================================
+//  Records staff communications like text messages and calls with prospects.
+// ============================================================================
+
 import db from '../config/db.js';
 
 class LeadFollowupModel {

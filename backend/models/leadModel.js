@@ -1,3 +1,9 @@
+// ============================================================================
+//  LEAD MODEL (The Rolodex)
+// ============================================================================
+//  Stores details about potential tenants who are interested in moving in.
+// ============================================================================
+
 import db from '../config/db.js';
 import leadStageHistoryModel from './leadStageHistoryModel.js';
 

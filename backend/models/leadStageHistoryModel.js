@@ -1,3 +1,9 @@
+// ============================================================================
+//  LEAD STAGE HISTORY MODEL (The Progression Timeline)
+// ============================================================================
+//  Tracks a lead moving from Inquiry to Viewed to Leased.
+// ============================================================================
+
 import db from '../config/db.js';
 
 class LeadStageHistoryModel {
