@@ -14,6 +14,7 @@ import {
   AlertTriangle,
   CheckCircle,
   Check,
+  XCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatLKR } from '@/utils/formatters';
@@ -36,6 +37,8 @@ export function TenantLeasePage() {
     renewalRequests,
     acknowledgeRefund,
     disputeRefund,
+    tenantAcceptRenewal,
+    tenantDeclineRenewal,
   } = useApp();
 
   // Multi-Unit Logic (E19): Use active lease from context
@@ -350,6 +353,40 @@ export function TenantLeasePage() {
                                     You'll see the proposed terms here shortly.
                                   </p>
                                 )}
+
+                                {request.status === 'negotiating' &&
+                                  request.proposedMonthlyRent && (
+                                    <div className="flex gap-2 pt-2">
+                                      <Button
+                                        size="sm"
+                                        className="bg-emerald-600 hover:bg-emerald-700 text-white flex-1"
+                                        onClick={() =>
+                                          tenantAcceptRenewal(request.id)
+                                        }
+                                      >
+                                        <CheckCircle className="size-4 mr-2" />
+                                        Accept Terms
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="text-red-600 border-red-200 hover:bg-red-50 flex-1"
+                                        onClick={() => {
+                                          if (
+                                            window.confirm(
+                                              'Are you sure you want to decline these terms? This will notify the staff to revise the proposal.'
+                                            )
+                                          ) {
+                                            tenantDeclineRenewal(request.id);
+                                          }
+                                        }}
+                                      >
+                                        <XCircle className="size-4 mr-2" />
+                                        Decline
+                                      </Button>
+                                    </div>
+                                  )}
+
                                 {request.negotiationNotes && (
                                   <div className="mt-2 pt-2 border-t text-xs text-gray-600 italic">
                                     " {request.negotiationNotes} "

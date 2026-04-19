@@ -134,6 +134,8 @@ interface LeaseContextType {
   ) => Promise<void>;
   approveRenewal: (id: string) => Promise<void>;
   rejectRenewal: (id: string) => Promise<void>;
+  tenantAcceptRenewal: (id: string) => Promise<void>;
+  tenantDeclineRenewal: (id: string) => Promise<void>;
 }
 
 const LeaseContext = createContext<LeaseContextType | undefined>(undefined);
@@ -495,6 +497,8 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
     try {
       await apiClient.post(`/renewal-requests/${id}/propose`, {
         proposedMonthlyRent: toCentsFromLKR(data.proposedMonthlyRent),
+        proposedEndDate: data.proposedEndDate,
+        notes: data.notes,
       });
       toast.success('Renewal terms proposed successfully');
       fetchRenewalRequests();
@@ -527,6 +531,29 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const tenantAcceptRenewal = async (id: string) => {
+    try {
+      await apiClient.post(`/renewal-requests/${id}/accept`);
+      toast.success('Renewal terms accepted! Awaiting final staff approval.');
+      fetchRenewalRequests();
+      fetchLeases();
+    } catch (e: any) {
+      toast.error(e.response?.data?.error || 'Failed to accept renewal terms');
+      throw e;
+    }
+  };
+
+  const tenantDeclineRenewal = async (id: string) => {
+    try {
+      await apiClient.post(`/renewal-requests/${id}/decline`);
+      toast.success('Renewal terms declined. Staff will be notified.');
+      fetchRenewalRequests();
+    } catch (e: any) {
+      toast.error(e.response?.data?.error || 'Failed to decline renewal terms');
+      throw e;
+    }
+  };
+
   return (
     <LeaseContext.Provider
       value={{
@@ -554,6 +581,8 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
         proposeRenewalTerms,
         approveRenewal,
         rejectRenewal,
+        tenantAcceptRenewal,
+        tenantDeclineRenewal,
         cancelLease,
         recordDisbursement,
       }}

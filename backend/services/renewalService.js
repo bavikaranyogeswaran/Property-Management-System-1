@@ -146,12 +146,13 @@ class RenewalService {
   }
 
   // APPROVE: The final step. Activates the new lease and archives the old one.
-  async approve(requestId, user) {
+  async approve(requestId, user, overrideStatusCheck = false) {
     const request = await renewalRequestModel.findById(requestId);
     if (!request) throw new AppError('Renewal request not found', 404);
 
     // [FIX] Tenant must have explicitly accepted terms before staff can finalise
-    if (request.status !== 'tenant_accepted') {
+    // EXCEPT if it's an privileged override (instantRenew)
+    if (!overrideStatusCheck && request.status !== 'tenant_accepted') {
       throw new AppError(
         `Cannot approve: renewal is in '${request.status}' status. Tenant must accept proposed terms first.`,
         400
@@ -508,7 +509,7 @@ class RenewalService {
     );
 
     // 3. Approve automatically
-    return await this.approve(requestId, user);
+    return await this.approve(requestId, user, true);
   }
 
   async getRequests(user) {
