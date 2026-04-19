@@ -1,3 +1,11 @@
+// ============================================================================
+//  RENEWAL SERVICE (The Retention Expert)
+// ============================================================================
+//  This service manages the negotiation for lease extensions.
+//  It handles term proposals, tenant acceptance/rejection, and
+//  automatically rolling over deposits to new agreements.
+// ============================================================================
+
 import renewalRequestModel from '../models/renewalRequestModel.js';
 import leaseModel from '../models/leaseModel.js';
 import userModel from '../models/userModel.js';
@@ -29,6 +37,7 @@ import notificationModel from '../models/notificationModel.js';
  * negotiations and audit trails.
  */
 class RenewalService {
+  // CREATE FROM NOTICE: Starts a renewal pipeline if a tenant decides they want to stay.
   async createFromNotice(leaseId, user = null) {
     const lease = await leaseModel.findById(leaseId);
     if (!lease) throw new AppError('Lease not found', 404);
@@ -62,6 +71,7 @@ class RenewalService {
     return requestId;
   }
 
+  // PROPOSE TERMS: Staff step. Sends the new rent and end date to the tenant for review.
   async proposeTerms(requestId, data, user) {
     const request = await renewalRequestModel.findById(requestId);
     if (!request) throw new AppError('Renewal request not found', 404);
@@ -135,6 +145,7 @@ class RenewalService {
     }
   }
 
+  // APPROVE: The final step. Activates the new lease and archives the old one.
   async approve(requestId, user) {
     const request = await renewalRequestModel.findById(requestId);
     if (!request) throw new AppError('Renewal request not found', 404);
@@ -347,6 +358,7 @@ class RenewalService {
     }
   }
 
+  // TENANT ACCEPT: The tenant says "Yes" to the new proposed deal.
   async tenantAccept(requestId, user) {
     const request = await renewalRequestModel.findById(requestId);
     if (!request) throw new AppError('Renewal request not found', 404);

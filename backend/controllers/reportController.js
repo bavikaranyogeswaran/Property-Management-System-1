@@ -1,3 +1,10 @@
+// ============================================================================
+//  REPORT CONTROLLER (The Data Scientist)
+// ============================================================================
+//  This file generates PDF reports and JSON statistics for the dashboard.
+//  It helps Owners and Treasurers see how the business is performing.
+// ============================================================================
+
 import reportService from '../services/reportService.js';
 import { getLocalTime, parseLocalDate } from '../utils/dateUtils.js';
 import ReportGenerator from '../utils/pdfGenerator.js';
@@ -8,6 +15,7 @@ class ReportController {
   // =========================================================================
   //  1. FINANCIAL PERFORMANCE REPORT
   // =========================================================================
+  // FINANCIAL REPORT: Generates a PDF showing income vs expenses for a specific year.
   generateFinancialReport = catchAsync(async (req, res, next) => {
     const year = req.query.year || new Date().getFullYear();
     const data = await reportService.getFinancialReportData(year, req.user);
@@ -137,6 +145,7 @@ class ReportController {
   // =========================================================================
   //  2. OCCUPANCY REPORT
   // =========================================================================
+  // OCCUPANCY REPORT: Generates a PDF showing which units are empty and which are generating money.
   generateOccupancyReport = catchAsync(async (req, res, next) => {
     const data = await reportService.getOccupancyReportData(req.user);
 
@@ -217,6 +226,7 @@ class ReportController {
   // =========================================================================
   //  3. TENANT RISK PROFILE REPORT
   // =========================================================================
+  // TENANT RISK REPORT: Generates a PDF flagging tenants with poor payment histories.
   generateTenantRiskReport = catchAsync(async (req, res, next) => {
     const data = await reportService.getTenantRiskStats(req.user);
 
@@ -522,6 +532,7 @@ class ReportController {
   // =========================================================================
   //  6. LEAD CONVERSION ANALYTICS REPORT
   // =========================================================================
+  // LEAD CONVERSION REPORT: Generates a PDF showing how many inquiries turn into signed leases.
   generateLeadConversionReport = catchAsync(async (req, res, next) => {
     const data = await reportService.getLeadConversionReportData(req.user);
 

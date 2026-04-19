@@ -1,9 +1,18 @@
+// ============================================================================
+//  LEAD CONTROLLER (The Receptionist)
+// ============================================================================
+//  This file handles the first contact with potential tenants.
+//  It manages inquiries, property visits, and the conversion from
+//  a "Lead" (prospect) to a "Tenant" (resident).
+// ============================================================================
+
 import leadService from '../services/leadService.js';
 import userService from '../services/userService.js';
 import leadModel from '../models/leadModel.js';
 import unitModel from '../models/unitModel.js';
 
 class LeadController {
+  // CONVERT LEAD: The critical transition. Turns a prospect into a tenant and starts their lease.
   async convertLead(req, res) {
     try {
       if (req.user.role !== 'owner') {
@@ -109,6 +118,7 @@ class LeadController {
     }
   }
 
+  // CREATE LEAD: Records a new inquiry from the website.
   async createLead(req, res) {
     try {
       const result = await leadService.registerInterest(req.body);
@@ -186,6 +196,7 @@ class LeadController {
     }
   }
 
+  // CREATE FOLLOW-UP: Staff records a phone call or email sent to the prospect.
   async createFollowup(req, res) {
     try {
       const { id } = req.params;

@@ -1,3 +1,11 @@
+// ============================================================================
+//  LEAD SERVICE (The CRM Engine)
+// ============================================================================
+//  This service manages the relationship with prospects.
+//  It handles interest registration, lead scoring, follow-ups, and
+//  provides portal access for applicants to track their progress.
+// ============================================================================
+
 import leadModel from '../models/leadModel.js';
 import unitModel from '../models/unitModel.js';
 import visitModel from '../models/visitModel.js';
@@ -23,6 +31,7 @@ import leaseService from './leaseService.js';
 import leaseModel from '../models/leaseModel.js';
 
 class LeadService {
+  // REGISTER INTEREST: The "Landing Page" logic. Saves a guest's inquiry and sends a welcome email.
   async registerInterest(data) {
     const {
       name,
@@ -217,6 +226,7 @@ class LeadService {
     return await leadModel.findByEmail(email);
   }
 
+  // UPDATE LEAD: Staff step. Updates status (Interested -> Viewed -> Converted) or changes notes.
   async updateLead(id, data, user) {
     if (!isAtLeast(user.role, ROLES.OWNER)) {
       throw new Error('Access denied.');
@@ -278,6 +288,7 @@ class LeadService {
     return await leadStageHistoryModel.findAll(user.id);
   }
 
+  // RESEND PORTAL LINK: Sends the access email again if the prospect lost it.
   async resendPortalLink(leadId, user) {
     if (!isAtLeast(user.role, ROLES.TREASURER)) {
       throw new Error('Access denied.');
@@ -337,6 +348,7 @@ class LeadService {
     return { success: true };
   }
 
+  // CALCULATE LEAD SCORE: Ranks prospects based on their move-in date and contact info (quality filter).
   calculateLeadScore(data) {
     const { preferredTermMonths, moveInDate, phone } = data;
     let score = 0;

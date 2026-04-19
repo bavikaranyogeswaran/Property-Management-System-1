@@ -1,3 +1,10 @@
+// ============================================================================
+//  AUTHENTICATION SERVICE (The Identity Verifier)
+// ============================================================================
+//  This service handles the logic for confirming who a user is.
+//  It manages login, password resets, and email verification tokens.
+// ============================================================================
+
 import bcrypt from 'bcryptjs';
 import logger from '../utils/logger.js';
 import jwt from 'jsonwebtoken';
@@ -16,6 +23,7 @@ import emailService from '../utils/emailService.js';
 const JWT_SECRET = config.jwt.secret;
 
 class AuthService {
+  // LOGIN: Verifies credentials and issues a JWT "Access Card".
   async login(email, password) {
     const user = await userModel.findByEmail(email);
 
@@ -62,6 +70,7 @@ class AuthService {
       },
     };
   }
+  // VERIFY EMAIL: Confirms the user's email is real using a one-time token.
   async verifyEmail(token) {
     // [HARDENED] Use Opaque Token from Redis
     const tokenData = await securityTokenService.consumeToken(token, 'verify');
@@ -74,6 +83,7 @@ class AuthService {
     return { message: 'Email verified successfully' };
   }
 
+  // SETUP PASSWORD: The final step of onboarding where a new user sets their password.
   async setupPassword(token, password, tenantData = null) {
     // [HARDENED] Use Opaque Token from Redis
     const tokenData = await securityTokenService.consumeToken(token, 'setup');
@@ -98,6 +108,7 @@ class AuthService {
     }
   }
 
+  // REQUEST PASSWORD RESET: Sends a "Rescue Link" to the user's email if they forgot their password.
   async requestPasswordReset(email) {
     // 1. Find user (don't throw error if not found - security parity)
     const user = await userModel.findByEmail(email);
@@ -131,6 +142,7 @@ class AuthService {
     return { message: 'If an account exists, a reset link has been sent.' };
   }
 
+  // RESET PASSWORD: Uses the "Rescue Link" to actually change the password.
   async resetPassword(token, newPassword) {
     // [HARDENED] Use Opaque Token from Redis (Ensures one-time use)
     const tokenData = await securityTokenService.consumeToken(token, 'reset');

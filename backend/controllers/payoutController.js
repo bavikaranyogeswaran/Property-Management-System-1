@@ -1,8 +1,17 @@
+// ============================================================================
+//  PAYOUT CONTROLLER (The Owner's Paymaster)
+// ============================================================================
+//  This file handles sending money OUT to property owners.
+//  It calculates how much an owner is owed (Rent minus Expenses) and
+//  records when the money has been sent to them.
+// ============================================================================
+
 import payoutService from '../services/payoutService.js';
 import authorizationService from '../services/authorizationService.js';
 
 class PayoutController {
   // 1. Preview (Calculate but don't save)
+  // PREVIEW PAYOUT: Calculates the expected profit sharing before officially saving it.
   async previewPayout(req, res) {
     try {
       const { ownerId, startDate, endDate } = req.query;
@@ -54,6 +63,7 @@ class PayoutController {
   }
 
   // 2. Create (Calculate and Save)
+  // CREATE PAYOUT: Officially records a payout which then needs to be paid by the bank.
   async createPayout(req, res) {
     try {
       const { ownerId, startDate, endDate, selection } = req.body;
@@ -92,6 +102,7 @@ class PayoutController {
     }
   }
 
+  // GET HISTORY: Shows a list of all past money transfers to a specific owner.
   async getHistory(req, res) {
     try {
       const ownerId = req.query.ownerId || req.user.id;
@@ -118,6 +129,7 @@ class PayoutController {
     }
   }
 
+  // MARK AS PAID: Treasurer step. Confirms the money is out of our account and into the owner's.
   async markAsPaid(req, res) {
     try {
       const { id } = req.params;

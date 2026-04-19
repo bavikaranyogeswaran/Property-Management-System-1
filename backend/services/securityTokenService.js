@@ -1,11 +1,13 @@
 import redis from '../config/redis.js';
 import crypto from 'crypto';
 
-/**
- * SecurityTokenService
- * Manages opaque, one-time use tokens stored in Redis with auto-expiry.
- * Replaces stateless JWTs for high-integrity actions (Password Reset, Setup, Verification).
- */
+// ============================================================================
+//  SECURITY TOKEN SERVICE (The One-Time Key Maker)
+// ============================================================================
+//  Manages opaque, one-time use tokens stored in Redis with auto-expiry.
+//  These are like "temporary entrance passes" for high-security actions
+//  like resetting a password or verifying an email.
+// ============================================================================
 class SecurityTokenService {
   /**
    * Create a new opaque token
@@ -15,6 +17,7 @@ class SecurityTokenService {
    * @param {Object} metadata - Optional additional data to store with the token
    * @returns {string} The generated token
    */
+  // CREATE TOKEN: Generates a random, secure token and saves it in the vault (Redis).
   async createToken(userId, type, ttlSeconds = 3600, metadata = {}) {
     const token = crypto.randomBytes(32).toString('hex');
     const key = `token:${type}:${token}`;
@@ -36,6 +39,7 @@ class SecurityTokenService {
    * @param {string} expectedType - The expected action type
    * @returns {Object|null} The token data if valid, otherwise null
    */
+  // CONSUME TOKEN: Checks if a token is valid, and if so, "burns" it so it can't be used again.
   async consumeToken(token, expectedType) {
     if (!token) return null;
 
@@ -67,6 +71,7 @@ class SecurityTokenService {
    * For simplicity, our flow naturally overwrites the previous token in practice if we use user-keyed storage,
    * but here we use token-keyed for O(1) verify.
    */
+  // REVOKE TOKENS: Cancels all active tokens of a certain type for a user.
   async revokeAllForUser(userId, type) {
     // Implementation note: Scanning keys is slow.
     // In high-scale, we would store a secondary key `userTokens:{userId}:{type}` -> token.

@@ -1,3 +1,11 @@
+// ============================================================================
+//  PAYMENT SERVICE (The Financial Record Keeper)
+// ============================================================================
+//  This service manages all movement of money into the system.
+//  It handles payment submissions, manual & automated verifications,
+//  ledger bookkeeping, and the generation of receipts.
+// ============================================================================
+
 import pool from '../config/db.js';
 import paymentModel from '../models/paymentModel.js';
 import invoiceModel from '../models/invoiceModel.js';
@@ -28,6 +36,7 @@ import unitLockService from './unitLockService.js';
 // [REMOVED] getLedgerClassification is now encapsulated within LedgerService.js
 
 class PaymentService {
+  // SUBMIT PAYMENT: Saves a payment slip or details sent by a tenant for review.
   async submitPayment(data, tenantId, file) {
     const { invoiceId, amount, paymentDate, paymentMethod, referenceNumber } =
       data;
@@ -112,6 +121,7 @@ class PaymentService {
     }
   }
 
+  // SUBMIT GUEST PAYMENT: Handles the special "Security Deposit" payment made by applicants during onboarding.
   async submitGuestPayment(data, magicToken, file) {
     const { paymentDate, paymentMethod, referenceNumber } = data;
     let evidenceUrl = data.evidenceUrl;
@@ -311,6 +321,7 @@ class PaymentService {
    * Records a payment that has already been verified by an automated gateway (e.g. PayHere).
    * Skips manual treasurer verification and triggers all post-payment workflows.
    */
+  // RECORD AUTOMATED PAYMENT: Instantly logs a payment confirmed by an online gateway like PayHere.
   async recordAutomatedPayment(data, connection = null) {
     const { invoiceId, amount, paymentMethod, referenceNumber } = data;
 
@@ -504,6 +515,7 @@ class PaymentService {
     }
   }
 
+  // VERIFY PAYMENT: Manual review by a Treasurer. Confirms if the money actually hit the bank account.
   async verifyPayment(
     paymentId,
     status,

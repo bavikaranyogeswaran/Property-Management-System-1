@@ -1,3 +1,11 @@
+// ============================================================================
+//  USER SERVICE (The Staff & Tenant Manager)
+// ============================================================================
+//  This service handles the core logic for managing people in the system.
+//  It deals with onboarding staff (Treasurers), managing tenant profiles,
+//  and converting leads (potential tenants) into active tenants with leases.
+// ============================================================================
+
 import bcrypt from 'bcryptjs';
 import userModel from '../models/userModel.js';
 import leadModel from '../models/leadModel.js';
@@ -27,6 +35,7 @@ import { ROLES } from '../utils/roleUtils.js';
 const SALT_ROUNDS = 10;
 
 class UserService {
+  // CREATE TREASURER: Handles the technical steps of hiring a new staff member (User + Profile + Welcome Email).
   async createTreasurer(
     name,
     email,
@@ -107,6 +116,7 @@ class UserService {
     }
   }
 
+  // UPDATE TREASURER: Saves changes to a staff member's basic info.
   async updateTreasurer(id, data) {
     const { name, email, phone, status } = data;
 
@@ -125,6 +135,7 @@ class UserService {
     return { id, name, email, phone, status };
   }
 
+  // UPDATE USER PROFILE: A unified way for any user to update their own contact info and profile details.
   async updateUserProfile(id, data) {
     const {
       name,
@@ -245,6 +256,7 @@ class UserService {
   }
 
   // Convert lead to tenant
+  // CONVERT LEAD TO TENANT: The "Closing" logic. Converts an applicant into a formal tenant, reserved a unit, and generates a draft lease.
   async convertLeadToTenant(
     leadId,
     startDate,

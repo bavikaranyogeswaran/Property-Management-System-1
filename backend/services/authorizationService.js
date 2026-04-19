@@ -1,3 +1,11 @@
+// ============================================================================
+//  AUTHORIZATION SERVICE (The Gatekeeper)
+// ============================================================================
+//  This service centralizes all security checks.
+//  It verifies if a User (Tenant, Owner, or Staff) has the right to
+//  view or modify a specific Resource (Property, Unit, Lease, etc.).
+// ============================================================================
+
 import pool from '../config/db.js';
 import propertyModel from '../models/propertyModel.js';
 import unitModel from '../models/unitModel.js';
@@ -8,15 +16,11 @@ import maintenanceRequestModel from '../models/maintenanceRequestModel.js';
 import staffModel from '../models/staffModel.js';
 import { ROLES, isAtLeast } from '../utils/roleUtils.js';
 
-/**
- * AuthorizationService
- * Centralizes ownership and permission checks for all resources.
- * [HARDENED]: Replaced recursive model calls with flattened SQL checks to prevent connection pool saturation.
- */
 class AuthorizationService {
   /**
    * Checks if a user has OWNERSHIP or STAFF access to a property.
    */
+  // CAN ACCESS PROPERTY: Verifies if the user is the owner or an assigned staff member.
   async canAccessProperty(userId, role, propertyId) {
     if (role === ROLES.SYSTEM) return true;
 
@@ -68,6 +72,7 @@ class AuthorizationService {
    * Checks if a user can access a lease.
    * [FLATTENED]: Single query handles Tenant, Owner, and Staff checks.
    */
+  // CAN ACCESS LEASE: Multi-role check for Tenants (their own lease), Owners, and assigned Staff.
   async canAccessLease(userId, role, leaseId) {
     if (role === ROLES.SYSTEM) return true;
 

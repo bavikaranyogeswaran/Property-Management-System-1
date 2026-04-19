@@ -1,3 +1,11 @@
+// ============================================================================
+//  INVOICE SERVICE (The Billing Logic)
+// ============================================================================
+//  This service calculates the amounts for bills.
+//  It handles monthly rent generation, manual invoice creation,
+//  and corrections for billing errors.
+// ============================================================================
+
 import db from '../config/db.js';
 import invoiceModel from '../models/invoiceModel.js';
 import leaseModel from '../models/leaseModel.js';
@@ -33,6 +41,7 @@ class InvoiceService {
     }
   }
 
+  // CREATE INVOICE: Manually generates a one-off bill (e.g., for repairs or late fees).
   async createInvoice(data, user) {
     if (!isAtLeast(user.role, ROLES.TREASURER)) {
       throw new Error('Denied. Only Treasurers can create invoices.');
@@ -103,6 +112,7 @@ class InvoiceService {
     }
   }
 
+  // GENERATE MONTHLY INVOICES: The heavy-lifter. Calculates rent for all active tenants at the start of the month.
   async generateMonthlyInvoices(year, month, user) {
     if (!isAtLeast(user.role, ROLES.TREASURER)) {
       throw new Error('Access denied. Only Treasurers can generate invoices.');
@@ -239,6 +249,7 @@ class InvoiceService {
     return lockResult.result;
   }
 
+  // CORRECT INVOICE: Voids a wrong bill and issues a new one with the correct amount.
   async correctInvoice(invoiceId, newAmount, reason, user) {
     if (!isAtLeast(user.role, ROLES.TREASURER))
       throw new Error('Only treasurers can correct invoices.');

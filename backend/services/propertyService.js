@@ -1,3 +1,11 @@
+// ============================================================================
+//  PROPERTY SERVICE (The Real Estate Expert)
+// ============================================================================
+//  This service handles the business logic for properties (buildings).
+//  It manages ownership verification, property listing for different roles,
+//  and the "archival" (deletion) process.
+// ============================================================================
+
 import propertyModel from '../models/propertyModel.js';
 import unitModel from '../models/unitModel.js';
 import leaseModel from '../models/leaseModel.js';
@@ -7,6 +15,7 @@ import leaseTermModel from '../models/leaseTermModel.js';
 import { ROLES } from '../utils/roleUtils.js';
 
 class PropertyService {
+  // CREATE PROPERTY: Registers a new building with its address and type.
   async createProperty(data) {
     // data contains: name, propertyTypeId, propertyNo, street, city, district, imageUrl, description, features
     if (
@@ -28,6 +37,7 @@ class PropertyService {
     return await propertyModel.findById(id);
   }
 
+  // GET PROPERTIES: Advanced listing logic that shows specific buildings based on whether you're a Guest, Staff, or Owner.
   async getProperties(user, query = {}) {
     const isPublic = query.public === 'true';
 
@@ -56,6 +66,7 @@ class PropertyService {
     return await propertyModel.findAll(null);
   }
 
+  // VERIFY OWNERSHIP: A security check to ensure an Owner actually own the building they're trying to edit.
   async verifyOwnership(propertyId, userId, role) {
     const property = await propertyModel.findById(propertyId);
     if (!property) {
@@ -90,6 +101,7 @@ class PropertyService {
     return await propertyModel.findById(id);
   }
 
+  // DELETE PROPERTY: Safely archives a building and its units, but only if all leases are finished.
   async deleteProperty(id) {
     // 1. Check for any active or pending leases targeting units in this property
     const activeLeaseCount = await leaseModel.countActiveByPropertyId(id);
@@ -125,6 +137,7 @@ class PropertyService {
   async getPropertyTypes() {
     return await propertyModel.getTypes();
   }
+  // ADD IMAGES: Attaches photos to a property to make it look good on the public list.
   async addImages(propertyId, files) {
     if (!files || files.length === 0) return [];
 

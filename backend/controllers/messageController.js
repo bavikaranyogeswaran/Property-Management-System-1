@@ -1,7 +1,15 @@
+// ============================================================================
+//  MESSAGE CONTROLLER (The Post Office)
+// ============================================================================
+//  This file handles all direct communication between staff and tenants/leads.
+//  It records the history of conversations and marks them as read.
+// ============================================================================
+
 import messageModel from '../models/messageModel.js';
 import leadModel from '../models/leadModel.js';
 
 class MessageController {
+  // SEND MESSAGE: Dispatches a new note to a Lead (prospect).
   async sendMessage(req, res) {
     try {
       const { leadId } = req.params;
@@ -45,6 +53,7 @@ class MessageController {
     }
   }
 
+  // GET MESSAGES: Retrieves the chat history for a specific Lead.
   async getMessages(req, res) {
     try {
       const { leadId } = req.params;
@@ -71,6 +80,7 @@ class MessageController {
   // --- TENANT SPECIFIC ENDPOINTS ---
 
   // For tenant fetching their own messages
+  // GET TENANT MESSAGES: Retrieves the chat history for a verified Tenant.
   async getTenantMessages(req, res) {
     try {
       const tenantId =
@@ -83,6 +93,7 @@ class MessageController {
   }
 
   // For anyone sending a message in a tenant thread
+  // SEND TENANT MESSAGE: Dispatches a new note into a verified Tenant's thread.
   async sendTenantMessage(req, res) {
     try {
       const tenantId =

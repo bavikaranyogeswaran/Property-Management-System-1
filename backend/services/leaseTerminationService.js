@@ -1,3 +1,11 @@
+// ============================================================================
+//  LEASE TERMINATION SERVICE (The Move-Out Manager)
+// ============================================================================
+//  This service handles the "End" of a tenant's stay:
+//  Premature terminations, natural expirations, and the checkout process.
+//  It ensures the unit is returned to the pool for the next tenant.
+// ============================================================================
+
 import crypto, { randomUUID } from 'crypto';
 import leaseModel from '../models/leaseModel.js';
 import unitModel from '../models/unitModel.js';
@@ -29,6 +37,7 @@ class LeaseTerminationService {
     this.facade = facade;
   }
 
+  // TERMINATE LEASE: Handles an early move-out, potentially charging a fee.
   async terminateLease(
     leaseId,
     terminationDate,
@@ -160,6 +169,7 @@ class LeaseTerminationService {
     }
   }
 
+  // FINALIZE CHECKOUT: The very last step. Confirms the tenant has left and the keys are back.
   async finalizeLeaseCheckout(leaseId, user) {
     const lease = await leaseModel.findById(leaseId);
     if (!lease) throw new AppError('Lease not found', 404);
@@ -230,6 +240,7 @@ class LeaseTerminationService {
     }
   }
 
+  // CANCEL LEASE: Deletes a Draft or Pending lease if the deal falls through.
   async cancelLease(leaseId, user) {
     const conn = await pool.getConnection();
     try {
@@ -322,6 +333,7 @@ class LeaseTerminationService {
     }
   }
 
+  // WITHDRAW APPLICATION: The "Change of Heart" logic. When a prospect decides they don't want the unit anymore.
   async withdrawApplication(leaseId, user) {
     const conn = await pool.getConnection();
     try {

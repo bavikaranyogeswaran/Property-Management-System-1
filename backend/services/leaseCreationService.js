@@ -1,3 +1,11 @@
+// ============================================================================
+//  LEASE CREATION SERVICE (The Contract Architect)
+// ============================================================================
+//  This service specializes in the first chapter of a tenant's journey:
+//  Drafting the lease, checking unit availability, and handling the deposit
+//  payment and document verification steps to activate the contract.
+// ============================================================================
+
 import crypto, { randomUUID } from 'crypto';
 import leaseModel from '../models/leaseModel.js';
 import unitModel from '../models/unitModel.js';
@@ -32,6 +40,7 @@ class LeaseCreationService {
     this.facade = facade;
   }
 
+  // CREATE LEASE: The foundation. Checks if a unit is free and creates a "Draft" contract.
   async createLease(data, connection = null, user = null) {
     const {
       tenantId,
@@ -219,6 +228,7 @@ class LeaseCreationService {
     }
   }
 
+  // VERIFY DOCUMENTS: Staff review step. Marks the tenant's paperwork as valid.
   async verifyLeaseDocuments(leaseId, user) {
     const lockKey = `dist_lock:lease_activation:${leaseId}`;
     const lockToken = await redis.acquireLock(lockKey, 30000);
@@ -341,6 +351,7 @@ class LeaseCreationService {
     }
   }
 
+  // REJECT DOCUMENTS: Sends the tenant back to the drawing board if their papers are wrong.
   async rejectLeaseDocuments(leaseId, reason, user) {
     if (!reason) {
       throw new AppError('Rejection reason is required', 400);
@@ -406,6 +417,7 @@ class LeaseCreationService {
     }
   }
 
+  // SIGN LEASE: The final activation. Moves the lease from "Draft" to "Active" and the unit to "Occupied".
   async signLease(leaseId, user, connection = null) {
     const lockKey = `dist_lock:lease_activation:${leaseId}`;
     const isOwnTransaction = !connection;

@@ -1,3 +1,11 @@
+// ============================================================================
+//  LEDGER SERVICE (The Auditor)
+// ============================================================================
+//  This service ensures that every dollar in the system is accounted for.
+//  It maps business events (like rent payments) into formalized double-entry
+//  accounting records for financial integrity.
+// ============================================================================
+
 import ledgerModel from '../models/ledgerModel.js';
 import { getCurrentDateString } from '../utils/dateUtils.js';
 
@@ -30,6 +38,7 @@ class LedgerService {
    * @param {string} [description]
    * @param {Object} [connection]
    */
+  // POST PAYMENT: Staff/System step. Records a verified payment into the central ledger.
   async postPayment(paymentId, invoice, amount, description, connection) {
     const { accountType, category } = getLedgerClassification(
       invoice.invoiceType || invoice.invoice_type

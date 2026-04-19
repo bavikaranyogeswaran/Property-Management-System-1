@@ -1,3 +1,11 @@
+// ============================================================================
+//  UNIT LOCK SERVICE (The Booking Guard)
+// ============================================================================
+//  This service prevents "Double Booking" accidents.
+//  It uses Redis to temporarily "hold" a unit while a tenant is checking out,
+//  ensuring no two people try to pay for the same room at the same time.
+// ============================================================================
+
 import { connection as redis } from '../config/queue.js';
 
 class UnitLockService {
@@ -7,6 +15,7 @@ class UnitLockService {
    * @param {string|number} leadId
    * @returns {Promise<boolean>} True if lock acquired or already held by this lead
    */
+  // ACQUIRE LOCK: Claims a unit for a specific Lead for 15 minutes.
   async acquireLock(unitId, leadId) {
     const id = unitId.toString();
     const lid = leadId.toString();
@@ -38,6 +47,7 @@ class UnitLockService {
   /**
    * Check if a unit is locked by someone ELSE.
    */
+  // IS LOCKED: Checks if someone else is currently in the middle of paying for this unit.
   async isLocked(unitId, excludeLeadId = null) {
     const id = unitId.toString();
     const lockKey = `unit_lock:${id}`;

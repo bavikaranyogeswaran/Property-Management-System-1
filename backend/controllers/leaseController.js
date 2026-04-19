@@ -1,9 +1,17 @@
+// ============================================================================
+//  LEASE CONTROLLER (The Contract Registry)
+// ============================================================================
+//  This file handles the administrative actions for leases:
+//  Signing contracts, terminating them, and managing deposit refunds.
+// ============================================================================
+
 import leaseService from '../services/leaseService.js';
 import renewalService from '../services/renewalService.js';
 import { toCentsFromMajor } from '../utils/moneyUtils.js';
 import catchAsync from '../utils/catchAsync.js';
 
 class LeaseController {
+  // GET LEASES: Lists all rental agreements based on who is asking (Tenant or Staff).
   getLeases = catchAsync(async (req, res) => {
     const results = await leaseService.getLeases(req.user);
     res.json(results);
@@ -15,6 +23,7 @@ class LeaseController {
     res.json(lease);
   });
 
+  // CREATE LEASE: Drafts a new rental contract for a tenant.
   createLease = catchAsync(async (req, res) => {
     const result = await leaseService.createLease(req.body, null, req.user);
     res.status(201).json({
@@ -47,6 +56,7 @@ class LeaseController {
     res.json({ message: 'Lease signed successfully', status: result.status });
   });
 
+  // VERIFY DOCUMENTS: Staff checks the tenant's ID and other papers before activating the lease.
   verifyLeaseDocuments = catchAsync(async (req, res) => {
     const { id } = req.params;
     const result = await leaseService.verifyLeaseDocuments(id, req.user);
@@ -59,6 +69,7 @@ class LeaseController {
     res.json(status);
   });
 
+  // INSTANT RENEW: Extends a lease immediately without a complex negotiation.
   instantRenew = catchAsync(async (req, res) => {
     const { id } = req.params;
     const { newEndDate, newMonthlyRent } = req.body;
@@ -101,6 +112,7 @@ class LeaseController {
     res.json({ message: 'Refund request marked as disputed', ...result });
   });
 
+  // TERMINATE LEASE: Ends a rental agreement, often with a final move-out date.
   terminateLease = catchAsync(async (req, res) => {
     const { id } = req.params;
     const { terminationDate, terminationFee } = req.body;

@@ -1,9 +1,18 @@
+// ============================================================================
+//  PAYOUT SERVICE (The Owner's Accountant)
+// ============================================================================
+//  This service calculates the complex math of profit sharing.
+//  It subtracts agency commissions and maintenance expenses from the total
+//  rent collected to find the final payout for the property owner.
+// ============================================================================
+
 import payoutModel from '../models/payoutModel.js';
 import ledgerModel from '../models/ledgerModel.js';
 import pool from '../config/db.js';
 import { fromCents } from '../utils/moneyUtils.js';
 
 class PayoutService {
+  // PREVIEW PAYOUT: Shows the owner exactly how the math works before any money is moved.
   async previewPayout(ownerId, startDate, endDate, selection = null) {
     if (!endDate) {
       throw new Error('End date is required');
@@ -17,6 +26,7 @@ class PayoutService {
     );
   }
 
+  // CREATE PAYOUT: Saves the calculated record and links all relevant invoices/expenses.
   async createPayout(ownerId, startDate, endDate, selection = null) {
     if (!endDate) {
       throw new Error('End date is required');
@@ -140,6 +150,7 @@ class PayoutService {
     return row[0];
   }
 
+  // MARK AS PAID: Treasurer step. Records the bank reference to prove money was sent.
   async markAsPaid(payoutId, treasurerId, bankReference, proofUrl = null) {
     const connection = await pool.getConnection();
     try {

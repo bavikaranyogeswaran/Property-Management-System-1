@@ -1,6 +1,14 @@
+// ============================================================================
+//  NOTIFICATION CONTROLLER (The Alerts Center)
+// ============================================================================
+//  This file handles the personal "inbox" of system alerts.
+//  It notifies users about payments, lease expirations, and maintenance updates.
+// ============================================================================
+
 import notificationModel from '../models/notificationModel.js';
 
 class NotificationController {
+  // GET NOTIFICATIONS: Lists all unread alerts for the logged-in user.
   async getNotifications(req, res) {
     try {
       const userId = req.user.id;
@@ -12,6 +20,7 @@ class NotificationController {
     }
   }
 
+  // MARK AS READ: Clears a single notification.
   async markAsRead(req, res) {
     try {
       const { id } = req.params;
@@ -27,6 +36,7 @@ class NotificationController {
     }
   }
 
+  // MARK ALL AS READ: Clears the entire notification inbox at once.
   async markAllAsRead(req, res) {
     try {
       const userId = req.user.id;

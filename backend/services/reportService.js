@@ -1,3 +1,11 @@
+// ============================================================================
+//  REPORT SERVICE (The Statistician)
+// ============================================================================
+//  This service calculates all the numbers for reports.
+//  It aggregates data from multiple tables to provide a "Big Picture" view
+//  of financial health, occupancy, and tenant behavior.
+// ============================================================================
+
 import pool from '../config/db.js';
 import invoiceModel from '../models/invoiceModel.js';
 import maintenanceCostModel from '../models/maintenanceCostModel.js';
@@ -33,6 +41,7 @@ class ReportService {
     return [];
   }
 
+  // GET FINANCIAL STATS: Aggregates revenue and expenses to see if properties are profitable.
   async getFinancialStats(year, user) {
     const propertyIds = await this._getAccessiblePropertyIds(user);
     if (propertyIds.length === 0) return {};
@@ -200,6 +209,7 @@ class ReportService {
     return await ledgerModel.getYearlySummary(propertyIds, year);
   }
 
+  // GET OCCUPANCY STATS: Calculates how many units are rented vs vacant.
   async getOccupancyStats(user) {
     const propertyIds = await this._getAccessiblePropertyIds(user);
     if (propertyIds.length === 0) return {};
@@ -291,6 +301,7 @@ class ReportService {
     };
   }
 
+  // GET TENANT RISK STATS: Analyzes payment behavior to predict who might miss rent.
   async getTenantRiskStats(user) {
     const propertyIds = await this._getAccessiblePropertyIds(user);
     if (propertyIds.length === 0) return [];
@@ -499,6 +510,7 @@ class ReportService {
     return { categories, sorted, totalCost, topCategory, topPct, insights };
   }
 
+  // GET LEASE EXPIRATION STATS: Predicts which leases will end soon so we can start renewals.
   async getLeaseExpirationStats(user) {
     const propertyIds = await this._getAccessiblePropertyIds(user);
     if (propertyIds.length === 0) return [];
@@ -587,6 +599,7 @@ class ReportService {
     };
   }
 
+  // GET LEAD CONVERSION STATS: Tracks how successful we are at turning website visitors into tenants.
   async getLeadConversionStats(user) {
     const ownerId = user?.role === ROLES.OWNER ? user.id : null;
     const stats = await leadModel.getLeadConversionStats(ownerId);

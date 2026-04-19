@@ -1,3 +1,11 @@
+// ============================================================================
+//  LEASE SERVICE FACADE (The Main Hub)
+// ============================================================================
+//  This service is the main "reception desk" for everything lease-related.
+//  It coordinates between specialized services that handle creation,
+//  termination, billing, and refunds.
+// ============================================================================
+
 import crypto, { randomUUID } from 'crypto';
 import leaseModel from '../models/leaseModel.js';
 import unitModel from '../models/unitModel.js';
@@ -34,6 +42,7 @@ class LeaseService {
     this.sharedService = new LeaseSharedService(this);
   }
 
+  // CREATE LEASE: Delegates to Creation Service to start a new rental agreement.
   async createLease(data, connection, user) {
     return this.creationService.createLease(data, connection, user);
   }
@@ -50,6 +59,7 @@ class LeaseService {
     return this.creationService.signLease(leaseId, user, connection);
   }
 
+  // TERMINATE LEASE: Delegates to Termination Service to end a contract.
   async terminateLease(leaseId, terminationDate, terminationFee, user) {
     return this.terminationService.terminateLease(
       leaseId,
@@ -79,6 +89,7 @@ class LeaseService {
     return this.terminationService.updateNoticeStatus(leaseId, status, user);
   }
 
+  // REQUEST REFUND: Delegates to Refund Service to start the move-out money return.
   async requestRefund(leaseId, amount, notes, user) {
     return this.refundService.requestRefund(leaseId, amount, notes, user);
   }

@@ -1,3 +1,11 @@
+// ============================================================================
+//  MAINTENANCE SERVICE (The Handyman logic)
+// ============================================================================
+//  This service manages the lifecycle of maintenance requests.
+//  It handles submitting issues, tracking repair costs, updating statuses,
+//  and billing tenants if they were responsible for the damage.
+// ============================================================================
+
 import maintenanceRequestModel from '../models/maintenanceRequestModel.js';
 import propertyModel from '../models/propertyModel.js';
 import notificationModel from '../models/notificationModel.js';
@@ -26,6 +34,7 @@ import staffModel from '../models/staffModel.js';
 import AppError from '../utils/AppError.js';
 
 class MaintenanceService {
+  // CREATE REQUEST: Tenant submits a new issue (with images) to be fixed.
   async createRequest(data, tenantId) {
     const { unitId, title, description, priority, images } = data;
 
@@ -101,6 +110,7 @@ class MaintenanceService {
     return requestId;
   }
 
+  // UPDATE STATUS: Moves a request through the workflow (e.g., 'submitted' -> 'in_progress' -> 'completed').
   async updateStatus(id, data, user) {
     const { status } = data;
     if (!authorizationService.isAtLeast(user.role, ROLES.TREASURER)) {
@@ -280,6 +290,7 @@ class MaintenanceService {
     }
   }
 
+  // CREATE INVOICE: Generates a bill for the tenant for maintenance-related costs.
   async createInvoice(data, user) {
     if (!authorizationService.isAtLeast(user.role, ROLES.TREASURER)) {
       throw new AppError(
@@ -408,6 +419,7 @@ class MaintenanceService {
     }
   }
 
+  // RECORD COST: Specifically logs a material or labor expense for a repair job.
   async recordCost(data, user) {
     if (!authorizationService.isAtLeast(user.role, ROLES.TREASURER)) {
       throw new AppError(
