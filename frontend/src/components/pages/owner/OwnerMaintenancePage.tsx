@@ -51,9 +51,11 @@ import {
   Eye,
   Trash2,
   FileText,
+  Plus,
+  Calendar,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { formatLKR, toLKRFromCents, toCentsFromLKR } from '@/utils/formatters';
+import { formatLKR } from '@/utils/formatters';
 
 export function OwnerMaintenancePage() {
   const {
@@ -142,7 +144,7 @@ export function OwnerMaintenancePage() {
     try {
       await addMaintenanceCost({
         requestId: selectedRequest.id,
-        amount: toCentsFromLKR(parseFloat(costFormData.amount)),
+        amount: parseFloat(costFormData.amount),
         description: costFormData.description,
         billTo: costFormData.billTo,
       });
@@ -165,7 +167,7 @@ export function OwnerMaintenancePage() {
     try {
       await createMaintenanceInvoice(
         selectedRequest.id,
-        toCentsFromLKR(parseFloat(billFormData.amount)),
+        parseFloat(billFormData.amount),
         billFormData.description,
         billFormData.dueDate
       );
@@ -235,7 +237,7 @@ export function OwnerMaintenancePage() {
     },
     {
       label: 'Total Cost',
-      value: formatLKR(toLKRFromCents(totalMaintenanceCost)),
+      value: formatLKR(totalMaintenanceCost),
       icon: DollarSign,
       color: 'bg-purple-50 text-purple-700',
     },
@@ -305,7 +307,7 @@ export function OwnerMaintenancePage() {
                   {costs.length > 0 ? (
                     <div>
                       <span className="font-semibold">
-                        {formatLKR(toLKRFromCents(totalCost))}
+                        {formatLKR(totalCost)}
                       </span>
                       <span className="text-xs text-gray-500 ml-1">
                         ({costs.length})
@@ -325,6 +327,7 @@ export function OwnerMaintenancePage() {
                         // Ensure other dialogs are closed to trigger the 'details' view
                         setIsStatusDialogOpen(false);
                         setIsCostDialogOpen(false);
+                        setIsBillDialogOpen(false);
                       }}
                     >
                       <Eye className="size-4" />
@@ -336,6 +339,7 @@ export function OwnerMaintenancePage() {
                         setSelectedRequest(request);
                         setIsStatusDialogOpen(true);
                         setIsCostDialogOpen(false);
+                        setIsBillDialogOpen(false);
                       }}
                     >
                       <Edit className="size-4" />
@@ -347,6 +351,7 @@ export function OwnerMaintenancePage() {
                         setSelectedRequest(request);
                         setIsCostDialogOpen(true);
                         setIsBillDialogOpen(false);
+                        setIsStatusDialogOpen(false);
                       }}
                       title="Record Cost"
                     >
@@ -368,6 +373,7 @@ export function OwnerMaintenancePage() {
                         });
                         setIsBillDialogOpen(true);
                         setIsCostDialogOpen(false);
+                        setIsStatusDialogOpen(false);
                       }}
                       title="Bill Tenant"
                     >
@@ -499,6 +505,7 @@ export function OwnerMaintenancePage() {
                 <TabsTrigger value="all">
                   All ({maintenanceRequests.length})
                 </TabsTrigger>
+                <TabsTrigger value="expenses">Expenses & Ledger</TabsTrigger>
               </TabsList>
             </div>
             <TabsContent value="submitted" className="m-0">
@@ -513,12 +520,176 @@ export function OwnerMaintenancePage() {
             <TabsContent value="all" className="m-0">
               <RequestTable requests={maintenanceRequests} />
             </TabsContent>
+            <TabsContent value="expenses" className="m-0">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Request & Category</TableHead>
+                      <TableHead>Property / Unit</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Total Costs</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {maintenanceRequests
+                      .sort(
+                        (a, b) =>
+                          new Date(b.submittedDate).getTime() -
+                          new Date(a.submittedDate).getTime()
+                      )
+                      .map((request) => {
+                        const unit = units.find((u) => u.id === request.unitId);
+                        const property = unit
+                          ? properties.find((p) => p.id === unit.propertyId)
+                          : null;
+                        const requestCosts = maintenanceCosts.filter(
+                          (c) => c.requestId === request.id
+                        );
+                        const totalCost = requestCosts.reduce(
+                          (sum, c) => sum + c.amount,
+                          0
+                        );
+
+                        return (
+                          <React.Fragment key={request.id}>
+                            <TableRow
+                              className={
+                                requestCosts.length > 0
+                                  ? 'border-b-0 text-sm'
+                                  : 'text-sm'
+                              }
+                            >
+                              <TableCell className="align-top whitespace-nowrap">
+                                <div className="flex items-center gap-2">
+                                  <Calendar className="size-4 text-gray-400" />
+                                  {request.submittedDate}
+                                </div>
+                              </TableCell>
+                              <TableCell className="align-top">
+                                <div className="font-medium">
+                                  {request.title}
+                                </div>
+                                <Badge
+                                  variant="secondary"
+                                  className="text-[10px] h-4 px-1 mt-1 capitalize"
+                                >
+                                  {request.category}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="align-top">
+                                <div className="text-sm">
+                                  <div className="font-medium">
+                                    {property?.name}
+                                  </div>
+                                  <div className="text-gray-500">
+                                    Unit {unit?.unitNumber}
+                                  </div>
+                                </div>
+                              </TableCell>
+                              <TableCell className="align-top">
+                                <Badge
+                                  variant={
+                                    getStatusBadge(request.status).variant
+                                  }
+                                >
+                                  {getStatusBadge(request.status).label}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="align-top font-semibold text-gray-900">
+                                {totalCost > 0 ? formatLKR(totalCost) : '-'}
+                              </TableCell>
+                              <TableCell className="align-top text-right">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-8 gap-1"
+                                  onClick={() => {
+                                    setSelectedRequest(request);
+                                    setIsCostDialogOpen(true);
+                                  }}
+                                >
+                                  <Plus className="size-3.5" />
+                                  Add Cost
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                            {requestCosts.length > 0 && (
+                              <TableRow className="bg-gray-50/50">
+                                <TableCell colSpan={6} className="pt-0 pb-4">
+                                  <div className="grid gap-2 pl-4 border-l-2 border-gray-200 ml-2">
+                                    {requestCosts.map((cost) => (
+                                      <div
+                                        key={cost.id}
+                                        className="flex justify-between items-center text-sm group"
+                                      >
+                                        <div className="flex items-center gap-2 text-gray-600">
+                                          <DollarSign className="size-3" />
+                                          <span>{cost.description}</span>
+                                          <span className="text-gray-400 text-xs">
+                                            ({cost.recordedDate})
+                                          </span>
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                          <Badge
+                                            variant={
+                                              cost.billTo === 'tenant'
+                                                ? 'destructive'
+                                                : 'secondary'
+                                            }
+                                            className="text-[10px] h-4 py-0 px-1"
+                                          >
+                                            {cost.billTo === 'tenant'
+                                              ? 'Tenant'
+                                              : 'Owner'}
+                                          </Badge>
+                                          <span className="font-medium text-gray-900">
+                                            {formatLKR(cost.amount)}
+                                          </span>
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setCostToDelete(cost);
+                                              setIsDeleteCostDialogOpen(true);
+                                            }}
+                                            className="text-red-500 hover:text-red-700 opacity-0 group-hover:opacity-100 transition-opacity"
+                                            title="Delete Cost"
+                                          >
+                                            <Trash2 className="size-3.5" />
+                                          </button>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </React.Fragment>
+                        );
+                      })}
+                  </TableBody>
+                </Table>
+                {maintenanceRequests.length === 0 && (
+                  <div className="py-12 text-center text-gray-500">
+                    No maintenance requests found.
+                  </div>
+                )}
+              </div>
+            </TabsContent>
           </Tabs>
         </CardContent>
       </Card>
 
       {/* Status Update Dialog */}
-      <Dialog open={isStatusDialogOpen} onOpenChange={setIsStatusDialogOpen}>
+      <Dialog
+        open={isStatusDialogOpen}
+        onOpenChange={(open) => {
+          setIsStatusDialogOpen(open);
+          if (!open) setSelectedRequest(null);
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Update Request Status</DialogTitle>
@@ -585,7 +756,13 @@ export function OwnerMaintenancePage() {
       </Dialog>
 
       {/* Add Cost Dialog */}
-      <Dialog open={isCostDialogOpen} onOpenChange={setIsCostDialogOpen}>
+      <Dialog
+        open={isCostDialogOpen}
+        onOpenChange={(open) => {
+          setIsCostDialogOpen(open);
+          if (!open) setSelectedRequest(null);
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Record Maintenance Cost</DialogTitle>
@@ -629,7 +806,7 @@ export function OwnerMaintenancePage() {
                             {cost.billTo === 'tenant' ? 'Tenant' : 'Owner'}
                           </Badge>
                           <span className="font-semibold">
-                            {formatLKR(toLKRFromCents(cost.amount))}
+                            {formatLKR(cost.amount)}
                           </span>
                           <button
                             type="button"
@@ -647,11 +824,7 @@ export function OwnerMaintenancePage() {
                     ))}
                     <div className="pt-2 border-t flex justify-between font-semibold">
                       <span>Total:</span>
-                      <span>
-                        {formatLKR(
-                          toLKRFromCents(getTotalCost(selectedRequest.id))
-                        )}
-                      </span>
+                      <span>{formatLKR(getTotalCost(selectedRequest.id))}</span>
                     </div>
                   </div>
                 </div>
@@ -736,7 +909,12 @@ export function OwnerMaintenancePage() {
       </Dialog>
       {/* View Details Dialog */}
       <Dialog
-        open={!!selectedRequest && !isStatusDialogOpen && !isCostDialogOpen}
+        open={
+          !!selectedRequest &&
+          !isStatusDialogOpen &&
+          !isCostDialogOpen &&
+          !isBillDialogOpen
+        }
         onOpenChange={(open) => !open && setSelectedRequest(null)}
       >
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -864,9 +1042,7 @@ export function OwnerMaintenancePage() {
                 <div className="flex justify-between items-center mb-2">
                   <h4 className="font-medium">Maintenance Costs</h4>
                   <span className="font-semibold">
-                    {formatLKR(
-                      toLKRFromCents(getTotalCost(selectedRequest.id))
-                    )}
+                    {formatLKR(getTotalCost(selectedRequest.id))}
                   </span>
                 </div>
                 {getRequestCosts(selectedRequest.id).length > 0 ? (
@@ -880,7 +1056,7 @@ export function OwnerMaintenancePage() {
                           {cost.description}
                         </span>
                         <span className="font-medium">
-                          {formatLKR(toLKRFromCents(cost.amount))}
+                          {formatLKR(cost.amount)}
                         </span>
                       </div>
                     ))}
@@ -937,7 +1113,13 @@ export function OwnerMaintenancePage() {
       </Dialog>
 
       {/* Bill Tenant Dialog */}
-      <Dialog open={isBillDialogOpen} onOpenChange={setIsBillDialogOpen}>
+      <Dialog
+        open={isBillDialogOpen}
+        onOpenChange={(open) => {
+          setIsBillDialogOpen(open);
+          if (!open) setSelectedRequest(null);
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Bill Tenant for Maintenance</DialogTitle>
@@ -949,9 +1131,7 @@ export function OwnerMaintenancePage() {
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Total Recorded Cost:</span>
                   <span className="font-semibold">
-                    {formatLKR(
-                      toLKRFromCents(getTotalCost(selectedRequest.id))
-                    )}
+                    {formatLKR(getTotalCost(selectedRequest.id))}
                   </span>
                 </div>
               </div>

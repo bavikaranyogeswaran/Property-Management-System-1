@@ -42,7 +42,6 @@ import { TenantPaymentSummaryPage } from '@/components/pages/tenant/TenantPaymen
 // Treasurer Pages
 import { TreasurerDashboard } from '@/components/pages/treasurer/TreasurerDashboard';
 import { PaymentVerificationPage } from '@/components/pages/treasurer/PaymentVerificationPage';
-import { MaintenanceExpensesPage } from '@/components/pages/treasurer/MaintenanceExpensesPage';
 
 // Shared Pages
 import { AnalyticsPage } from '@/components/reports/AnalyticsPage';
@@ -376,16 +375,6 @@ export function AppRoutes() {
       />
 
       {/* Treasurer Area */}
-      <Route
-        path="/expenses"
-        element={
-          <ProtectedRoute>
-            <RoleRoute allowedRoles={['treasurer']}>
-              <MaintenanceExpensesPage />
-            </RoleRoute>
-          </ProtectedRoute>
-        }
-      />
       <Route
         path="/payment-verification"
         element={

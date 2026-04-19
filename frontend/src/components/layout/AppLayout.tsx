@@ -90,7 +90,6 @@ export function AppLayout({ children }: AppLayoutProps) {
       icon: CreditCard,
     },
     { path: '/receipts', label: 'Receipts', icon: Receipt },
-    { path: '/expenses', label: 'Expenses', icon: DollarSign },
     { path: '/maintenance', label: 'Maintenance', icon: Wrench },
     { path: '/analytics', label: 'Financial Reports', icon: BarChart3 },
   ];
