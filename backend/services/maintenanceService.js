@@ -461,6 +461,8 @@ class MaintenanceService {
       // [BILLING FIX] Same context-aware logic for recording costs
       const targetLease = await this._getLeaseForRequest(requestId, connection);
 
+      let generatedInvoiceId = null;
+
       if (targetLease) {
         // [F2.6] Route cost based on billTo field
         if (billTo === ROLES.TENANT) {
@@ -474,6 +476,8 @@ class MaintenanceService {
             },
             connection
           );
+
+          generatedInvoiceId = invoiceId;
 
           await connection.query(
             'UPDATE maintenance_costs SET invoice_id = ?, is_reimbursable = TRUE WHERE cost_id = ?',
@@ -526,6 +530,28 @@ class MaintenanceService {
       );
 
       await connection.commit();
+
+      // Notify Tenant via Email if an invoice was generated
+      if (generatedInvoiceId && targetLease) {
+        try {
+          const tenant = await userModel.findById(targetLease.tenantId);
+          if (tenant && tenant.email) {
+            const currentNow = now();
+            await emailService.sendInvoiceNotification(tenant.email, {
+              amount: Number(amount),
+              dueDate: formatToLocalDate(addDays(now(), 7)),
+              month: currentNow.getMonth() + 1,
+              year: currentNow.getFullYear(),
+              invoiceId: generatedInvoiceId,
+              description: `Maintenance charge: ${request.title}`,
+              isPaid: false,
+            });
+          }
+        } catch (err) {
+          console.error('Failed to send maintenance invoice email:', err);
+        }
+      }
+
       return {
         costId,
         billingSuccess: !!(targetLease && billTo === ROLES.TENANT),

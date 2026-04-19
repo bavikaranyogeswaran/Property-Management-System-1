@@ -387,14 +387,26 @@ class EmailService {
       (invoiceDetails.description &&
         invoiceDetails.description.includes('Late Fee'));
 
-    const subject = isLateFee
-      ? `Late Fee Applied: ${month}/${year}`
-      : `New Rent Invoice Received: ${month}/${year}`;
+    const isMaintenance =
+      invoiceId !== 'LATE-FEE' &&
+      invoiceDetails.description &&
+      invoiceDetails.description.toLowerCase().includes('maintenance');
 
-    const title = isLateFee ? 'Late Fee Notification' : 'New Invoice Available';
-    const message = isLateFee
-      ? 'A late fee has been applied to your account due to overdue payment.'
-      : 'A new invoice has been generated for your rent.';
+    let subject = `New Rent Invoice Received: ${month}/${year}`;
+    let title = 'New Invoice Available';
+    let message = 'A new invoice has been generated for your rent.';
+
+    if (isLateFee) {
+      subject = `Late Fee Applied: ${month}/${year}`;
+      title = 'Late Fee Notification';
+      message =
+        'A late fee has been applied to your account due to overdue payment.';
+    } else if (isMaintenance) {
+      subject = `Maintenance Invoice Received: ${month}/${year}`;
+      title = 'Maintenance Invoice Available';
+      message =
+        'A new invoice has been generated for a recent maintenance request.';
+    }
 
     if (!this.transporter) {
       console.log('==================================================');
