@@ -1,0 +1,74 @@
+name: Continuous Deployment to Azure
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch: # Allows manual trigger
+
+jobs:
+  build-and-push:
+    name: Build and Push Images
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.set-tag.outputs.tag }}
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set Image Tag
+        id: set-tag
+        run: echo "tag=$(date +%s)" >> $GITHUB_OUTPUT
+
+      - name: Log in to Azure
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Log in to Azure Container Registry
+        run: az acr login --name ${{ secrets.ACR_NAME }}
+
+      - name: Build and Push Backend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: true
+          tags: ${{ secrets.ACR_NAME }}.azurecr.io/pms-backend:${{ steps.set-tag.outputs.tag }}, ${{ secrets.ACR_NAME }}.azurecr.io/pms-backend:latest
+
+      - name: Build and Push Frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          push: true
+          tags: ${{ secrets.ACR_NAME }}.azurecr.io/pms-frontend:${{ steps.set-tag.outputs.tag }}, ${{ secrets.ACR_NAME }}.azurecr.io/pms-frontend:latest
+
+  deploy:
+    name: Deploy to Azure
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    environment: production # This triggers the manual approval in GitHub
+    
+    steps:
+      - name: Log in to Azure
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Deploy Backend App
+        uses: azure/container-apps-deploy-action@v1
+        with:
+          resourceGroup: pms-prod-rg
+          containerAppName: pms-backend
+          containerAppEnvironment: pms-environment
+          imageToDeploy: ${{ secrets.ACR_NAME }}.azurecr.io/pms-backend:${{ needs.build-and-push.outputs.image_tag }}
+          targetPort: 3000
+          ingress: external
+
+      - name: Deploy Frontend App
+        uses: azure/container-apps-deploy-action@v1
+        with:
+          resourceGroup: pms-prod-rg
+          containerAppName: pms-frontend
+          containerAppEnvironment: pms-environment
+          imageToDeploy: ${{ secrets.ACR_NAME }}.azurecr.io/pms-frontend:${{ needs.build-and-push.outputs.image_tag }}
+          targetPort: 8080
+          ingress: external
