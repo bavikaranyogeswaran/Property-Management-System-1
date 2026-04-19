@@ -1425,12 +1425,19 @@ export const reconcileCloudinaryAssets = async () => {
 
 /**
  * Registers repeatable jobs with the BullMQ scheduler.
- * Gracefully skips if Redis is unavailable (jobs will register on next restart).
+ * Retries for a short period if Redis is still booting up (C6 fix for container race conditions).
  */
-export const registerRepeatableJobs = async () => {
+export const registerRepeatableJobs = async (retries = 10) => {
   if (!isQueueRedisReady) {
-    logger.warn(
-      '[Queue] Redis is not available. Skipping repeatable job registration. Jobs will be registered on next restart when Redis is reachable.'
+    if (retries > 0) {
+      logger.info(
+        `[Queue] Redis not ready yet. Retrying job registration in 3s... (${retries} retries left)`
+      );
+      await new Promise((res) => setTimeout(res, 3000));
+      return registerRepeatableJobs(retries - 1);
+    }
+    logger.error(
+      '[Queue] Redis is unavailable after multiple retries. Recurring jobs will NOT be registered. System needs manual restart or intervention.'
     );
     return;
   }

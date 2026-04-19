@@ -25,6 +25,7 @@ export const config = {
     password:
       process.env.DB_PASSWORD || (isProduction ? undefined : 'password'),
     name: process.env.DB_NAME || (isProduction ? undefined : 'pms_database'),
+    port: parseInt(process.env.DB_PORT || '3306', 10),
     ssl: process.env.DB_SSL === 'true',
   },
   jwt: {

@@ -19,6 +19,27 @@ import auditLogger from './utils/auditLogger.js';
 import notificationModel from './models/notificationModel.js';
 import userModel from './models/userModel.js';
 import { ROLES } from './utils/roleUtils.js';
+import http from 'http';
+
+// --- HEALTH CHECK SERVER ---
+// Since this worker runs in Docker, it needs to respond to health probes
+// even though it doesn't serve a website.
+const HEALTH_PORT = process.env.PORT || 3000;
+http
+  .createServer((req, res) => {
+    if (req.url === '/api/health') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ status: 'healthy', service: 'pms-worker' }));
+    } else {
+      res.writeHead(404);
+      res.end();
+    }
+  })
+  .listen(HEALTH_PORT, () => {
+    logger.info(
+      `[Worker] Health check server listening on port ${HEALTH_PORT}`
+    );
+  });
 
 // Validate Configuration on Startup (Fail Fast)
 validateConfig();
