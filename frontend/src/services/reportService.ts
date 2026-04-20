@@ -44,16 +44,25 @@ const handleResponse = (
 };
 
 export const reportService = {
-  downloadFinancialReport: async (
-    year: number = new Date().getFullYear(),
-    action: 'view' | 'download' = 'view'
-  ) => {
+  downloadFinancialReport: async (options: {
+    year?: number;
+    month?: number;
+    action?: 'view' | 'download';
+  }) => {
+    const { year = new Date().getFullYear(), month, action = 'view' } = options;
     try {
-      const response = await axios.get(`${API_URL}/financial?year=${year}`, {
+      let url = `${API_URL}/financial?year=${year}`;
+      if (month) url += `&month=${month}`;
+
+      const response = await axios.get(url, {
         headers: getAuthHeader(),
         responseType: 'blob',
       });
-      handleResponse(response, `financial_report_${year}.pdf`, action);
+      handleResponse(
+        response,
+        `financial_report_${year}_${month || 'full'}.pdf`,
+        action
+      );
       return true;
     } catch (error) {
       console.error('Action failed', error);
@@ -61,9 +70,18 @@ export const reportService = {
     }
   },
 
-  downloadOccupancyReport: async (action: 'view' | 'download' = 'view') => {
+  downloadOccupancyReport: async (options: {
+    year?: number;
+    month?: number;
+    action?: 'view' | 'download';
+  }) => {
+    const { year, month, action = 'view' } = options;
     try {
-      const response = await axios.get(`${API_URL}/occupancy`, {
+      let url = `${API_URL}/occupancy?`;
+      if (year) url += `year=${year}`;
+      if (month) url += `&month=${month}`;
+
+      const response = await axios.get(url, {
         headers: getAuthHeader(),
         responseType: 'blob',
       });
@@ -75,7 +93,10 @@ export const reportService = {
     }
   },
 
-  downloadTenantRiskReport: async (action: 'view' | 'download' = 'view') => {
+  downloadTenantRiskReport: async (options: {
+    action?: 'view' | 'download';
+  }) => {
+    const { action = 'view' } = options;
     try {
       const response = await axios.get(`${API_URL}/tenant-risk`, {
         headers: getAuthHeader(),
@@ -89,9 +110,17 @@ export const reportService = {
     }
   },
 
-  downloadMaintenanceReport: async (action: 'view' | 'download' = 'view') => {
+  downloadMaintenanceReport: async (options: {
+    year?: number;
+    month?: number;
+    action?: 'view' | 'download';
+  }) => {
+    const { year = new Date().getFullYear(), month, action = 'view' } = options;
     try {
-      const response = await axios.get(`${API_URL}/maintenance`, {
+      let url = `${API_URL}/maintenance?year=${year}`;
+      if (month) url += `&month=${month}`;
+
+      const response = await axios.get(url, {
         headers: getAuthHeader(),
         responseType: 'blob',
       });
@@ -103,7 +132,8 @@ export const reportService = {
     }
   },
 
-  downloadLeaseReport: async (action: 'view' | 'download' = 'view') => {
+  downloadLeaseReport: async (options: { action?: 'view' | 'download' }) => {
+    const { action = 'view' } = options;
     try {
       const response = await axios.get(`${API_URL}/leases`, {
         headers: getAuthHeader(),
@@ -117,9 +147,19 @@ export const reportService = {
     }
   },
 
-  downloadLeadReport: async (action: 'view' | 'download' = 'view') => {
+  downloadLeadReport: async (options: {
+    year?: number;
+    month?: number;
+    action?: 'view' | 'download';
+  }) => {
+    const { year, month, action = 'view' } = options;
     try {
-      const response = await axios.get(`${API_URL}/leads`, {
+      let query = [];
+      if (year) query.push(`year=${year}`);
+      if (month) query.push(`month=${month}`);
+      const queryString = query.length > 0 ? `?${query.join('&')}` : '';
+
+      const response = await axios.get(`${API_URL}/leads${queryString}`, {
         headers: getAuthHeader(),
         responseType: 'blob',
       });

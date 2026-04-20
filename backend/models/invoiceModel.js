@@ -398,20 +398,30 @@ class InvoiceModel {
   }
 
   // Analytics optimized query to avoid O(N) memory buildup
-  async getFinancialStatsByYear(year) {
-    const [rows] = await pool.query(
-      `
-      SELECT p.name AS property_name, SUM(ri.amount) AS total_income
+  async getFinancialStats(year, startDate = null, endDate = null) {
+    let query = `
+      SELECT p.property_id, p.name AS property_name, SUM(ri.amount) AS total_income
       FROM rent_invoices ri
       JOIN leases l ON ri.lease_id = l.lease_id
       JOIN units un ON l.unit_id = un.unit_id
       JOIN properties p ON un.property_id = p.property_id
-      WHERE ri.status = 'paid' AND YEAR(ri.due_date) = ?
-      GROUP BY p.property_id
-      `,
-      [year]
-    );
+      WHERE ri.status = 'paid'
+    `;
+    const params = [];
+
+    if (startDate && endDate) {
+      query += ` AND ri.due_date BETWEEN ? AND ?`;
+      params.push(startDate, endDate);
+    } else {
+      query += ` AND YEAR(ri.due_date) = ?`;
+      params.push(year);
+    }
+
+    query += ` GROUP BY p.property_id, p.name`;
+
+    const [rows] = await pool.query(query, params);
     return rows.map((row) => ({
+      propertyId: row.property_id,
       propertyName: row.property_name,
       totalIncome: Number(row.total_income || 0),
     }));

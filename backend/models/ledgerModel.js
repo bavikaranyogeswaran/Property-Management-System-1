@@ -89,11 +89,15 @@ class LedgerModel {
    * Get aggregated financial summary per property for a given year.
    * Returns: { propertyName: { revenue, liability, expense } }
    */
-  async getSummaryByProperty(propertyIds, year) {
+  async getSummaryByProperty(
+    propertyIds,
+    year,
+    startDate = null,
+    endDate = null
+  ) {
     if (!propertyIds || propertyIds.length === 0) return {};
 
-    const [rows] = await pool.query(
-      `SELECT 
+    let query = `SELECT 
          p.name AS property_name,
          al.account_type,
          SUM(al.credit) AS total_credit,
@@ -102,11 +106,21 @@ class LedgerModel {
        JOIN leases l ON al.lease_id = l.lease_id
        JOIN units u ON l.unit_id = u.unit_id
        JOIN properties p ON u.property_id = p.property_id
-       WHERE p.property_id IN (?)
-       AND YEAR(al.entry_date) = ?
-       GROUP BY p.name, al.account_type`,
-      [propertyIds, year]
-    );
+       WHERE p.property_id IN (?)`;
+
+    const params = [propertyIds];
+
+    if (startDate && endDate) {
+      query += ` AND al.entry_date BETWEEN ? AND ?`;
+      params.push(startDate, endDate);
+    } else {
+      query += ` AND YEAR(al.entry_date) = ?`;
+      params.push(year);
+    }
+
+    query += ` GROUP BY p.name, al.account_type`;
+
+    const [rows] = await pool.query(query, params);
 
     const summary = {};
 
@@ -145,7 +159,7 @@ class LedgerModel {
   /**
    * Get a full ledger summary for a given year (totals only).
    */
-  async getYearlySummary(propertyIds, year) {
+  async getYearlySummary(propertyIds, year, startDate = null, endDate = null) {
     if (!propertyIds || propertyIds.length === 0) {
       return {
         totalRevenue: 0,
@@ -156,8 +170,7 @@ class LedgerModel {
       };
     }
 
-    const [rows] = await pool.query(
-      `SELECT 
+    let query = `SELECT 
          al.account_type,
          al.category,
          SUM(al.credit) AS total_credit,
@@ -166,11 +179,22 @@ class LedgerModel {
        JOIN leases l ON al.lease_id = l.lease_id
        JOIN units u ON l.unit_id = u.unit_id
        JOIN properties p ON u.property_id = p.property_id
-       WHERE p.property_id IN (?)
-       AND YEAR(al.entry_date) = ?
-       GROUP BY al.account_type, al.category`,
-      [propertyIds, year]
-    );
+       WHERE p.property_id IN (?)`;
+
+    const params = [propertyIds];
+
+    if (startDate && endDate) {
+      query += ` AND al.entry_date BETWEEN ? AND ?`;
+      params.push(startDate, endDate);
+    } else {
+      query += ` AND YEAR(al.entry_date) = ?`;
+      params.push(year);
+    }
+
+    query += ` GROUP BY al.account_type, al.category`;
+
+    // Note: The values of `debit` and `credit` are stored as cents in the database.
+    const [rows] = await pool.query(query, params);
 
     let totalRevenueCollected = 0;
     let totalRevenueEarned = 0;
@@ -196,7 +220,6 @@ class LedgerModel {
     return {
       totalRevenue: totalRevenueCollected,
       totalRevenueEarned,
-      totalRevenueCollected,
       totalLiabilityHeld,
       totalLiabilityRefunded,
       netLiability: totalLiabilityHeld - totalLiabilityRefunded,

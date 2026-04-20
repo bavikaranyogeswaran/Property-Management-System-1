@@ -316,7 +316,7 @@ class LeadModel {
 
   // Analytics optimized query to avoid O(N) memory buildup
   // DB enum: 'interested', 'converted', 'dropped'
-  async getLeadConversionStats(ownerId) {
+  async getLeadConversionStats(ownerId, startDate = null, endDate = null) {
     let query = `
       SELECT 
         COUNT(*) AS Total,
@@ -326,10 +326,23 @@ class LeadModel {
       FROM leads l
     `;
     const params = [];
+    const conditions = [];
+
     if (ownerId) {
-      query += ` INNER JOIN properties p ON l.property_id = p.property_id WHERE p.owner_id = ?`;
+      query += ` INNER JOIN properties p ON l.property_id = p.property_id`;
+      conditions.push(`p.owner_id = ?`);
       params.push(ownerId);
     }
+
+    if (startDate && endDate) {
+      conditions.push(`l.created_at BETWEEN ? AND ?`);
+      params.push(startDate, endDate);
+    }
+
+    if (conditions.length > 0) {
+      query += ` WHERE ` + conditions.join(' AND ');
+    }
+
     const [rows] = await db.query(query, params);
     return rows[0];
   }

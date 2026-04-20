@@ -194,20 +194,28 @@ class MaintenanceCostModel {
   }
 
   // Analytics optimized query to avoid O(N) memory buildup
-  async getFinancialStatsByYear(year) {
-    const [rows] = await pool.query(
-      `
-      SELECT p.name AS property_name, SUM(mc.amount) AS total_expense
+  async getFinancialStats(year, startDate = null, endDate = null) {
+    let query = `
+      SELECT p.property_id, p.name AS property_name, SUM(mc.amount) AS total_expense
       FROM maintenance_costs mc
       JOIN maintenance_requests mr ON mc.request_id = mr.request_id
       JOIN units u ON mr.unit_id = u.unit_id
       JOIN properties p ON u.property_id = p.property_id
-      WHERE YEAR(mc.recorded_date) = ?
-      AND (mc.bill_to = 'owner' OR mc.bill_to IS NULL)
-      GROUP BY p.property_id
-      `,
-      [year]
-    );
+      WHERE (mc.bill_to = 'owner' OR mc.bill_to IS NULL)
+    `;
+    const params = [];
+
+    if (startDate && endDate) {
+      query += ` AND mc.recorded_date BETWEEN ? AND ?`;
+      params.push(startDate, endDate);
+    } else {
+      query += ` AND YEAR(mc.recorded_date) = ?`;
+      params.push(year);
+    }
+
+    query += ` GROUP BY p.property_id, p.name`;
+
+    const [rows] = await pool.query(query, params);
     return rows;
   }
 }

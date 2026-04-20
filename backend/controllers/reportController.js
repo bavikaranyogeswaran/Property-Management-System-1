@@ -17,13 +17,34 @@ class ReportController {
   // =========================================================================
   // FINANCIAL REPORT: Generates a PDF showing income vs expenses for a specific year.
   generateFinancialReport = catchAsync(async (req, res, next) => {
-    const year = req.query.year || new Date().getFullYear();
-    const data = await reportService.getFinancialReportData(year, req.user);
+    const year = parseInt(req.query.year) || new Date().getFullYear();
+    const month = req.query.month ? parseInt(req.query.month) : null;
+
+    let startDate = null;
+    let endDate = null;
+    let periodTitle = `${year}`;
+
+    if (month) {
+      const lastDay = new Date(year, month, 0).getDate();
+      startDate = `${year}-${String(month).padStart(2, '0')}-01`;
+      endDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+      const monthLabel = new Date(year, month - 1).toLocaleString('default', {
+        month: 'long',
+      });
+      periodTitle = `${monthLabel} ${year}`;
+    }
+
+    const data = await reportService.getFinancialReportData(
+      year,
+      req.user,
+      startDate,
+      endDate
+    );
 
     const gen = new ReportGenerator(
       res,
-      `financial_report_${year}.pdf`,
-      `Financial Performance Report — ${year}`,
+      `financial_report_${year}_${month || 'full'}.pdf`,
+      `Financial Performance Report — ${periodTitle}`,
       'Income, expense breakdown, and profitability analysis by property'
     );
 
@@ -147,12 +168,25 @@ class ReportController {
   // =========================================================================
   // OCCUPANCY REPORT: Generates a PDF showing which units are empty and which are generating money.
   generateOccupancyReport = catchAsync(async (req, res, next) => {
+    const year = parseInt(req.query.year) || new Date().getFullYear();
+    const month = req.query.month ? parseInt(req.query.month) : null;
+    let periodTitle = 'Current Snapshot';
+
+    if (month) {
+      const monthLabel = new Date(year, month - 1).toLocaleString('default', {
+        month: 'long',
+      });
+      periodTitle = `${monthLabel} ${year}`;
+    } else if (req.query.year) {
+      periodTitle = `${year}`;
+    }
+
     const data = await reportService.getOccupancyReportData(req.user);
 
     const gen = new ReportGenerator(
       res,
       'occupancy_report.pdf',
-      'Occupancy Report',
+      `Occupancy Report — ${periodTitle}`,
       'Unit occupancy rates, vacancy analysis, and revenue impact assessment'
     );
 
@@ -348,13 +382,34 @@ class ReportController {
   //  4. MAINTENANCE COST ANALYSIS REPORT
   // =========================================================================
   generateMaintenanceCategoryReport = catchAsync(async (req, res, next) => {
-    const year = req.query.year || new Date().getFullYear();
-    const data = await reportService.getMaintenanceReportData(req.user, year);
+    const year = parseInt(req.query.year) || new Date().getFullYear();
+    const month = req.query.month ? parseInt(req.query.month) : null;
+
+    let startDate = null;
+    let endDate = null;
+    let periodTitle = `${year}`;
+
+    if (month) {
+      const lastDay = new Date(year, month, 0).getDate();
+      startDate = `${year}-${String(month).padStart(2, '0')}-01`;
+      endDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+      const monthLabel = new Date(year, month - 1).toLocaleString('default', {
+        month: 'long',
+      });
+      periodTitle = `${monthLabel} ${year}`;
+    }
+
+    const data = await reportService.getMaintenanceReportData(
+      req.user,
+      year,
+      startDate,
+      endDate
+    );
 
     const gen = new ReportGenerator(
       res,
-      'maintenance_category_report.pdf',
-      'Maintenance Cost Analysis',
+      `maintenance_report_${year}_${month || 'full'}.pdf`,
+      `Maintenance Cost Analysis — ${periodTitle}`,
       'Expense categorization, cost concentration analysis, and budget optimization insights'
     );
 
@@ -534,12 +589,37 @@ class ReportController {
   // =========================================================================
   // LEAD CONVERSION REPORT: Generates a PDF showing how many inquiries turn into signed leases.
   generateLeadConversionReport = catchAsync(async (req, res, next) => {
-    const data = await reportService.getLeadConversionReportData(req.user);
+    const year = parseInt(req.query.year) || new Date().getFullYear();
+    const month = req.query.month ? parseInt(req.query.month) : null;
+
+    let startDate = null;
+    let endDate = null;
+    let periodTitle = 'All Time';
+
+    if (month) {
+      const lastDay = new Date(year, month, 0).getDate();
+      startDate = `${year}-${String(month).padStart(2, '0')}-01`;
+      endDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+      const monthLabel = new Date(year, month - 1).toLocaleString('default', {
+        month: 'long',
+      });
+      periodTitle = `${monthLabel} ${year}`;
+    } else if (req.query.year) {
+      startDate = `${year}-01-01`;
+      endDate = `${year}-12-31`;
+      periodTitle = `${year}`;
+    }
+
+    const data = await reportService.getLeadConversionReportData(
+      req.user,
+      startDate,
+      endDate
+    );
 
     const gen = new ReportGenerator(
       res,
       'marketing_funnel_report.pdf',
-      'Lead Conversion & Pipeline Analysis',
+      `Lead Conversion & Pipeline Analysis — ${periodTitle}`,
       'Marketing efficiency, lead-to-lease conversion rates, and pipeline health metrics'
     );
 
@@ -639,8 +719,24 @@ class ReportController {
   // =========================================================================
 
   getLedgerSummary = catchAsync(async (req, res, next) => {
-    const year = req.query.year || new Date().getFullYear();
-    const summary = await reportService.getLedgerSummary(year, req.user);
+    const year = parseInt(req.query.year) || new Date().getFullYear();
+    const month = req.query.month ? parseInt(req.query.month) : null;
+
+    let startDate = null;
+    let endDate = null;
+
+    if (month) {
+      const lastDay = new Date(year, month, 0).getDate();
+      startDate = `${year}-${String(month).padStart(2, '0')}-01`;
+      endDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+    }
+
+    const summary = await reportService.getLedgerSummary(
+      year,
+      req.user,
+      startDate,
+      endDate
+    );
     res.json(summary);
   });
 

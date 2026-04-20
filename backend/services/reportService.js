@@ -42,14 +42,16 @@ class ReportService {
   }
 
   // GET FINANCIAL STATS: Aggregates revenue and expenses to see if properties are profitable.
-  async getFinancialStats(year, user) {
+  async getFinancialStats(year, user, startDate = null, endDate = null) {
     const propertyIds = await this._getAccessiblePropertyIds(user);
     if (propertyIds.length === 0) return {};
 
     // Try ledger-based reporting first
     const ledgerSummary = await ledgerModel.getSummaryByProperty(
       propertyIds,
-      year
+      year,
+      startDate,
+      endDate
     );
     const hasLedgerData = Object.keys(ledgerSummary).length > 0;
 
@@ -66,16 +68,23 @@ class ReportService {
       }
 
       // Also include maintenance costs not yet in ledger
-      const [costs] = await pool.query(
-        `SELECT mc.*, p.name as property_name
-                 FROM maintenance_costs mc
-                 JOIN maintenance_requests mr ON mc.request_id = mr.request_id
-                 JOIN units u ON mr.unit_id = u.unit_id
-                 JOIN properties p ON u.property_id = p.property_id
-                 WHERE YEAR(mc.recorded_date) = ?
-                 AND p.property_id IN (?)`,
-        [year, propertyIds]
-      );
+      let costQuery = `SELECT mc.*, p.name as property_name
+                       FROM maintenance_costs mc
+                       JOIN maintenance_requests mr ON mc.request_id = mr.request_id
+                       JOIN units u ON mr.unit_id = u.unit_id
+                       JOIN properties p ON u.property_id = p.property_id
+                       WHERE p.property_id IN (?)`;
+      const costParams = [propertyIds];
+
+      if (startDate && endDate) {
+        costQuery += ` AND mc.recorded_date BETWEEN ? AND ?`;
+        costParams.push(startDate, endDate);
+      } else {
+        costQuery += ` AND YEAR(mc.recorded_date) = ?`;
+        costParams.push(year);
+      }
+
+      const [costs] = await pool.query(costQuery, costParams);
       costs.forEach((cost) => {
         const name = cost.property_name || 'Unknown Property';
         if (!propertyStats[name])
@@ -86,30 +95,41 @@ class ReportService {
       });
     } else {
       // Fallback: Optimized invoice-based approach
-      const invoiceStats = await invoiceModel.getFinancialStatsByYear(year);
-      const costStats =
-        await maintenanceCostModel.getFinancialStatsByYear(year);
+      const invoiceStats = await invoiceModel.getFinancialStats(
+        year,
+        startDate,
+        endDate
+      );
+      const costStats = await maintenanceCostModel.getFinancialStats(
+        year,
+        startDate,
+        endDate
+      );
 
       // Filter by accessible properties
       invoiceStats
-        .filter((s) => propertyIds.includes(Number(s.property_id)))
+        .filter((s) =>
+          propertyIds.includes(Number(s.propertyId || s.property_id))
+        )
         .forEach((s) => {
-          const name = s.property_name || 'Unknown Property';
+          const name = s.propertyName || s.property_name || 'Unknown Property';
           if (!propertyStats[name])
             propertyStats[name] = { income: 0, expense: 0, depositsHeld: 0 };
           propertyStats[name].income = moneyMath(propertyStats[name].income)
-            .add(s.total_income)
+            .add(s.totalIncome || s.total_income)
             .value();
         });
 
       costStats
-        .filter((s) => propertyIds.includes(Number(s.property_id)))
+        .filter((s) =>
+          propertyIds.includes(Number(s.propertyId || s.property_id))
+        )
         .forEach((s) => {
-          const name = s.property_name || 'Unknown Property';
+          const name = s.propertyName || s.property_name || 'Unknown Property';
           if (!propertyStats[name])
             propertyStats[name] = { income: 0, expense: 0, depositsHeld: 0 };
           propertyStats[name].expense = moneyMath(propertyStats[name].expense)
-            .add(s.total_expense)
+            .add(s.totalExpense || s.total_expense)
             .value();
         });
     }
@@ -121,8 +141,8 @@ class ReportService {
    * Analytics: Financial Review
    * Combines raw stats with business insights/recommendations.
    */
-  async getFinancialReportData(year, user) {
-    const stats = await this.getFinancialStats(year, user);
+  async getFinancialReportData(year, user, startDate = null, endDate = null) {
+    const stats = await this.getFinancialStats(year, user, startDate, endDate);
     const entries = Object.entries(stats);
     let totalIncome = 0;
     let totalExpense = 0;
@@ -204,9 +224,14 @@ class ReportService {
    * Get a comprehensive ledger summary for a given year.
    * Returns totals for revenue, liabilities, expenses and net operating income.
    */
-  async getLedgerSummary(year, user) {
+  async getLedgerSummary(year, user, startDate = null, endDate = null) {
     const propertyIds = await this._getAccessiblePropertyIds(user);
-    return await ledgerModel.getYearlySummary(propertyIds, year);
+    return await ledgerModel.getYearlySummary(
+      propertyIds,
+      year,
+      startDate,
+      endDate
+    );
   }
 
   // GET OCCUPANCY STATS: Calculates how many units are rented vs vacant.
@@ -600,9 +625,13 @@ class ReportService {
   }
 
   // GET LEAD CONVERSION STATS: Tracks how successful we are at turning website visitors into tenants.
-  async getLeadConversionStats(user) {
+  async getLeadConversionStats(user, startDate = null, endDate = null) {
     const ownerId = user?.role === ROLES.OWNER ? user.id : null;
-    const stats = await leadModel.getLeadConversionStats(ownerId);
+    const stats = await leadModel.getLeadConversionStats(
+      ownerId,
+      startDate,
+      endDate
+    );
     return {
       Total: Number(stats.Total || 0),
       Interested: Number(stats.Interested || 0),
@@ -614,8 +643,8 @@ class ReportService {
   /**
    * Analytics: Lead Conversion
    */
-  async getLeadConversionReportData(user) {
-    const stats = await this.getLeadConversionStats(user);
+  async getLeadConversionReportData(user, startDate = null, endDate = null) {
+    const stats = await this.getLeadConversionStats(user, startDate, endDate);
     const convRate =
       stats.Total > 0
         ? ((stats.Converted / stats.Total) * 100).toFixed(1)
