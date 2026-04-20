@@ -3,7 +3,7 @@ import { useAuth } from '@/app/context/AuthContext';
 import { useUser } from '@/app/context/UserContext';
 import { payoutApi } from '@/services/api';
 import { OwnerPayout } from '@/types/models';
-import { formatLKR } from '@/utils/formatters';
+import { formatLKR, toLKRFromCents } from '@/utils/formatters';
 import { PayoutDetailModal } from '../owner/PayoutDetailModal';
 import {
   FileText,
@@ -322,7 +322,7 @@ const TreasurerPayoutsPage: React.FC = () => {
                       Gross Rent
                     </span>
                     <p className="text-sm font-bold text-gray-900">
-                      {formatLKR(liveTotals.gross)}
+                      {formatLKR(toLKRFromCents(liveTotals.gross))}
                     </p>
                   </div>
                   <div className="bg-white p-2 rounded border shadow-sm">
@@ -330,7 +330,7 @@ const TreasurerPayoutsPage: React.FC = () => {
                       Agency Fee
                     </span>
                     <p className="text-sm font-bold text-red-600">
-                      -{formatLKR(liveTotals.commission)}
+                      -{formatLKR(toLKRFromCents(liveTotals.commission))}
                     </p>
                   </div>
                   <div className="bg-white p-2 rounded border shadow-sm">
@@ -338,7 +338,7 @@ const TreasurerPayoutsPage: React.FC = () => {
                       Maintenance
                     </span>
                     <p className="text-sm font-bold text-red-600">
-                      -{formatLKR(liveTotals.expenses)}
+                      -{formatLKR(toLKRFromCents(liveTotals.expenses))}
                     </p>
                   </div>
                   <div className="bg-blue-600 p-2 rounded border shadow-md text-white">
@@ -346,7 +346,7 @@ const TreasurerPayoutsPage: React.FC = () => {
                       Net Payout
                     </span>
                     <p className="text-base font-black">
-                      {formatLKR(liveTotals.net)}
+                      {formatLKR(toLKRFromCents(liveTotals.net))}
                     </p>
                   </div>
                 </div>
@@ -401,7 +401,7 @@ const TreasurerPayoutsPage: React.FC = () => {
                                     Unit {item.unit_number}
                                   </p>
                                   <p className="text-[11px] font-black text-gray-900">
-                                    {formatLKR(item.amount)}
+                                    {formatLKR(toLKRFromCents(item.amount))}
                                   </p>
                                 </div>
                                 <p className="text-[9px] text-gray-500 truncate leading-tight">
@@ -450,7 +450,7 @@ const TreasurerPayoutsPage: React.FC = () => {
                                     Unit {item.unit_number}
                                   </p>
                                   <p className="text-[11px] font-black text-red-600">
-                                    -{formatLKR(item.amount)}
+                                    -{formatLKR(toLKRFromCents(item.amount))}
                                   </p>
                                 </div>
                                 <div className="flex items-center gap-1.5 overflow-hidden">
@@ -583,7 +583,7 @@ const TreasurerPayoutsPage: React.FC = () => {
                             </Badge>
                           </td>
                           <td className="px-6 py-4 text-right font-black text-gray-900">
-                            {formatLKR(p.amount)}
+                            {formatLKR(toLKRFromCents(p.amount))}
                           </td>
                           <td className="px-6 py-4">
                             <div className="flex items-center justify-center gap-2">

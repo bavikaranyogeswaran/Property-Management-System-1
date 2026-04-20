@@ -440,8 +440,10 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
       await apiClient.delete(`/property-types/${id}`);
       setPropertyTypes((prev) => prev.filter((t) => t.id !== id));
       toast.success('Property type deleted');
-    } catch (error) {
-      toast.error('Failed to delete property type');
+    } catch (error: any) {
+      toast.error(
+        error.response?.data?.error || 'Failed to delete property type'
+      );
     }
   };
 
@@ -450,8 +452,8 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
       const response = await apiClient.post('/unit-types', type);
       setUnitTypes((prev) => [...prev, response.data]);
       toast.success('Unit type added');
-    } catch (error) {
-      toast.error('Failed to add unit type');
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to add unit type');
     }
   };
 
@@ -460,8 +462,8 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
       await apiClient.delete(`/unit-types/${id}`);
       setUnitTypes((prev) => prev.filter((t) => t.id !== id));
       toast.success('Unit type deleted');
-    } catch (error) {
-      toast.error('Failed to delete unit type');
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to delete unit type');
     }
   };
 

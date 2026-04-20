@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../app/context/AuthContext';
 import { payoutApi } from '../../services/api';
 import { OwnerPayout } from '../../types/models';
-import { formatLKR } from '../../utils/formatters';
+import { formatLKR, toLKRFromCents } from '../../utils/formatters';
 import { PayoutDetailModal } from './owner/PayoutDetailModal';
 import { FileText, Download, Eye, Table as TableIcon } from 'lucide-react';
 import { toast } from 'sonner';
@@ -168,7 +168,7 @@ const OwnerPayoutsPage: React.FC = () => {
                     {new Date(p.periodEnd).toLocaleDateString()}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
-                    {formatLKR(p.amount)}
+                    {formatLKR(toLKRFromCents(p.amount))}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span

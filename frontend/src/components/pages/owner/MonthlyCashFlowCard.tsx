@@ -36,8 +36,14 @@ export function MonthlyCashFlowCard() {
     apiClient
       .get('/reports/cash-flow')
       .then((res) => {
+        // Convert cents to LKR for all data points
+        const convertedData = res.data.map((d: any) => ({
+          ...d,
+          revenue: d.revenue ? d.revenue / 100 : 0,
+          expense: d.expense ? d.expense / 100 : 0,
+        }));
         // Ensure we handle potential sorting issues from DB
-        const sortedData = res.data.sort((a: any, b: any) =>
+        const sortedData = convertedData.sort((a: any, b: any) =>
           a.month.localeCompare(b.month)
         );
         setData(sortedData);
