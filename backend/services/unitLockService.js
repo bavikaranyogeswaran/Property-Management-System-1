@@ -15,97 +15,81 @@ class UnitLockService {
    * @param {string|number} leadId
    * @returns {Promise<boolean>} True if lock acquired or already held by this lead
    */
-  // ACQUIRE LOCK: Claims a unit for a specific Lead for 15 minutes.
+  // ACQUIRE LOCK: Claims a unit for a specific Lead. Prevents "Double Booking" during the 15-minute checkout window.
   async acquireLock(unitId, leadId) {
-    const id = unitId.toString();
-    const lid = leadId.toString();
-    const lockKey = `unit_lock:${id}`;
-    const ttlSeconds = 15 * 60; // 15 minute lock for checkout/conversion
+    const lockKey = `unit_lock:${unitId}`;
+    const ttlSeconds = 15 * 60;
 
     try {
-      // SETNX (Set if Not Exists) with EX (Expiry)
-      const result = await redis.set(lockKey, lid, 'EX', ttlSeconds, 'NX');
+      // 1. [CONCURRENCY] Atomic Claim: Set key only if not exists (NX) with auto-expiry (EX)
+      const result = await redis.set(
+        lockKey,
+        leadId.toString(),
+        'EX',
+        ttlSeconds,
+        'NX'
+      );
+      if (result === 'OK') return true;
 
-      if (result === 'OK') {
-        return true;
-      }
-
-      // If already exists, check if it belongs to the same lead (refresh)
+      // 2. [CONCURRENCY] Refresh: If already held by the same lead, extend the timer
       const currentValue = await redis.get(lockKey);
-      if (currentValue === lid) {
+      if (currentValue === leadId.toString()) {
         await redis.expire(lockKey, ttlSeconds);
         return true;
       }
 
       return false;
-    } catch (error) {
-      console.error('UnitLockService Redis Error (acquire):', error);
+    } catch (err) {
+      console.error('Lock Acquisition Error:', err);
       return false;
     }
   }
 
-  /**
-   * Check if a unit is locked by someone ELSE.
-   */
-  // IS LOCKED: Checks if someone else is currently in the middle of paying for this unit.
+  // IS LOCKED: Checks if another user is currently in a checkout session for this unit.
   async isLocked(unitId, excludeLeadId = null) {
-    const id = unitId.toString();
-    const lockKey = `unit_lock:${id}`;
+    const lockKey = `unit_lock:${unitId}`;
 
     try {
+      // 1. [CONCURRENCY] Memory Probe: Check Redis for an active lock value
       const currentValue = await redis.get(lockKey);
-
-      // FAIL-CLOSED: If Redis returns a value, we know it's locked.
       if (!currentValue) return null;
 
-      if (excludeLeadId && currentValue === excludeLeadId.toString()) {
-        return null; // Locked by the caller, so it's "available" to them.
-      }
+      // 2. Self-Exclusion: If the caller holds the lock, treat it as available
+      if (excludeLeadId && currentValue === excludeLeadId.toString())
+        return null;
 
+      // 3. Resolve metadata for UI feedback (e.g., "Locked for 5 more minutes")
       const ttl = await redis.ttl(lockKey);
-      const expiresAt = new Date(Date.now() + (ttl > 0 ? ttl : 0) * 1000);
-
-      return { leadId: currentValue, expiresAt };
-    } catch (error) {
-      console.error('UnitLockService Redis Error (check):', error);
-
-      // [HARDENED] FAIL-CLOSED: If Redis is down, we must assume it IS locked
-      // to prevent race conditions (Double Booking).
+      return {
+        leadId: currentValue,
+        expiresAt: new Date(Date.now() + (ttl > 0 ? ttl : 0) * 1000),
+      };
+    } catch (err) {
+      console.error('Lock Check Error:', err);
+      // 4. [CONCURRENCY] Fail-Closed Guard: If Redis is unreachable, assume LOCKED to prevent race conditions
       return {
         leadId: 'SYSTEM_LOCK_ERROR',
-        expiresAt: new Date(Date.now() + 60000), // Assume locked for 60s while system recovers
+        expiresAt: new Date(Date.now() + 60000),
         error: 'Connection failure',
       };
     }
   }
 
-  /**
-   * Manually release a lock.
-   * @param {string|number} unitId
-   * @param {string|number} leadId (Optional) If provided, lock will only be released if it matches this lead.
-   */
+  // RELEASE LOCK: Manually surrenders a unit claim.
   async releaseLock(unitId, leadId = null) {
-    const id = unitId.toString();
-    const lockKey = `unit_lock:${id}`;
-    const lid = leadId ? leadId.toString() : null;
+    const lockKey = `unit_lock:${unitId}`;
 
     try {
-      if (lid) {
-        // Atomic ownership check via Lua script
-        const script = `
-          if redis.call("get", KEYS[1]) == ARGV[1] then
-            return redis.call("del", KEYS[1])
-          else
-            return 0
-          end
-        `;
-        await redis.eval(script, 1, lockKey, lid);
+      if (leadId) {
+        // 1. [SECURITY] Ownership-Verified Delete: Use Lua to atomically check leadId before deleting (Prevent stealing)
+        const script = `if redis.call("get", KEYS[1]) == ARGV[1] then return redis.call("del", KEYS[1]) else return 0 end`;
+        await redis.eval(script, 1, lockKey, leadId.toString());
       } else {
-        // Fallback for system-level overrides or legacy calls
+        // 2. Force Purge: System-level override
         await redis.del(lockKey);
       }
-    } catch (error) {
-      console.error('UnitLockService Redis Error (release):', error);
+    } catch (err) {
+      console.error('Lock Release Error:', err);
     }
   }
 

@@ -12,11 +12,9 @@ import pool from '../config/db.js';
 import { fromCents } from '../utils/moneyUtils.js';
 
 class PayoutService {
-  // PREVIEW PAYOUT: Shows the owner exactly how the math works before any money is moved.
+  // PREVIEW PAYOUT: Non-destructive calculation engine. Simulate profit sharing for a given date range.
   async previewPayout(ownerId, startDate, endDate, selection = null) {
-    if (!endDate) {
-      throw new Error('End date is required');
-    }
+    if (!endDate) throw new Error('End date is required');
     return await payoutModel.calculateNetPayout(
       ownerId,
       startDate,
@@ -26,22 +24,17 @@ class PayoutService {
     );
   }
 
-  // CREATE PAYOUT: Saves the calculated record and links all relevant invoices/expenses.
+  // CREATE PAYOUT: Formalizes a profit-sharing cycle. Locks financial records and generates management fee revenue.
   async createPayout(ownerId, startDate, endDate, selection = null) {
-    if (!endDate) {
-      throw new Error('End date is required');
-    }
+    if (!endDate) throw new Error('End date is required');
 
+    // 1. [CONCURRENCY] Idempotency Check: Prevent duplicate payouts for overlapping periods
     const isSelective = !!(
       selection?.incomeIds?.length || selection?.expenseIds?.length
     );
-    const hasOverlap = await payoutModel.checkOverlap(
-      ownerId,
-      startDate,
-      endDate,
-      isSelective
-    );
-    if (hasOverlap) {
+    if (
+      await payoutModel.checkOverlap(ownerId, startDate, endDate, isSelective)
+    ) {
       throw new Error(
         'A payout record already exists that covers part of this period.'
       );
@@ -53,6 +46,7 @@ class PayoutService {
     try {
       await connection.beginTransaction();
 
+      // 2. [FINANCIAL] Calculate Net distribution: Income - Commissions - Expenses - Debt Offsets
       const {
         totalGross,
         totalCommission,
@@ -70,11 +64,10 @@ class PayoutService {
         connection,
         selection
       );
+      if (incomeIds.length === 0 && expenseIds.length === 0)
+        throw new Error('No eligible records found.');
 
-      if (incomeIds.length === 0 && expenseIds.length === 0) {
-        throw new Error('No eligible records found for this payout period.');
-      }
-
+      // 3. Persist the high-level Payout record
       const payoutId = await payoutModel.create(
         {
           ownerId,
@@ -88,6 +81,7 @@ class PayoutService {
         connection
       );
 
+      // 4. [AUDIT] Atomic Linking: Tag all processed invoices and expenses with this Payout ID to prevent re-processing
       await payoutModel.linkRecordsToPayout(
         payoutId,
         incomeIds,
@@ -95,21 +89,18 @@ class PayoutService {
         connection
       );
 
-      // [NEW] Deficit Recovery Recovery: Mark old deficits as settled by this payout
-      if (deficitPayoutIds && deficitPayoutIds.length > 0) {
+      // 5. [FINANCIAL] Debt Recovery: If this payout clears previous owner debts (deficits), mark those records as settled
+      if (deficitPayoutIds && deficitPayoutIds.length > 0)
         await payoutModel.markDeficitsAsOffset(
           payoutId,
           deficitPayoutIds,
           connection
         );
-      }
 
-      // [NEW] Accounting Integration: Record Management Fee Revenue in Ledger
-      // We process each lease's portion of the commission to maintain ledger granularity.
+      // 6. [SIDE EFFECT] Revenue Recognition: Record the Agency's management commission in the Ledger
       if (leaseCommissions && Object.keys(leaseCommissions).length > 0) {
         for (const [leaseId, amount] of Object.entries(leaseCommissions)) {
           if (amount <= 0) continue;
-
           await ledgerModel.create(
             {
               leaseId,
@@ -135,36 +126,34 @@ class PayoutService {
     }
   }
 
+  // GET HISTORY: Fetch all past payouts for an owner.
   async getHistory(ownerId) {
     return await payoutModel.findByOwnerId(ownerId);
   }
 
+  // GET BY ID: Admin-level deep fetch of a single payout record.
   async getPayoutById(payoutId) {
-    // Note: This is an internal helper or for admins. Standard usage should go through role-aware finders.
     const [row] = await (
       await import('../config/db.js')
     ).default.query('SELECT * FROM owner_payouts WHERE payout_id = ?', [
       payoutId,
     ]);
-    if (!row[0]) return null;
-    return row[0];
+    return row[0] || null;
   }
 
-  // MARK AS PAID: Treasurer step. Records the bank reference to prove money was sent.
+  // MARK AS PAID: Financial closure step. Treasurer confirms bank transfer completion.
   async markAsPaid(payoutId, treasurerId, bankReference, proofUrl = null) {
     const connection = await pool.getConnection();
     try {
       await connection.beginTransaction();
 
-      // [H4 HARDENING] Perform row locking to prevent concurrent status updates
+      // 1. [CONCURRENCY] Row-level Lock: Prevent race conditions if two managers update simultaneously
       const payout = await payoutModel.findByIdForUpdate(payoutId, connection);
       if (!payout) throw new Error('Payout record not found.');
-      if (payout.status !== 'pending') {
-        throw new Error(
-          `Cannot mark payout as paid. Current status: ${payout.status}`
-        );
-      }
+      if (payout.status !== 'pending')
+        throw new Error(`Cannot pay record with status: ${payout.status}`);
 
+      // 2. Perform DB update with payment meta-data
       await payoutModel.markAsPaid(
         payoutId,
         treasurerId,
@@ -183,37 +172,36 @@ class PayoutService {
     }
   }
 
+  // ACKNOWLEDGE: Owner step to confirm receipt of funds.
   async acknowledgePayout(ownerId, payoutId) {
     const history = await payoutModel.findByOwnerId(ownerId);
     const payout = history.find((p) => String(p.id) === String(payoutId));
-    if (!payout) throw new Error('Payout not found or access denied');
-    if (payout.status !== 'paid')
-      throw new Error('Only paid payouts can be acknowledged');
+    if (!payout || payout.status !== 'paid')
+      throw new Error('Payout not eligible for acknowledgment.');
 
     await payoutModel.acknowledge(payoutId);
     return true;
   }
 
+  // DISPUTE: Owner step to flag potential calculation errors.
   async disputePayout(ownerId, payoutId, reason) {
     const history = await payoutModel.findByOwnerId(ownerId);
     const payout = history.find((p) => String(p.id) === String(payoutId));
-    if (!payout) throw new Error('Payout not found or access denied');
-    if (payout.status !== 'paid')
-      throw new Error('Only paid payouts can be disputed');
+    if (!payout || payout.status !== 'paid')
+      throw new Error('Payout not eligible for dispute.');
 
     await payoutModel.dispute(payoutId, reason);
     return true;
   }
 
+  // GET DETAILS: Full breakdown of every line-item constituent in a payout.
   async getPayoutDetails(ownerId, payoutId) {
-    // 1. Verify payout belongs to the requesting owner
+    // 1. [SECURITY] Resolve ownership scope
     const payouts = await payoutModel.findByOwnerId(ownerId);
     const payout = payouts.find((p) => String(p.id) === String(payoutId));
+    if (!payout) throw new Error('Payout not found or access denied.');
 
-    if (!payout) {
-      throw new Error('Payout not found or access denied');
-    }
-
+    // 2. Aggregate details (constituent invoices and maintenance costs)
     const details = await payoutModel.getPayoutDetails(payoutId);
 
     return {
@@ -234,16 +222,18 @@ class PayoutService {
     };
   }
 
+  // EXPORT CSV: Generates a bank-ready or tax-ready constituent breakdown.
   async exportPayoutCSV(ownerId, payoutId) {
+    // 1. Fetch detailed constituent records
     const details = await this.getPayoutDetails(ownerId, payoutId);
 
-    // Helper to escape CSV values (prevents injection and formatting breaks)
-    const escapeCSV = (val) => {
-      if (val === null || val === undefined) return '""';
-      const str = String(val).replace(/"/g, '""');
-      return `"${str}"`;
-    };
+    // 2. CSV Sanitization helper
+    const esc = (val) =>
+      val === null || val === undefined
+        ? '""'
+        : `"${String(val).replace(/"/g, '""')}"`;
 
+    // 3. Mapping Engine: Convert constituent models into CSV rows
     const rows = [
       [
         'Property',
@@ -253,47 +243,42 @@ class PayoutService {
         'Date',
         'Income (LKR)',
         'Expense (LKR)',
-      ].map(escapeCSV),
+      ].map(esc),
     ];
 
-    // Income Rows
-    details.income.forEach((item) => {
+    // Add Incomes (Rent, Fees)
+    details.income.forEach((i) => {
       const type =
-        item.invoice_type === 'rent'
+        i.invoice_type === 'rent'
           ? 'Rent'
-          : item.invoice_type === 'late_fee'
+          : i.invoice_type === 'late_fee'
             ? 'Late Fee'
-            : item.invoice_type.charAt(0).toUpperCase() +
-              item.invoice_type.slice(1);
-
-      const description =
-        item.invoice_description || `${type} for ${item.month}/${item.year}`;
-
+            : 'Misc';
       rows.push([
-        escapeCSV(item.property_name),
-        escapeCSV(item.unit_number),
-        escapeCSV(type),
-        escapeCSV(description),
-        escapeCSV(item.payment_date),
-        escapeCSV(fromCents(item.amount).toFixed(2)),
-        escapeCSV('0.00'),
+        esc(i.property_name),
+        esc(i.unit_number),
+        esc(type),
+        esc(i.invoice_description || `${type} for ${i.month}/${i.year}`),
+        esc(i.payment_date),
+        esc(fromCents(i.amount).toFixed(2)),
+        esc('0.00'),
       ]);
     });
 
-    // Expense Rows
-    details.expenses.forEach((item) => {
+    // Add Expenses (Maintenance)
+    details.expenses.forEach((e) =>
       rows.push([
-        escapeCSV(item.property_name),
-        escapeCSV(item.unit_number),
-        escapeCSV('Maintenance'),
-        escapeCSV(item.description || item.request_title),
-        escapeCSV(item.recorded_date),
-        escapeCSV('0.00'),
-        escapeCSV(fromCents(item.amount).toFixed(2)),
-      ]);
-    });
+        esc(e.property_name),
+        esc(e.unit_number),
+        esc('Maintenance'),
+        esc(e.description || e.request_title),
+        esc(e.recorded_date),
+        esc('0.00'),
+        esc(fromCents(e.amount).toFixed(2)),
+      ])
+    );
 
-    // Summary Rows
+    // 4. Summary Breakdown
     rows.push([]);
     rows.push(
       [
@@ -304,7 +289,7 @@ class PayoutService {
         '',
         fromCents(details.summary.totalGross).toFixed(2),
         '',
-      ].map(escapeCSV)
+      ].map(esc)
     );
     rows.push(
       [
@@ -315,7 +300,7 @@ class PayoutService {
         '',
         '',
         fromCents(details.summary.totalCommission).toFixed(2),
-      ].map(escapeCSV)
+      ].map(esc)
     );
     rows.push(
       [
@@ -326,7 +311,7 @@ class PayoutService {
         '',
         '',
         fromCents(details.summary.totalExpenses).toFixed(2),
-      ].map(escapeCSV)
+      ].map(esc)
     );
     rows.push([]);
     rows.push(
@@ -338,7 +323,7 @@ class PayoutService {
         '',
         fromCents(details.summary.netPayout).toFixed(2),
         '',
-      ].map(escapeCSV)
+      ].map(esc)
     );
 
     return rows.map((r) => r.join(',')).join('\n');

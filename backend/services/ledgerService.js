@@ -38,12 +38,14 @@ class LedgerService {
    * @param {string} [description]
    * @param {Object} [connection]
    */
-  // POST PAYMENT: Staff/System step. Records a verified payment into the central ledger.
+  // POST PAYMENT: Formalizes a verified payment into the central double-entry accounting vault.
   async postPayment(paymentId, invoice, amount, description, connection) {
+    // 1. [FINANCIAL] Resolve Accounting Classification: Map business event (invoice type) to ledger heads (liability/revenue)
     const { accountType, category } = getLedgerClassification(
       invoice.invoiceType || invoice.invoice_type
     );
 
+    // 2. Perform Atomic Entry into the accounting_ledger table
     return await ledgerModel.create(
       {
         paymentId: Number(paymentId),

@@ -15,49 +15,38 @@ cloudinary.config({
  * Automatically identifies and deletes files uploaded via Multer-Cloudinary
  * if the request ended in a failure.
  */
+// CLEANUP ASSETS: Automatically identifies and deletes orphaned files uploaded via Multer-Cloudinary if a request fails.
 export const cleanupRequestAssets = async (req) => {
   try {
     const assetsToDelete = [];
 
-    // 1. Single File case (req.file)
-    if (req.file && req.file.url) {
-      // For multer-storage-cloudinary, .filename is the public_id
-      assetsToDelete.push(req.file.filename);
-    }
+    // 1. Single File Collection (req.file)
+    if (req.file?.url) assetsToDelete.push(req.file.filename);
 
-    // 2. Multiple Files case (req.files)
+    // 2. Multiple Files Collection (req.files)
     if (req.files) {
-      if (Array.isArray(req.files)) {
-        // Array case (e.g. upload.array('photos'))
+      if (Array.isArray(req.files))
         req.files.forEach((file) => assetsToDelete.push(file.filename));
-      } else {
-        // Fields case (e.g. upload.fields([{ name: 'id' }, { name: 'receipt' }]))
-        Object.values(req.files).forEach((fieldArray) => {
-          fieldArray.forEach((file) => assetsToDelete.push(file.filename));
-        });
-      }
+      else
+        Object.values(req.files).forEach((fieldArray) =>
+          fieldArray.forEach((file) => assetsToDelete.push(file.filename))
+        );
     }
 
     if (assetsToDelete.length === 0) return;
 
     logger.info(
       `[Asset Cleanup] Enqueueing ${assetsToDelete.length} orphaned assets for removal.`,
-      {
-        path: req.originalUrl,
-        public_ids: assetsToDelete,
-      }
+      { path: req.originalUrl, public_ids: assetsToDelete }
     );
 
-    // Enqueue each publicId for deletion with separate jobs for independent retries
+    // 3. [SIDE EFFECT] Asynchronous Removal: Enqueue each publicId to the background task queue for reliable Cloudinary deletion
     await Promise.all(
       assetsToDelete.map((publicId) =>
         mainQueue.add(
           'cleanup_cloudinary_asset_task',
           { publicId },
-          {
-            retryLimit: 5,
-            backoff: { type: 'exponential', delay: 10000 },
-          }
+          { retryLimit: 5, backoff: { type: 'exponential', delay: 10000 } }
         )
       )
     );

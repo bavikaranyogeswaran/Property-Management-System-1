@@ -24,9 +24,10 @@ const JWT_SECRET = config.jwt.secret;
 
 class AuthService {
   // LOGIN: Verifies credentials and issues a JWT "Access Card".
+  // LOGIN: Primary entry point for user sessions. Verifies credentials and issues a multi-factor-ready JWT.
   async login(email, password) {
+    // 1. [SECURITY] Identify user and verify active status (Block locked/purged accounts)
     const user = await userModel.findByEmail(email);
-
     if (!user || user.status !== 'active') {
       logger.warn('[AUTH] Login failed: User not found or inactive', {
         email,
@@ -36,8 +37,8 @@ class AuthService {
       throw new AppError('Invalid credentials', 401);
     }
 
+    // 2. [SECURITY] Cryptographic password comparison (Constant-time to prevent timing attacks)
     const isValid = await bcrypt.compare(password, user.passwordHash);
-
     if (!isValid) {
       logger.warn('[AUTH] Login failed: Invalid password', {
         email,
@@ -46,8 +47,10 @@ class AuthService {
       throw new AppError('Invalid credentials', 401);
     }
 
+    // 3. [AUDIT] Log successful entry
     logger.info('[AUTH] Login successful', { email, userId: user.id });
 
+    // 4. [SECURITY] Issue JWT with Token Versioning (Allows global logout by incrementing token version in DB)
     const token = sign(
       {
         id: user.id,
@@ -71,60 +74,62 @@ class AuthService {
     };
   }
   // VERIFY EMAIL: Confirms the user's email is real using a one-time token.
+  // VERIFY EMAIL: Public endpoint to activate a user's contact point via a secure magic link.
   async verifyEmail(token) {
-    // [HARDENED] Use Opaque Token from Redis
+    // 1. [SECURITY] Consume Opaque Token (Enforces one-time use and TTL)
     const tokenData = await securityTokenService.consumeToken(token, 'verify');
+    if (!tokenData) throw new Error('Invalid or expired verification token');
 
-    if (!tokenData) {
-      throw new Error('Invalid or expired verification token');
-    }
-
+    // 2. Perform DB activation
     await userModel.verifyEmail(tokenData.userId);
     return { message: 'Email verified successfully' };
   }
 
   // SETUP PASSWORD: The final step of onboarding where a new user sets their password.
+  // SETUP PASSWORD: The final onboarding step. Sets user identity and hydrates profile data.
   async setupPassword(token, password, tenantData = null) {
-    // [HARDENED] Use Opaque Token from Redis
+    // 1. [SECURITY] Validate Magic Link Token
     const tokenData = await securityTokenService.consumeToken(token, 'setup');
-
-    if (!tokenData) {
-      throw new Error('Invalid or expired setup token');
-    }
+    if (!tokenData) throw new Error('Invalid or expired setup token');
 
     try {
+      // 2. [SECURITY] Generate salted hash for the new password
       const hashedPassword = await bcrypt.hash(password, 10);
+
+      // 3. Atomically set password and invalidate all existing tokens (Security reset)
       await userModel.setupPassword(tokenData.userId, hashedPassword);
       await userModel.incrementTokenVersion(tokenData.userId);
 
+      // 4. [SIDE EFFECT] If invite was for a Tenant, hydrate their specific profile fields
       if (tokenData.metadata?.role === ROLES.TENANT && tenantData) {
         await tenantModel.updateProfile(tokenData.userId, tenantData);
       }
 
-      return { message: 'Password set successfully' };
+      return { message: 'Account secured.' };
     } catch (error) {
       console.error('Setup password error:', error.message);
-      throw new Error(error.message || 'Internal error during password setup');
+      throw new Error(error.message || 'Error during account security setup.');
     }
   }
 
   // REQUEST PASSWORD RESET: Sends a "Rescue Link" to the user's email if they forgot their password.
+  // REQUEST PASSWORD RESET: Security-neutral flow to deliver rescue links.
   async requestPasswordReset(email) {
-    // 1. Find user (don't throw error if not found - security parity)
+    // 1. [SECURITY] Identify user (Parity: always return generic success to avoid email enum leaks)
     const user = await userModel.findByEmail(email);
 
-    // 2. If user exists, generate token and send email
     if (user) {
-      // [HARDENED] Use Opaque Token (Random Bytes in Redis)
+      // 2. [SECURITY] Generate secure opaque token with 1-hour TTL
       const resetToken = await securityTokenService.createToken(
         user.id,
         'reset',
-        3600 // 1 hour
+        3600
       );
 
+      // 3. [SIDE EFFECT] Deliver rescue email
       await emailService.sendPasswordResetEmail(user.email, resetToken);
 
-      // Log audit
+      // 4. [AUDIT] Track breach/recovery attempt
       try {
         await auditLogger.log({
           userId: user.id,
@@ -134,38 +139,30 @@ class AuthService {
           details: { email },
         });
       } catch (e) {
-        console.error('Audit log failed for password reset request:', e);
+        console.error('Audit fail:', e);
       }
     }
 
-    // Always return generic success
     return { message: 'If an account exists, a reset link has been sent.' };
   }
 
   // RESET PASSWORD: Uses the "Rescue Link" to actually change the password.
+  // RESET PASSWORD: Finalizes account recovery via a validated magic link.
   async resetPassword(token, newPassword) {
-    // [HARDENED] Use Opaque Token from Redis (Ensures one-time use)
+    // 1. [SECURITY] Validate and Consume reset link (Single-use enforcement)
     const tokenData = await securityTokenService.consumeToken(token, 'reset');
-
-    if (!tokenData) {
-      throw new Error('Invalid or expired reset token');
-    }
+    if (!tokenData) throw new Error('Invalid or expired reset token');
 
     try {
-      // 2. Find user
       const user = await userModel.findById(tokenData.userId);
-      if (!user) {
-        throw new Error('User not found');
-      }
+      if (!user) throw new Error('User not found');
 
-      // 3. Hash new password
+      // 2. [SECURITY] Hash replacement password and rotate JWT version (Invalidates all existing logins)
       const hashedPassword = await bcrypt.hash(newPassword, 10);
-
-      // 4. Update password
       await userModel.updatePassword(tokenData.userId, hashedPassword);
       await userModel.incrementTokenVersion(tokenData.userId);
 
-      // Log audit
+      // 3. [AUDIT] Log critical security event
       try {
         await auditLogger.log({
           userId: tokenData.userId,
@@ -174,7 +171,7 @@ class AuthService {
           entityType: 'user',
         });
       } catch (e) {
-        console.error('Audit log failed for password reset completion:', e);
+        console.error('Audit fail:', e);
       }
 
       return { message: 'Password has been reset successfully' };

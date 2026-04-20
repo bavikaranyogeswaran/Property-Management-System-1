@@ -44,6 +44,7 @@ class LeaseTerminationService {
     terminationFee = 0,
     user = null
   ) {
+    // 1. Fetch lease and validate current status
     const lease = await leaseModel.findById(leaseId);
     if (!lease) throw new AppError('Lease not found', 404);
 
@@ -51,6 +52,7 @@ class LeaseTerminationService {
       throw new AppError('Only active leases can be terminated', 400);
     }
 
+    // 2. Validate termination date logic
     if (!terminationDate) {
       throw new AppError('Termination date is required.', 400);
     }
@@ -68,7 +70,7 @@ class LeaseTerminationService {
     try {
       await connection.beginTransaction();
 
-      // [HARDENED] Deterministic Locking Order (Unit -> Lease)
+      // [HARDENED] 3. Deterministic Locking Order (Unit -> Lease)
       // Lock Unit first (Parent) then Lease (Child) to prevent deadlocks with Payment flows.
       await unitModel.findByIdForUpdate(lease.unitId, connection);
       await leaseModel.findByIdForUpdate(leaseId, connection);
@@ -76,7 +78,9 @@ class LeaseTerminationService {
       const todayDate = getLocalTime();
       const start = parseLocalDate(lease.startDate);
 
+      // 4. Branch Logic: Pre-start Cancellation vs Active Termination
       if (todayDate < start) {
+        // [SIDE EFFECT] Move to 'cancelled' status directly
         await leaseModel.update(
           leaseId,
           { status: 'cancelled', endDate: terminationDate },
@@ -85,7 +89,9 @@ class LeaseTerminationService {
         await invoiceModel.voidAllPendingByLeaseId(leaseId, connection);
         await this.facade._syncUnitStatus(lease.unitId, connection);
       } else {
+        // 5. Active Termination Logic
         if (terminationFee > 0) {
+          // [SIDE EFFECT] Generate termination penalty invoice
           await invoiceModel.create(
             {
               leaseId,
@@ -98,25 +104,29 @@ class LeaseTerminationService {
           );
         }
 
+        // 6. Update lease to 'ended' status
         await leaseModel.update(
           leaseId,
           { status: 'ended', endDate: terminationDate },
           connection
         );
         await invoiceModel.voidAllPendingByLeaseId(leaseId, connection);
+
+        // 7. [SIDE EFFECT] Mark unit for maintenance (turnover phase)
         await unitModel.update(
           lease.unitId,
           { status: 'maintenance', isTurnoverCleared: false },
           connection
         );
 
-        // [C5 FIX] Auto-close non-invoiced open maintenance requests upon lease termination
+        // [SIDE EFFECT] Auto-close non-invoiced open maintenance requests
         await connection.query(
           "UPDATE maintenance_requests SET status = 'closed' WHERE tenant_id = ? AND unit_id = ? AND status IN ('submitted', 'in_progress')",
           [lease.tenantId, lease.unitId]
         );
       }
 
+      // 8. [AUDIT] Log the termination event
       await auditLogger.log(
         {
           userId: user?.id || user?.user_id || null,
@@ -129,6 +139,7 @@ class LeaseTerminationService {
         connection
       );
 
+      // 9. [SIDE EFFECT] Notify tenant and treasurers (Refund required alert)
       await notificationModel.create(
         {
           userId: lease.tenantId,
@@ -171,10 +182,10 @@ class LeaseTerminationService {
 
   // FINALIZE CHECKOUT: The very last step. Confirms the tenant has left and the keys are back.
   async finalizeLeaseCheckout(leaseId, user) {
+    // 1. Fetch lease and validate status eligibility
     const lease = await leaseModel.findById(leaseId);
     if (!lease) throw new AppError('Lease not found', 404);
 
-    // [C2 FIX - Problem 2] Accept both 'expired' and 'ended' leases for checkout
     if (lease.status !== 'expired' && lease.status !== 'ended') {
       throw new AppError(
         'Only expired or ended leases can be finalized for checkout',
@@ -182,22 +193,12 @@ class LeaseTerminationService {
       );
     }
 
-    // Check if security deposit is settled (refunded or offset)
-    if (
-      !['refunded', 'partially_refunded', 'offset'].includes(
-        lease.depositStatus
-      )
-    ) {
-      // We allow finalizing even if not fully refunded, but we should log/warn
-      // For this state machine, ending the lease is the final step.
-    }
-
     const connection = await pool.getConnection();
 
     try {
       await connection.beginTransaction();
 
-      // [HARDENED] Deterministic Locking Order (Unit -> Lease)
+      // [HARDENED] 2. Deterministic Locking Order (Unit -> Lease)
       await unitModel.findByIdForUpdate(lease.unitId, connection);
       await leaseModel.findByIdForUpdate(leaseId, connection);
 
@@ -207,17 +208,17 @@ class LeaseTerminationService {
         .slice(0, 19)
         .replace('T', ' ');
 
-      // 1. Update lease: set actual_checkout_at (and status to 'ended' if it was 'expired')
+      // 3. Update lease: record actual checkout timestamp
       const updateData = { actualCheckoutAt };
       if (lease.status === 'expired') {
         updateData.status = 'ended';
       }
       await leaseModel.update(leaseId, updateData, connection);
 
-      // 2. Resolve Unit Status Atomically
+      // 4. [SIDE EFFECT] Resolve Unit Status based on future leases
       await this.facade._syncUnitStatus(lease.unitId, connection);
 
-      // 3. Audit Log
+      // 5. [AUDIT] Log checkout finalization
       await auditLogger.log(
         {
           userId: user.id || user.user_id,
@@ -246,9 +247,7 @@ class LeaseTerminationService {
     try {
       await conn.beginTransaction();
 
-      // [HARDENED] Deterministic Locking Order (Unit -> Lease)
-
-      // 1. Initial look up (no lock) to get Unit ID
+      // 1. [HARDENED] Deterministic Locking Order (Unit -> Lease)
       const baseLease = await leaseModel.findById(leaseId, conn);
       if (!baseLease) throw new AppError('Lease not found', 404);
 
@@ -263,6 +262,7 @@ class LeaseTerminationService {
       const lease = await leaseModel.findByIdForUpdate(leaseId, conn);
       if (!lease) throw new AppError('Lease reference not found.', 404);
 
+      // [SECURITY] manual cancellation restricted to non-active leases
       if (['active', 'expired', 'ended'].includes(baseLease.status)) {
         throw new AppError(
           'Only draft or pending leases can be cancelled manually. Use termination flow for active leases.',
@@ -270,9 +270,10 @@ class LeaseTerminationService {
         );
       }
 
+      // 4. Update status to 'cancelled'
       await leaseModel.update(leaseId, { status: 'cancelled' }, conn);
 
-      // [FIX] Detect Trapped Deposits: If the application was paid, queue for refund.
+      // 5. [FINANCIAL] Detect Trapped Deposits: Alert for refund processing
       if (lease.depositStatus === 'paid') {
         await leaseModel.update(
           leaseId,
@@ -300,17 +301,16 @@ class LeaseTerminationService {
         }
       }
 
-      // [D2 FIX] Clear magic tokens for this lease upon cancellation
+      // 6. [CLEANUP] Clear magic links
       await conn.query(
         'UPDATE rent_invoices SET magic_token_hash = NULL, magic_token_expires_at = NULL WHERE lease_id = ?',
         [leaseId]
       );
 
-      // [HARD RESERVATION FIX] Check if unit should go back to available
-      // [FIXED] Now uses _syncUnitStatus to account for other future leases correctly
+      // 7. [SIDE EFFECT] Release unit reservation lock
       await this.facade._syncUnitStatus(lease.unitId, conn);
 
-      // [B4 FIX] Added missing auditLogger import
+      // 8. [AUDIT] Log cancellation
       await auditLogger.log(
         {
           userId: user.id || user.user_id,
@@ -339,9 +339,7 @@ class LeaseTerminationService {
     try {
       await conn.beginTransaction();
 
-      // [HARDENED] Deterministic Locking Order (Unit -> Lease)
-
-      // 1. Initial look up (no lock) to get Unit ID
+      // 1. [HARDENED] Deterministic Locking Order (Unit -> Lease)
       const baseLease = await leaseModel.findById(leaseId, conn);
       if (!baseLease) throw new AppError('Lease not found', 404);
 
@@ -356,7 +354,7 @@ class LeaseTerminationService {
       const lease = await leaseModel.findByIdForUpdate(leaseId, conn);
       if (!lease) throw new AppError('Lease reference not found.', 404);
 
-      // Ownership check: must be the tenant
+      // [SECURITY] Ownership check: must be the tenant withdrawing their own app
       if (String(lease.tenantId) !== String(user.id)) {
         throw new AppError(
           'Access denied: You can only withdraw your own application.',
@@ -364,6 +362,7 @@ class LeaseTerminationService {
         );
       }
 
+      // [SECURITY] Rule: Withdrawals restricted to draft phase
       if (lease.status !== 'draft') {
         throw new AppError(
           'Applications can only be withdrawn while in draft status. Use termination flow for active leases.',
@@ -371,9 +370,10 @@ class LeaseTerminationService {
         );
       }
 
+      // 4. Perform cancellation
       await leaseModel.update(leaseId, { status: 'cancelled' }, conn);
 
-      // [FIX] Detect Trapped Deposits: If the prospect paid, queue for refund.
+      // 5. [FINANCIAL] Refund Alert: Paid deposit must be returned if prospect withdraws
       if (lease.depositStatus === 'paid') {
         await leaseModel.update(
           leaseId,
@@ -401,16 +401,14 @@ class LeaseTerminationService {
         }
       }
 
-      // [D2 FIX] Clear magic tokens for this lease upon withdrawal
+      // 6. [CLEANUP] Kill magic links and release unit lock
       await conn.query(
         'UPDATE rent_invoices SET magic_token_hash = NULL, magic_token_expires_at = NULL WHERE lease_id = ?',
         [leaseId]
       );
-
-      // [HARD RESERVATION FIX] Check if unit should go back to available
-      // [FIXED] Now uses _syncUnitStatus to account for other future leases correctly
       await this.facade._syncUnitStatus(lease.unitId, conn);
 
+      // 7. [AUDIT] Log the withdrawal event
       await auditLogger.log(
         {
           userId: user.id || user.user_id,
@@ -433,14 +431,11 @@ class LeaseTerminationService {
     }
   }
 
+  // PROCESS AUTOMATED ESCALATIONS: A scheduled cleanup task that handles annual rent increases.
   async processAutomatedEscalations() {
+    // 1. Identify all leases crossing their anniversary date today
     const targetDate = today();
-    console.log(`[Escalation] Processing escalations for ${targetDate}...`);
-
     const leases = await leaseModel.findLeasesNeedingEscalation(targetDate);
-    console.log(
-      `[Escalation] Found ${leases.length} leases needing escalation.`
-    );
 
     const results = [];
     for (const lease of leases) {
@@ -451,14 +446,13 @@ class LeaseTerminationService {
         const currentRent = Number(lease.monthly_rent);
         const percentage = Number(lease.escalation_percentage);
 
-        // [HARDENED] Precise Decimal Calculation (Compounding)
-        // Replaced: Math.round(currentRent * (1 + percentage/100))
+        // [HARDENED] 2. Precise Decimal Calculation (Compounding increase)
         const newRent = moneyMath(currentRent)
           .mul(1 + percentage / 100)
           .round()
           .value();
 
-        // 1. Record the adjustment history
+        // 3. Record historical adjustment and update lease record
         await conn.query(
           'INSERT INTO lease_rent_adjustments (lease_id, effective_date, new_monthly_rent, notes) VALUES (?, ?, ?, ?)',
           [
@@ -469,18 +463,16 @@ class LeaseTerminationService {
           ]
         );
 
-        // 2. Update the lease record
         await leaseModel.update(
           lease.lease_id,
           {
             monthlyRent: newRent,
-            lastEscalation_date: targetDate, // This confirms the anniversary is handled
+            lastEscalation_date: targetDate,
           },
           conn
         );
 
-        // 3. Notification Logic
-
+        // 4. [SIDE EFFECT] Notify tenant and log system audit
         await notificationModel.create(
           {
             userId: lease.tenant_id,
@@ -505,16 +497,9 @@ class LeaseTerminationService {
         );
 
         await conn.commit();
-        console.log(
-          `[Escalation] Successfully escalated Lease #${lease.lease_id} to ${newRent}`
-        );
         results.push({ leaseId: lease.lease_id, status: 'success', newRent });
       } catch (err) {
         await conn.rollback();
-        console.error(
-          `[Escalation] Failed to escalate Lease #${lease.lease_id}:`,
-          err
-        );
         results.push({
           leaseId: lease.lease_id,
           status: 'failed',
@@ -527,7 +512,9 @@ class LeaseTerminationService {
     return results;
   }
 
+  // UPDATE NOTICE STATUS: Records the tenant's intent (Renew vs Vacate) at lease end.
   async updateNoticeStatus(leaseId, status, user) {
+    // 1. Ownership & Authorization checks
     const lease = await leaseModel.findById(leaseId);
     if (!lease) throw new AppError('Lease not found', 404);
     if (
@@ -535,19 +522,21 @@ class LeaseTerminationService {
       String(lease.tenantId) !== String(user.id)
     )
       throw new AppError('Access denied', 403);
+
+    // 2. Perform the update
     if (!['undecided', 'vacating', 'renewing'].includes(status))
       throw new AppError('Invalid notice status', 400);
+
     await leaseModel.update(leaseId, { noticeStatus: status });
 
-    // [H11 FIX] Auto-cancel renewals if tenant decides to vacate
+    // 3. [SIDE EFFECT] Clean up pending renewals if tenant decides to vacate
     if (status === 'vacating') {
       await renewalService.cancelPendingRenewals(leaseId);
     }
 
-    // [FIX] Negotiated Renewal Flow: Create a renewal request instead of a draft lease
+    // 4. [SIDE EFFECT] Trigger Negotiated Renewal Flow if renewing
     if (status === 'renewing' && lease.status === 'active' && lease.endDate) {
       await renewalService.createFromNotice(leaseId, user);
-      console.log(`[RENEWAL] Created renewal request for Lease ${leaseId}`);
     }
 
     return true;

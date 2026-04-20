@@ -32,15 +32,17 @@ class LeaseRefundService {
     this.facade = facade;
   }
 
+  // REQUEST REFUND: Initiate the return of the security deposit.
   async requestRefund(leaseId, amount, notes, user) {
+    // 1. Fetch lease and check available ledger balance
     const lease = await leaseModel.findById(leaseId);
     if (!lease) throw new AppError('Lease not found', 404);
 
     const ledgerBalance = await leaseModel.getDepositBalance(leaseId);
-    if (ledgerBalance <= 0) {
+    if (ledgerBalance <= 0)
       throw new AppError('No security deposit available to refund.', 400);
-    }
 
+    // 2. [SECURITY] State gate: ensure no active or finished refund exists
     if (['refunded', 'awaiting_approval'].includes(lease.depositStatus)) {
       throw new AppError(
         `Deposit is already ${lease.depositStatus.replace('_', ' ')}.`,
@@ -58,20 +60,22 @@ class LeaseRefundService {
       );
     }
 
-    // [B2 FIX] Removed duplicate getDepositBalance call that reassigned a const
+    // 3. [VALIDATION] Ensure refund amount does not exceed ledger balance
     if (amount > ledgerBalance) {
       throw new AppError(
-        `Refund amount (LKR ${fromCents(amount).toLocaleString()}) cannot exceed verified ledger balance (LKR ${fromCents(ledgerBalance).toLocaleString()}).`,
+        `Refund amount cannot exceed verified ledger balance.`,
         400
       );
     }
 
+    // 4. Update lease with proposed refund amount and status
     await leaseModel.update(leaseId, {
       depositStatus: 'awaiting_approval',
       proposedRefundAmount: amount,
       refundNotes: notes,
     });
 
+    // 5. [AUDIT] Log the request
     await auditLogger.log({
       userId: user.id || user.user_id,
       actionType: 'DEPOSIT_REFUND_REQUESTED',
@@ -83,7 +87,9 @@ class LeaseRefundService {
     return { status: 'awaiting_approval', proposedRefundAmount: amount };
   }
 
+  // APPROVE REFUND: Staff finalizes the settlement and performs debt offsets.
   async approveRefund(leaseId, user) {
+    // 1. Fetch lease and validate awaiting state
     const lease = await leaseModel.findById(leaseId);
     if (!lease) throw new AppError('Lease not found', 404);
 
@@ -95,32 +101,29 @@ class LeaseRefundService {
     }
 
     const amount = lease.proposedRefundAmount;
-    // Status moves to 'awaiting_acknowledgment' instead of directly to 'refunded'
     const status = 'awaiting_acknowledgment';
 
     const connection = await pool.getConnection();
     try {
       await connection.beginTransaction();
 
+      // 2. [SECURITY] Atomic balance verification
       const ledgerBalance = await leaseModel.getDepositBalance(
         leaseId,
         connection
       );
-      if (amount > ledgerBalance) {
-        throw new AppError(
-          `Refund amount (LKR ${fromCents(amount).toLocaleString()}) cannot exceed verified ledger balance (LKR ${fromCents(ledgerBalance).toLocaleString()}).`,
-          400
-        );
-      }
+      if (amount > ledgerBalance)
+        throw new AppError('Refund amount violates ledger balance.', 400);
 
+      // 3. [FINANCIAL] Calculate withheld amount for debt settlement
       let withheldAmount = ledgerBalance - amount;
 
       if (withheldAmount > 0) {
+        // Find all unpaid invoices
         const pendingInvoices = await invoiceModel.findPendingDebts(
           leaseId,
           connection
         );
-
         const invoiceIds = pendingInvoices.map((inv) => inv.invoice_id);
         const allPayments = await paymentModel.findByInvoiceIds(
           invoiceIds,
@@ -133,6 +136,7 @@ class LeaseRefundService {
           paymentsMap.get(p.invoice_id).push(p);
         });
 
+        // 4. [FINANCIAL] Loop through debts and apply deposit offsets
         for (const inv of pendingInvoices) {
           if (withheldAmount <= 0) break;
 
@@ -140,11 +144,11 @@ class LeaseRefundService {
           const paidAlready = payments
             .filter((p) => p.status === 'verified')
             .reduce((sum, p) => moneyMath(sum).add(p.amount).value(), 0);
-
           const outstanding = moneyMath(inv.amount).sub(paidAlready).value();
           const toPay = Math.min(withheldAmount, outstanding);
 
           if (toPay > 0) {
+            // [FINANCIAL] Perform atomic debt payment via 'deposit_offset'
             const payId = await paymentModel.create(
               {
                 invoiceId: inv.invoice_id,
@@ -155,28 +159,17 @@ class LeaseRefundService {
               },
               connection
             );
-
             await paymentModel.updateStatus(
               payId,
               'verified',
               null,
               connection
             );
-
-            if (toPay >= outstanding) {
-              await invoiceModel.updateStatus(
-                inv.invoice_id,
-                'paid',
-                connection
-              );
-            } else {
-              await invoiceModel.updateStatus(
-                inv.invoice_id,
-                'partially_paid',
-                connection
-              );
-            }
-
+            await invoiceModel.updateStatus(
+              inv.invoice_id,
+              toPay >= outstanding ? 'paid' : 'partially_paid',
+              connection
+            );
             await receiptModel.create(
               {
                 paymentId: payId,
@@ -189,6 +182,7 @@ class LeaseRefundService {
               connection
             );
 
+            // Record revenue and liability reduction in ledger
             await ledgerModel.create(
               {
                 paymentId: payId,
@@ -197,12 +191,11 @@ class LeaseRefundService {
                 accountType: 'revenue',
                 category: 'rent',
                 credit: Number(toPay),
-                description: `Deposit offset applied to outstanding invoice #${inv.invoice_id}`,
+                description: `Deposit offset to inv #${inv.invoice_id}`,
                 entryDate: getCurrentDateString(),
               },
               connection
             );
-
             await ledgerModel.create(
               {
                 paymentId: payId,
@@ -211,7 +204,7 @@ class LeaseRefundService {
                 accountType: 'liability',
                 category: 'deposit_withheld',
                 debit: Number(toPay),
-                description: `Security deposit withheld for outstanding debt`,
+                description: `Deposit withheld for debt`,
                 entryDate: getCurrentDateString(),
               },
               connection
@@ -222,22 +215,18 @@ class LeaseRefundService {
         }
       }
 
+      // 5. [FINANCIAL] Any remaining withheld amount is treated as property damage deductions
       if (withheldAmount > 0) {
         const invId = await invoiceModel.create(
           {
             leaseId,
             amount: withheldAmount,
-            dueDate: (() => {
-              const d = getLocalTime();
-              d.setDate(d.getDate() + 5);
-              return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-            })(),
-            description: `Security Deposit Deductions (Damages/Cleaning): ${lease.refundNotes || ''}`,
+            dueDate: formatToLocalDate(addDays(getLocalTime(), 5)),
+            description: `Deposit Deductions (Damages): ${lease.refundNotes || ''}`,
             type: 'maintenance',
           },
           connection
         );
-
         const payId = await paymentModel.create(
           {
             invoiceId: invId,
@@ -248,10 +237,8 @@ class LeaseRefundService {
           },
           connection
         );
-
         await paymentModel.updateStatus(payId, 'verified', null, connection);
         await invoiceModel.updateStatus(invId, 'paid', connection);
-
         await receiptModel.create(
           {
             paymentId: payId,
@@ -272,12 +259,11 @@ class LeaseRefundService {
             accountType: 'revenue',
             category: 'maintenance',
             credit: Number(withheldAmount),
-            description: `Security deposit deduction for damages: ${invId}`,
+            description: `Deposit deduction for damages`,
             entryDate: getCurrentDateString(),
           },
           connection
         );
-
         await ledgerModel.create(
           {
             paymentId: payId,
@@ -286,21 +272,17 @@ class LeaseRefundService {
             accountType: 'liability',
             category: 'deposit_withheld',
             debit: Number(withheldAmount),
-            description: `Security deposit withheld for property damages`,
+            description: `Deposit withheld for property damages`,
             entryDate: today(),
           },
           connection
         );
       }
 
-      await leaseModel.update(
-        leaseId,
-        {
-          depositStatus: status,
-        },
-        connection
-      );
+      // 6. Update lease state to 'awaiting_acknowledgment'
+      await leaseModel.update(leaseId, { depositStatus: status }, connection);
 
+      // 7. [AUDIT] Log the approval
       await auditLogger.log(
         {
           userId: user.id || user.user_id,
@@ -323,29 +305,26 @@ class LeaseRefundService {
     }
   }
 
+  // CONFIRM DISBURSEMENT: Record the actual transfer of funds via bank.
   async confirmDisbursement(leaseId, data, user) {
+    // 1. [SECURITY] RBAC check
     if (!isAtLeast(user.role, ROLES.TREASURER)) {
       throw new AppError(
-        'Access denied. Only owners and treasurers can record disbursements.',
+        'Only Owners/Treasurers can record disbursements.',
         403
       );
     }
 
     const { bankReferenceId, disbursementDate } = data;
     if (!bankReferenceId)
-      throw new AppError(
-        'Bank Reference ID is required for disbursement.',
-        400
-      );
+      throw new AppError('Bank Reference ID is required.', 400);
 
+    // 2. Fetch lease and validate disbursement state
     const lease = await leaseModel.findById(leaseId);
     if (!lease) throw new AppError('Lease not found', 404);
 
     if (lease.depositStatus !== 'awaiting_acknowledgment') {
-      throw new AppError(
-        'This refund is not in the correct state (Approved, Pending Disbursement).',
-        400
-      );
+      throw new AppError('Settlement is not in Awaiting Disbursal state.', 400);
     }
 
     const amount = lease.proposedRefundAmount;
@@ -354,21 +333,20 @@ class LeaseRefundService {
     try {
       await connection.beginTransaction();
 
-      // 1. Finalize Lease State
+      // 3. Update lease with final disbursement details
       await leaseModel.update(
         leaseId,
         {
           refundedAmount: Number(lease.refundedAmount || 0) + Number(amount),
           depositStatus: 'refunded',
           proposedRefundAmount: 0,
-          bankReferenceId: bankReferenceId,
+          bankReferenceId,
           disbursementDate: disbursementDate || today(),
         },
         connection
       );
 
-      // 2. Create the final "Cash Outflow" Ledger Entry
-
+      // 4. [FINANCIAL] Record final cash outflow on the ledger
       await ledgerModel.create(
         {
           leaseId: Number(leaseId),
@@ -381,6 +359,7 @@ class LeaseRefundService {
         connection
       );
 
+      // 5. [AUDIT] Log the disbursement
       await auditLogger.log(
         {
           userId: user.id || user.user_id,
@@ -403,36 +382,34 @@ class LeaseRefundService {
     }
   }
 
+  // DISPUTE REFUND: Tenant files a disagreement with the proposed settlement.
   async disputeRefund(leaseId, notes, user) {
+    // 1. [SECURITY] Role and Ownership Check
     const lease = await leaseModel.findById(leaseId);
     if (!lease) throw new AppError('Lease not found', 404);
 
-    // Only the tenant of this specific lease can file a dispute
-    if (user.role !== ROLES.TENANT) {
-      throw new AppError(
-        'Access denied: Only tenants can dispute a refund.',
-        403
-      );
+    if (
+      user.role !== ROLES.TENANT ||
+      String(lease.tenantId) !== String(user.id)
+    ) {
+      throw new AppError('Access denied: Ownership required.', 403);
     }
-    if (String(lease.tenantId) !== String(user.id)) {
-      throw new AppError(
-        'Access denied: You are not the tenant of this lease.',
-        403
-      );
-    }
-    // A dispute is only valid when a settlement is awaiting the tenant's acknowledgment
+
+    // 2. [SECURITY] Process state check: can only dispute while awaiting acknowledgment
     if (lease.depositStatus !== 'awaiting_acknowledgment') {
       throw new AppError(
-        'No refund settlement is currently awaiting your review. A dispute can only be filed after a settlement has been proposed.',
+        'Dispute can only be filed against a proposed settlement.',
         400
       );
     }
 
+    // 3. Update status to 'disputed'
     await leaseModel.update(leaseId, {
       depositStatus: 'disputed',
       refundNotes: notes,
     });
 
+    // 4. [AUDIT] Log the dispute initiation
     await auditLogger.log({
       userId: user.id || user.user_id,
       actionType: 'DEPOSIT_REFUND_DISPUTED',
@@ -441,55 +418,52 @@ class LeaseRefundService {
       details: { notes },
     });
 
-    // [FLOW 8 FIX] Notify Owner and Treasurers
-    const property = await pool
-      .query(
+    // 5. [SIDE EFFECT] Notify Staff (Owner & Treasurers) of the dispute
+    try {
+      const propertyResult = await pool.query(
         'SELECT owner_id FROM properties WHERE property_id = (SELECT unit_id FROM leases WHERE lease_id = ?)',
         [leaseId]
-      )
-      .then(([rows]) => rows[0]);
+      );
+      const ownerId = propertyResult?.[0]?.[0]?.owner_id;
+      if (ownerId)
+        await notificationModel.create({
+          userId: ownerId,
+          message: `Refund Dispute for Lease #${leaseId}. Notes: ${notes}`,
+          type: 'lease',
+          severity: 'warning',
+          entityType: 'lease',
+          entityId: leaseId,
+        });
 
-    if (property?.owner_id) {
-      await notificationModel.create({
-        userId: property.owner_id,
-        message: `Tenant has disputed the refund offer for Lease #${leaseId}. Notes: ${notes}`,
-        type: 'lease',
-        severity: 'warning',
-        entityType: 'lease',
-        entityId: leaseId,
-      });
-    }
-
-    const treasurers = await userModel.findByRole(ROLES.TREASURER);
-    for (const t of treasurers) {
-      await notificationModel.create({
-        userId: t.id || t.user_id,
-        message: `Tenant has disputed the refund offer for Lease #${leaseId}. Review required.`,
-        type: 'lease',
-        severity: 'warning',
-        entityType: 'lease',
-        entityId: leaseId,
-      });
+      const treasurers = await userModel.findByRole(ROLES.TREASURER);
+      for (const t of treasurers) {
+        await notificationModel.create({
+          userId: t.id || t.user_id,
+          message: `Refund dispute filed for Lease #${leaseId}.`,
+          type: 'lease',
+          severity: 'warning',
+          entityType: 'lease',
+          entityId: leaseId,
+        });
+      }
+    } catch (err) {
+      console.warn('Dispute notification failed:', err);
     }
 
     return { status: 'disputed' };
   }
 
+  // ACKNOWLEDGE REFUND: Tenant agrees to the proposed settlement.
   async acknowledgeRefund(leaseId, tenantId) {
+    // 1. Fetch lease and validate ownership
     const lease = await leaseModel.findById(leaseId);
     if (!lease) throw new AppError('Lease not found', 404);
-
-    // Authorization: Only the tenant of this lease can acknowledge
-    if (String(lease.tenantId) !== String(tenantId)) {
-      throw new AppError(
-        'Access denied: You are not the tenant of this lease.',
-        403
-      );
-    }
+    if (String(lease.tenantId) !== String(tenantId))
+      throw new AppError('Access denied: Ownership required.', 403);
 
     if (lease.depositStatus !== 'awaiting_acknowledgment') {
       throw new AppError(
-        'No refund settlement is currently awaiting your acknowledgment.',
+        'No settlement is currently awaiting acknowledgment.',
         400
       );
     }
@@ -498,6 +472,7 @@ class LeaseRefundService {
     try {
       await connection.beginTransaction();
 
+      // 2. Perform atomic status transition
       const currentBalance = await leaseModel.getDepositBalance(
         leaseId,
         connection
@@ -509,12 +484,11 @@ class LeaseRefundService {
 
       await leaseModel.update(
         leaseId,
-        {
-          depositStatus: finalStatus,
-        },
+        { depositStatus: finalStatus },
         connection
       );
 
+      // 3. [AUDIT] Log the tenant's acceptance
       await auditLogger.log(
         {
           userId: tenantId,
@@ -537,34 +511,32 @@ class LeaseRefundService {
     }
   }
 
+  // RESOLVE REFUND DISPUTE: Staff revises the settlement offer after a dispute.
   async resolveRefundDispute(leaseId, user, adjustedAmount) {
-    if (adjustedAmount === undefined || adjustedAmount < 0) {
-      throw new AppError('Valid adjustedAmount is required', 400);
-    }
-    if (!isAtLeast(user.role, ROLES.TREASURER)) {
-      throw new AppError('Access denied', 403);
-    }
+    // 1. [SECURITY] Role and validation check
+    if (adjustedAmount === undefined || adjustedAmount < 0)
+      throw new AppError('Valid adjustedAmount required', 400);
+    if (!isAtLeast(user.role, ROLES.TREASURER))
+      throw new AppError('Access denied: Staff only.', 403);
 
+    // 2. Fetch lease and ensure it's in disputed state
     const lease = await leaseModel.findById(leaseId);
     if (!lease) throw new AppError('Lease not found', 404);
-
-    if (lease.depositStatus !== 'disputed') {
+    if (lease.depositStatus !== 'disputed')
       throw new AppError('Only disputed refunds can be resolved.', 400);
-    }
 
+    // 3. [SECURITY] Ledger guard: revised amount cannot exceed total held
     const ledgerBalance = await leaseModel.getDepositBalance(leaseId);
-    if (adjustedAmount > ledgerBalance) {
-      throw new AppError(
-        `Adjusted refund amount (LKR ${fromCents(adjustedAmount).toLocaleString()}) cannot exceed verified ledger balance (LKR ${fromCents(ledgerBalance).toLocaleString()}).`,
-        400
-      );
-    }
+    if (adjustedAmount > ledgerBalance)
+      throw new AppError(`Adjusted refund exceeds ledger balance.`, 400);
 
+    // 4. Revert to 'awaiting_acknowledgment' with the new amount
     await leaseModel.update(leaseId, {
       depositStatus: 'awaiting_acknowledgment',
       proposedRefundAmount: adjustedAmount,
     });
 
+    // 5. [AUDIT] Log the resolution
     await auditLogger.log({
       userId: user.id || user.user_id,
       actionType: 'DEPOSIT_REFUND_RESOLVED',
@@ -576,27 +548,27 @@ class LeaseRefundService {
       },
     });
 
-    // [FLOW 8 FIX] Notify Tenant of revised offer
+    // 6. [SIDE EFFECT] Notify Tenant of revised offer (Notification + Email)
     await notificationModel.create({
       userId: lease.tenantId,
-      message: `A revised security deposit refund offer has been made for your lease. New proposed amount: LKR ${fromCents(adjustedAmount).toLocaleString()}.`,
+      message: `A revised refund offer has been made: LKR ${fromCents(adjustedAmount).toLocaleString()}.`,
       type: 'lease',
       severity: 'info',
       entityType: 'lease',
       entityId: leaseId,
     });
 
-    const tenant = await userModel.findById(lease.tenantId);
-    if (tenant?.email) {
-      try {
-        const emailService = (await import('../utils/emailService.js')).default;
-        await emailService.sendGenericNotification(tenant.email, {
+    try {
+      const tenant = await userModel.findById(lease.tenantId);
+      if (tenant?.email) {
+        const mailer = (await import('../utils/emailService.js')).default;
+        await mailer.sendGenericNotification(tenant.email, {
           subject: 'Revised Refund Offer',
-          message: `Your landlord has updated the security deposit refund offer for your lease. Please log in to acknowledge the new amount: LKR ${fromCents(adjustedAmount).toLocaleString()}.`,
+          message: `Staff has updated the refund offer for your lease. New amount: LKR ${fromCents(adjustedAmount).toLocaleString()}.`,
         });
-      } catch (err) {
-        console.error('Failed to send refund resolution email:', err);
       }
+    } catch (err) {
+      console.error('Refund resolution email failed:', err);
     }
 
     return {
@@ -605,21 +577,22 @@ class LeaseRefundService {
     };
   }
 
+  // UPDATE DISBURSEMENT REFERENCE: Corrections tool for bank reference numbers.
   async updateDisbursementReference(leaseId, newReference, user) {
-    if (!isAtLeast(user.role, ROLES.TREASURER)) {
+    // 1. [SECURITY] RBAC check
+    if (!isAtLeast(user.role, ROLES.TREASURER))
       throw new AppError('Access denied', 403);
-    }
 
+    // 2. Fetch lease and ensure finalized status
     const lease = await leaseModel.findById(leaseId);
     if (!lease) throw new AppError('Lease not found', 404);
-
-    if (lease.depositStatus !== 'refunded') {
+    if (lease.depositStatus !== 'refunded')
       throw new AppError(
-        'Disbursement reference can only be updated for finalized (refunded) settlements.',
+        'Reference can only be updated for finalized settlements.',
         400
       );
-    }
 
+    // 3. Update record and log audit trail
     const oldReference = lease.bankReferenceId;
     await leaseModel.update(leaseId, { bankReferenceId: newReference });
 
@@ -634,28 +607,13 @@ class LeaseRefundService {
     return { success: true, newReference };
   }
 
+  // REFUND DEPOSIT: Backward-compatible shortcut for initiating requests.
   async refundDeposit(leaseId, amount, user) {
-    // This now acts as a shortcut for owners or a request for treasurers
-    if (isAtLeast(user.role, ROLES.OWNER)) {
-      // Owners can directly approve if they want, but usually they'll use approveRefund.
-      // For backward compatibility or direct action, we'll make them request then immediately approve?
-      // Or just call the request then they can approve later.
-      // Re-evaluating: The controller will handle the branching.
-      // LeaseService.refundDeposit is now essentially requestRefund.
-      return await this.facade.requestRefund(
-        leaseId,
-        amount,
-        'Direct refund request',
-        user
-      );
-    } else {
-      return await this.facade.requestRefund(
-        leaseId,
-        amount,
-        'Refund request by treasurer',
-        user
-      );
-    }
+    // Branching logic based on role (Owners/Managers vs Treasurers)
+    const notes = isAtLeast(user.role, ROLES.OWNER)
+      ? 'Direct refund request'
+      : 'Refund request by treasurer';
+    return await this.facade.requestRefund(leaseId, amount, notes, user);
   }
 }
 

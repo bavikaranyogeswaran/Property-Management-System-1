@@ -13,33 +13,25 @@ class LeadPortalService {
    * Retrieves comprehensive portal data for a given token.
    * Orchestrates multi-model loads and enforces PII protection.
    */
+  // GET PORTAL CONTEXT: Detailed hydration engine for the public-facing Lead Portal (No login required).
+  // Orchestrates multi-model loads while enforcing strict PII protection and status-based access.
   async getPortalContext(token) {
-    if (!token) {
-      throw new AppError('Access token is required', 400);
-    }
+    if (!token) throw new AppError('Token required', 400);
 
+    // 1. [SECURITY] Token Validation: Verify the opaque access link exists and is not expired
     const tokenRecord = await leadTokenModel.findByToken(token);
-    if (!tokenRecord) {
-      throw new AppError(
-        'Invalid or expired access link. Please contact the property owner for a new link.',
-        401
-      );
-    }
+    if (!tokenRecord)
+      throw new AppError('Invalid or expired access link.', 401);
 
+    // 2. [SECURITY] Lead Identity Resolving: Fetch the associated inquiry record
     const lead = await leadModel.findById(tokenRecord.leadId);
-    if (!lead) {
-      throw new AppError('Lead not found', 404);
-    }
+    if (!lead) throw new AppError('Lead not found', 404);
 
-    // [SECURITY] Block access for 'dropped' inquiries
-    if (lead.status === 'dropped') {
-      throw new AppError(
-        'This inquiry has been closed. Please contact the property owner for more information.',
-        403
-      );
-    }
+    // 3. [SECURITY] Status Guard: Block access if the lead has been 'dropped' (Closed inquiry)
+    if (lead.status === 'dropped')
+      throw new AppError('This inquiry is closed.', 403);
 
-    // Fetch property and unit details
+    // 4. Resolve Structural Context: Fetch building and unit details (Sanitized for public browse)
     const [property, unit] = await Promise.all([
       lead.propertyId
         ? propertyModel.findById(lead.propertyId)
@@ -49,136 +41,107 @@ class LeadPortalService {
         : Promise.resolve(null),
     ]);
 
-    // Fetch associated draft lease if it exists
+    // 5. [SECURITY] Lease Discovery: Safely check for an associated 'draft' lease for this email
     let activeLease = null;
     if (lead.email) {
       const [leases] = await db.query(
         "SELECT * FROM leases WHERE tenant_id = (SELECT user_id FROM users WHERE email = ? LIMIT 1) AND status = 'draft' ORDER BY created_at DESC LIMIT 1",
         [lead.email]
       );
-
       if (leases.length > 0) {
         const rawLease = leaseModel.mapRows(leases)[0];
         const depositStats = await leaseModel.getDepositStatus(rawLease.id);
-
-        // [SECURITY] PII Sanitization
+        // [PII] Sanitize lease DTO for the lead's view (Hide other tenants/private notes)
         activeLease = {
           id: rawLease.id,
           startDate: rawLease.startDate,
           endDate: rawLease.endDate,
           monthlyRent: rawLease.monthlyRent,
           status: rawLease.status,
-          currentDepositBalance: rawLease.currentDepositBalance,
-          depositStatus: rawLease.depositStatus,
-          targetDeposit: rawLease.targetDeposit,
-          documentUrl: rawLease.documentUrl,
-          depositStats: depositStats,
+          depositStats,
         };
       }
     }
 
-    // Fetch lease terms for the owner
-    let leaseTerms = [];
-    if (property && property.owner_id) {
-      leaseTerms = await leaseTermModel.findAllByOwner(property.owner_id);
-    }
-
-    // Construct Portal DTO (Sanitized)
+    // 6. Construct Final Sanitized Context DTO
     return {
       lead: {
         id: lead.id,
         name: lead.name,
         email: lead.email,
-        phone: lead.phone,
         status: lead.status,
-        propertyId: lead.propertyId,
         interestedUnit: lead.interestedUnit,
-        createdAt: lead.createdAt,
         moveInDate: lead.moveInDate,
-        preferredTermMonths: lead.preferredTermMonths,
       },
-      property: property
-        ? {
-            name: property.name,
-            street: property.street,
-            city: property.city,
-            district: property.district,
-          }
-        : null,
+      property: property ? { name: property.name, city: property.city } : null,
       unit: unit
         ? {
             unitNumber: unit.unitNumber,
             type: unit.type,
             monthlyRent: unit.monthlyRent,
             status: unit.status,
-            isAvailable: unit.status === 'available',
           }
         : null,
       activeLease,
-      leaseTerms,
+      leaseTerms: property?.owner_id
+        ? await leaseTermModel.findAllByOwner(property.owner_id)
+        : [],
     };
   }
 
+  // GET MESSAGES: Retrieves the communication thread between the lead and the property staff.
   async getMessages(token) {
-    if (!token) throw new AppError('Access token is required', 400);
+    if (!token) throw new AppError('Token required', 400);
 
+    // 1. [SECURITY] Authenticate via token
     const tokenRecord = await leadTokenModel.findByToken(token);
-    if (!tokenRecord) throw new AppError('Invalid or expired access link', 401);
+    if (!tokenRecord) throw new AppError('Unauthorized', 401);
 
     return await messageModel.findByLeadId(tokenRecord.leadId);
   }
 
+  // SEND MESSAGE: Dispatches an inquiry update or question from the lead to the owner dashboard.
   async sendMessage(token, content) {
-    if (!token) throw new AppError('Access token is required', 400);
-    if (!content || !content.trim())
-      throw new AppError('Message content is required', 400);
+    if (!token) throw new AppError('Token required', 400);
+    if (!content?.trim()) throw new AppError('Content required', 400);
 
+    // 1. [SECURITY] Resolve identity via token
     const tokenRecord = await leadTokenModel.findByToken(token);
-    if (!tokenRecord) throw new AppError('Invalid or expired access link', 401);
-
+    if (!tokenRecord) throw new AppError('Unauthorized', 401);
     const lead = await leadModel.findById(tokenRecord.leadId);
-    if (!lead) throw new AppError('Lead not found', 404);
+    if (!lead || lead.status === 'dropped')
+      throw new AppError('Inquiry closed', 403);
 
-    if (lead.status === 'dropped') {
-      throw new AppError(
-        'This inquiry has been closed. You cannot send messages.',
-        403
-      );
-    }
-
+    // 2. Persist message record (SenderType 'lead' signals it's from the portal)
     const messageId = await messageModel.create({
       leadId: tokenRecord.leadId,
-      senderId: null,
       content: content.trim(),
       senderType: 'lead',
       senderLeadId: lead.id,
     });
 
-    await leadModel.update(tokenRecord.leadId, {
-      lastContactedAt: new Date(),
-    });
+    // 3. [SIDE EFFECT] Engagement Tracking: Update last contacted timestamp to bump proximity score
+    await leadModel.update(tokenRecord.leadId, { lastContactedAt: new Date() });
 
     return {
       id: messageId,
-      leadId: tokenRecord.leadId,
-      senderLeadId: lead.id,
-      senderType: 'lead',
       content: content.trim(),
       createdAt: new Date(),
-      isRead: false,
       senderName: lead.name,
-      senderRole: 'lead',
     };
   }
 
+  // UPDATE PREFERENCES: Updates the lead's moving constraints (Move-in date/Term).
   async updatePreferences(token, preferences) {
-    if (!token) throw new AppError('Access token is required', 400);
+    if (!token) throw new AppError('Token required', 400);
 
+    // 1. [SECURITY] Authenticate
     const tokenRecord = await leadTokenModel.findByToken(token);
-    if (!tokenRecord) throw new AppError('Invalid or expired access link', 401);
+    if (!tokenRecord) throw new AppError('Unauthorized', 401);
 
     const { moveInDate, preferredTermMonths, leaseTermId } = preferences;
 
+    // 2. Persist updated constraints
     await leadModel.update(tokenRecord.leadId, {
       move_in_date: moveInDate,
       preferred_term_months: preferredTermMonths,

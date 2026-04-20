@@ -25,48 +25,43 @@ class PayHereService {
    * @param {string|null} magicToken
    * @returns {Promise<Object>}
    */
+  // PREPARE CHECKOUT: Generates the cryptographically signed payload for the PayHere gateway.
   async prepareCheckout(invoiceId, magicToken = null) {
-    let invoice;
-    if (magicToken) {
-      invoice = await invoiceModel.findByMagicToken(magicToken);
-    } else {
-      invoice = await invoiceModel.findById(invoiceId);
-    }
+    // 1. [SECURITY] Identify Invoice and confirm eligibility (Unpaid & No pending manual verify)
+    let invoice = magicToken
+      ? await invoiceModel.findByMagicToken(magicToken)
+      : await invoiceModel.findById(invoiceId);
     if (!invoice) throw new Error('Invoice not found');
     if (invoice.status === 'paid') throw new Error('Invoice is already paid');
 
-    // [SCENARIO C FIX] Check for existing manual/pending payments to prevent duplicates
     const existingPayments = await paymentModel.findByInvoiceId(
       invoice.id || invoice.invoice_id
     );
-    if (existingPayments.some((p) => p.status === 'pending')) {
-      throw new Error(
-        'A payment for this invoice is already awaiting verification. Please wait for staff approval or contact support.'
-      );
-    }
+    if (existingPayments.some((p) => p.status === 'pending'))
+      throw new Error('Payment already awaiting verification.');
 
+    // 2. Fetch Tenant Identity for PII requirements (First/Last name, Email)
     const tenant = await userModel.findById(
       invoice.tenantId || invoice.tenant_id
     );
     if (!tenant) throw new Error('Tenant record not found');
 
+    // 3. Generate unique Order Reference and sign with Merchant Secret
     const orderId = `INV-${invoice.id || invoice.invoice_id}-${Date.now()}`;
-    // [FIXED] Database stores Decimal (Major units). PayHere Sandbox/Production also expects Major units.
     const amount = fromCents(invoice.amount);
-    const currency = 'LKR';
+    const hash = generateCheckoutHash(orderId, amount, 'LKR');
 
-    const hash = generateCheckoutHash(orderId, amount, currency);
-
-    // Save the orderId to the invoice so the success page can find it later
+    // 4. [AUDIT] Track original Order ID against Invoice for callback mapping
     await invoiceModel.updateLastOrderId(
       invoice.id || invoice.invoice_id,
       orderId
     );
 
+    // 5. Build structured payload for the frontend POST-to-gateway
     return {
       sandbox:
         process.env.NODE_ENV !== 'production' ||
-        process.env.PAYHERE_SANDBOX === 'true', // Use environment logic
+        process.env.PAYHERE_SANDBOX === 'true',
       merchant_id: MERCHANT_ID,
       return_url: `${RETURN_URL}?token=${magicToken}`,
       cancel_url: CANCEL_URL,
@@ -74,13 +69,13 @@ class PayHereService {
       order_id: orderId,
       items: invoice.description || `Payment for Invoice #${invoiceId}`,
       amount: amount.toFixed(2),
-      currency: currency,
-      hash: hash,
+      currency: 'LKR',
+      hash,
       first_name: tenant.firstName || tenant.first_name || 'Tenant',
       last_name: tenant.lastName || tenant.last_name || `#${tenant.id}`,
       email: tenant.email,
       phone: tenant.phone || '',
-      address: 'Colombo, Sri Lanka', // Placeholder as required by PayHere
+      address: 'Colombo, Sri Lanka',
       city: 'Colombo',
       country: 'Sri Lanka',
       custom_1: magicToken,
@@ -91,63 +86,36 @@ class PayHereService {
    * Processes the notification sent by PayHere.
    * @param {Object} payload
    */
+  // PROCESS NOTIFICATION: Webhook receiver for the async "Payment Done" event.
   async processNotification(payload, skipHash = false) {
-    console.log('[PayHereService] Received Notification:', payload);
-
-    // 1. Validate Hash (unless skipped by internal authorized simulation)
-    if (!skipHash) {
-      const isValid = validateNotificationHash(payload);
-      if (!isValid) {
-        console.error('[PayHereService] Invalid Hash Signature Received');
-        throw new Error('Invalid signature');
-      }
-    }
+    // 1. [SECURITY] Cryptographic Signature Check: Ensure message originates from PayHere
+    if (!skipHash && !validateNotificationHash(payload))
+      throw new Error('Invalid signature');
 
     const { order_id, status_code, payhere_amount, payment_id } = payload;
 
-    // Extract invoice ID (Format: INV-ID-TIMESTAMP)
+    // 2. Map Order Reference back to DB Invoice record
     const parts = order_id.split('-');
-    let invoiceId;
+    const invoiceId = parts.length >= 2 ? Number(parts[1]) : Number(order_id);
+    if (isNaN(invoiceId)) throw new Error(`Invalid Order ID: ${order_id}`);
 
-    if (parts.length >= 2) {
-      invoiceId = Number(parts[1]);
-    } else {
-      invoiceId = Number(order_id);
-    }
-
-    if (isNaN(invoiceId)) {
-      console.error(
-        `[PayHereService] Failed to extract valid Invoice ID from Order ID: ${order_id}`
-      );
-      throw new Error(`Invalid Order ID format: ${order_id}`);
-    }
-
-    // 2. Handle Status Code
-    // 2 = Success, 0 = Pending, -1 = Cancelled, -2 = Failed, -3 = Chargedback
+    // 2 = Success Code
     if (status_code === '2') {
-      // 2. Load Invoice and verify amount
+      // 3. [FINANCIAL] Amount Guard: Verify that recieved amount matches expected invoice amount
       const invoice = await invoiceModel.findById(invoiceId);
       if (!invoice) throw new Error('Invoice not found');
 
-      const expectedCents = Number(invoice.amount);
-      const receivedCents = toCents(payhere_amount);
+      if (Math.abs(Number(invoice.amount) - toCents(payhere_amount)) > 100)
+        throw new Error('Amount mismatch.');
 
-      // Variance check (allows 1.00 LKR difference)
-      if (Math.abs(expectedCents - receivedCents) > 100) {
-        console.error(
-          `[PayHereService] Amount mismatch for Invoice #${invoiceId}. Expected: ${expectedCents}, Received: ${receivedCents}`
-        );
-        throw new Error('Payment amount mismatch');
-      }
-
-      // 3. Record the payment (Hardened with Atomic Idempotency and Locking)
+      // 4. Record Automated Receipt: Hand over to PaymentService for DB finalization and receipt generation
       const { paymentId, setupToken } =
         await paymentService.recordAutomatedPayment({
-          invoiceId: invoiceId,
-          amount: receivedCents,
+          invoiceId,
+          amount: toCents(payhere_amount),
           paymentMethod: 'payhere',
           referenceNumber: payment_id,
-          guaranteeFullSettlement: false, // Allows the minor 1-cent variance enforced above
+          guaranteeFullSettlement: false,
         });
 
       return {
@@ -156,12 +124,9 @@ class PayHereService {
         paymentId,
         setupToken,
       };
-    } else {
-      console.warn(
-        `[PayHereService] Payment status for Invoice #${invoiceId} is ${status_code}`
-      );
-      return { success: false, message: `Payment status: ${status_code}` };
     }
+
+    return { success: false, message: `Status: ${status_code}` };
   }
 }
 

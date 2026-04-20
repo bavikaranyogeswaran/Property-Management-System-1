@@ -31,7 +31,7 @@ import leaseService from './leaseService.js';
 import leaseModel from '../models/leaseModel.js';
 
 class LeadService {
-  // REGISTER INTEREST: The "Landing Page" logic. Saves a guest's inquiry and sends a welcome email.
+  // REGISTER INTEREST: The "Landing Page" entry point. Captures public inquiries and initializes CRM tracking.
   async registerInterest(data) {
     const {
       name,
@@ -47,63 +47,43 @@ class LeadService {
       leaseTermId,
     } = data;
 
-    if (!name || !email || !propertyId) {
+    // 1. [VALIDATION] Mandatory field and format checks
+    if (!name || !email || !propertyId)
       throw new Error('Name, email, and property are required');
-    }
-
     const emailValidation = validateEmail(email);
     if (!emailValidation.isValid) throw new Error(emailValidation.error);
 
-    if (phone) {
-      const phoneValidation = validatePhoneNumber(phone);
-      if (!phoneValidation.isValid) throw new Error(phoneValidation.error);
-    }
-
-    // [E-Past Validation] Prevent move-in dates in the past
+    // 2. [VALIDATION] Prevent bookings/leads in the past
     if (moveInDate) {
       const startDate = parseLocalDate(moveInDate);
-      if (isBefore(startDate, getLocalTime()) && !isToday(startDate)) {
+      if (isBefore(startDate, getLocalTime()) && !isToday(startDate))
         throw new Error('Preferred move-in date cannot be in the past');
-      }
     }
 
+    // 3. Unit Resolution: Handle specific unit vs property-wide inquiries
     let finalUnitId = unitId || interestedUnit;
-
     if (finalUnitId && finalUnitId !== '' && finalUnitId !== 'null') {
       const unitCheck = await unitModel.findById(finalUnitId);
       if (!unitCheck) throw new Error('Invalid unit selected');
-
-      if (String(unitCheck.propertyId) !== String(propertyId)) {
-        throw new Error(
-          'Selected unit does not belong to the specified property'
-        );
-      }
+      if (String(unitCheck.propertyId) !== String(propertyId))
+        throw new Error('Unit mismatch for property.');
     } else {
       finalUnitId = null;
-      const occupiedCount = await unitModel.countOccupied(propertyId);
-      if (occupiedCount > 0) {
+      if ((await unitModel.countOccupied(propertyId)) > 0)
         throw new Error(
-          'Cannot express interest in the whole property because some units are currently occupied. Please select a specific unit.'
+          'Cannot inquire property-wide while units are occupied.'
         );
-      }
     }
 
-    // Check if email belongs to a staff/owner — reject if so
+    // 4. [SECURITY] Role Guard: prevent staff from registering as leads
     const existingUser = await userModel.findByEmail(email);
-    if (existingUser) {
-      const allowedRoles = [ROLES.TENANT];
-      if (!allowedRoles.includes(existingUser.role)) {
-        throw new Error(
-          'This email is already associated with a staff/owner account. Please use a different email or log in.'
-        );
-      }
-    }
+    if (existingUser && existingUser.role !== ROLES.TENANT)
+      throw new Error('Email associated with staff account.');
 
-    // --- OVERLAP & PREFERENCE Logic ---
+    // 5. Overlap Logic: Soft-check for physical availability for requested period
     if (finalUnitId && moveInDate && preferredTermMonths) {
       const startDate = parseLocalDate(moveInDate);
       const endDate = addMonths(startDate, parseInt(preferredTermMonths, 10));
-
       const hasOverlap = await (
         await import('../models/leaseModel.js')
       ).default.checkOverlap(
@@ -111,65 +91,54 @@ class LeadService {
         formatToLocalDate(startDate),
         formatToLocalDate(endDate)
       );
-
-      if (hasOverlap) {
-        throw new Error(
-          'This unit is already booked/occupied for part of your requested period. Please try a different start date or unit.'
-        );
-      }
+      if (hasOverlap) throw new Error('Unit unavailable for requested period.');
     }
 
+    // 6. Lead Scoring: Rank prospect based on quality metrics
     const score = this.calculateLeadScore({
       preferredTermMonths,
       moveInDate,
       phone,
     });
 
+    // 7. Upsert Logic: Identify re-inquiries or create new Lead entry
     const existingLeadId = await leadModel.findIdByEmailAndProperty(
       email,
       propertyId
     );
-
     let leadId;
-    let message;
     let isNew = false;
 
     if (existingLeadId) {
       leadId = existingLeadId;
-
-      // [C1 FIX] Log unit interest change before overwriting
+      // [AUDIT] Log if prospect changed their unit of interest
       if (finalUnitId) {
         const existingLead = await leadModel.findById(leadId);
         if (
-          existingLead &&
-          existingLead.interestedUnit &&
+          existingLead?.interestedUnit &&
           String(existingLead.interestedUnit) !== String(finalUnitId)
         ) {
           await leadStageHistoryModel.create(
             leadId,
             existingLead.status,
-            existingLead.status, // status stays the same
-            `Unit interest changed from Unit #${existingLead.interestedUnit} to Unit #${finalUnitId}`
+            existingLead.status,
+            `Unit interest changed from #${existingLead.interestedUnit} to #${finalUnitId}`
           );
         }
       }
-
       await leadModel.update(leadId, {
         lastContactedAt: getLocalTime(),
         notes: notes ? `${notes} (Re-inquiry)` : undefined,
         interestedUnit: finalUnitId,
-        unitId: finalUnitId,
-        name: name,
-        phone: phone,
+        name,
+        phone,
         move_in_date: moveInDate,
         occupants_count: occupantsCount,
         preferred_term_months: preferredTermMonths,
         lease_term_id: leaseTermId,
-        score: score,
+        score,
       });
-      message = 'Interest updated. We will contact you soon.';
     } else {
-      // No user row is created — leads are guests, not system users
       leadId = await leadModel.create({
         propertyId,
         unitId: finalUnitId,
@@ -183,42 +152,39 @@ class LeadService {
         preferred_term_months: preferredTermMonths,
         lease_term_id: leaseTermId,
         status: 'interested',
-        score: score,
+        score,
       });
-      message = 'Interest registered! We will contact you soon.';
       isNew = true;
     }
 
-    // Generate portal access token (ALWAYS rotate on re-inquiry)
+    // 8. [SIDE EFFECT] Portal Access: Rotate token and send welcome email
     await leadTokenModel.invalidateForLead(leadId);
     const portalToken = await leadTokenModel.create(leadId);
-
-    // Email Notification with portal link
     try {
       const property = await propertyModel.findById(propertyId);
-      const propertyName = property ? property.name : 'our property';
       await emailService.sendWelcomeLead(
         email,
         name,
-        propertyName,
+        property?.name || 'our property',
         portalToken
       );
-    } catch (emailErr) {
-      console.error('Failed to send confirmation email', emailErr);
+    } catch (e) {
+      console.error('Lead welcome email failed:', e);
     }
 
-    return { id: leadId, message, isNew };
+    return {
+      id: leadId,
+      message: isNew ? 'Interest registered!' : 'Interest updated.',
+      isNew,
+    };
   }
 
+  // FETCH LEADS: Retrieves prospects filtered by staff assignment.
   async getLeads(user) {
-    if (user.role === ROLES.SYSTEM) {
-      return await leadModel.findAll(null);
-    }
-    if (user.role === ROLES.OWNER) {
-      return await leadModel.findAll(user.id);
-    } else if (user.role === ROLES.TREASURER) {
+    if (user.role === ROLES.SYSTEM) return await leadModel.findAll(null);
+    if (user.role === ROLES.OWNER) return await leadModel.findAll(user.id);
+    if (user.role === ROLES.TREASURER)
       return await leadModel.findByTreasurerId(user.id);
-    }
     throw new Error('Access denied.');
   }
 
@@ -226,53 +192,39 @@ class LeadService {
     return await leadModel.findByEmail(email);
   }
 
-  // UPDATE LEAD: Staff step. Updates status (Interested -> Viewed -> Converted) or changes notes.
+  // UPDATE LEAD: Staff management of the prospect pipeline status.
   async updateLead(id, data, user) {
-    if (!isAtLeast(user.role, ROLES.OWNER)) {
-      throw new Error('Access denied.');
-    }
-
+    // 1. [SECURITY] RBAC and Ownership Check
+    if (!isAtLeast(user.role, ROLES.OWNER)) throw new Error('Access denied.');
     const isOwner = await leadModel.verifyOwnership(id, user.id);
-    if (!isOwner)
-      throw new Error(
-        'Access denied. This lead does not belong to your property.'
-      );
+    if (!isOwner) throw new Error('Lead mismatch for property owner.');
 
-    // Status validation
     if (data.status) {
       const currentLead = await leadModel.findById(id);
       if (!currentLead) throw new Error('Lead not found');
 
-      // 1. Prevent moving away from terminal states
+      // 2. [SECURITY] Terminal State Guard: once 'converted' or 'dropped', status is locked.
       if (
-        currentLead.status === 'converted' ||
-        currentLead.status === 'dropped'
+        ['converted', 'dropped'].includes(currentLead.status) &&
+        data.status !== currentLead.status
       ) {
-        if (data.status !== currentLead.status) {
-          throw new Error(
-            `Cannot change status of a ${currentLead.status} lead.`
-          );
-        }
+        throw new Error(`Cannot modify terminal status: ${currentLead.status}`);
       }
 
-      // 2. Prevent setting to 'converted' directly
-      if (data.status === 'converted' && currentLead.status !== 'converted') {
-        throw new Error(
-          "Leads must be converted via the 'Convert to Tenant' process."
-        );
-      }
+      // 3. [SECURITY] Entry Point Guard: conversion must happen through Formal Conversion tool
+      if (data.status === 'converted' && currentLead.status !== 'converted')
+        throw new Error('Conversion required.');
 
-      // 3. Validate enum
-      const validStatuses = ['interested', 'viewed', 'converted', 'dropped'];
-      if (!validStatuses.includes(data.status)) {
-        throw new Error('Invalid status value.');
-      }
+      if (
+        !['interested', 'viewed', 'converted', 'dropped'].includes(data.status)
+      )
+        throw new Error('Invalid status.');
     }
 
+    // 4. Commit updates
     const success = await leadModel.update(id, data);
-    if (!success) throw new Error('Lead update failed');
 
-    // Cancel pending visits and revoke tokens when lead is dropped
+    // 5. [SIDE EFFECT] Cleanup: Cancel visits and revoke portal tokens for dropped leads
     if (data.status === 'dropped') {
       await visitModel.cancelVisitsForLead(id);
       await leadTokenModel.invalidateForLead(id);
@@ -288,93 +240,73 @@ class LeadService {
     return await leadStageHistoryModel.findAll(user.id);
   }
 
-  // RESEND PORTAL LINK: Sends the access email again if the prospect lost it.
+  // RESEND PORTAL LINK: CRM tool to provide access links to prospects.
   async resendPortalLink(leadId, user) {
-    if (!isAtLeast(user.role, ROLES.TREASURER)) {
+    // 1. [SECURITY] Role check
+    if (!isAtLeast(user.role, ROLES.TREASURER))
       throw new Error('Access denied.');
-    }
 
+    // 2. Fetch lead and identify state
     const lead = await leadModel.findById(leadId);
     if (!lead) throw new Error('Lead not found');
 
-    // Verification of ownership
-    const isOwner = await leadModel.verifyOwnership(leadId, user.id);
-    // If treasurer, verify via property assignment (LeadModel.findByTreasurerId already does this)
-    // But here we need a check.
-    // For simplicity, LeadModel.verifyOwnership can be updated to include treasurer check or we do it here.
-
-    // [NEW] Handle converted leads by resending tenant-level access
+    // 3. [SIDE EFFECT] Special case: Converted Leads (re-deliver appropriate credentials/links)
     if (lead.status === 'converted') {
       const existingUser = await userModel.findByEmail(lead.email);
-
       if (existingUser) {
-        // 1. If there's an active draft lease with an unpaid deposit, resend the deposit link
-        const tenantLeases = await leaseModel.findByTenantId(existingUser.id);
-        const draftLease = tenantLeases.find((l) => l.status === 'draft');
-
+        // If they have an unpaid draft lease, resend the deposit payment link
+        const draftLease = (
+          await leaseModel.findByTenantId(existingUser.id)
+        ).find((l) => l.status === 'draft');
         if (draftLease) {
-          const depositStatus = await leaseModel.getDepositStatus(
-            draftLease.id
-          );
-          if (depositStatus && !depositStatus.isFullyPaid) {
-            // [FIXED] Use official LeaseService method to rotate and resend deposit magic link
+          const depStatus = await leaseModel.getDepositStatus(draftLease.id);
+          if (depStatus && !depStatus.isFullyPaid) {
             await leaseService.regenerateMagicLink(draftLease.id, user);
-            return {
-              success: true,
-              message: 'Deposit payment link resent successfully.',
-            };
+            return { success: true, message: 'Deposit payment link resent.' };
           }
         }
-
-        // 2. Otherwise, resend the account invitation (setup link)
+        // Otherwise, resend the general account setup link
         return await userService.resendInvitation(existingUser.id);
       }
     }
 
-    // Rotate token
+    // 4. Guest Phase: rotate portal token and resend Welcome email
     await leadTokenModel.invalidateForLead(leadId);
     const portalToken = await leadTokenModel.create(leadId);
-
-    const property = await propertyModel.findById(lead.propertyId);
-    const propertyName = property ? property.name : 'our property';
-
-    await emailService.sendWelcomeLead(
-      lead.email,
-      lead.name,
-      propertyName,
-      portalToken
-    );
+    try {
+      const property = await propertyModel.findById(lead.propertyId);
+      await emailService.sendWelcomeLead(
+        lead.email,
+        lead.name,
+        property?.name || 'our property',
+        portalToken
+      );
+    } catch (e) {
+      console.error('Token resend email failed:', e);
+    }
 
     return { success: true };
   }
 
-  // CALCULATE LEAD SCORE: Ranks prospects based on their move-in date and contact info (quality filter).
+  // CALCULATE LEAD SCORE: Quality ranking based on urgency and seriousness.
   calculateLeadScore(data) {
     const { preferredTermMonths, moveInDate, phone } = data;
     let score = 0;
 
-    // Term score (long term is better)
-    if (preferredTermMonths) {
-      score += parseInt(preferredTermMonths, 10) * 5;
-    }
+    // Favor long-term leases
+    if (preferredTermMonths) score += parseInt(preferredTermMonths, 10) * 5;
 
-    // Phone provided (serious lead)
-    if (phone) {
-      score += 10;
-    }
+    // Contactability bonus
+    if (phone) score += 10;
 
-    // Urgency score (moving in soon is better)
+    // Urgency bonus: higher score for leads looking to move in within 30 days
     if (moveInDate) {
-      const moveIn = parseLocalDate(moveInDate);
-      const today = getLocalTime();
-      const diffTime = Math.abs(moveIn - today);
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-      if (diffDays <= 30) {
-        score += 20;
-      } else if (diffDays <= 60) {
-        score += 10;
-      }
+      const diffDays = Math.ceil(
+        Math.abs(parseLocalDate(moveInDate) - getLocalTime()) /
+          (1000 * 60 * 60 * 24)
+      );
+      if (diffDays <= 30) score += 20;
+      else if (diffDays <= 60) score += 10;
     }
 
     return score;
@@ -382,21 +314,18 @@ class LeadService {
 
   // --- Follow-up Management ---
   async getFollowups(leadId, user) {
-    if (!isAtLeast(user.role, ROLES.TREASURER)) {
+    if (!isAtLeast(user.role, ROLES.TREASURER))
       throw new Error('Access denied.');
-    }
-    const isOwnerOrAuth = await leadModel.verifyOwnership(leadId, user.id);
-    if (!isOwnerOrAuth) throw new Error('Access denied to this lead.');
-
+    if (!(await leadModel.verifyOwnership(leadId, user.id)))
+      throw new Error('Access denied to lead.');
     return await leadFollowupModel.findByLeadId(leadId);
   }
 
   async createFollowup(leadId, data, user) {
-    if (!isAtLeast(user.role, ROLES.TREASURER)) {
+    if (!isAtLeast(user.role, ROLES.TREASURER))
       throw new Error('Access denied.');
-    }
-    const isOwnerOrAuth = await leadModel.verifyOwnership(leadId, user.id);
-    if (!isOwnerOrAuth) throw new Error('Access denied to this lead.');
+    if (!(await leadModel.verifyOwnership(leadId, user.id)))
+      throw new Error('Access denied to lead.');
 
     return await leadFollowupModel.create({
       leadId,
@@ -406,7 +335,8 @@ class LeadService {
   }
 
   async getUpcomingFollowups(user) {
-    if (!isAtLeast(user.role, ROLES.OWNER)) return []; // For now owner only for dashboard
+    // Restricted to Owners for primary CRM dashboard
+    if (!isAtLeast(user.role, ROLES.OWNER)) return [];
     return await leadFollowupModel.findUpcoming(user.id);
   }
 }

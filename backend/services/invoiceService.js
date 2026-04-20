@@ -29,57 +29,52 @@ import { runWithLock } from '../utils/distributionLock.js';
 import { isAtLeast, ROLES } from '../utils/roleUtils.js';
 
 class InvoiceService {
+  // FETCH INVOICES: Retrieves a list of bills filtered for the specific viewer (Staff/Tenant/Owner).
   async getInvoices(user) {
-    if (user.role === ROLES.TENANT) {
+    if (user.role === ROLES.TENANT)
       return await invoiceModel.findByTenantId(user.id);
-    } else if (user.role === ROLES.TREASURER) {
+    if (user.role === ROLES.TREASURER)
       return await invoiceModel.findByTreasurerId(user.id);
-    } else if (user.role === ROLES.OWNER) {
+    if (user.role === ROLES.OWNER)
       return await invoiceModel.findByOwnerId(user.id);
-    } else {
-      throw new Error('Access denied');
-    }
+    throw new Error('Access denied');
   }
 
-  // CREATE INVOICE: Manually generates a one-off bill (e.g., for repairs or late fees).
+  // CREATE INVOICE: Manually generates a one-off bill for a lease.
   async createInvoice(data, user) {
-    if (!isAtLeast(user.role, ROLES.TREASURER)) {
+    // 1. [SECURITY] RBAC and property assignment check
+    if (!isAtLeast(user.role, ROLES.TREASURER))
       throw new Error('Denied. Only Treasurers can create invoices.');
-    }
 
     const connection = await db.getConnection();
-
     try {
       await connection.beginTransaction();
 
-      // RBAC Check: Ensure treasurer is assigned to this property
       const lease = await leaseModel.findById(data.leaseId, connection);
       if (!lease) throw new Error('Lease not found');
 
       const assigned = await staffModel.getAssignedProperties(user.id);
-      const assignedPropertyIds = assigned.map((p) => p.id.toString());
-
-      if (!assignedPropertyIds.includes(lease.propertyId.toString())) {
+      if (
+        !assigned.some((p) => p.id.toString() === lease.propertyId.toString())
+      ) {
         throw new Error(
           'Access denied. You are not assigned to this property.'
         );
       }
 
+      // 2. Insert invoice record
       const invoiceId = await invoiceModel.create(data, connection);
 
-      // 2. Auto-apply credit if exists (Participates in existing transaction)
-      if (invoiceId) {
+      // 3. [FINANCIAL] Auto-settle: check if tenant has prepaid credit to apply to this new debt
+      if (invoiceId)
         await paymentService.applyTenantCredit(invoiceId, connection);
-      }
 
       await connection.commit();
 
-      // 3. Post-Commit Actions (Notifications)
-      // Re-fetch to ensure we have the most accurate state for the email (e.g. if it's now 'paid')
+      // 4. [SIDE EFFECT] Deliver notification to tenant (Non-blocking)
       const finalInvoice = await invoiceModel.findById(invoiceId);
       const tenant = await userModel.findById(lease.tenantId);
-
-      if (tenant && tenant.email) {
+      if (tenant?.email) {
         const dueDate = parseLocalDate(data.dueDate);
         try {
           await emailService.sendInvoiceNotification(tenant.email, {
@@ -91,126 +86,94 @@ class InvoiceService {
             description: data.description,
             isPaid: finalInvoice.status === 'paid',
           });
-        } catch (emailErr) {
-          console.error(
-            '[InvoiceService] Failed to send invoice notification email:',
-            emailErr
-          );
+        } catch (e) {
+          console.error('Invoice email failed:', e);
         }
       }
 
       return invoiceId;
     } catch (error) {
       await connection.rollback();
-      console.error(
-        '[InvoiceService] Create Invoice Transaction Failed:',
-        error
-      );
       throw error;
     } finally {
       connection.release();
     }
   }
 
-  // GENERATE MONTHLY INVOICES: The heavy-lifter. Calculates rent for all active tenants at the start of the month.
+  // GENERATE MONTHLY INVOICES: Bulk process at month-start to bill all active leases.
   async generateMonthlyInvoices(year, month, user) {
-    if (!isAtLeast(user.role, ROLES.TREASURER)) {
-      throw new Error('Access denied. Only Treasurers can generate invoices.');
-    }
+    // 1. [SECURITY] Role check
+    if (!isAtLeast(user.role, ROLES.TREASURER))
+      throw new Error('Access denied.');
 
     const nowTime = getLocalTime();
     const y = year || nowTime.getFullYear();
     const m = month || nowTime.getMonth() + 1;
 
-    // 1. CONCURRENCY LOCK: Prevent multiple simultaneous bulk generations
-    // [HARDENED] Migrated to Redis Distributed Lock to avoid SQL row-locking overhead
+    // 2. [CONCURRENCY] Acquire distributed lock to prevent dual generation runs
     const lockName = `generate_invoices_${y}_${m}`;
 
     const lockResult = await runWithLock(lockName, 900, async () => {
+      // 3. Filter leases based on Staff assignment
       const activeLeases = await leaseModel.findActive();
-
-      // RBAC: Treasurer assignments
       const assigned = await staffModel.getAssignedProperties(user.id);
-      const assignedPropertyIds = assigned.map((p) => p.property_id.toString());
+      const assignedIds = assigned.map((p) => p.property_id.toString());
       const targetLeases = activeLeases.filter((l) =>
-        assignedPropertyIds.includes(l.propertyId.toString())
+        assignedIds.includes(l.propertyId.toString())
       );
 
       let generatedCount = 0;
       let skippedCount = 0;
 
-      // [HARDENED] Chunked Processing: Process in batches of 20 to prevent request timeouts
+      // 4. Batch Processing: Avoid event loop starvation with small chunks
       const CHUNK_SIZE = 20;
       for (let i = 0; i < targetLeases.length; i += CHUNK_SIZE) {
         const chunk = targetLeases.slice(i, i + CHUNK_SIZE);
-
         await Promise.all(
           chunk.map(async (lease) => {
-            const leaseStart = parseLocalDate(lease.startDate);
-            leaseStart.setHours(0, 0, 0, 0);
-
-            const targetMonthStart = parseLocalDate(
-              `${y}-${String(m).padStart(2, '0')}-01`
-            );
-            targetMonthStart.setHours(0, 0, 0, 0);
-
-            if (leaseStart > targetMonthStart) {
-              skippedCount++;
-              return;
-            }
-
+            // Idempotency check: don't double bill
             const exists = await invoiceModel.exists(lease.id, y, m);
             if (exists) {
               skippedCount++;
               return;
             }
 
-            const billingInfo = billingEngine.calculateMonthlyRent(lease, y, m);
-            if (!billingInfo) {
+            // Calculate amount (handles pro-rata etc.) via BillingEngine
+            const billing = billingEngine.calculateMonthlyRent(lease, y, m);
+            if (!billing) {
               skippedCount++;
               return;
             }
 
             const invoiceId = await invoiceModel.create({
               leaseId: lease.id,
-              amount: billingInfo.amount,
-              dueDate: billingInfo.dueDate,
-              description: billingInfo.description,
+              amount: billing.amount,
+              dueDate: billing.dueDate,
+              description: billing.description,
             });
 
-            // [FIX] Guard: Only apply credit and send email if invoice was actually created (not a duplicate)
             if (invoiceId) {
-              // Auto-apply credit if exists
+              // [FINANCIAL] Auto-apply prepaid credits
               try {
                 await paymentService.applyTenantCredit(invoiceId);
-              } catch (err) {
-                console.error(
-                  `[InvoiceService] Failed to auto-apply credit to generated invoice ${invoiceId}:`,
-                  err
-                );
+              } catch (e) {
+                console.error('Credit application failed:', e);
               }
 
-              // Notify Tenant via Email
+              // [SIDE EFFECT] Deliver email to tenant
               try {
                 const tenant = await userModel.findById(lease.tenantId);
-                if (tenant && tenant.email) {
+                if (tenant?.email)
                   await emailService.sendInvoiceNotification(tenant.email, {
-                    amount: billingInfo.amount,
-                    dueDate: billingInfo.dueDate,
+                    amount: billing.amount,
+                    dueDate: billing.dueDate,
                     month: m,
                     year: y,
-                    invoiceId: invoiceId,
-                    entityType: 'invoice',
-                    entityId: invoiceId,
+                    invoiceId,
                   });
-                }
-              } catch (err) {
-                console.error(
-                  `Failed to send email for invoice ${invoiceId}:`,
-                  err
-                );
+              } catch (e) {
+                console.error('Invoice notification failed:', e);
               }
-
               generatedCount++;
             } else {
               skippedCount++;
@@ -218,38 +181,28 @@ class InvoiceService {
           })
         );
 
-        // Small delay between chunks to yield to event loop
-        if (i + CHUNK_SIZE < targetLeases.length) {
+        if (i + CHUNK_SIZE < targetLeases.length)
           await new Promise((resolve) => setTimeout(resolve, 100));
-        }
       }
 
-      // 3. LOG COMPLETION: Persistent state for backfill/audit
+      // 5. [AUDIT] Track job completion in cron_checkpoints
       await db.query(
-        `INSERT INTO cron_checkpoints (job_name, last_success_date, status, message) 
-         VALUES (?, ?, 'success', ?)
-         ON DUPLICATE KEY UPDATE status = 'success', updated_at = NOW(), message = ?, last_success_date = VALUES(last_success_date)`,
+        `INSERT INTO cron_checkpoints (job_name, last_success_date, status, message) VALUES (?, ?, 'success', ?) ON DUPLICATE KEY UPDATE status = 'success', updated_at = NOW(), message = VALUES(message)`,
         [
           lockName,
           `${y}-${String(m).padStart(2, '0')}-01`,
-          `Generated ${generatedCount} invoices manually`,
-          `Generated ${generatedCount} invoices manually`,
+          `Manually generated ${generatedCount} invoices.`,
         ]
       );
 
       return { generated: generatedCount, skipped: skippedCount };
     });
 
-    if (!lockResult.success) {
-      throw new Error(
-        'Invoice generation for this period is already in progress. Please wait.'
-      );
-    }
-
+    if (!lockResult.success) throw new Error('Generation already in progress.');
     return lockResult.result;
   }
 
-  // CORRECT INVOICE: Voids a wrong bill and issues a new one with the correct amount.
+  // CORRECT INVOICE: Correction tool for billing errors. Voids original and issues a new one.
   async correctInvoice(invoiceId, newAmount, reason, user) {
     if (!isAtLeast(user.role, ROLES.TREASURER))
       throw new Error('Only treasurers can correct invoices.');
@@ -263,10 +216,10 @@ class InvoiceService {
     try {
       await connection.beginTransaction();
 
-      // 1. Void the original
+      // 1. Transactionally void the erroneous invoice
       await invoiceModel.updateStatus(invoiceId, 'void', connection);
 
-      // 2. Create replacement
+      // 2. Issue replacement invoice
       const newInvoiceId = await invoiceModel.create(
         {
           leaseId: invoice.leaseId || invoice.lease_id,
@@ -278,8 +231,7 @@ class InvoiceService {
         connection
       );
 
-      // 3. Audit log
-
+      // 3. [AUDIT] Log the correction trail
       await auditLogger.log(
         {
           userId: user.id || user.user_id,
@@ -307,57 +259,50 @@ class InvoiceService {
     }
   }
 
+  // UPDATE STATUS: Manual lifecycle management for invoices (e.g., marking overdue).
   async updateStatus(id, status, user) {
-    if (!isAtLeast(user.role, ROLES.TREASURER)) {
-      throw new Error(
-        'Access denied. Only Treasurers can update invoice status.'
-      );
-    }
+    // 1. [SECURITY] Role and Property Assignment Check
+    if (!isAtLeast(user.role, ROLES.TREASURER))
+      throw new Error('Access denied.');
 
     const invoice = await invoiceModel.findById(id);
     if (!invoice) throw new Error('Invoice not found');
-
-    // RBAC Check: Ensure treasurer is assigned to this property
     const lease = await leaseModel.findById(invoice.leaseId);
-    if (!lease) throw new Error('Lease not found');
+    if (!lease) throw new Error('Lease context missing');
 
     const assigned = await staffModel.getAssignedProperties(user.id);
-    const assignedPropertyIds = assigned.map((p) => p.id.toString());
-    if (!assignedPropertyIds.includes(lease.propertyId.toString())) {
+    if (
+      !assigned.some((p) => p.id.toString() === lease.propertyId.toString())
+    ) {
       throw new Error('Access denied. You are not assigned to this property.');
     }
 
     const oldStatus = invoice.status;
 
+    // 2. [VALIDATION] Prevent marking as overdue if due date hasn't passed or payment is pending
     if (status === 'overdue') {
       const dueDate = parseLocalDate(invoice.due_date);
       const currentToday = now();
       currentToday.setHours(0, 0, 0, 0);
       dueDate.setHours(0, 0, 0, 0);
 
-      if (currentToday <= dueDate) {
-        throw new Error('Cannot mark invoice as overdue before the due date.');
-      }
+      if (currentToday <= dueDate)
+        throw new Error('Cannot mark overdue before due date.');
 
       const payments = await paymentModel.findByInvoiceId(id);
-      const pendingPayments = payments.filter((p) => p.status === 'pending');
-      if (pendingPayments.length > 0) {
-        throw new Error(
-          'Cannot mark as overdue. A payment is pending verification.'
-        );
-      }
+      if (payments.some((p) => p.status === 'pending'))
+        throw new Error('Payment pending verification.');
     }
 
+    // 3. Apply state change
     const updatedInvoice = await invoiceModel.updateStatus(id, status);
 
-    // Logic Fix: If it's a deposit invoice being paid, update the Lease's deposit_status.
+    // 4. [SIDE EFFECT] Update Lease deposit status if a security deposit was just paid
     if (status === 'paid' && invoice.invoice_type === 'deposit') {
-      await leaseModel.update(invoice.lease_id, {
-        depositStatus: 'paid',
-      });
+      await leaseModel.update(invoice.lease_id, { depositStatus: 'paid' });
     }
 
-    // Scoring Logic
+    // 5. [BEHAVIOR] Penalize tenant behavior score for overdue status
     if (status === 'overdue' && oldStatus !== 'overdue') {
       try {
         const scoreChange = -10;
@@ -365,8 +310,8 @@ class InvoiceService {
           tenantId: invoice.tenant_id,
           type: 'negative',
           category: 'Payment',
-          scoreChange: scoreChange,
-          description: `Invoice #${id} marked as overdue.`,
+          scoreChange,
+          description: `Invoice #${id} overdue.`,
           recordedBy: user.id,
         });
         await tenantModel.incrementBehaviorScore(
@@ -374,7 +319,7 @@ class InvoiceService {
           scoreChange
         );
       } catch (err) {
-        console.error('Failed to update behavior score:', err);
+        console.error('Behavior score update failed:', err);
       }
     }
 

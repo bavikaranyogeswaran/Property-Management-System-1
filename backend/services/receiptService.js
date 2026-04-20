@@ -18,19 +18,18 @@ class ReceiptService {
    * @param {Object} invoice
    * @param {Object} [connection]
    */
-  // GENERATE RECEIPT: Creates a permanent proof record for a successful payment.
+  // GENERATE RECEIPT: Creates a permanent physical-legal proof record for a successful payment.
   async generateReceipt(payment, invoice, connection = null) {
     const paymentId = payment.id || payment.payment_id;
     const invoiceId = invoice.id || invoice.invoice_id;
     const tenantId = invoice.tenantId || invoice.tenant_id;
     const amount = Number(payment.amount);
 
-    // Idempotency: Ensure receipt doesn't already exist for this payment
+    // 1. [FINANCIAL] Idempotency: Prevent double-issuing receipts for the same transaction
     const existing = await receiptModel.findByPaymentId(paymentId, connection);
-    if (existing) {
-      return existing;
-    }
+    if (existing) return existing;
 
+    // 2. Generate unique tracking number and persist record
     const receiptId = await receiptModel.create(
       {
         paymentId,
@@ -43,6 +42,7 @@ class ReceiptService {
       connection
     );
 
+    // 3. Resolve hydrated receipt for return
     return await receiptModel.findById(receiptId, connection);
   }
 }

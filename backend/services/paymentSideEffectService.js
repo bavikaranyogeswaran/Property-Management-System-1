@@ -16,6 +16,8 @@ class PaymentSideEffectService {
    * Orchestrates the execution of non-critical side effects.
    * Ensures that a failure in notifications or scoring does not roll back the financial transaction.
    */
+  // HANDLE VERIFIED PAYMENT EFFECTS: Orchestrates non-critical business logic after a payment is secured.
+  // Note: Wrapped in safe execution blocks to ensure high-priority financial transactions never roll back due to side-effect failures.
   async handleVerifiedPaymentEffects(
     paymentId,
     invoice,
@@ -23,7 +25,7 @@ class PaymentSideEffectService {
     user,
     connection
   ) {
-    // 1. Audit Logging (Critical for tracking, but we catch locally to prevent rollback)
+    // 1. [AUDIT] Track Verification: Log the identity and payload of the verified payment
     await this._safelyExecute('Audit Logging', async () => {
       await auditLogger.log(
         {
@@ -42,12 +44,12 @@ class PaymentSideEffectService {
       );
     });
 
-    // 2. Notifications (Tenant)
+    // 2. [SIDE EFFECT] Tenant Hub: Push real-time notification to the tenant dashboard
     await this._safelyExecute('Tenant Notification', async () => {
       await notificationModel.create(
         {
           userId: invoice.tenantId || invoice.tenant_id,
-          message: `Payment of ${fromCents(payment.amount).toFixed(2)} for Invoice #${payment.invoiceId} has been verified.`,
+          message: `Payment of ${fromCents(payment.amount).toFixed(2)} for Invoice #${payment.invoiceId} verified.`,
           type: 'payment',
           entityType: 'payment',
           entityId: paymentId,
@@ -56,7 +58,7 @@ class PaymentSideEffectService {
       );
     });
 
-    // 3. Behavior Scoring
+    // 3. [SIDE EFFECT] Behavior Scoring: Reward on-time payments with positive behavior points
     await this._safelyExecute('Behavior Scoring', async () => {
       const paymentDate = parseLocalDate(payment.paymentDate || today());
       const dueDate = parseLocalDate(invoice.dueDate);
@@ -74,14 +76,14 @@ class PaymentSideEffectService {
       }
     });
 
-    // 4. Overpayment Notifications
-    const incrementalOverpayment = payment.incrementalOverpayment || 0;
-    if (incrementalOverpayment > 0) {
+    // 4. [SIDE EFFECT] Credit Management: Notify tenant about account balance increases (Overpayments)
+    const incOverpayment = payment.incrementalOverpayment || 0;
+    if (incOverpayment > 0) {
       await this._safelyExecute('Overpayment Notification', async () => {
         await notificationModel.create(
           {
             userId: invoice.tenantId,
-            message: `Overpayment of ${fromCents(incrementalOverpayment).toFixed(2)} has been credited to your account balance.`,
+            message: `Overpayment of ${fromCents(incOverpayment).toFixed(2)} credited to balance.`,
             type: 'payment',
             entityType: 'payment',
             entityId: paymentId,
@@ -91,14 +93,11 @@ class PaymentSideEffectService {
       });
     }
 
-    // 5. Fire-and-Forget Emails (Outside transaction)
-    // Note: This matches the existing behavior of sending confirmation emails
+    // 5. [SIDE EFFECT] External Comm: Dispatch fire-and-forget confirmation emails
     this._sendConfirmationEmail(invoice, payment);
   }
 
-  /**
-   * Standard error handler for silent side-effect failures.
-   */
+  // SAFE EXECUTE: Internal wrapper to trap errors and prevent main transaction interference.
   async _safelyExecute(label, fn) {
     try {
       await fn();
@@ -107,10 +106,10 @@ class PaymentSideEffectService {
         `[PaymentSideEffectService] Non-critical failure in ${label}:`,
         err.message
       );
-      // We do NOT re-throw. We want the main transaction to complete.
     }
   }
 
+  // SEND CONFIRMATION EMAIL: Resolves tenant identity and dispatches legal confirmation via SendGrid/Mailgun.
   async _sendConfirmationEmail(invoice, payment) {
     try {
       const tenant = await userModel.findById(
@@ -124,10 +123,10 @@ class PaymentSideEffectService {
           invoiceId: payment.invoiceId,
         });
       }
-    } catch (emailErr) {
+    } catch (err) {
       console.warn(
-        '[PaymentSideEffectService] Email confirmation failed (silently):',
-        emailErr.message
+        '[PaymentSideEffectService] Email dispatch failed silenty:',
+        err.message
       );
     }
   }

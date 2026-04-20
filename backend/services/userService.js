@@ -35,7 +35,7 @@ import { ROLES } from '../utils/roleUtils.js';
 const SALT_ROUNDS = 10;
 
 class UserService {
-  // CREATE TREASURER: Handles the technical steps of hiring a new staff member (User + Profile + Welcome Email).
+  // CREATE TREASURER: Handles onboarding for a new staff member.
   async createTreasurer(
     name,
     email,
@@ -48,19 +48,15 @@ class UserService {
     try {
       await connection.beginTransaction();
 
-      // Validation handled in Controller or here (DAL checks duplicate email)
-      // findByEmail uses pool, so it is outside transaction?
-      // Better to use connection if possible, but finding by email is just a read.
-      // However, concurrent inserts might race.
-      // For now, simple read is fine.
+      // 1. [SECURITY] Email Uniqueness Guard
       const existingUser = await userModel.findByEmail(email, connection);
-      if (existingUser) {
-        throw new Error('Email already in use');
-      }
+      if (existingUser) throw new Error('Email already in use');
 
+      // 2. Hash password (or generate temp one)
       const tempPassword = password || Math.random().toString(36).slice(-8);
       const hashedPassword = await bcrypt.hash(tempPassword, SALT_ROUNDS);
 
+      // 3. Create core User account
       const userId = await userModel.create(
         {
           name,
@@ -73,15 +69,10 @@ class UserService {
         connection
       );
 
-      // Create Staff Profile
-      await staffModel.create(
-        {
-          userId,
-          ...staffData,
-        },
-        connection
-      );
+      // 4. Create specialized Staff Profile
+      await staffModel.create({ userId, ...staffData }, connection);
 
+      // 5. [AUDIT] Log the staff creation
       await auditLogger.log(
         {
           userId: user?.id || null,
@@ -96,13 +87,11 @@ class UserService {
 
       await connection.commit();
 
-      // [FIXED] Use opaque Redis token (securityTokenService) to match what
-      // authService.setupPassword() expects. The old jwt.sign() approach was
-      // incompatible and caused "link expired" errors on the setup page.
+      // 6. [SIDE EFFECT] Generate setup token and send invitation email
       const token = await securityTokenService.createToken(
         userId,
         'setup',
-        172800, // 48 hours in seconds
+        172800,
         { role: ROLES.TREASURER }
       );
       await emailService.sendInvitationEmail(email, ROLES.TREASURER, token);
@@ -120,22 +109,19 @@ class UserService {
   async updateTreasurer(id, data) {
     const { name, email, phone, status } = data;
 
-    // Check if email is being changed and if it's taken
+    // 1. [SECURITY] Email Uniqueness validation for updates
     const existingUser = await userModel.findByEmail(email);
-    if (existingUser && existingUser.id !== parseInt(id)) {
+    if (existingUser && existingUser.id !== parseInt(id))
       throw new Error('Email already in use');
-    }
 
-    // We do NOT update password here.
+    // 2. Perform user record update
     const updated = await userModel.update(id, { name, email, phone, status });
-    if (!updated) {
-      throw new Error('User not found or update failed');
-    }
+    if (!updated) throw new Error('User not found or update failed');
 
     return { id, name, email, phone, status };
   }
 
-  // UPDATE USER PROFILE: A unified way for any user to update their own contact info and profile details.
+  // UPDATE USER PROFILE: Unified portal for self-service profile management.
   async updateUserProfile(id, data) {
     const {
       name,
@@ -150,42 +136,33 @@ class UserService {
     try {
       await connection.beginTransaction();
 
-      // 1. Fetch current user from users table
+      // 1. Fetch current profile state
       const currentUser = await userModel.findById(id, connection);
-      if (!currentUser) {
-        throw new Error('User not found');
-      }
+      if (!currentUser) throw new Error('User not found');
 
-      // 2. Update users table (common to all roles)
+      // 2. Update core Users table
       const usersUpdated = await userModel.update(
         id,
-        {
-          name,
-          phone,
-          email: currentUser.email, // Preserve email
-          status: currentUser.status, // Preserve status
-        },
+        { name, phone, email: currentUser.email, status: currentUser.status },
         connection
       );
+      if (!usersUpdated) throw new Error('Profile update failed');
 
-      if (!usersUpdated) {
-        throw new Error('Update to users table failed');
-      }
-
-      // 3. Update tenants table if user is a tenant (E7)
+      // 3. [SIDE EFFECT] Update specialized Tenant Profile if applicable
       if (currentUser.role === ROLES.TENANT) {
-        const tenantUpdateData = {
-          emergencyContactName,
-          emergencyContactPhone,
-          employmentStatus,
-          permanentAddress,
-        };
-
-        // tenantModel.update only updates provided fields based on its whitelist
-        await tenantModel.update(id, tenantUpdateData, connection);
+        await tenantModel.update(
+          id,
+          {
+            emergencyContactName,
+            emergencyContactPhone,
+            employmentStatus,
+            permanentAddress,
+          },
+          connection
+        );
       }
 
-      // 4. Log the action (Audit)
+      // 4. [AUDIT] Log the self-service update
       try {
         await auditLogger.log(
           {
@@ -199,12 +176,10 @@ class UserService {
           connection
         );
       } catch (err) {
-        console.error('Audit log failed for profile update:', err);
+        console.error('Profile audit failed:', err);
       }
 
       await connection.commit();
-
-      // Return the updated basic user object
       return {
         id,
         name,
@@ -222,9 +197,7 @@ class UserService {
 
   async deleteTreasurer(id) {
     const deleted = await userModel.delete(id);
-    if (!deleted) {
-      throw new Error('User not found or delete failed');
-    }
+    if (!deleted) throw new Error('User not found or delete failed');
     return { message: 'Treasurer deleted successfully' };
   }
 
@@ -233,12 +206,8 @@ class UserService {
   }
 
   async getTenants(ownerId = null, treasurerId = null) {
-    if (ownerId) {
-      return await userModel.findTenantsByOwner(ownerId);
-    }
-    if (treasurerId) {
-      return await userModel.findTenantsByTreasurer(treasurerId);
-    }
+    if (ownerId) return await userModel.findTenantsByOwner(ownerId);
+    if (treasurerId) return await userModel.findTenantsByTreasurer(treasurerId);
     return await userModel.findByRole(ROLES.TENANT);
   }
 
@@ -248,15 +217,12 @@ class UserService {
 
   async getUserById(id) {
     const user = await userModel.findById(id);
-    if (user) {
-      // Remove sensitive data
-      delete user.password_hash;
-    }
+    if (user) delete user.password_hash;
     return user;
   }
 
   // Convert lead to tenant
-  // CONVERT LEAD TO TENANT: The "Closing" logic. Converts an applicant into a formal tenant, reserved a unit, and generates a draft lease.
+  // CONVERT LEAD TO TENANT: Finalizes conversion from lead/applicant to formal tenant with a draft lease.
   async convertLeadToTenant(
     leadId,
     startDate,
@@ -268,74 +234,50 @@ class UserService {
     try {
       await connection.beginTransaction();
 
-      // 1. Get lead details
+      // 1. Fetch lead and handle Idempotency
       const lead = await leadModel.findById(leadId, connection);
-      if (!lead) {
-        throw new Error('Lead not found');
-      }
+      if (!lead) throw new Error('Lead not found');
 
-      // IDEMPOTENCY: If lead already converted, return Success.
       if (lead.status === 'converted') {
         const existingUser = await userModel.findByEmail(
           lead.email,
           connection
         );
-        let existingLeaseId = null;
-        if (existingUser) {
-          const [leases] = await connection.query(
-            "SELECT lease_id FROM leases WHERE tenant_id = ? AND unit_id = ? AND status IN ('draft', 'active') ORDER BY created_at DESC LIMIT 1",
-            [existingUser.id, targetUnitIdForLock]
-          );
-          if (leases.length > 0) {
-            existingLeaseId = leases[0].lease_id;
-          }
-        }
         return {
           message: 'Lead already converted',
-          tenantId: existingUser ? existingUser.id : null,
-          leaseId: existingLeaseId,
+          tenantId: existingUser?.id,
           alreadyConverted: true,
           magicLinkSent: true,
         };
       }
 
-      // LOCKING: Ensure unit is not being processed by another conversion.
-      const targetUnitIdForLock = tenantData.unitId || lead.interestedUnit;
-      if (targetUnitIdForLock) {
+      // 2. [CONCURRENCY] Acquire Unit Lock to prevent parallel conversions for same room
+      const targetUnitId = tenantData.unitId || lead.interestedUnit;
+      if (targetUnitId) {
         const lockAcquired = await unitLockService.acquireLock(
-          targetUnitIdForLock,
+          targetUnitId,
           leadId
         );
-        if (!lockAcquired) {
+        if (!lockAcquired)
           throw new Error(
-            'This unit is currently being processed by another staff member. Please wait 10 minutes or choose another unit.'
+            'Unit currently being processed by another staff member.'
           );
-        }
       }
 
-      // 2. Check if a user with this email already exists
+      // 3. User Resolution: Find existing account or create new Tenant account
       let userId;
       const existingUser = await userModel.findByEmail(lead.email, connection);
-
       let invitationToken = null;
-      if (existingUser) {
-        if (existingUser.role === ROLES.TENANT) {
-          // User is already an active tenant applying for another property.
-          // They already have an account and password, so we just proceed with lease creation.
-          userId = existingUser.id;
-          console.log(
-            `Lead ${leadId} is already a tenant (User ID: ${userId}). Proceeding with new lease creation.`
-          );
-        } else {
-          throw new Error(
-            `Email ${lead.email} is already associated with a ${existingUser.role} account. Cannot convert to tenant.`
-          );
-        }
-      } else {
-        // Create new user account for the tenant
-        const passwordToUse = Math.random().toString(36).slice(-8);
-        const hashedPassword = await bcrypt.hash(passwordToUse, SALT_ROUNDS);
 
+      if (existingUser) {
+        if (existingUser.role !== ROLES.TENANT)
+          throw new Error(`Email taken by ${existingUser.role} account.`);
+        userId = existingUser.id;
+      } else {
+        const hashedPassword = await bcrypt.hash(
+          Math.random().toString(36).slice(-8),
+          SALT_ROUNDS
+        );
         userId = await userModel.create(
           {
             name: lead.name,
@@ -347,36 +289,25 @@ class UserService {
           },
           connection
         );
-
-        // [FIXED] Use opaque Redis token to match authService.setupPassword() consumer
+        // Generate security token for first-time account setup
         invitationToken = await securityTokenService.createToken(
           userId,
           'setup',
-          172800, // 48 hours in seconds
+          172800,
           { role: ROLES.TENANT }
         );
       }
 
-      // Track email context data
-      const mailData = {
-        email: lead.email,
-        name: lead.name,
-        leaseId: null,
-        propertyName: null,
-        unitNumber: null,
-        depositAmount: 0,
-      };
-
-      // 3. Create Tenant Profile
+      // 4. Create specialized Tenant Profile
       const existingTenant = await tenantModel.findByUserId(userId, connection);
       if (!existingTenant) {
         await tenantModel.create(
           {
             userId,
-            nic: tenantData.nic || null,
-            permanentAddress: tenantData.permanentAddress || null,
-            emergencyContactName: tenantData.emergencyContactName || null,
-            emergencyContactPhone: tenantData.emergencyContactPhone || null,
+            nic: tenantData.nic,
+            permanentAddress: tenantData.permanentAddress,
+            emergencyContactName: tenantData.emergencyContactName,
+            emergencyContactPhone: tenantData.emergencyContactPhone,
             employmentStatus: 'Employed',
             monthlyIncome: Number(tenantData.monthlyIncome || 0),
           },
@@ -384,184 +315,118 @@ class UserService {
         );
       }
 
-      // 4. Update lead status (direct SQL to avoid duplicate history from leadModel.update)
+      // 5. Update Lead metrics and stage history
       await connection.query('UPDATE leads SET status = ? WHERE lead_id = ?', [
         'converted',
         leadId,
       ]);
-
-      // 4a. Invalidate portal access tokens
       await leadTokenModel.invalidateForLead(leadId, connection);
-
-      // 4b. Migrate past conversation thread to the active tenant ID
       await connection.query(
         'UPDATE messages SET tenant_id = ? WHERE lead_id = ?',
         [userId, leadId]
       );
-
       await leadStageHistoryModel.create(
         leadId,
-        lead.status, // fromStatus — captured before the update above
-        'converted', // toStatus
-        'System: Lead formally converted into an active tenant.',
+        lead.status,
+        'converted',
+        'System: Formal conversion to active tenant.',
         connection
       );
 
-      // [C1.2 FIX] Auto-drop other leads for this specific unit
-      if (lead.interestedUnit || tenantData.unitId) {
-        const affectedUnit = tenantData.unitId || lead.interestedUnit;
+      // 6. [SIDE EFFECT] Auto-drop other interested applicants for this specific unit
+      if (targetUnitId) {
         const [otherLeads] = await connection.query(
           "SELECT lead_id, status FROM leads WHERE unit_id = ? AND lead_id != ? AND status NOT IN ('converted', 'dropped')",
-          [affectedUnit, leadId]
+          [targetUnitId, leadId]
         );
-
-        for (const otherLead of otherLeads) {
+        for (const o of otherLeads) {
           await connection.query(
             "UPDATE leads SET status = 'dropped' WHERE lead_id = ?",
-            [otherLead.lead_id]
+            [o.lead_id]
           );
-          // Log history for each dropped lead
           await leadStageHistoryModel.create(
-            otherLead.lead_id,
-            otherLead.status,
+            o.lead_id,
+            o.status,
             'dropped',
-            `System: Unit #${affectedUnit} has been leased to another applicant.`,
+            'System: Unit leased to another applicant.',
             connection
           );
         }
-        console.log(
-          `[CLEANUP] Dropped ${otherLeads.length} other leads for unit #${affectedUnit}`
-        );
       }
 
-      // 5. Lease & Unit Logic
-      // Use provided unitId (from conversion dialog) OR the lead's original interest
-      const targetUnitId = tenantData.unitId || lead.interestedUnit;
-
+      // 7. Lease Creation: Generate the draft lease through LeaseService
+      let result = {
+        message: 'Lead converted',
+        tenantId: userId,
+        magicLinkSent: false,
+      };
       if (targetUnitId) {
-        // We rely on LeaseService to handle unit status and lease creation.
-        // However, we need to fetch the unit to get the rent first?
         const unit = await unitModel.findById(targetUnitId, connection);
-
         if (unit) {
-          const currentDay = getLocalTime();
-          const leaseStart = startDate ? parseLocalDate(startDate) : currentDay;
-          let leaseEnd;
-
-          // Fetch lease term if ID provided
-          const leaseTermId = tenantData.leaseTermId || lead.leaseTermId;
-          let leaseTerm = null;
-          if (leaseTermId) {
-            leaseTerm = await leaseTermModel.findById(leaseTermId, connection);
-          }
-
-          if (endDate) {
-            leaseEnd = parseLocalDate(endDate);
-          } else if (leaseTerm && leaseTerm.durationMonths) {
-            leaseEnd = addMonths(leaseStart, leaseTerm.durationMonths);
-          } else {
-            // Default to 1 year
-            leaseEnd = addMonths(leaseStart, 12);
-          }
-
-          // [C1.3 FIX] Make security deposit configurable
-          // [FIXED] Enforce Cent-First Architecture: Ensure values passed to LeaseService/EmailService are CENTS.
-          const monthlyRentCents = unit.monthlyRent;
+          const leaseStart = startDate
+            ? parseLocalDate(startDate)
+            : getLocalTime();
+          const leaseEnd = endDate
+            ? parseLocalDate(endDate)
+            : addMonths(leaseStart, 12);
           const securityDepositCents =
             tenantData.securityDeposit !== undefined
               ? toCentsFromMajor(tenantData.securityDeposit)
-              : monthlyRentCents; // Fallback to 1 month rent
+              : unit.monthlyRent;
 
-          // Use LeaseService with the existing transaction connection
-          const { leaseId, magicToken: internalMagicToken } =
-            await leaseService.createLease(
-              {
-                tenantId: userId,
-                unitId: targetUnitId,
-                startDate: leaseStart,
-                endDate: leaseEnd,
-                leaseTermId: leaseTermId,
-                monthlyRent: monthlyRentCents,
-                targetDeposit: securityDepositCents,
-                documentUrl: tenantData.documentUrl || null,
-              },
-              connection,
-              user // Pass the acting user here
-            );
+          const { leaseId, magicToken } = await leaseService.createLease(
+            {
+              tenantId: userId,
+              unitId: targetUnitId,
+              startDate: leaseStart,
+              endDate: leaseEnd,
+              monthlyRent: unit.monthlyRent,
+              targetDeposit: securityDepositCents,
+              documentUrl: tenantData.documentUrl,
+            },
+            connection,
+            user
+          );
 
-          // [NEW] Capture context for Notification email
-          mailData.leaseId = leaseId;
-          mailData.magicToken = internalMagicToken;
-          mailData.propertyName = unit.propertyName;
-          mailData.unitNumber = unit.unitNumber;
-          mailData.depositAmount = securityDepositCents;
-        }
-      }
+          await connection.commit(); // Transaction ends here
 
-      await connection.commit();
-
-      // RELEASE LOCK: Clear reservation on success
-      if (targetUnitId) {
-        unitLockService.releaseLock(targetUnitId, leadId);
-      }
-
-      try {
-        // [CRITICAL FIX] Send email ONLY after successful transaction commit
-        if (mailData.leaseId) {
-          if (mailData.magicToken) {
-            // Send Deposit Magic Link
-            await emailService.sendDepositMagicLink(
-              mailData.email,
-              mailData.name,
-              mailData.propertyName || 'Property',
-              mailData.unitNumber || 'N/A',
-              mailData.depositAmount,
-              mailData.magicToken
-            );
-          } else {
-            // Zero deposit path - notify draft is ready
-            await emailService.sendDraftLeaseNotification(
-              mailData.email,
-              mailData.name,
-              mailData.propertyName || 'Property',
-              mailData.unitNumber || 'N/A'
-            );
-            // If new user, ALSO send account setup invitation for credentials
-            if (invitationToken) {
-              await emailService.sendInvitationEmail(
-                mailData.email,
-                ROLES.TENANT,
-                invitationToken
+          // 8. [SIDE EFFECT] Deliver appropriate notification (Non-blocking)
+          try {
+            if (magicToken) {
+              await emailService.sendDepositMagicLink(
+                lead.email,
+                lead.name,
+                unit.propertyName,
+                unit.unitNumber,
+                securityDepositCents,
+                magicToken
               );
+            } else {
+              await emailService.sendDraftLeaseNotification(
+                lead.email,
+                lead.name,
+                unit.propertyName,
+                unit.unitNumber
+              );
+              if (invitationToken)
+                await emailService.sendInvitationEmail(
+                  lead.email,
+                  ROLES.TENANT,
+                  invitationToken
+                );
             }
+            result.magicLinkSent = true;
+          } catch (e) {
+            console.error('Conversion email failed:', e);
           }
-          return {
-            message: mailData.magicToken
-              ? 'Lead converted successfully. Deposit payment link sent.'
-              : 'Lead converted successfully. Draft lease is ready.',
-            tenantId: userId,
-            leaseId: mailData.leaseId,
-            magicLinkSent: true,
-          };
+          result.leaseId = leaseId;
         }
-      } catch (err) {
-        console.error('Failed to send conversion notification email:', err);
-        return {
-          message:
-            'Lead converted successfully, but notification email failed to send. Please resend manually.',
-          tenantId: userId,
-          leaseId: mailData.leaseId,
-          magicLinkSent: false,
-          error: 'Email delivery failed',
-        };
+      } else {
+        await connection.commit();
       }
 
-      return {
-        message: 'Lead converted successfully',
-        tenantId: userId,
-        leaseId: mailData.leaseId,
-        magicLinkSent: false,
-      };
+      if (targetUnitId) unitLockService.releaseLock(targetUnitId, leadId);
+      return result;
     } catch (error) {
       await connection.rollback();
       throw error;
@@ -570,47 +435,35 @@ class UserService {
     }
   }
 
+  // TRIGGER ONBOARDING: Sends login credentials to a tenant after their lease is ready.
   async triggerOnboarding(userId, connection = null) {
     const db = connection || pool;
+    // 1. Fetch user and handle Idempotency
     const user = await userModel.findById(userId, db);
-    if (!user) {
-      console.error(
-        `[UserService] Onboarding failed: User ${userId} not found.`
-      );
-      return null;
-    }
+    if (!user) return null;
 
-    // [IDEMPOTENCY] If already verified, skip token generation and email
-    if (user.isEmailVerified) {
-      console.log(
-        `[UserService] Skipping onboarding: User ${userId} is already verified.`
-      );
-      return null;
-    }
+    if (user.isEmailVerified) return null;
 
-    console.log(`[UserService] Generating setupToken for user ${userId}`);
-    // [FIXED] Use opaque Redis token to match authService.setupPassword() consumer
+    // 2. Generate security setup token
     const token = await securityTokenService.createToken(
       userId,
       'setup',
-      172800, // 48 hours in seconds
+      172800,
       { role: ROLES.TENANT }
     );
 
+    // 3. [SIDE EFFECT] Deliver onboarding email
     try {
       await emailService.sendInvitationEmail(user.email, ROLES.TENANT, token);
     } catch (err) {
-      console.error(
-        `[UserService] Failed to send onboarding email to ${user.email}:`,
-        err
-      );
+      console.error('Onboarding email failed:', err);
     }
 
-    // Log audit trail
+    // 4. [AUDIT] Log the onboarding trigger
     try {
       await auditLogger.log(
         {
-          userId: null, // System action
+          userId: null,
           actionType: 'TENANT_ONBOARDING_TRIGGERED',
           entityId: userId,
           entityType: 'user',
@@ -620,7 +473,7 @@ class UserService {
         db
       );
     } catch (err) {
-      console.error('[UserService] Failed to log onboarding audit:', err);
+      console.error('Onboarding audit failed:', err);
     }
 
     return token;
@@ -630,29 +483,28 @@ class UserService {
   //  STAFF MANAGEMENT
   // ============================================================================
 
+  // RESEND INVITATION: Manually re-triggers the setup email for a user.
   async resendInvitation(userId) {
     const user = await userModel.findById(userId);
     if (!user) throw new Error('User not found');
 
     if (user.isEmailVerified) {
-      // If already verified, send a "Welcome Back / Access Your Portal" email instead of an invitation
       await emailService.sendTenantConfirmation(user.email, user.name);
-      return { message: `Login instructions re-sent to ${user.email}` };
+      return { message: `Portals instructions re-sent.` };
     }
 
-    // Generate a fresh opaque Redis-backed setup token (48h)
     const token = await securityTokenService.createToken(
       userId,
       'setup',
       172800,
       { role: user.role }
     );
-
     await emailService.sendInvitationEmail(user.email, user.role, token);
 
-    return { message: `Invitation re-sent to ${user.email}` };
+    return { message: `Invitation re-sent.` };
   }
 
+  // FORCE LOGOUT: Invalidate all active sessions for a user (e.g., after termination).
   async forceLogout(id, actorId, reason = null) {
     const user = await userModel.findById(id);
     if (!user) throw new Error('User not found');
@@ -666,10 +518,10 @@ class UserService {
       entityType: 'user',
       details: { reason },
     });
-
-    return { message: 'User session invalidated successfully' };
+    return { message: 'User sessions invalidated.' };
   }
 
+  // ASSIGN PROPERTY: Link a Treasurer to a specific physical asset.
   async assignProperty(userId, propertyId, actorId) {
     await staffModel.assignProperty(userId, propertyId);
 
@@ -680,10 +532,10 @@ class UserService {
       entityType: 'property',
       details: { staffUserId: userId },
     });
-
     return { message: 'Property assigned successfully' };
   }
 
+  // REMOVE PROPERTY: Revoke a Treasurer's management rights over an asset.
   async removeProperty(userId, propertyId, actorId) {
     await staffModel.removePropertyAssignment(userId, propertyId);
 
@@ -694,7 +546,6 @@ class UserService {
       entityType: 'property',
       details: { staffUserId: userId },
     });
-
     return { message: 'Property assignment removed' };
   }
 }

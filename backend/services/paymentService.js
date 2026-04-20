@@ -39,10 +39,12 @@ import unitLockService from './unitLockService.js';
 class PaymentService {
   // SUBMIT PAYMENT: Saves a payment slip or details sent by a tenant for review.
   async submitPayment(data, tenantId, file) {
+    // 1. Extract payment details from request body
     const { invoiceId, amount, paymentDate, paymentMethod, referenceNumber } =
       data;
     let evidenceUrl = data.evidenceUrl;
 
+    // 2. Process file upload if present (bank slips, etc.)
     if (file) {
       if (!file.url) {
         throw new Error('Payment evidence file is corrupted or missing path.');
@@ -54,7 +56,7 @@ class PaymentService {
     try {
       await connection.beginTransaction();
 
-      // Integrity Check: Is invoice already paid?
+      // 3. Integrity Check: Is invoice already paid?
       const invoice = await invoiceModel.findById(invoiceId, connection);
 
       if (!invoice) throw new Error('Invoice not found');
@@ -62,13 +64,13 @@ class PaymentService {
         throw new Error('This invoice has already been paid.');
       }
 
-      // Authorization
+      // 4. Authorization: Ensure tenant owns the invoice
       const lease = await leaseModel.findById(invoice.leaseId, connection);
       if (!lease || String(lease.tenantId) !== String(tenantId)) {
         throw new Error('Access denied. This invoice does not belong to you.');
       }
 
-      // Concurrency Control: One pending payment at a time
+      // 5. Concurrency Control: Prevent duplicate pending payments
       const pendingPayments = await paymentModel.findByInvoiceId(
         invoiceId,
         connection
@@ -79,6 +81,7 @@ class PaymentService {
         );
       }
 
+      // 6. Create payment record in pending state
       const centsAmount = Number(amount);
       const paymentId = await paymentModel.create(
         {
@@ -92,7 +95,7 @@ class PaymentService {
         connection
       );
 
-      // Notify Treasurers
+      // 7. Notify Treasurers for manual review
       const treasurers = await userModel.findByRole(
         ROLES.TREASURER,
         connection
@@ -124,6 +127,7 @@ class PaymentService {
 
   // SUBMIT GUEST PAYMENT: Handles the special "Security Deposit" payment made by applicants during onboarding.
   async submitGuestPayment(data, magicToken, file) {
+    // 1. Extract guest details
     const { paymentDate, paymentMethod, referenceNumber } = data;
     let evidenceUrl = data.evidenceUrl;
 
@@ -131,7 +135,7 @@ class PaymentService {
     try {
       await connection.beginTransaction();
 
-      // 1. Verify Magic Token
+      // 2. Verify Magic Token for guest identification
       const invoice = await invoiceModel.findByMagicToken(
         magicToken,
         connection
@@ -145,34 +149,35 @@ class PaymentService {
       // [HARDENED] Deterministic Locking Order (Unit -> Lease)
       // Replaced the heavy JOIN ... FOR UPDATE which locked both tables simultaneously (high deadlock risk).
 
-      // 1. Lock Unit first
+      // 3. Lock Unit first (Parent resource)
       const unit = await unitModel.findByIdForUpdate(
         invoice.unitId,
         connection
       );
       if (!unit) throw new Error('Unit not found.');
 
-      // 2. Lock Lease second
+      // 4. Lock Lease second (Child resource)
       const lease = await leaseModel.findByIdForUpdate(
         invoice.leaseId,
         connection
       );
       if (!lease) throw new Error('Lease reference not found.');
 
+      // 5. Integrity Check: Ensure unit is not in emergency maintenance
       if (unit.status === 'maintenance') {
         throw new Error(
           'This unit is currently undergoing emergency maintenance or repair. Please contact the property manager before proceeding.'
         );
       }
 
+      // 6. Integrity Check: Ensure lease offer is still active
       if (lease.status === 'cancelled') {
         throw new Error(
           'This lease offer has expired or been cancelled. Please contact the property manager.'
         );
       }
 
-      // Atomic Overlap Check: Ensure no one ELSE has already submitted a payment for this unit during these dates.
-      // This is the "Hard Reservation Lock" mentioned in the audit.
+      // 7. [SECURITY] Atomic Overlap Check: Prevent double-booking race condition
       const [overlappingPayments] = await connection.query(
         `SELECT p.payment_id 
                  FROM payments p
@@ -204,7 +209,7 @@ class PaymentService {
       const invoiceId = invoice.id;
       const amount = invoice.amount; // Guests must pay the full amount for the deposit to "hold" the unit
 
-      // [NEW] Link Payment to Lead: Mark lead as 'Payment Pending' in notes
+      // 8. [AUDIT] Link Payment to Lead: Mark historical progress
       try {
         const leadId = await leadModel.findIdByEmailAndProperty(
           invoice.tenant_email || invoice.email,
@@ -228,6 +233,7 @@ class PaymentService {
         );
       }
 
+      // 9. Process file attachment
       if (file) {
         if (!file.url) {
           throw new Error(
@@ -237,7 +243,7 @@ class PaymentService {
         evidenceUrl = file.url;
       }
 
-      // 2. Concurrency Control: One pending payment at a time (for this specific invoice)
+      // 10. Concurrency Control: Prevent duplicate attempts for guest
       const invoicePending = await paymentModel.findByInvoiceId(
         invoiceId,
         connection
@@ -248,6 +254,7 @@ class PaymentService {
         );
       }
 
+      // 11. Create guest payment record
       const paymentId = await paymentModel.create(
         {
           invoiceId,
@@ -264,7 +271,7 @@ class PaymentService {
       // We want it to persist so the guest can track their verification status.
       // await invoiceModel.clearMagicToken(invoiceId, connection);
 
-      // 3. Notify Treasurers
+      // 12. Notify Treasurers of incoming guest deposit
       const guestTreasurers = await userModel.findByRole(
         ROLES.TREASURER,
         connection
@@ -324,8 +331,8 @@ class PaymentService {
    */
   // RECORD AUTOMATED PAYMENT: Instantly logs a payment confirmed by an online gateway like PayHere.
   async recordAutomatedPayment(data, connection = null) {
+    // 1. Setup transaction context
     const { invoiceId, amount, paymentMethod, referenceNumber } = data;
-
     const conn = connection || (await pool.getConnection());
     const isExternalConn = !!connection;
 
@@ -363,6 +370,7 @@ class PaymentService {
       let paymentId;
 
       if (existingPayment) {
+        // 3. Idempotency: If already verified, return successful result
         if (existingPayment.status === 'verified') {
           console.log(
             `[PaymentService] Idempotent trigger: Payment for ref ${referenceNumber} already verified. Skipping duplicate.`
@@ -372,7 +380,7 @@ class PaymentService {
         }
 
         // [FIX] RECOVERY LOGIC: If a previously REJECTED or PENDING payment is confirmed by the gateway,
-        // we update the existing record to 'verified' instead of trying to create a new one (which fails unique constraint).
+        // we update the existing record to 'verified' instead of trying to create a new one.
         console.log(
           `[PaymentService] Recovery trigger: Updating existing ${existingPayment.status} payment (Ref: ${referenceNumber}) to verified.`
         );
@@ -385,8 +393,7 @@ class PaymentService {
         paymentId = Number(existingPayment.id);
       }
 
-      // [SECURITY FIX] True Tampering Guard: Reject zero-value or negative amounts only.
-      // Legitimate underpayments from the gateway are recorded and flagged for Treasurer review unless guaranteeFullSettlement is strict.
+      // [SECURITY FIX] True Tampering Guard: Reject zero-value or negative amounts.
       const expectedCents = Number(invoice.amount);
       if (Number(amount) <= 0) {
         throw new Error(
@@ -395,6 +402,7 @@ class PaymentService {
       }
       const isUnderpayment = Number(amount) < expectedCents;
       if (isUnderpayment) {
+        // 4. Security Check: Handle discrepancy between paid amount vs expected
         console.warn(
           `[Security Alert] Gateway underpayment for Invoice #${invoiceId}. Expected: ${expectedCents}, Received: ${amount}. Recording and flagging.`
         );
@@ -406,7 +414,7 @@ class PaymentService {
       }
 
       if (!paymentId) {
-        // 3. Create New Verified Payment
+        // 5. Create New Verified Payment record
         try {
           paymentId = await paymentModel.create(
             {
@@ -422,8 +430,7 @@ class PaymentService {
           );
         } catch (dupErr) {
           if (dupErr.code === 'ER_DUP_ENTRY') {
-            // Concurrent request beat us to it right after the SELECT but before our lock?
-            // Or just finished its transaction.
+            // Concurrent request catch-all
             const fallback = await paymentModel.findByReferenceNumber(
               referenceNumber,
               conn
@@ -436,24 +443,23 @@ class PaymentService {
 
       const payment = await paymentModel.findById(paymentId, conn);
 
-      // [NEW] Reload Invoice with Lock AFTER trigger has fired (to get updated amount_paid)
+      // [NEW] 6. Reload Invoice with Lock AFTER trigger has fired (to get updated amount_paid)
       const freshInvoice = await invoiceModel.findByIdForUpdate(
         invoiceId,
         conn
       );
 
-      // 2. Finalize actions (ledger, receipt, activation, notifications)
-      // Use a dummy system user for automated actions
+      // 7. Finalize actions (ledger, receipt, activation, notifications)
       const systemUser = { id: null, role: 'system' };
       const setupToken = await this._finalizeVerifiedPayment(
         paymentId,
-        freshInvoice || invoice, // Fallback to stale if something went critically wrong
+        freshInvoice || invoice,
         payment,
         systemUser,
         conn
       );
 
-      // [NEW] Notify Treasurer of gateway underpayment
+      // [NEW] 8. Notify Treasurer of gateway underpayment for manual follow-up
       if (isUnderpayment) {
         const treasurers = await userModel.findByRole(ROLES.TREASURER, conn);
         for (const t of treasurers) {
@@ -479,7 +485,7 @@ class PaymentService {
         await conn.query('RELEASE SAVEPOINT record_automated_payment');
       }
 
-      // 3. Fire-and-forget emails
+      // 9. Fire-and-forget emails (Tenant confirmation)
       try {
         const tenant = await userModel.findById(
           invoice.tenantId || invoice.tenant_id,
@@ -524,6 +530,7 @@ class PaymentService {
     reason = null,
     connection = null
   ) {
+    // 1. Authorization: Only Staff with Treasurer/Owner permissions allowed
     if (!authorizationService.isAtLeast(user.role, ROLES.TREASURER)) {
       throw new Error(
         'Access denied. Only Treasurers (or Owners) can verify payments.'
@@ -535,6 +542,7 @@ class PaymentService {
     try {
       if (isOwnTransaction) await conn.beginTransaction();
 
+      // 2. Fetch resources and lock rows for mutation
       const payment = await paymentModel.findById(paymentId, conn);
       if (!payment) throw new Error('Payment not found');
 
@@ -544,14 +552,14 @@ class PaymentService {
       );
       if (!invoice) throw new Error('Invoice not found');
 
-      // [C3 FIX - Problem 3] Block verification for voided/cancelled invoices
+      // [SECURITY FIX] 3. Integrity Check: Block verification for voided/cancelled invoices
       if (invoice.status === 'void' || invoice.status === 'cancelled') {
         throw new Error(
           'Cannot verify payment for a voided or cancelled invoice.'
         );
       }
 
-      // [C3 FIX - Problem 2] Strict Treasurer Assignment RBAC
+      // [SECURITY] 4. Access Control: Cross-verify treasurer assignment to the property
       const lease = await leaseModel.findById(
         invoice.leaseId || invoice.lease_id,
         conn
@@ -564,6 +572,7 @@ class PaymentService {
       );
 
       if (user.role === ROLES.OWNER) {
+        // 4a. Owner check: Must own the property
         const property = await propertyModel.findById(
           unit.propertyId || unit.property_id,
           conn
@@ -576,6 +585,7 @@ class PaymentService {
           throw new Error('Access denied. You do not own this property.');
         }
       } else {
+        // 4b. Treasurer check: Must be assigned to this specific property
         const assignedProperties = await staffModel.getAssignedProperties(
           user.id || user.user_id,
           conn
@@ -591,10 +601,11 @@ class PaymentService {
         }
       }
 
+      // 5. Update Status with Race-Condition protection
       const { payment: updatedPayment, changed } =
         await paymentModel.updateStatus(paymentId, status, null, conn);
 
-      // [C3 FIX - Problem 4] Concurrency Lock: Throw explicit error on Idempotency catch
+      // [RACE CONDITION FIX] Concurrent catch
       if (!changed) {
         if (isOwnTransaction) await conn.rollback();
         throw new Error(
@@ -602,15 +613,17 @@ class PaymentService {
         );
       }
 
+      // 6. Branch Logic: Handle Verification vs Rejection
       if (status === 'verified') {
         const payment = updatedPayment;
         if (payment) {
-          // [NEW] Reload Invoice with Lock AFTER trigger has fired (to get updated amount_paid)
+          // [NEW] 6a. Reload Invoice with Lock AFTER trigger fired
           const freshInvoice = await invoiceModel.findByIdForUpdate(
             payment.invoiceId || payment.invoice_id,
             conn
           );
 
+          // 6b. Run post-verification automation
           await this._finalizeVerifiedPayment(
             paymentId,
             freshInvoice || invoice,
@@ -622,6 +635,7 @@ class PaymentService {
       } else if (status === 'rejected') {
         const payment = updatedPayment;
         if (payment) {
+          // 7a. Revert invoice status based on remaining verified funds
           const allPayments = await paymentModel.findByInvoiceId(
             payment.invoiceId,
             conn
@@ -645,6 +659,7 @@ class PaymentService {
             );
           }
 
+          // 7b. Business Rule: Handle security deposit failure impact on reservation
           if (invoice.invoice_type === 'deposit') {
             await leaseModel.update(
               invoice.lease_id,
@@ -654,7 +669,7 @@ class PaymentService {
               conn
             );
 
-            // [FIX A] Release unit only if no verified funds remain for this deposit
+            // [FIX] Release unit reservation if NO verified funds remain
             if (totalVerified === 0) {
               const activeCount = await leaseModel.countActiveByUnitId(
                 unit.id,
@@ -663,7 +678,7 @@ class PaymentService {
               if (activeCount === 0) {
                 await unitModel.update(unit.id, { status: 'available' }, conn);
 
-                // Collapse the expiry window to allow cron cleanup
+                // [CRON] Collapse the expiry window to allow cleanup
                 await leaseModel.update(
                   invoice.leaseId,
                   { reservationExpiresAt: { sql: 'NOW()' } },
@@ -673,6 +688,7 @@ class PaymentService {
             }
           }
 
+          // 7c. Notify Tenant of rejection
           const rejectMessage = reason
             ? `Payment of ${fromCents(payment.amount).toFixed(2)} for Invoice #${payment.invoiceId} was rejected. Reason: ${reason}`
             : `Payment of ${fromCents(payment.amount).toFixed(2)} for Invoice #${payment.invoiceId} was rejected. Please contact support.`;
@@ -689,6 +705,7 @@ class PaymentService {
             conn
           );
 
+          // 7d. [AUDIT] Log rejection for historical records
           await auditLogger.log(
             {
               userId: user.user_id || user.id,
@@ -709,7 +726,7 @@ class PaymentService {
 
       if (isOwnTransaction) await conn.commit();
 
-      // Fire-and-forget emails outside transaction
+      // 8. Communication Side Effects: Send Confirmation or Rejection emails
       if (status === 'verified') {
         const invoice = await invoiceModel.findById(updatedPayment.invoiceId);
         try {
@@ -779,13 +796,14 @@ class PaymentService {
     user,
     connection
   ) {
+    // 1. Calculate financial variables from atomic state
     const invAmount = Number(invoice.amount);
     const totalPaidAfter = Number(
       invoice.amountPaid || invoice.amount_paid || 0
     );
     const thisPaymentAmount = Number(payment.amount);
 
-    // 1. [CRITICAL] Calculate overpayment using atomic snapshots
+    // [FINANCIAL] Calculate overpayment using atomic snapshots
     const currentSurplus = Math.max(0, totalPaidAfter - invAmount);
     const previousSurplus = Math.max(
       0,
@@ -796,7 +814,7 @@ class PaymentService {
       currentSurplus - previousSurplus
     );
 
-    // 2. [CRITICAL] Update Invoice Payment Status
+    // 2. [FINANCIAL] Update Invoice Payment Status based on new total
     if (totalPaidAfter >= invAmount) {
       await invoiceModel.updateStatus(payment.invoiceId, 'paid', connection);
     } else if (totalPaidAfter > 0) {
@@ -807,7 +825,7 @@ class PaymentService {
       );
     }
 
-    // 3. [CRITICAL] Handle Credit Balance (Overpayment)
+    // 3. [FINANCIAL] Handle Credit Balance (Overpayment) for future use
     if (incrementalOverpayment > 0) {
       await tenantModel.addCredit(
         invoice.tenantId,
@@ -818,7 +836,7 @@ class PaymentService {
       );
     }
 
-    // 4. [FINANCIAL] Generate Receipt & Post Ledger
+    // 4. [FINANCIAL] Generate Receipt & Post Ledger Entry
     await receiptService.generateReceipt(
       { id: paymentId, amount: payment.amount },
       invoice,
@@ -833,8 +851,7 @@ class PaymentService {
       connection
     );
 
-    // 5. [OPERATIONAL] Operational Side Effects (Lease state, Auto-activation)
-    // Delegated to Operational Service to keep this transaction lean.
+    // 5. [OPERATIONAL] Trigger State Changes (Lease state, Auto-activation)
     const setupToken = await paymentOperationalService.handleDepositPayment(
       invoice,
       { ...payment, status: 'verified' },
@@ -842,8 +859,7 @@ class PaymentService {
       connection
     );
 
-    // 6. [NON-CRITICAL] Secondary Side Effects (Notifications, Scoring, Audit)
-    // Delegated to SideEffect Service which ensures resilience (try/catch internal).
+    // 6. [SIDE EFFECT] Secondary actions (Notifications, Scoring, Audit)
     await paymentSideEffectService.handleVerifiedPaymentEffects(
       paymentId,
       invoice,
@@ -855,7 +871,9 @@ class PaymentService {
     return setupToken;
   }
 
+  // GET PAYMENTS: Fetches payment history tailored to the user's role.
   async getPayments(user) {
+    // Branch logic based on RBAC
     if (user.role === ROLES.TENANT) {
       return await paymentModel.findByTenantId(user.id);
     } else if (user.role === ROLES.TREASURER) {
@@ -871,6 +889,7 @@ class PaymentService {
    * Automatically applies any existing credit balance from the tenant's record
    * to a specific invoice. Reduces the "Balance Due" by creating a 'credit_applied' payment.
    */
+  // APPLY TENANT CREDIT: Automatically settles an invoice using the tenant's existing credit balance.
   async applyTenantCredit(invoiceId, connection = null) {
     const db = connection || pool;
     const isExternalConn = !!connection;
@@ -879,7 +898,7 @@ class PaymentService {
     try {
       if (!isExternalConn) await conn.beginTransaction();
 
-      // 1. Fetch Invoice
+      // 1. Fetch Invoice details for validation
       const invoice = await invoiceModel.findById(invoiceId, conn);
       if (!invoice) throw new Error(`Invoice #${invoiceId} not found`);
       if (invoice.status === 'paid') {
@@ -887,14 +906,14 @@ class PaymentService {
         return null;
       }
 
-      // 2. Fetch Tenant Credit Balance
+      // 2. [FINANCIAL] Fetch Tenant Credit Balance
       const tenant = await tenantModel.findByUserId(invoice.tenantId, conn);
       if (!tenant || tenant.creditBalance <= 0) {
         if (!isExternalConn) await conn.rollback();
         return null;
       }
 
-      // 3. Calculate Amount to Apply (Balance Due check)
+      // 3. Calculate "Balance Due" to determine how much credit to consume
       const allPayments = await paymentModel.findByInvoiceId(invoiceId, conn);
       const totalVerified = allPayments
         .filter((p) => p.status === 'verified')
@@ -912,7 +931,7 @@ class PaymentService {
         return null;
       }
 
-      // 4. Create Verified 'credit_applied' Payment
+      // 4. Create Verified 'credit_applied' Payment record
       const payId = await paymentModel.create(
         {
           invoiceId,
@@ -926,7 +945,7 @@ class PaymentService {
       );
       await paymentModel.updateStatus(payId, 'verified', null, conn);
 
-      // 5. Update Tenant Balance
+      // 5. Atomic Deduction from tenant's account balance
       await tenantModel.deductCredit(
         invoice.tenantId,
         amountToApply,
@@ -935,7 +954,7 @@ class PaymentService {
         invoiceId
       );
 
-      // 6. Update Invoice Status
+      // 6. Update Invoice Status based on new total
       const newTotalVerified = moneyMath(totalVerified)
         .add(amountToApply)
         .value();
@@ -945,14 +964,13 @@ class PaymentService {
         await invoiceModel.updateStatus(invoiceId, 'partially_paid', conn);
       }
 
-      // 7. Generate Receipt
+      // 7. [AUDIT] Generate Receipt & Post Ledger Entry
       await receiptService.generateReceipt(
         { id: payId, amount: amountToApply },
         invoice,
         conn
       );
 
-      // 8. Post Ledger Entry (Delegated to LedgerService)
       await ledgerService.postPayment(
         payId,
         invoice,
@@ -961,7 +979,7 @@ class PaymentService {
         conn
       );
 
-      // 9. Notify Tenant
+      // 8. Notify Tenant of the automatic settlement
       await notificationModel.create(
         {
           userId: invoice.tenantId,
@@ -974,10 +992,6 @@ class PaymentService {
       );
 
       if (!isExternalConn) await conn.commit();
-      console.log(
-        `[PaymentService] Auto-applied ${amountToApply} credit to Invoice #${invoiceId} for Tenant ${invoice.tenantId}`
-      );
-
       return { paymentId: payId, amountApplied: amountToApply };
     } catch (error) {
       if (!isExternalConn) await conn.rollback();
@@ -995,6 +1009,7 @@ class PaymentService {
    * [NEW] Resolves Actionable Silent Failures.
    * Converts a background communication error into a prioritized staff alert.
    */
+  // HANDLE COMMUNICATION FAILURE: Converts a background email failure into a prioritized staff alert.
   async _handleCommunicationFailure(
     invoiceId,
     tenantId,
@@ -1011,7 +1026,7 @@ class PaymentService {
         error.message
       );
 
-      // 1. Audit Log: Visible in Recent Activity
+      // 1. [AUDIT] Log failure for staff visibility in Recent Activity
       await auditLogger.log(
         {
           userId: null, // System action
@@ -1029,7 +1044,7 @@ class PaymentService {
         conn
       );
 
-      // 2. Notify Assigned Treasurers/Owners
+      // 2. Identify and notify assigned Treasurers/Owners of the failure
       const [staff] = await conn.query(
         `SELECT DISTINCT user_id FROM staff_property_assignments spa
          JOIN units u ON spa.property_id = u.property_id

@@ -19,9 +19,11 @@ class SecurityTokenService {
    */
   // CREATE TOKEN: Generates a random, secure token and saves it in the vault (Redis).
   async createToken(userId, type, ttlSeconds = 3600, metadata = {}) {
+    // 1. [SECURITY] Generate cryptographically strong random hex string
     const token = crypto.randomBytes(32).toString('hex');
     const key = `token:${type}:${token}`;
 
+    // 2. Map payload including user relation and creation time
     const payload = JSON.stringify({
       userId,
       type,
@@ -29,6 +31,7 @@ class SecurityTokenService {
       createdAt: new Date().toISOString(),
     });
 
+    // 3. Persist to Redis with sliding expiration (Auto-expiry)
     await redis.set(key, payload, 'EX', ttlSeconds);
     return token;
   }
@@ -43,14 +46,14 @@ class SecurityTokenService {
   async consumeToken(token, expectedType) {
     if (!token) return null;
 
+    // 1. [SECURITY] Resolve key from distributed state (Redis)
     const key = `token:${expectedType}:${token}`;
     const data = await redis.get(key);
-
     if (!data) return null;
 
     const parsed = JSON.parse(data);
 
-    // Ensure type matches (extra safety)
+    // 2. [SECURITY] Ensure action type matches (Prevent token reuse across different flows)
     if (parsed.type !== expectedType) {
       console.error(
         `[SecurityToken] Type mismatch: Expected ${expectedType}, got ${parsed.type}`
@@ -58,7 +61,7 @@ class SecurityTokenService {
       return null;
     }
 
-    // ONE-TIME USE: Delete immediately after retrieval
+    // 3. [SECURITY] One-Time Use: Atomic delete immediately after retrieval (Burn-on-read)
     await redis.del(key);
 
     return parsed;

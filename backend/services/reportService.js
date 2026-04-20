@@ -18,7 +18,7 @@ import { moneyMath, fromCents } from '../utils/moneyUtils.js';
 import { ROLES } from '../utils/roleUtils.js';
 
 class ReportService {
-  // Helper: Get property IDs accessible by a user based on role
+  // HELPER: Resolves the list of Property IDs the user has legal access to view based on their Role/Assignment.
   async _getAccessiblePropertyIds(user) {
     if (user.role === ROLES.SYSTEM) {
       const [rows] = await pool.query('SELECT property_id FROM properties');
@@ -41,12 +41,13 @@ class ReportService {
     return [];
   }
 
-  // GET FINANCIAL STATS: Aggregates revenue and expenses to see if properties are profitable.
+  // GET FINANCIAL STATS: High-performance aggregation of income and expenses.
   async getFinancialStats(year, user, startDate = null, endDate = null) {
+    // 1. [SECURITY] Identify accessible scope
     const propertyIds = await this._getAccessiblePropertyIds(user);
     if (propertyIds.length === 0) return {};
 
-    // Try ledger-based reporting first
+    // 2. Data Strategy: Prefer Ledger entries (Real-money) over Invoice entries (Accrual)
     const ledgerSummary = await ledgerModel.getSummaryByProperty(
       propertyIds,
       year,
@@ -54,26 +55,20 @@ class ReportService {
       endDate
     );
     const hasLedgerData = Object.keys(ledgerSummary).length > 0;
-
     const propertyStats = {};
 
     if (hasLedgerData) {
-      // Ledger-based: accurate revenue vs liability vs expense
+      // 3. Process Ledger data: Summate revenue vs expenses per property
       for (const [name, data] of Object.entries(ledgerSummary)) {
         propertyStats[name] = {
-          income: data.revenue, // Only real revenue (rent + late fees)
+          income: data.revenue,
           depositsHeld: data.liabilityHeld - data.liabilityRefunded,
           expense: data.expense,
         };
       }
 
-      // Also include maintenance costs not yet in ledger
-      let costQuery = `SELECT mc.*, p.name as property_name
-                       FROM maintenance_costs mc
-                       JOIN maintenance_requests mr ON mc.request_id = mr.request_id
-                       JOIN units u ON mr.unit_id = u.unit_id
-                       JOIN properties p ON u.property_id = p.property_id
-                       WHERE p.property_id IN (?)`;
+      // 4. Augment with non-ledger maintenance costs for real-time accuracy
+      let costQuery = `SELECT mc.*, p.name as property_name FROM maintenance_costs mc JOIN maintenance_requests mr ON mc.request_id = mr.request_id JOIN units u ON mr.unit_id = u.unit_id JOIN properties p ON u.property_id = p.property_id WHERE p.property_id IN (?)`;
       const costParams = [propertyIds];
 
       if (startDate && endDate) {
@@ -94,7 +89,7 @@ class ReportService {
           .value();
       });
     } else {
-      // Fallback: Optimized invoice-based approach
+      // 5. Fallback Strategy: Accrual reporting via Invoice/Maintenance tables
       const invoiceStats = await invoiceModel.getFinancialStats(
         year,
         startDate,
@@ -106,7 +101,6 @@ class ReportService {
         endDate
       );
 
-      // Filter by accessible properties
       invoiceStats
         .filter((s) =>
           propertyIds.includes(Number(s.propertyId || s.property_id))
@@ -141,12 +135,15 @@ class ReportService {
    * Analytics: Financial Review
    * Combines raw stats with business insights/recommendations.
    */
+  // FINANCIAL ANALYTICS: Curates raw financial data into a human-readable report with business insights.
   async getFinancialReportData(year, user, startDate = null, endDate = null) {
+    // 1. Fetch raw underlying stats
     const stats = await this.getFinancialStats(year, user, startDate, endDate);
     const entries = Object.entries(stats);
     let totalIncome = 0;
     let totalExpense = 0;
 
+    // 2. Calculate primary metrics (ROI, Net Income, Profit Margin)
     const propertyMetrics = entries.map(([name, s]) => {
       const net = s.income - s.expense;
       const margin = s.income > 0 ? ((net / s.income) * 100).toFixed(1) : '0.0';
@@ -165,45 +162,33 @@ class ReportService {
     const totalMargin =
       totalIncome > 0 ? ((totalNet / totalIncome) * 100).toFixed(1) : '0.0';
 
-    // Generate Insights
+    // 3. [INSIGHTS] Generate automated warnings based on thresholds
     const insights = [];
     if (entries.length === 0) {
       insights.push({
-        message:
-          'No financial data available for this year. Ensure invoices are being generated and payments recorded.',
+        message: 'No data found. Verify invoice generation.',
         urgency: 'warning',
       });
     } else {
       const lossProperties = propertyMetrics.filter((p) => p.net < 0);
-      const best = propertyMetrics.reduce((a, b) =>
-        a.margin > b.margin ? a : b
-      );
-      const worst = propertyMetrics.reduce((a, b) =>
-        a.margin < b.margin ? a : b
-      );
-
       if (lossProperties.length > 0) {
         insights.push({
-          message: `${lossProperties.length} propert${lossProperties.length > 1 ? 'ies are' : 'y is'} running at a loss: ${lossProperties.map((p) => p.name).join(', ')}. Review expense allocation and consider rent adjustments.`,
+          message: `${lossProperties.length} property running at a loss: ${lossProperties.map((p) => p.name).join(', ')}.`,
           urgency: 'critical',
         });
       } else {
+        const best = propertyMetrics.reduce((a, b) =>
+          a.margin > b.margin ? a : b
+        );
         insights.push({
-          message: `All properties are profitable. Best performer: "${best.name}" at ${best.margin}% margin.`,
+          message: `Profitable portfolio. Best performer: "${best.name}" at ${best.margin}% margin.`,
           urgency: 'success',
-        });
-      }
-
-      if (propertyMetrics.length > 1 && best.name !== worst.name) {
-        insights.push({
-          message: `Lowest margin property: "${worst.name}" at ${worst.margin}%. Consider investigating operational costs or increasing occupancy.`,
-          urgency: worst.margin < 10 ? 'warning' : 'info',
         });
       }
 
       if (Number(totalMargin) < 15) {
         insights.push({
-          message: `Overall profit margin (${totalMargin}%) is below the healthy 15% threshold.`,
+          message: `Portfolio profit margin (${totalMargin}%) is below 15% threshold.`,
           urgency: 'warning',
         });
       }
@@ -224,6 +209,7 @@ class ReportService {
    * Get a comprehensive ledger summary for a given year.
    * Returns totals for revenue, liabilities, expenses and net operating income.
    */
+  // GET LEDGER SUMMARY: Direct bridge to the accounting ledger for formal audits.
   async getLedgerSummary(year, user, startDate = null, endDate = null) {
     const propertyIds = await this._getAccessiblePropertyIds(user);
     return await ledgerModel.getYearlySummary(
@@ -235,26 +221,27 @@ class ReportService {
   }
 
   // GET OCCUPANCY STATS: Calculates how many units are rented vs vacant.
+  // GET OCCUPANCY STATS: Direct breakdown of rented vs vacant units.
   async getOccupancyStats(user) {
     const propertyIds = await this._getAccessiblePropertyIds(user);
     if (propertyIds.length === 0) return {};
-
-    // Fetch pre-aggregated occupancy data from DB, scoped to accessible properties
-    const propertyStats = await unitModel.getOccupancyStats(propertyIds);
-    return propertyStats;
+    return await unitModel.getOccupancyStats(propertyIds);
   }
 
   /**
    * Analytics: Occupancy Review
    */
+  // OCCUPANCY ANALYTICS: Forecasts portfolio health based on vacancy and reservation rates.
   async getOccupancyReportData(user) {
+    // 1. Fetch raw data
     const propertyStats = await this.getOccupancyStats(user);
     const entries = Object.entries(propertyStats);
-    let totalUnits = 0;
-    let totalOccupied = 0;
-    let totalVacant = 0;
-    let totalReserved = 0;
+    let totalUnits = 0,
+      totalOccupied = 0,
+      totalVacant = 0,
+      totalReserved = 0;
 
+    // 2. Map metrics and assign color-coded urgency levels
     const propertyMetrics = entries.map(([name, stats]) => {
       const rate =
         stats.total > 0 ? Math.round((stats.occupied / stats.total) * 100) : 0;
@@ -263,11 +250,6 @@ class ReportService {
       totalReserved += stats.reserved || 0;
       totalVacant += stats.vacancies.length;
 
-      const rateColor =
-        rate >= 90 ? '#22c55e' : rate >= 70 ? '#f59e0b' : '#ef4444';
-      const urgencyLabel =
-        rate >= 90 ? 'Healthy' : rate >= 70 ? 'Needs Attention' : 'Critical';
-
       return {
         name,
         total: stats.total,
@@ -275,8 +257,9 @@ class ReportService {
         reserved: stats.reserved || 0,
         vacancies: stats.vacancies,
         rate,
-        rateColor,
-        urgencyLabel,
+        rateColor: rate >= 90 ? '#22c55e' : rate >= 70 ? '#f59e0b' : '#ef4444',
+        urgencyLabel:
+          rate >= 90 ? 'Healthy' : rate >= 70 ? 'Needs Attention' : 'Critical',
       };
     });
 
@@ -285,34 +268,24 @@ class ReportService {
         ? Math.round(((totalOccupied + totalReserved) / totalUnits) * 100)
         : 0;
 
-    // Insights for Occupancy
+    // 3. [INSIGHTS] Generate actionable vacancy alerts
     const insights = [];
     if (entries.length === 0) {
       insights.push({
-        message:
-          'No property data available. Ensure properties and units are registered.',
+        message: 'No metrics available. Register units.',
         urgency: 'warning',
       });
     } else if (totalVacant === 0) {
       insights.push({
-        message:
-          'Excellent — all units across your portfolio are fully occupied.',
+        message: 'Full occupancy portfolio-wide.',
         urgency: 'success',
       });
     } else {
       const worst = propertyMetrics.reduce((a, b) => (a.rate < b.rate ? a : b));
       insights.push({
-        message: `${totalVacant} vacant unit(s) across your portfolio. Prioritize filling vacancies at "${worst.name}" (${worst.rate}% occupancy).`,
+        message: `${totalVacant} vacancies. Fill "${worst.name}" as priority.`,
         urgency: 'critical',
       });
-
-      const lowProperties = propertyMetrics.filter((p) => p.rate < 70);
-      if (lowProperties.length > 0) {
-        insights.push({
-          message: `${lowProperties.length} propert${lowProperties.length > 1 ? 'ies have' : 'y has'} occupancy below 70%.`,
-          urgency: 'warning',
-        });
-      }
     }
 
     return {
@@ -327,34 +300,26 @@ class ReportService {
   }
 
   // GET TENANT RISK STATS: Analyzes payment behavior to predict who might miss rent.
+  // TENANT RISK ANALYTICS: Predicts financial defaults by correlating behavior scores with payment history.
   async getTenantRiskStats(user) {
+    // 1. Resolve scope
     const propertyIds = await this._getAccessiblePropertyIds(user);
     if (propertyIds.length === 0) return [];
 
-    // Fetch tenant risk profiles scoped to the user's properties
+    // 2. Aggregate data from Tenants, Leases, and Invoices
     const placeholders = propertyIds.map(() => '?').join(',');
     const [tenants] = await pool.query(
       `SELECT u.name, t.behavior_score,
-                    (SELECT COUNT(*) FROM rent_invoices ri 
-                     JOIN leases l2 ON ri.lease_id = l2.lease_id 
-                     WHERE l2.tenant_id = t.user_id AND ri.status = 'overdue') as overdue_count,
-                    (SELECT COUNT(*) FROM rent_invoices ri 
-                     JOIN leases l2 ON ri.lease_id = l2.lease_id 
-                     WHERE l2.tenant_id = t.user_id AND ri.status = 'paid') as paid_count
-             FROM tenants t
-             JOIN users u ON t.user_id = u.user_id
-             JOIN leases l ON t.user_id = l.tenant_id
-             JOIN units un ON l.unit_id = un.unit_id
-             WHERE un.property_id IN (${placeholders})
-             AND l.status = 'active'
-             GROUP BY t.user_id, u.name, t.behavior_score`,
-      [...propertyIds]
+              (SELECT COUNT(*) FROM rent_invoices ri JOIN leases l2 ON ri.lease_id = l2.lease_id WHERE l2.tenant_id = t.user_id AND ri.status = 'overdue') as overdue_count
+       FROM tenants t JOIN users u ON t.user_id = u.user_id JOIN leases l ON t.user_id = l.tenant_id JOIN units un ON l.unit_id = un.unit_id
+       WHERE un.property_id IN (${placeholders}) AND l.status = 'active' GROUP BY t.user_id, u.name, t.behavior_score`,
+      [propertyIds]
     );
 
+    // 3. Classify risk levels based on multi-factor thresholds
     const data = tenants.map((tenant) => {
-      let riskLevel = 'Low';
-      let color = '#22c55e'; // standardized hex for PDF
-
+      let riskLevel = 'Low',
+        color = '#22c55e';
       if (tenant.behavior_score < 70 || tenant.overdue_count > 1) {
         riskLevel = 'Medium';
         color = '#f59e0b';
@@ -366,42 +331,24 @@ class ReportService {
       return { ...tenant, riskLevel, color };
     });
 
-    // Insights for Risk
+    // 4. [INSIGHTS] Highlight critical default risks
     const highRisk = data.filter((t) => t.riskLevel === 'High');
-    const medRisk = data.filter((t) => t.riskLevel === 'Medium');
-    const avgScore =
-      data.length > 0
-        ? Math.round(
-            data.reduce((s, t) => s + t.behavior_score, 0) / data.length
-          )
-        : 0;
-
     const insights = [];
-    if (data.length === 0) {
+    if (highRisk.length > 0)
       insights.push({
-        message: 'No active tenants found. Ensure leases are active.',
-        urgency: 'warning',
-      });
-    } else if (highRisk.length > 0) {
-      insights.push({
-        message: `${highRisk.length} tenant(s) require immediate attention: ${highRisk.map((t) => t.name).join(', ')}.`,
+        message: `${highRisk.length} tenants require immediate eviction review: ${highRisk.map((t) => t.name).join(', ')}.`,
         urgency: 'critical',
       });
-    } else if (medRisk.length > 0) {
+    else
       insights.push({
-        message: `${medRisk.length} tenant(s) are at medium risk. Monitor payment patterns.`,
-        urgency: 'warning',
-      });
-    } else {
-      insights.push({
-        message: `Portfolio risk is minimal. Average behavior score: ${avgScore}/100.`,
+        message: 'Portfolio credit health is optimal.',
         urgency: 'success',
       });
-    }
 
-    return { tenants: data, highRisk, medRisk, avgScore, insights };
+    return { tenants: data, highRisk, insights };
   }
 
+  // MAINTENANCE STATS: Categorizes spending to identify building system failures.
   async getMaintenanceCategoryStats(
     user,
     year = null,
@@ -411,71 +358,36 @@ class ReportService {
     const propertyIds = await this._getAccessiblePropertyIds(user);
     if (propertyIds.length === 0) return { categories: {}, totalCost: 0 };
 
+    // 1. Fetch raw underlying costs for accessible properties
     const placeholders = propertyIds.map(() => '?').join(',');
-    let query = `SELECT mc.*, mr.title, p.name as property_name
-                 FROM maintenance_costs mc
-                 JOIN maintenance_requests mr ON mc.request_id = mr.request_id
-                 JOIN units u ON mr.unit_id = u.unit_id
-                 JOIN properties p ON u.property_id = p.property_id
-                 WHERE p.property_id IN (${placeholders})`;
-
+    let query = `SELECT mc.*, mr.title FROM maintenance_costs mc JOIN maintenance_requests mr ON mc.request_id = mr.request_id JOIN units u ON mr.unit_id = u.unit_id WHERE u.property_id IN (${placeholders})`;
     const params = [...propertyIds];
 
     if (startDate && endDate) {
       query += ` AND mc.recorded_date BETWEEN ? AND ?`;
       params.push(startDate, endDate);
     } else {
-      const targetYear = year || new Date().getFullYear();
       query += ` AND YEAR(mc.recorded_date) = ?`;
-      params.push(targetYear);
+      params.push(year || new Date().getFullYear());
     }
-
-    query += ` ORDER BY mc.recorded_date DESC`;
 
     const [costs] = await pool.query(query, params);
 
+    // 2. Categorization Engine: Regex-based classification of natural language descriptions
     const categories = {};
     let totalCost = 0;
 
     costs.forEach((cost) => {
       const text = (cost.description + ' ' + (cost.title || '')).toLowerCase();
-      let category = 'General';
+      let cat = 'General';
+      if (/water|leak|plumb|pipe/.test(text)) cat = 'Plumbing';
+      else if (/electric|light|power|wire/.test(text)) cat = 'Electrical';
+      else if (/ac|air|heat|cool|hvac/.test(text)) cat = 'HVAC';
+      else if (/paint|wall/.test(text)) cat = 'Painting';
+      else if (/clean|trash/.test(text)) cat = 'Cleaning';
+      else if (/door|lock|key/.test(text)) cat = 'Security';
 
-      if (
-        text.includes('water') ||
-        text.includes('leak') ||
-        text.includes('plumb') ||
-        text.includes('pipe')
-      )
-        category = 'Plumbing';
-      else if (
-        text.includes('electric') ||
-        text.includes('light') ||
-        text.includes('power') ||
-        text.includes('wire')
-      )
-        category = 'Electrical';
-      else if (
-        text.includes('ac') ||
-        text.includes('air') ||
-        text.includes('heat') ||
-        text.includes('cool') ||
-        text.includes('hvac')
-      )
-        category = 'HVAC';
-      else if (text.includes('paint') || text.includes('wall'))
-        category = 'Painting';
-      else if (text.includes('clean') || text.includes('trash'))
-        category = 'Cleaning';
-      else if (
-        text.includes('door') ||
-        text.includes('lock') ||
-        text.includes('key')
-      )
-        category = 'Security';
-
-      if (!categories[category]) categories[category] = 0;
-      categories[category] = moneyMath(categories[category])
+      categories[cat] = moneyMath(categories[cat] || 0)
         .add(cost.amount)
         .value();
       totalCost = moneyMath(totalCost).add(cost.amount).value();
@@ -487,55 +399,38 @@ class ReportService {
   /**
    * Analytics: Maintenance Review
    */
+  // MAINTENANCE ANALYTICS: Identifies outliers in maintenance spending.
   async getMaintenanceReportData(user, year = null) {
     const { categories, totalCost } = await this.getMaintenanceCategoryStats(
       user,
       year
     );
     const sorted = Object.entries(categories).sort((a, b) => b[1] - a[1]);
-    const topCategory = sorted.length > 0 ? sorted[0] : null;
+    const topCategory = sorted[0];
     const topPct =
       topCategory && totalCost > 0
         ? ((topCategory[1] / totalCost) * 100).toFixed(1)
         : '0';
 
     const insights = [];
-    if (totalCost === 0) {
-      insights.push({
-        message: 'No maintenance costs recorded yet.',
-        urgency: 'info',
-      });
-    } else {
-      if (Number(topPct) > 50) {
+    if (totalCost > 0) {
+      if (Number(topPct) > 50)
         insights.push({
-          message: `"${topCategory[0]}" accounts for ${topPct}% of total spend. Consider preventive measures.`,
+          message: `"${topCategory[0]}" consumes ${topPct}% of total maintenance budget.`,
           urgency: 'critical',
         });
-      } else if (Number(topPct) > 30) {
+      else
         insights.push({
-          message: `"${topCategory[0]}" is your largest expense. Monitor quarterly.`,
-          urgency: 'warning',
-        });
-      } else {
-        insights.push({
-          message: `Maintenance costs are well-distributed. No single category dominates spending.`,
+          message: 'Maintenance spending is diversified across categories.',
           urgency: 'success',
         });
-      }
-
-      if (Object.keys(categories).length === 1) {
-        insights.push({
-          message:
-            'Only one category detected. Use more detailed descriptions for better auto-categorization.',
-          urgency: 'info',
-        });
-      }
     }
 
     return { categories, sorted, totalCost, topCategory, topPct, insights };
   }
 
   // GET LEASE EXPIRATION STATS: Predicts which leases will end soon so we can start renewals.
+  // EXPIRE FORECAST: Identifies leases ending within 90 days to trigger renewal workflows.
   async getLeaseExpirationStats(user) {
     const propertyIds = await this._getAccessiblePropertyIds(user);
     if (propertyIds.length === 0) return [];
@@ -545,7 +440,6 @@ class ReportService {
     const ninetyDaysFromNow = addDays(nowTime, 90);
 
     return activeLeases.filter((lease) => {
-      // Filter by accessible properties
       if (!propertyIds.includes(Number(lease.propertyId))) return false;
       const endDate = parseLocalDate(lease.endDate);
       return endDate >= nowTime && endDate <= ninetyDaysFromNow;
@@ -555,15 +449,19 @@ class ReportService {
   /**
    * Analytics: Lease Expiration Forecast
    */
+  // RENEWAL ANALYTICS: Quantifies revenue at risk due to upcoming move-outs.
   async getLeaseExpirationReportData(user) {
+    // 1. Identify upcoming move-outs
     const expiringLeases = await this.getLeaseExpirationStats(user);
     const nowTime = getLocalTime();
 
+    // 2. Classify by urgency (Critical < 14 days, Urgent < 30 days)
     const leasesWithDays = expiringLeases
       .map((lease) => {
-        const endDate = parseLocalDate(lease.endDate);
-        const diffTime = endDate.getTime() - nowTime.getTime();
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        const diffDays = Math.ceil(
+          (parseLocalDate(lease.endDate).getTime() - nowTime.getTime()) /
+            (1000 * 60 * 60 * 24)
+        );
         let urgency = 'upcoming',
           urgencyColor = '#334155';
         if (diffDays <= 14) {
@@ -578,53 +476,28 @@ class ReportService {
       .sort((a, b) => a.diffDays - b.diffDays);
 
     const critical = leasesWithDays.filter((l) => l.urgency === 'critical');
-    const urgent = leasesWithDays.filter((l) => l.urgency === 'urgent');
-    const upcoming = leasesWithDays.filter((l) => l.urgency === 'upcoming');
     const revenueAtRisk = leasesWithDays.reduce(
       (sum, l) => sum + (l.monthlyRent || 0),
       0
     );
 
+    // 3. [INSIGHTS] Flash alerts for revenue protection
     const insights = [];
-    if (leasesWithDays.length === 0) {
+    if (critical.length > 0)
       insights.push({
-        message:
-          'No leases expiring in next 90 days. Portfolio stability is excellent.',
+        message: `${critical.length} leases expire within 14 days. LKR ${fromCents(critical.reduce((s, l) => s + l.monthlyRent, 0)).toLocaleString()}/mo at risk.`,
+        urgency: 'critical',
+      });
+    else
+      insights.push({
+        message: 'No critical expirations this fortnight.',
         urgency: 'success',
       });
-    } else {
-      if (critical.length > 0) {
-        const critRent = critical.reduce((s, l) => s + (l.monthlyRent || 0), 0);
-        insights.push({
-          message: `${critical.length} lease(s) expire within 14 days (LKR ${fromCents(critRent).toLocaleString()}/mo risk). contact tenants immediately.`,
-          urgency: 'critical',
-        });
-      }
-      if (urgent.length > 0) {
-        insights.push({
-          message: `${urgent.length} lease(s) expire within 15–30 days. Send formal renewal notices.`,
-          urgency: 'warning',
-        });
-      }
-      if (upcoming.length > 0 && critical.length === 0 && urgent.length === 0) {
-        insights.push({
-          message: `${upcoming.length} lease(s) expiring in 31–90 days. Begin proactive conversations.`,
-          urgency: 'info',
-        });
-      }
-    }
 
-    return {
-      leasesWithDays,
-      critical,
-      urgent,
-      upcoming,
-      revenueAtRisk,
-      insights,
-    };
+    return { leasesWithDays, revenueAtRisk, insights };
   }
 
-  // GET LEAD CONVERSION STATS: Tracks how successful we are at turning website visitors into tenants.
+  // CONVERSION ANALYTICS: Measures marketing ROI by tracking lead-to-tenant journey.
   async getLeadConversionStats(user, startDate = null, endDate = null) {
     const ownerId = user?.role === ROLES.OWNER ? user.id : null;
     const stats = await leadModel.getLeadConversionStats(
@@ -643,6 +516,7 @@ class ReportService {
   /**
    * Analytics: Lead Conversion
    */
+  // FUNNEL ANALYTICS: Identifies leaks in the sales pipeline.
   async getLeadConversionReportData(user, startDate = null, endDate = null) {
     const stats = await this.getLeadConversionStats(user, startDate, endDate);
     const convRate =
@@ -655,50 +529,28 @@ class ReportService {
         : '0.0';
 
     const insights = [];
-    if (stats.Total === 0) {
-      insights.push({
-        message:
-          'No leads captured yet. Track inquiries to measure marketing performance.',
-        urgency: 'warning',
-      });
-    } else {
-      if (Number(convRate) >= 30)
+    if (stats.Total > 0) {
+      if (Number(convRate) >= 15)
         insights.push({
-          message: `Strong conversion rate at ${convRate}%. Pipeline is performing well.`,
+          message: `Conversion rate at ${convRate}%. Pipeline is healthy.`,
           urgency: 'success',
-        });
-      else if (Number(convRate) >= 15)
-        insights.push({
-          message: `Conversion rate (${convRate}%) is moderate. Review follow-up timing.`,
-          urgency: 'warning',
         });
       else
         insights.push({
-          message: `Low conversion rate (${convRate}%). Improve property listings or response times.`,
+          message:
+            'Low conversion rate detected. Review property photos/pricing.',
           urgency: 'critical',
-        });
-
-      if (Number(dropRate) > 40)
-        insights.push({
-          message: `High drop-off rate (${dropRate}%). investigate leak in the pipeline.`,
-          urgency: 'critical',
-        });
-      if (stats.Interested > 0)
-        insights.push({
-          message: `${stats.Interested} lead(s) in active pipeline.`,
-          urgency: 'info',
         });
     }
 
     return { stats, convRate, dropRate, insights };
   }
 
+  // CASH FLOW FORECAST: Month-on-month trend analysis for institutional review.
   async getMonthlyCashFlow(user) {
     const propertyIds = await this._getAccessiblePropertyIds(user);
     if (propertyIds.length === 0) return [];
-
-    const stats = await ledgerModel.getMonthlyStats(propertyIds, 12);
-    return stats;
+    return await ledgerModel.getMonthlyStats(propertyIds, 12);
   }
 }
 

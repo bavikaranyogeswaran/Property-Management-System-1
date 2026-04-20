@@ -42,6 +42,7 @@ class LeaseCreationService {
 
   // CREATE LEASE: The foundation. Checks if a unit is free and creates a "Draft" contract.
   async createLease(data, connection = null, user = null) {
+    // 1. Extract input parameters
     const {
       tenantId,
       unitId,
@@ -49,10 +50,10 @@ class LeaseCreationService {
       endDate,
       monthlyRent,
       targetDeposit,
-      documentUrl, // [ADDED] Document URL
+      documentUrl,
     } = data;
 
-    // Validation (runs before acquiring any connection)
+    // 2. [VALIDATION] Prevent invalid or incomplete data from reaching the DB
     if (
       !tenantId ||
       !unitId ||
@@ -73,60 +74,41 @@ class LeaseCreationService {
       throw new AppError(durationCheck.error, 400);
     }
 
-    if (!parseLocalDate(startDate) || !parseLocalDate(endDate)) {
-      throw new AppError('Invalid date format', 400);
-    }
-
     if (monthlyRent <= 0) {
       throw new AppError('Monthly rent must be greater than 0', 400);
     }
 
-    // If no connection provided, create our own transaction.
     const isOwnTransaction = !connection;
     const conn = connection || (await pool.getConnection());
 
     try {
-      if (isOwnTransaction) {
-        await conn.beginTransaction();
-      }
+      if (isOwnTransaction) await conn.beginTransaction();
 
+      // 3. Verify tenant existence
       const tenant = await tenantModel.findByUserId(tenantId, conn);
-      if (!tenant) {
-        throw new AppError('Tenant not found', 404);
-      }
+      if (!tenant) throw new AppError('Tenant not found', 404);
 
-      // 1. Check if unit is available (and LOCK it)
+      // 4. [CONCURRENCY] Lock the unit for atomic status check
       const unit = await unitModel.findByIdForUpdate(unitId, conn);
-      if (!unit) {
-        throw new AppError('Unit not found', 404);
-      }
+      if (!unit) throw new AppError('Unit not found', 404);
 
-      // Check unit status - cannot lease units currently under maintenance or trashed
+      // [SECURITY] Block leasing for maintenance or inactive units
       if (unit.status === 'maintenance') {
-        throw new AppError(
-          'Unit is currently under maintenance and cannot be leased.',
-          409
-        );
+        throw new AppError('Unit is currently under maintenance.', 409);
       }
-      // [C2 FIX - Problem 3] Changed 'trashed' → 'inactive' (matches actual ENUM)
       if (unit.status === 'inactive') {
         throw new AppError('Unit is no longer available (inactive).', 409);
       }
 
-      // [PROPERTY STATUS HARDENING] Prevent new draft leases in inactive buildings
+      // [SECURITY] Block leasing in inactive buildings
       if (unit.propertyStatus === 'inactive' || unit.propertyArchived) {
         throw new AppError(
-          `Cannot create lease: The building (${unit.propertyName || 'Property'}) is currently inactive or archived.`,
+          `Building (${unit.propertyName}) is inactive or archived.`,
           409
         );
       }
 
-      // 2a. [REMOVED] Same-tenant overlap check (Supporting Multi-Unit Leases)
-      // We no longer block a single tenant from holding multiple active leases
-      // across different units or properties. Unit-level availability is still
-      // strictly enforced by the check below.
-
-      // 2. Check for Date Overlaps
+      // 5. [SECURITY] Atomic Overlap Check to prevent double-leasing
       const hasOverlap = await leaseModel.checkOverlap(
         unitId,
         startDate,
@@ -141,6 +123,7 @@ class LeaseCreationService {
         );
       }
 
+      // 6. Create the Lease record in 'draft' state
       const leaseParams = {
         tenantId,
         unitId,
@@ -151,17 +134,15 @@ class LeaseCreationService {
         targetDeposit: Number(targetDeposit || 0),
         documentUrl: documentUrl || null,
         leaseTermId: data.leaseTermId || null,
-        reservationExpiresInDays: 2, // [HARDENED] Use DB-native math
+        reservationExpiresInDays: 2,
       };
 
-      // 3. Create Lease
       const leaseId = await leaseModel.create(leaseParams, conn);
 
-      // [NEW] Update Unit Status to 'reserved' to hold it
+      // 7. [SIDE EFFECT] Hold the unit status to 'reserved'
       await unitModel.update(unitId, { status: 'reserved' }, conn);
 
-      // 4. Generate Security Deposit Invoice immediately for the Draft Lease
-      // This allows the tenant to pay their "Holding Deposit" before the official signing.
+      // 8. Generate Security Deposit Invoice and Magic Link
       let rawToken = null;
       if (leaseParams.targetDeposit > 0) {
         rawToken = randomUUID();
@@ -169,13 +150,13 @@ class LeaseCreationService {
           .createHash('sha256')
           .update(rawToken)
           .digest('hex');
-        const expiresAt = formatToLocalDate(addDays(today(), 7)); // Increased to 7 days for verification phase
+        const expiresAt = formatToLocalDate(addDays(today(), 7));
 
         await invoiceModel.create(
           {
             leaseId,
             amount: leaseParams.targetDeposit,
-            dueDate: formatToLocalDate(addDays(today(), 7)), // Due in 7 days to hold the unit
+            dueDate: formatToLocalDate(addDays(today(), 7)),
             description: 'Security Deposit',
             type: 'deposit',
             magicTokenHash: tokenHash,
@@ -183,13 +164,9 @@ class LeaseCreationService {
           },
           conn
         );
-
-        // Note: The rawToken should be passed to the email service if one was being sent here.
-        // Currently, LeaseService doesn't send the email directly in this method,
-        // but we've secured the storage.
       }
 
-      // Audit Log (Resilient)
+      // 9. [AUDIT] Log creation for staff history
       await this._safelyExecute('LEASE_CREATED_DRAFT Audit', async () => {
         await auditLogger.log(
           {
@@ -197,24 +174,14 @@ class LeaseCreationService {
             actionType: 'LEASE_CREATED_DRAFT',
             entityId: leaseId,
             entityType: 'lease',
-            details: {
-              tenantId,
-              unitId,
-              startDate,
-              endDate,
-              monthlyRent: leaseParams.monthlyRent,
-              targetDeposit: leaseParams.targetDeposit,
-            },
+            details: { ...leaseParams },
           },
           null,
           conn
         );
       });
 
-      if (isOwnTransaction) {
-        await conn.commit();
-      }
-
+      if (isOwnTransaction) await conn.commit();
       return { leaseId, magicToken: rawToken };
     } catch (error) {
       if (isOwnTransaction) {
@@ -230,28 +197,22 @@ class LeaseCreationService {
 
   // VERIFY DOCUMENTS: Staff review step. Marks the tenant's paperwork as valid.
   async verifyLeaseDocuments(leaseId, user) {
+    // 1. [RACE CONDITION] distributed lock to prevent double activation
     const lockKey = `dist_lock:lease_activation:${leaseId}`;
     const lockToken = await redis.acquireLock(lockKey, 30000);
     if (!lockToken) {
-      throw new AppError(
-        'This lease is currently being processed. Please try again in 30 seconds.',
-        409
-      );
+      throw new AppError('Lease is being processed. Try again in 30s.', 409);
     }
 
     const connection = await pool.getConnection();
     try {
       await connection.beginTransaction();
 
-      // [CONCURRENCY HARDENING] Lock Hierarchy (Unit -> Lease)
-      // Load base lease to get unitId
+      // 2. [CONCURRENCY] Lock Hierarchy (Unit -> Lease)
       const baseLease = await leaseModel.findById(leaseId, connection);
       if (!baseLease) throw new AppError('Lease not found', 404);
 
-      // Lock parent (Unit) first to maintain global hierarchy order
       await unitModel.findByIdForUpdate(baseLease.unitId, connection);
-
-      // Lock child (Lease) second
       const lease = await leaseModel.findByIdForUpdate(leaseId, connection);
       if (!lease) throw new AppError('Lease not found', 404);
 
@@ -262,18 +223,16 @@ class LeaseCreationService {
         );
       }
 
-      // [IDEMPOTENCY GUARD] Exit early if already verified to prevent redundant side effects
+      // 3. [IDEMPOTENCY] Exit if already verified
       if (lease.verificationStatus === 'verified') {
         return {
           isDocumentsVerified: true,
           activated: lease.status === 'active',
-          message:
-            lease.status === 'active'
-              ? 'Lease is already active and documents are verified.'
-              : 'Documents are already verified. Awaiting deposit payment for activation.',
+          message: 'Documents already verified.',
         };
       }
 
+      // 4. Update verification status
       await leaseModel.update(
         leaseId,
         {
@@ -284,7 +243,7 @@ class LeaseCreationService {
         connection
       );
 
-      // Audit Log (Resilient)
+      // 5. [AUDIT] Log verification
       await this._safelyExecute('LEASE_DOCUMENTS_VERIFIED Audit', async () => {
         await auditLogger.log(
           {
@@ -299,7 +258,7 @@ class LeaseCreationService {
         );
       });
 
-      // Check if deposit is already paid. If so, auto-activate now.
+      // 6. AUTO-ACTIVATION check: If deposit is paid, sign now.
       const depositStats = await leaseModel.getDepositStatus(
         leaseId,
         connection
@@ -310,37 +269,27 @@ class LeaseCreationService {
 
       if (depositStats && depositStats.isFullyPaid) {
         try {
-          // [GRACEFUL ACTIVATION] Attempt to sign/activate, but don't crash verification if it fails.
-          // This ensures documents stay verified even if the house isn't ready.
+          // [SIDE EFFECT] Trigger activation sequence
           await this.signLease(leaseId, user, connection);
           activated = true;
         } catch (actErr) {
-          console.warn(
-            `[LeaseCreationService] Auto-activation deferred during verification for Lease #${leaseId}:`,
-            actErr.message
-          );
           activationWarning = actErr.message;
         }
       }
 
       await connection.commit();
 
-      // [POST-COMMIT] Trigger Onboarding (Resilient)
+      // 7. [SIDE EFFECT] Trigger system onboarding for activated tenants
       if (activated) {
         await this._safelyExecute('TRIGGER_ONBOARDING', async () => {
           await userService.triggerOnboarding(lease.tenantId);
         });
       }
 
-      const baseMsg = 'Documents verified successfully.';
       return {
         isDocumentsVerified: true,
         activated,
-        message: activated
-          ? `${baseMsg} Lease auto-activated (deposit found).`
-          : activationWarning
-            ? `${baseMsg} Note: Auto-activation deferred: ${activationWarning}`
-            : `${baseMsg} Awaiting deposit payment for activation.`,
+        message: 'Documents verified successfully.',
       };
     } catch (error) {
       await connection.rollback();
@@ -353,22 +302,18 @@ class LeaseCreationService {
 
   // REJECT DOCUMENTS: Sends the tenant back to the drawing board if their papers are wrong.
   async rejectLeaseDocuments(leaseId, reason, user) {
-    if (!reason) {
-      throw new AppError('Rejection reason is required', 400);
-    }
+    // 1. Validation
+    if (!reason) throw new AppError('Rejection reason is required', 400);
+
     const connection = await pool.getConnection();
     try {
       await connection.beginTransaction();
 
-      // [CONCURRENCY HARDENING] Lock Hierarchy (Unit -> Lease)
-      // Load base lease to get unitId
+      // 2. [CONCURRENCY] Lock Hierarchy
       const baseLease = await leaseModel.findById(leaseId, connection);
       if (!baseLease) throw new AppError('Lease not found', 404);
 
-      // Lock parent (Unit) first
       await unitModel.findByIdForUpdate(baseLease.unitId, connection);
-
-      // Lock child (Lease) second
       const lease = await leaseModel.findByIdForUpdate(leaseId, connection);
       if (!lease) throw new AppError('Lease not found', 404);
 
@@ -378,6 +323,7 @@ class LeaseCreationService {
           400
         );
 
+      // 3. Mark as rejected to allow fresh uploads
       await leaseModel.update(
         leaseId,
         {
@@ -388,7 +334,7 @@ class LeaseCreationService {
         connection
       );
 
-      // Audit Log (Resilient)
+      // 4. [AUDIT] Log rejection
       await this._safelyExecute('LEASE_DOCUMENTS_REJECTED Audit', async () => {
         await auditLogger.log(
           {
@@ -403,10 +349,6 @@ class LeaseCreationService {
         );
       });
 
-      // [HARD RESERVATION FIX] If documents are rejected, we DO NOT automatically cancel the lease
-      // to allow the tenant to fix the issue. However, we could release the unit if desired.
-      // Keeping it reserved for now as rejection is often just "re-upload clearer images".
-
       await connection.commit();
       return { verificationStatus: 'rejected' };
     } catch (error) {
@@ -419,56 +361,43 @@ class LeaseCreationService {
 
   // SIGN LEASE: The final activation. Moves the lease from "Draft" to "Active" and the unit to "Occupied".
   async signLease(leaseId, user, connection = null) {
+    // 1. [RACE CONDITION] Acquire distributed lock
     const lockKey = `dist_lock:lease_activation:${leaseId}`;
     const isOwnTransaction = !connection;
     let lockToken = null;
 
-    // Only acquire distributed lock if this is the entry point (own transaction)
     if (isOwnTransaction) {
       lockToken = await redis.acquireLock(lockKey, 30000);
-      if (!lockToken) {
-        throw new AppError(
-          'Activation in progress. Please try again in 30 seconds.',
-          409
-        );
-      }
+      if (!lockToken) throw new AppError('Activation in progress.', 409);
     }
 
     const conn = connection || (await pool.getConnection());
 
     try {
-      if (isOwnTransaction) {
-        await conn.beginTransaction();
-      }
+      if (isOwnTransaction) await conn.beginTransaction();
 
-      // 1. Initial look up to get Unit ID (no lock)
+      // 2. [CONCURRENCY] Lock Parent (Unit) first
       const baseLease = await leaseModel.findById(leaseId, conn);
       if (!baseLease) throw new AppError('Lease not found', 404);
 
-      // 2. Lock Parent (Unit) first
       const unit = await unitModel.findByIdForUpdate(baseLease.unitId, conn);
-      if (!unit || unit.status === 'inactive') {
-        throw new AppError('Unit is no longer available for occupancy.', 409);
-      }
+      if (!unit || unit.status === 'inactive')
+        throw new AppError('Unit unavailable.', 409);
 
-      // [PROPERTY STATUS HARDENING] Check parent property status
+      // [SECURITY] Block activation if building is offline
       if (unit.propertyStatus === 'inactive' || unit.propertyArchived) {
         throw new AppError(
-          `Cannot activate lease: The building (${unit.propertyName || 'Property'}) is currently inactive or archived.`,
+          `Building (${unit.propertyName}) is inactive or archived.`,
           409
         );
       }
 
-      // 3. Lock Child (Lease) second
+      // 3. [CONCURRENCY] Lock Child (Lease) second
       const lease = await leaseModel.findByIdForUpdate(leaseId, conn);
       if (!lease) throw new AppError('Lease not found', 404);
 
-      // [FIX B] Allow idempotent re-entry — lease may have been activated in a previous
-      // crashed transaction that the gateway is retrying.
+      // [IDEMPOTENCY] Skip if already active
       if (lease.status === 'active' || lease.status === 'pending') {
-        console.log(
-          `[LeaseService] Idempotent signLease: Lease #${leaseId} is already ${lease.status}. Skipping.`
-        );
         if (isOwnTransaction) await conn.commit();
         return {
           status: lease.status,
@@ -477,22 +406,13 @@ class LeaseCreationService {
         };
       }
 
+      // 4. Integrity Checks: Status and Availability
       if (lease.status !== 'draft')
         throw new AppError('Only draft leases can be signed', 400);
-
-      if (unit.status === 'maintenance') {
-        throw new AppError(
-          'Unit is currently under maintenance or repair and cannot be leased until cleared by staff.',
-          409
-        );
-      }
-
-      if (!unit.isTurnoverCleared) {
-        throw new AppError(
-          'Unit is pending turnover clearance. Occupancy is blocked until inspection is complete.',
-          400
-        );
-      }
+      if (unit.status === 'maintenance')
+        throw new AppError('Unit is under maintenance.', 409);
+      if (!unit.isTurnoverCleared)
+        throw new AppError('Unit pending turnover clearance.', 400);
 
       const hasOverlap = await leaseModel.checkOverlap(
         lease.unitId,
@@ -501,33 +421,23 @@ class LeaseCreationService {
         leaseId,
         conn
       );
-      if (hasOverlap) {
-        throw new AppError(
-          'Unit is already leased for the selected dates.',
-          409
-        );
-      }
+      if (hasOverlap)
+        throw new AppError('Unit is already leased for these dates.', 409);
 
-      const todayDate = today();
-
-      // [NEW] Verify Deposit Payment in Ledger before activating
-      // This ensures the unit status move to 'occupied' is backed by verified funds.
+      // 5. [FINANCIAL] Final verification of Security Deposit funds
       const depositStats = await leaseModel.getDepositStatus(leaseId, conn);
       if (depositStats && !depositStats.isFullyPaid) {
         throw new AppError(
-          `Cannot activate lease: Security Deposit of LKR ${fromCents(depositStats.targetAmount).toLocaleString()} is not fully paid. Current ledger balance: LKR ${fromCents(depositStats.paidAmount).toLocaleString()}.`,
+          `Deposit not fully paid. Balance: LKR ${fromCents(depositStats.paidAmount)}.`,
           400
         );
       }
 
-      // [NEW] Verify Documents
-      if (!lease.isDocumentsVerified) {
-        throw new AppError(
-          'Cannot activate lease: Tenant documents have not been verified by staff.',
-          400
-        );
-      }
+      // 6. [SECURITY] Final validation of Staff Evidence verification
+      if (!lease.isDocumentsVerified)
+        throw new AppError('Documents not verified by staff.', 400);
 
+      // 7. Transition to 'active' or 'pending' (if future start date)
       const isFutureLease = parseLocalDate(lease.startDate) > getLocalTime();
       const initialStatus = isFutureLease ? 'pending' : 'active';
 
@@ -536,84 +446,78 @@ class LeaseCreationService {
         {
           status: initialStatus,
           signedAt: getLocalTime(),
-          reservationExpiresAt: { sql: 'NULL' }, // [HARDENED] Clear expiry using DB logic
+          reservationExpiresAt: { sql: 'NULL' },
         },
         conn
       );
 
-      // [D2 FIX] Clear magic tokens for this lease upon activation to kill guest links
+      // 8. [CLEANUP] Kill Magic Guest Links
       try {
         const [invs] = await conn.query(
           'SELECT invoice_id FROM rent_invoices WHERE lease_id = ? AND magic_token_hash IS NOT NULL',
           [leaseId]
         );
-        for (const inv of invs) {
+        for (const inv of invs)
           await invoiceModel.clearMagicToken(inv.invoice_id, conn);
-        }
       } catch (tokenErr) {
-        console.warn(
-          `[LeaseService] Failed to clear magic tokens for Lease #${leaseId}:`,
-          tokenErr.message
-        );
+        console.warn('Token cleanup failed', tokenErr.message);
       }
 
-      await visitModel.cancelVisitsForUnit(lease.unitId, todayDate, conn);
+      // 9. [SIDE EFFECT] Activate physical unit and convert leads
+      await visitModel.cancelVisitsForUnit(lease.unitId, today(), conn);
 
       if (parseLocalDate(lease.startDate) <= getLocalTime()) {
         await unitModel.update(lease.unitId, { status: 'occupied' }, conn);
 
+        // Convert Lead record to 'converted' automatically
         try {
           const tenantUser = await userModel.findById(lease.tenantId, conn);
           if (tenantUser?.email) {
-            // [HARDENED] Fuzzy Matching for Lead Conversion
-            // Use LOWER() and TRIM() to ensure conversion works even with inconsistent user entry.
             const [matchingLeads] = await conn.query(
-              `SELECT lead_id, status FROM leads 
+              `SELECT lead_id FROM leads 
                WHERE (LOWER(TRIM(email)) = LOWER(TRIM(?)) OR (unit_id = ? AND status = 'interested')) 
-               AND property_id = ? 
-               AND status = 'interested' 
-               ORDER BY (LOWER(TRIM(email)) = LOWER(TRIM(?))) DESC LIMIT 1`,
+               AND property_id = ? AND status = 'interested' LIMIT 1`,
               [
                 tenantUser.email,
                 unit.unitId || unit.unit_id,
                 unit.propertyId || unit.property_id,
-                tenantUser.email,
               ]
             );
-            if (matchingLeads.length > 0) {
+            if (matchingLeads.length > 0)
               await leadModel.update(
                 matchingLeads[0].lead_id,
                 { status: 'converted' },
                 conn
               );
-            }
           }
         } catch (err) {
-          console.error('Failed to mark lead as converted:', err);
+          console.error('Lead conversion failed', err);
         }
 
         await leadModel.dropLeadsForUnit(lease.unitId, conn);
       }
 
-      // [IMPROVEMENT] Backfill Missing Rent Invoices if activated late
-      // [RESILIENCE] Wrapped in try/catch to ensure activation isn't blocked by non-critical backfill errors.
+      // 10. [OPERATIONAL] Backfill missing Rent Invoices if activated late
       try {
         const start = parseLocalDate(lease.startDate);
-        const now = getLocalTime();
-
         let cursorDate = new Date(start.getFullYear(), start.getMonth(), 1);
-        const targetDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        const targetDate = new Date(
+          getLocalTime().getFullYear(),
+          getLocalTime().getMonth(),
+          1
+        );
 
         while (cursorDate <= targetDate) {
-          const y = cursorDate.getFullYear();
-          const m = cursorDate.getMonth() + 1;
-
-          const billingInfo = billingEngine.calculateMonthlyRent(lease, y, m);
+          const billingInfo = billingEngine.calculateMonthlyRent(
+            lease,
+            cursorDate.getFullYear(),
+            cursorDate.getMonth() + 1
+          );
           if (billingInfo) {
             const exists = await invoiceModel.exists(
               lease.id,
-              y,
-              m,
+              cursorDate.getFullYear(),
+              cursorDate.getMonth() + 1,
               'rent',
               conn
             );
@@ -633,14 +537,10 @@ class LeaseCreationService {
           cursorDate.setMonth(cursorDate.getMonth() + 1);
         }
       } catch (backfillErr) {
-        console.error(
-          `[LeaseService] Automated Rent Backfill failed for Lease #${leaseId}:`,
-          backfillErr
-        );
-        // We do NOT throw here. The lease activation is the priority.
+        console.error('Rent backfill failed', backfillErr);
       }
 
-      // Audit Log (Resilient)
+      // 11. [AUDIT] Log final activation
       await this._safelyExecute('LEASE_SIGNED_ACTIVATED Audit', async () => {
         await auditLogger.log(
           {
@@ -655,31 +555,21 @@ class LeaseCreationService {
         );
       });
 
-      if (isOwnTransaction) {
-        await conn.commit();
-      }
+      if (isOwnTransaction) await conn.commit();
 
-      // [POST-COMMIT] Notify dropped leads (Resilient)
+      // [SIDE EFFECT] Notify dropped leads of unit unavailability
       if (parseLocalDate(lease.startDate) <= getLocalTime()) {
         await this._safelyExecute('Notify Dropped Leads', async () => {
           const [droppedLeads] = await conn.query(
-            `SELECT l.email, l.name, u.unit_number, p.name AS property_name 
-             FROM leads l
-             JOIN units u ON l.unit_id = u.unit_id
-             JOIN properties p ON l.property_id = p.property_id
-             WHERE l.unit_id = ? AND l.status = 'dropped' 
-             AND l.notes LIKE '%Unit Leased%'`,
+            `SELECT l.email, l.name, u.unit_number, p.name AS property_name FROM leads l JOIN units u ON l.unit_id = u.unit_id JOIN properties p ON l.property_id = p.property_id WHERE l.unit_id = ? AND l.status = 'dropped' AND l.notes LIKE '%Unit Leased%'`,
             [lease.unitId]
           );
-
-          for (const lead of droppedLeads) {
-            if (lead.email) {
+          for (const lead of droppedLeads)
+            if (lead.email)
               await emailService.sendGenericNotification(lead.email, {
-                subject: `Unit ${lead.unit_number} at ${lead.property_name} is no longer available`,
-                message: `Dear ${lead.name}, Unit ${lead.unit_number} at ${lead.property_name} is no longer available. Please contact us for alternative units.`,
+                subject: `Unit unavailable`,
+                message: `Unit ${lead.unit_number} at ${lead.property_name} is no longer available.`,
               });
-            }
-          }
         });
       }
 
@@ -701,6 +591,7 @@ class LeaseCreationService {
    * Standard error handler for silent side-effect failures.
    * Ensures non-critical tasks like logging and notifications do not crash core business state.
    */
+  // SAFELY EXECUTE: Standard error handler for non-critical silent side-effect failures.
   async _safelyExecute(label, fn) {
     try {
       await fn();
@@ -709,7 +600,6 @@ class LeaseCreationService {
         `[LeaseCreationService] Non-critical failure in ${label}:`,
         err.message
       );
-      // We do NOT re-throw. We want the main transaction to complete.
     }
   }
 }

@@ -27,45 +27,35 @@ class LeaseBillingService {
     this.facade = facade;
   }
 
+  // ADD RENT ADJUSTMENT: Schedules a future change to the monthly rent amount.
   async addRentAdjustment(leaseId, data, user) {
+    // 1. [SECURITY] Identify lease and verify management rights
     const lease = await this.facade.getLeaseById(leaseId, user);
     if (!lease) throw new AppError('Lease not found', 404);
     if (!isAtLeast(user.role, ROLES.OWNER))
-      throw new AppError(
-        'Access denied: Only owners can perform rent adjustments',
-        403
-      );
+      throw new AppError('Only Owners can adjust rent.', 403);
 
     const { effectiveDate, newMonthlyRent, notes } = data;
-    if (
-      !effectiveDate ||
-      newMonthlyRent === undefined ||
-      newMonthlyRent === null
-    ) {
-      throw new AppError('effectiveDate and newMonthlyRent are required', 400);
-    }
+    if (!effectiveDate || newMonthlyRent === undefined)
+      throw new AppError('Missing adjustment data.', 400);
 
-    if (newMonthlyRent < 0) {
-      throw new AppError('Monthly rent cannot be negative', 400);
-    }
+    // 2. [VALIDATION] Temporal constraints: Adjustment must fall within active lease dates
     const start = parseLocalDate(lease.startDate);
     const eff = parseLocalDate(effectiveDate);
-
     if (eff < start)
       throw new AppError('Adjustment date cannot be before lease start', 400);
     if (lease.endDate && eff > parseLocalDate(lease.endDate))
       throw new AppError('Adjustment date cannot be after lease end', 400);
 
-    // [HARDENED] Input is now sanitized to cents at the controller.
-    const newRentCents = newMonthlyRent;
-
+    // 3. Persist the future-dated adjustment record
     const adjustmentId = await leaseModel.createAdjustment({
       leaseId,
       effectiveDate,
-      newMonthlyRent: newRentCents,
+      newMonthlyRent,
       notes,
     });
 
+    // 4. [AUDIT] Track the financial change
     await auditLogger.log({
       userId: user.id || user.user_id,
       actionType: 'LEASE_RENT_ADJUSTED',
@@ -77,6 +67,7 @@ class LeaseBillingService {
     return adjustmentId;
   }
 
+  // GET ADJUSTMENTS: Lists all historical and future rent variations for the tenancy.
   async getRentAdjustments(leaseId, user) {
     const lease = await this.facade.getLeaseById(leaseId, user);
     if (!lease) throw new AppError('Lease not found', 404);

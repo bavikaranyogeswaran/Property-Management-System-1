@@ -38,7 +38,7 @@ class MaintenanceService {
   async createRequest(data, tenantId) {
     const { unitId, title, description, priority, images } = data;
 
-    // RBAC/Security: Verify tenant currently LEASES this unit
+    // 1. [SECURITY] RBAC: Verify tenant currently LEASES this unit
     const tenantLeases = await leaseModel.findByTenantId(tenantId);
     const isLeased = tenantLeases.some(
       (l) => l.unitId === unitId.toString() && l.status === 'active'
@@ -46,12 +46,12 @@ class MaintenanceService {
 
     if (!isLeased) {
       throw new AppError(
-        'Access denied. You do not have an active lease for this unit.',
+        'Access denied. No active lease found for this unit.',
         403
       );
     }
 
-    // [HARDENED ANTI-SPAM] Content-Aware Deduplication
+    // 2. [SECURITY] Content-Aware Deduplication to prevent spamming
     const isDuplicate = await maintenanceRequestModel.findRecentDuplicate(
       unitId,
       tenantId,
@@ -59,21 +59,16 @@ class MaintenanceService {
       description
     );
     if (isDuplicate) {
-      throw new AppError(
-        'A maintenance request with this exact content was already submitted recently. Please wait a few minutes before trying again.',
-        400
-      );
+      throw new AppError('Similar request already submitted recently.', 400);
     }
 
-    // Flood Protection: Max 5 open requests per unit
+    // 3. Flood Protection: Max 5 open requests per unit
     const openCount = await maintenanceRequestModel.countOpenByUnitId(unitId);
     if (openCount >= 5) {
-      throw new AppError(
-        'Maximum number of open maintenance requests (5) reached for this unit.',
-        400
-      );
+      throw new AppError('Maximum open requests reached for this unit.', 400);
     }
 
+    // 4. Create the Maintenance Request record
     const requestId = await maintenanceRequestModel.create({
       unitId,
       tenantId,
@@ -84,12 +79,12 @@ class MaintenanceService {
       images,
     });
 
-    // Notify Owner
+    // 5. [SIDE EFFECT] Notify Owner of the new issue
     try {
       const unit = await unitModel.findById(unitId);
-      if (unit && unit.propertyId) {
+      if (unit?.propertyId) {
         const property = await propertyModel.findById(unit.propertyId);
-        if (property && property.ownerId) {
+        if (property?.ownerId) {
           await notificationModel.create({
             userId: property.ownerId,
             message: `New Maintenance Request for Unit ${unit.unitNumber}: ${title}`,
@@ -101,21 +96,19 @@ class MaintenanceService {
         }
       }
     } catch (notifyErr) {
-      console.error(
-        'Failed to notify owner of maintenance request:',
-        notifyErr
-      );
+      console.error('Owner notification failed:', notifyErr);
     }
 
     return requestId;
   }
 
-  // UPDATE STATUS: Moves a request through the workflow (e.g., 'submitted' -> 'in_progress' -> 'completed').
+  // UPDATE STATUS: Moves a request through the workflow.
   async updateStatus(id, data, user) {
     const { status } = data;
+    // 1. [SECURITY] RBAC check
     if (!authorizationService.isAtLeast(user.role, ROLES.TREASURER)) {
       throw new AppError(
-        'Only Treasurers (or Owners) can update maintenance status',
+        'Only Treasurers/Owners can update maintenance status',
         403
       );
     }
@@ -127,41 +120,37 @@ class MaintenanceService {
       const request = await maintenanceRequestModel.findById(id);
       if (!request) throw new AppError('Request not found', 404);
 
-      // Treasurer RBAC: Check assigned property
+      // 2. [SECURITY] Estate-specific assignment check for Treasurers
       if (user.role === ROLES.TREASURER) {
         const unit = await unitModel.findById(request.unitId, connection);
         if (!unit) throw new AppError('Unit not found', 404);
-
         const isAssigned = await staffModel.isAssignedToProperty(
           user.id,
           unit.propertyId
         );
-
-        if (!isAssigned) {
+        if (!isAssigned)
           throw new AppError(
-            'Access denied. You are not assigned to the property for this unit.',
+            'Access denied: Property assignment required.',
             403
           );
-        }
       }
 
-      // State Machine Guardrails
+      // 3. [SECURITY] State Machine Guardrails to prevent status regression
       if (request.status === 'completed' || request.status === 'closed') {
-        if (status !== request.status) {
+        if (status !== request.status)
           throw new AppError(
             `Cannot update status of a ${request.status} request.`,
             400
           );
-        }
       }
       if (request.status === 'in_progress' && status === 'submitted') {
         throw new AppError(
-          'Cannot move a request backwards from in_progress to submitted.',
+          'Cannot move request backwards from in_progress to submitted.',
           400
         );
       }
 
-      // Extract assignment metadata if provided
+      // 4. Record new status and technician metadata
       const assignmentData = {
         assignedTo: data.assignedTo,
         assignedBy: user.id,
@@ -175,17 +164,17 @@ class MaintenanceService {
         assignmentData
       );
 
-      // [NEW] Record resolution timestamp for performance tracking
+      // 5. [AUDIT] Track resolution time
       if (status === 'completed' || status === 'closed') {
-        const [rows] = await connection.query(
+        await connection.query(
           'UPDATE maintenance_requests SET resolved_at = NOW() WHERE request_id = ? AND resolved_at IS NULL',
           [id]
         );
       }
 
-      // [HARDENED] Deterministic Locking Order
-      // Lock the Unit record first before synchronizing its availability status
+      // 6. [CONCURRENCY] Unit Availability Synchronization
       if (status === 'completed' || status === 'closed') {
+        // [HARDENED] Deterministic Locking Order (Unit first)
         const unitLock = await unitModel.findByIdForUpdate(
           request.unitId,
           connection
@@ -197,76 +186,61 @@ class MaintenanceService {
           connection
         );
 
-        // If this request was just completed, we must ensure NO other submitted/in-progress ones exist
-        if (openCount === 0) {
-          const unit = unitLock; // Use the already locked record
-
-          // Critical Guardrail: Only revert if the unit was specifically in 'maintenance' status
-          if (unit && unit.status === 'maintenance') {
-            // [CRITICAL FIX] Avoid "Ghost Availability"
-            // Check if there's a future lease commitment before marking as 'available'
-            const [futureLeases] = await connection.query(
-              `SELECT COUNT(*) as count FROM leases 
-                              WHERE unit_id = ? AND status IN ('active', 'pending', 'draft')
-                              AND (start_date > CURRENT_DATE() OR (status = 'draft' AND (reservation_expires_at IS NULL OR reservation_expires_at >= CURRENT_DATE())))`,
-              [request.unitId]
-            );
-
-            const nextStatus =
-              futureLeases[0].count > 0 ? 'reserved' : 'available';
-            await unitModel.update(
-              request.unitId,
-              { status: nextStatus },
-              connection
-            );
-            console.log(
-              `[MaintenanceService] Auto-released Unit ${unit.unitNumber} to '${nextStatus}' after repairs.`
-            );
-          }
+        // If no more open tasks, release the unit status
+        if (openCount === 0 && unitLock.status === 'maintenance') {
+          // Check for future lease commitments
+          const [futureLeases] = await connection.query(
+            `SELECT COUNT(*) as count FROM leases WHERE unit_id = ? AND status IN ('active', 'pending', 'draft') AND (start_date > CURRENT_DATE() OR (status = 'draft' AND (reservation_expires_at IS NULL OR reservation_expires_at >= CURRENT_DATE())))`,
+            [request.unitId]
+          );
+          const nextStatus =
+            futureLeases[0].count > 0 ? 'reserved' : 'available';
+          await unitModel.update(
+            request.unitId,
+            { status: nextStatus },
+            connection
+          );
         }
       }
 
       await connection.commit();
 
-      // Notification Logic (Async, outside transaction)
+      // 7. [SIDE EFFECT] Notify Tenant and Staff of status change (Non-blocking)
       if (status === 'completed' || status === 'in_progress') {
         try {
-          if (request && request.tenant_id) {
-            // Internal Notification
+          if (request?.tenant_id) {
             await notificationModel.create({
               userId: request.tenant_id,
               message:
                 status === 'completed'
-                  ? `Maintenance Request '${request.title}' has been marked as completed.`
-                  : `Maintenance Request '${request.title}' is now In Progress. Technician assigned.`,
+                  ? `Maintenance Request '${request.title}' completed.`
+                  : `Maintenance Request '${request.title}' in progress.`,
               type: 'maintenance',
               entityType: 'maintenance_request',
               entityId: id,
             });
 
-            // Email Notification
             const tenant = await userModel.findById(request.tenant_id);
-            if (tenant && tenant.email) {
+            if (tenant?.email) {
               const unit = await unitModel.findById(request.unitId);
               const property = unit
                 ? await propertyModel.findById(unit.propertyId)
                 : null;
-
               await emailService.sendMaintenanceStatusUpdate(tenant.email, {
                 title: request.title,
-                status: status,
-                propertyName: property ? property.name : null,
-                unitNumber: unit ? unit.unitNumber : null,
+                status,
+                propertyName: property?.name,
+                unitNumber: unit?.unitNumber,
               });
             }
           }
 
           if (status === 'completed') {
             const treasurers = await userModel.findByRole(ROLES.TREASURER);
-            for (const treasurer of treasurers) {
+            for (const t of treasurers) {
               await notificationModel.create({
-                userId: treasurer.user_id,
-                message: `Maintenance Request '${request.title}' has been completed. Please record final costs.`,
+                userId: t.user_id,
+                message: `Maintenance Request '${request.title}' completed. Review costs.`,
                 type: 'maintenance',
                 entityType: 'maintenance_request',
                 entityId: id,
@@ -274,10 +248,7 @@ class MaintenanceService {
             }
           }
         } catch (err) {
-          console.error(
-            'Failed to send maintenance status update notifications:',
-            err
-          );
+          console.error('Status update notification failed:', err);
         }
       }
 
@@ -292,9 +263,10 @@ class MaintenanceService {
 
   // CREATE INVOICE: Generates a bill for the tenant for maintenance-related costs.
   async createInvoice(data, user) {
+    // 1. [SECURITY] RBAC check
     if (!authorizationService.isAtLeast(user.role, ROLES.TREASURER)) {
       throw new AppError(
-        'Access denied. Only Treasurers (or Owners) can create maintenance invoices.',
+        'Only Treasurers/Owners can create maintenance invoices.',
         403
       );
     }
@@ -305,34 +277,29 @@ class MaintenanceService {
       await connection.beginTransaction();
 
       const { requestId, amount, dueDate, description } = data;
+
+      // 2. Locate request and historical lease context
       const request = await maintenanceRequestModel.findById(
         requestId,
         connection
       );
       if (!request) throw new AppError('Maintenance Request not found', 404);
 
-      // [HARDENED] Historical Context Discovery:
-      // Find the lease that was active when the request was created, regardless of time elapsed.
       const targetLease = await this._getLeaseForRequest(requestId, connection);
-
       if (!targetLease) {
         throw new AppError(
-          `Critical Integrity Error: No historical or active lease found for Tenant ID ${request.tenantId} at Unit ${request.unitId}. Maintenance cannot be billed without a ledger recipient.`,
+          'Critical Integrity Error: No historical lease found via _getLeaseForRequest.',
           409
         );
       }
 
+      // 3. Aggregate all unbilled costs associated with this job
       const [unbilledCosts] = await connection.query(
         'SELECT cost_id, amount FROM maintenance_costs WHERE request_id = ? AND invoice_id IS NULL',
         [requestId]
       );
-
-      if (unbilledCosts.length === 0) {
-        throw new AppError(
-          'No unbilled costs found for this maintenance request to invoice.',
-          400
-        );
-      }
+      if (unbilledCosts.length === 0)
+        throw new AppError('No unbilled costs found to invoice.', 400);
 
       const aggregatedTotalCents = unbilledCosts.reduce(
         (sum, cost) => sum + Number(cost.amount),
@@ -340,18 +307,9 @@ class MaintenanceService {
       );
       const costIds = unbilledCosts.map((c) => c.cost_id);
 
+      // 4. Create the Invoice record
       let proposedDescription =
         description || `Maintenance Bill: ${request.title}`;
-      const existingInvoices = await invoiceModel.findByLeaseAndDescription(
-        targetLease.id,
-        proposedDescription,
-        connection
-      );
-
-      if (existingInvoices.length > 0) {
-        proposedDescription = `${proposedDescription} (${new Date().getTime()})`;
-      }
-
       const invoiceId = await invoiceModel.create(
         {
           leaseId: targetLease.id,
@@ -363,7 +321,7 @@ class MaintenanceService {
         connection
       );
 
-      // Link all aggregated costs to this new invoice
+      // 5. Link costs to the new invoice
       if (costIds.length > 0) {
         await connection.query(
           'UPDATE maintenance_costs SET invoice_id = ?, is_reimbursable = TRUE WHERE cost_id IN (?)',
@@ -371,33 +329,30 @@ class MaintenanceService {
         );
       }
 
-      // [NEW] Attempt to auto-apply any credits
+      // 6. [SIDE EFFECT] Attempt to auto-apply any account credits
       await paymentService.applyTenantCredit(invoiceId, connection);
 
       await connection.commit();
 
-      const displayAmountMajor = fromCents(aggregatedTotalCents);
+      // 7. [SIDE EFFECT] Notify Tenant of the maintenance bill via notification and email
       const finalInvoice = await invoiceModel.findById(invoiceId);
-
       await notificationModel.create({
         userId: request.tenantId,
-        message: `You have been billed ${displayAmountMajor} for maintenance: ${request.title}${finalInvoice.status === 'paid' ? ' (Paid via Credit)' : ''}`,
+        message: `Billed LKR ${fromCents(aggregatedTotalCents)} for maintenance: ${request.title}${finalInvoice.status === 'paid' ? ' (Paid via Credit)' : ''}`,
         type: 'invoice',
         entityType: 'invoice',
         entityId: invoiceId,
       });
 
-      // Notify Tenant via Email
       try {
         const tenant = await userModel.findById(request.tenantId);
-        if (tenant && tenant.email) {
-          const currentNow = now();
+        if (tenant?.email) {
           await emailService.sendInvoiceNotification(tenant.email, {
-            amount: displayAmountMajor,
+            amount: fromCents(aggregatedTotalCents),
             dueDate: dueDate || today(),
-            month: currentNow.getMonth() + 1,
-            year: currentNow.getFullYear(),
-            invoiceId: invoiceId,
+            month: now().getMonth() + 1,
+            year: now().getFullYear(),
+            invoiceId,
             description: proposedDescription,
             isPaid: finalInvoice.status === 'paid',
           });
@@ -409,10 +364,6 @@ class MaintenanceService {
       return invoiceId;
     } catch (error) {
       await connection.rollback();
-      console.error(
-        '[MaintenanceService] Create Maintenance Invoice Transaction Failed:',
-        error
-      );
       throw error;
     } finally {
       connection.release();
@@ -421,9 +372,10 @@ class MaintenanceService {
 
   // RECORD COST: Specifically logs a material or labor expense for a repair job.
   async recordCost(data, user) {
+    // 1. [SECURITY] RBAC check
     if (!authorizationService.isAtLeast(user.role, ROLES.TREASURER)) {
       throw new AppError(
-        'Access denied. Only Treasurers (or Owners) can record maintenance costs.',
+        'Only Treasurers/Owners can record maintenance costs.',
         403
       );
     }
@@ -443,7 +395,7 @@ class MaintenanceService {
     try {
       await connection.beginTransaction();
 
-      // 1. Record the cost
+      // 2. Perform the cost insertion
       const costId = await maintenanceCostModel.create(
         {
           requestId,
@@ -457,14 +409,13 @@ class MaintenanceService {
         connection
       );
 
-      // 2. Identify lease to link ledger entry
-      // [BILLING FIX] Same context-aware logic for recording costs
+      // 3. Identify lease context for ledger and billing routing
       const targetLease = await this._getLeaseForRequest(requestId, connection);
 
       let generatedInvoiceId = null;
 
       if (targetLease) {
-        // [F2.6] Route cost based on billTo field
+        // 4. [SIDE EFFECT] Create instant invoice if billTo = Tenant
         if (billTo === ROLES.TENANT) {
           const invoiceId = await invoiceModel.create(
             {
@@ -476,18 +427,15 @@ class MaintenanceService {
             },
             connection
           );
-
           generatedInvoiceId = invoiceId;
-
           await connection.query(
             'UPDATE maintenance_costs SET invoice_id = ?, is_reimbursable = TRUE WHERE cost_id = ?',
             [invoiceId, costId]
           );
-
           await notificationModel.create(
             {
               userId: targetLease.tenantId,
-              message: `A maintenance charge of LKR ${Number(amount).toFixed(2)} has been billed to your account.`,
+              message: `Maintenance charge LKR ${Number(amount).toFixed(2)} billed.`,
               type: 'invoice',
               entityType: 'invoice',
               entityId: invoiceId,
@@ -496,7 +444,7 @@ class MaintenanceService {
           );
         }
 
-        // 3. Post to Ledger as an Expense
+        // 5. [AUDIT] Post to Ledger as an Expense (Category decided by billTo)
         await ledgerModel.create(
           {
             leaseId: targetLease.id,
@@ -512,8 +460,8 @@ class MaintenanceService {
           connection
         );
       } else {
-        console.error(
-          `[MaintenanceService] WARNING: Maintenance cost recorded for Req #${requestId} but NO LEASE was found. Ledger entry skipped. Owner payout will be inaccurate.`
+        console.warn(
+          `Maintenance Req #${requestId} cost recorded without an active lease link. Ledger skip.`
         );
       }
 
@@ -531,22 +479,20 @@ class MaintenanceService {
 
       await connection.commit();
 
-      // Notify Tenant via Email if an invoice was generated
+      // 6. [SIDE EFFECT] Notify Tenant if auto-billed
       if (generatedInvoiceId && targetLease) {
         try {
           const tenant = await userModel.findById(targetLease.tenantId);
-          if (tenant && tenant.email) {
-            const currentNow = now();
+          if (tenant?.email)
             await emailService.sendInvoiceNotification(tenant.email, {
               amount: Number(amount),
               dueDate: formatToLocalDate(addDays(now(), 7)),
-              month: currentNow.getMonth() + 1,
-              year: currentNow.getFullYear(),
+              month: now().getMonth() + 1,
+              year: now().getFullYear(),
               invoiceId: generatedInvoiceId,
               description: `Maintenance charge: ${request.title}`,
               isPaid: false,
             });
-          }
         } catch (err) {
           console.error('Failed to send maintenance invoice email:', err);
         }
@@ -568,12 +514,12 @@ class MaintenanceService {
    * [NEW] Private Helper: Identify the correct lease for a maintenance request.
    * Prioritizes the lease that was active on the date the request was created.
    */
+  // GET LEASE FOR REQUEST: Private Helper indicating which lease was active at time of job initiation.
   async _getLeaseForRequest(requestId, connection = null) {
     const request = await maintenanceRequestModel.findById(requestId);
     if (!request) return null;
 
-    // [BILLING FIX] Fetch ALL leases for this physical unit, regardless of tenant mapping.
-    // This allows maintenance on vacant units to be anchored to the most recent lease for ledger/payout routing.
+    // Fetch all leases for the unit to find the chronological match
     const leases = await leaseModel.findByUnitId(request.unitId, connection);
 
     const requestDateString =
@@ -581,34 +527,30 @@ class MaintenanceService {
         ? request.createdAt.toISOString().split('T')[0]
         : new Date(request.createdAt).toISOString().split('T')[0];
 
-    // 1. Best Match: Lease that was active spanning the date the request was created.
-    let targetLease = leases.find((l) => {
-      return (
+    // Priority 1: Direct date match
+    let targetLease = leases.find(
+      (l) =>
         requestDateString >= l.startDate &&
         (!l.endDate || requestDateString <= l.endDate)
-      );
-    });
+    );
 
-    // 2. Fallback: Most recent lease for that unit (findByUnitId is pre-ordered DESC)
-    if (!targetLease && leases.length > 0) {
-      targetLease = leases[0];
-    }
+    // Priority 2: Fallback to most recent lease
+    if (!targetLease && leases.length > 0) targetLease = leases[0];
 
     return targetLease;
   }
 
+  // GET REQUESTS: Fetches relevant jobs based on User role.
   async getRequests(user) {
-    if (user.role === ROLES.SYSTEM) {
+    if (user.role === ROLES.SYSTEM)
       return await maintenanceRequestModel.findAll();
-    } else if (user.role === ROLES.TENANT) {
+    if (user.role === ROLES.TENANT)
       return await maintenanceRequestModel.findByTenantId(user.id);
-    } else if (user.role === ROLES.OWNER) {
+    if (user.role === ROLES.OWNER)
       return await maintenanceRequestModel.findByOwnerId(user.id);
-    } else if (user.role === ROLES.TREASURER) {
+    if (user.role === ROLES.TREASURER)
       return await maintenanceRequestModel.findByTreasurerId(user.id);
-    } else {
-      throw new AppError('Access denied', 403);
-    }
+    throw new AppError('Access denied', 403);
   }
 }
 
