@@ -8,11 +8,12 @@
 import pool from '../config/db.js';
 
 class StaffModel {
+  // CREATE: Records professional and scheduling metadata for a staff member.
   async create(staffData, connection) {
     const { userId, nic, employeeId, jobTitle, shiftStart, shiftEnd } =
       staffData;
 
-    // Uses the provided connection for transaction support
+    // 1. [DATA] Persistence: Extends the core 'User' profile with employment-specific fields
     const query = `
             INSERT INTO staff 
             (user_id, nic, employee_id, job_title, shift_start, shift_end) 
@@ -29,6 +30,7 @@ class StaffModel {
         shiftEnd,
       ]);
     } catch (err) {
+      // 2. [SECURITY] Duplicate Guard: Enforce identity uniqueness via NIC
       if (
         err.code === 'ER_DUP_ENTRY' &&
         err.message.includes('unique_staff_nic')
@@ -43,7 +45,9 @@ class StaffModel {
     return userId;
   }
 
+  // FIND BY USER ID: Resolves the employment profile for a specific staff user.
   async findByUserId(userId) {
+    // 1. [QUERY] Extraction
     const [rows] = await pool.query('SELECT * FROM staff WHERE user_id = ?', [
       userId,
     ]);
@@ -59,11 +63,9 @@ class StaffModel {
     };
   }
 
-  //  ASSIGN PROPERTY: Giving a Treasurer responsibility for a specific building.
-  //  The UNIQUE(user_id, property_id) constraint prevents duplicate assignments.
-  //  Multiple staff can now be assigned to the same property.
+  // ASSIGN PROPERTY: Links a treasurer to a building they are responsible for managing.
   async assignProperty(userId, propertyId) {
-    // Check if this specific user is already assigned to this property
+    // 1. [SECURITY] Sanity Check: Prevent logical duplicate assignments
     const [existing] = await pool.query(
       'SELECT user_id FROM staff_property_assignments WHERE user_id = ? AND property_id = ?',
       [userId, propertyId]
@@ -73,6 +75,7 @@ class StaffModel {
       throw new Error('This treasurer is already assigned to this property');
     }
 
+    // 2. [DATA] Persistence: Grant management access via join-table entry
     const [result] = await pool.query(
       'INSERT INTO staff_property_assignments (user_id, property_id) VALUES (?, ?)',
       [userId, propertyId]
@@ -80,7 +83,9 @@ class StaffModel {
     return result.insertId;
   }
 
+  // REMOVE PROPERTY ASSIGNMENT: Revokes a staff member's management access to a building.
   async removePropertyAssignment(userId, propertyId) {
+    // 1. [DATA] Cleanup
     const [result] = await pool.query(
       'DELETE FROM staff_property_assignments WHERE user_id = ? AND property_id = ?',
       [userId, propertyId]
@@ -88,14 +93,14 @@ class StaffModel {
     return result.affectedRows > 0;
   }
 
+  // GET ASSIGNED PROPERTIES: Lists all buildings under a staff member's active management.
   async getAssignedProperties(userId) {
+    // 1. [QUERY] Extraction via Join-Table
     const [rows] = await pool.query(
-      `
-            SELECT p.*, spa.assigned_at 
+      `SELECT p.*, spa.assigned_at 
             FROM properties p
             JOIN staff_property_assignments spa ON p.property_id = spa.property_id
-            WHERE spa.user_id = ?
-        `,
+            WHERE spa.user_id = ?`,
       [userId]
     );
 
@@ -112,11 +117,9 @@ class StaffModel {
     }));
   }
 
-  /**
-   * [HIGH-PERFORMANCE] Point-check for staff assignment.
-   * Replaces fetching of the entire portfolio with a single row 'EXISTS' check.
-   */
+  // IS ASSIGNED TO PROPERTY: Low-latency check to verify management authorization.
   async isAssignedToProperty(userId, propertyId) {
+    // 1. [SECURITY] Point Check: Validates assignment without pulling full building metadata
     const [rows] = await pool.query(
       'SELECT 1 FROM staff_property_assignments WHERE user_id = ? AND property_id = ? LIMIT 1',
       [userId, propertyId]

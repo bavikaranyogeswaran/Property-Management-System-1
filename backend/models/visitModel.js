@@ -7,6 +7,7 @@
 import db from '../config/db.js';
 
 class VisitModel {
+  // CREATE: Schedules a new property viewing, ensuring data normalization between leads and guests.
   async create(data) {
     const {
       propertyId,
@@ -17,15 +18,15 @@ class VisitModel {
       visitorPhone,
       scheduledDate,
       notes,
-      assignedStaffId, // [H22] Staff member conducting the visit
+      assignedStaffId,
     } = data;
 
-    // C28 Resolve: Single Source of Truth
-    // If a lead is linked, we do NOT store redundant name/email/phone in local columns.
+    // 1. [DATA] Redundancy Cleanup: don't store contact info if linked to a lead (Source of Truth resolution)
     const finalName = leadId ? null : visitorName;
     const finalEmail = leadId ? null : visitorEmail;
     const finalPhone = leadId ? null : visitorPhone;
 
+    // 2. [DATA] Persistence: records the appointment with optional unit and staff assignment
     const [result] = await db.query(
       `INSERT INTO property_visits 
             (property_id, unit_id, lead_id, visitor_name, visitor_email, visitor_phone, scheduled_date, notes, assigned_staff_id) 
@@ -46,13 +47,12 @@ class VisitModel {
     return result.insertId;
   }
 
+  // FIND ALL: Lists scheduled visits across the portfolio, resolving contact details dynamically.
   async findAll(filters = {}) {
+    // 1. [QUERY] Unified Projection: Coalesces lead info or guest info into a single 'resolved' identity
     let query = `
             SELECT 
-                v.*,
-                p.name as property_name,
-                u.unit_number as unit_number,
-                l.status as lead_status,
+                v.*, p.name as property_name, u.unit_number as unit_number, l.status as lead_status,
                 COALESCE(l.name, v.visitor_name) as resolved_name,
                 COALESCE(l.email, v.visitor_email) as resolved_email,
                 COALESCE(l.phone, v.visitor_phone) as resolved_phone,
@@ -66,16 +66,15 @@ class VisitModel {
         `;
     const params = [];
 
+    // 2. [SECURITY] Filter Injection: handles owner/property scoping
     if (filters.ownerId) {
       query += ` AND p.owner_id = ?`;
       params.push(filters.ownerId);
     }
-
     if (filters.propertyId) {
       query += ` AND v.property_id = ?`;
       params.push(filters.propertyId);
     }
-
     if (filters.propertyIds && filters.propertyIds.length > 0) {
       query += ` AND v.property_id IN (?)`;
       params.push(filters.propertyIds);
@@ -96,23 +95,23 @@ class VisitModel {
       status: row.status,
       notes: row.notes,
       createdAt: row.created_at,
-      // Joined fields
       propertyName: row.property_name,
       unitNumber: row.unit_number,
       leadStatus: row.lead_status,
       assignedStaffId: row.assigned_staff_id
         ? row.assigned_staff_id.toString()
-        : null, // [H22]
-      assignedStaffName: row.assigned_staff_name || null, // [H22]
+        : null,
+      assignedStaffName: row.assigned_staff_name || null,
     }));
   }
 
+  // UPDATE: Modifies visit details using dynamic field mapping.
   async update(visitId, data) {
     const fields = [];
     const params = [];
 
+    // 1. [TRANSFORMATION] Case Normalization: maps camelCase keys to snake_case storage columns
     Object.keys(data).forEach((key) => {
-      // Map camelCase to snake_case if necessary, or just use keys directly if they match
       const snakeKey = key.replace(/[A-Z]/g, (m) => `_${m.toLowerCase()}`);
       fields.push(`${snakeKey} = ?`);
       params.push(data[key]);
@@ -121,6 +120,7 @@ class VisitModel {
     if (fields.length === 0) return false;
 
     params.push(visitId);
+    // 2. [DATA] Persistence
     const [result] = await db.query(
       `UPDATE property_visits SET ${fields.join(', ')} WHERE visit_id = ?`,
       params
@@ -128,7 +128,9 @@ class VisitModel {
     return result.affectedRows > 0;
   }
 
+  // UPDATE STATUS: Moves a visit through its lifecycle (Confirmed, Completed, No-Show).
   async updateStatus(visitId, status) {
+    // 1. [DATA] Persistence
     const [result] = await db.query(
       `UPDATE property_visits SET status = ? WHERE visit_id = ?`,
       [status, visitId]
@@ -136,7 +138,9 @@ class VisitModel {
     return result.affectedRows > 0;
   }
 
+  // FIND BY ID: Fetches a single visit with resolved visitor identity.
   async findById(visitId) {
+    // 1. [QUERY] Logic: Prioritizes lead contact info over guest fallback
     const [rows] = await db.query(
       `SELECT 
         v.*,
@@ -164,8 +168,11 @@ class VisitModel {
       createdAt: row.created_at,
     };
   }
+
+  // CANCEL VISITS FOR UNIT: Automated cleanup of pending viewings when a unit is leased.
   async cancelVisitsForUnit(unitId, date, connection = null) {
     const dbConn = connection || db;
+    // 1. [DATA] Bulk Archival: moves pending appointments to 'cancelled' status
     await dbConn.query(
       `UPDATE property_visits 
              SET status = 'cancelled', notes = CONCAT(COALESCE(notes, ''), ' [System: Unit Leased]') 
@@ -174,8 +181,10 @@ class VisitModel {
     );
   }
 
+  // CANCEL VISITS FOR LEAD: Logic cleanup when a lead is dropped from the sales funnel.
   async cancelVisitsForLead(leadId, connection = null) {
     const dbConn = connection || db;
+    // 1. [DATA] Persistence
     await dbConn.query(
       `UPDATE property_visits
        SET status = 'cancelled', notes = CONCAT(COALESCE(notes, ''), ' [System: Lead dropped]')
@@ -184,9 +193,10 @@ class VisitModel {
     );
   }
 
+  // EXISTS IN SLOT: Checks for scheduling conflicts at the room level.
   async existsInSlot(unitId, scheduledDate, excludeVisitId = null) {
     if (!unitId) return false;
-    // [H24 FIX] Proximity Logic: Check if any visit exists within +/- 30 minutes of the target slot.
+    // 1. [QUERY] Proximity Logic: Enforces a 30-minute buffer between visits for the same unit
     const query = `
       SELECT visit_id FROM property_visits 
       WHERE unit_id = ? 
@@ -201,13 +211,14 @@ class VisitModel {
     return rows.length > 0;
   }
 
+  // COUNT IN SLOT BY PROPERTY: Checks for scheduling density at the building level.
   async countInSlotByProperty(
     propertyId,
     scheduledDate,
     excludeVisitId = null
   ) {
     if (!propertyId) return 0;
-    // [H24 FIX] Proximity Logic: Max 1 concurrent visit per property within a 30-minute window.
+    // 1. [QUERY] Density Logic: Prevents over-scheduling staff by limiting concurrent building visits
     const query = `
       SELECT COUNT(*) as count FROM property_visits 
       WHERE property_id = ? 
@@ -222,7 +233,9 @@ class VisitModel {
     return rows[0].count;
   }
 
+  // FIND UPCOMING: Retrieves immediate appointments for notification or staff preparation.
   async findUpcoming(hoursAhead = 24) {
+    // 1. [QUERY] Date-based window extraction
     const [rows] = await db.query(
       `SELECT v.*, p.name as property_name, u.unit_number
        FROM property_visits v

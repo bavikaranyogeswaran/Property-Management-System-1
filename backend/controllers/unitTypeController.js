@@ -11,6 +11,7 @@ class UnitTypeController {
   // GET ALL TYPES: Lists every unit category configured in the system.
   async getAllUnitTypes(req, res) {
     try {
+      // 1. [DATA] Collection Retrieval
       const types = await unitTypeModel.findAll();
       res.json(types);
     } catch (error) {
@@ -21,10 +22,9 @@ class UnitTypeController {
   // GET TYPE BY ID: Fetches details of a single category layout.
   async getUnitTypeById(req, res) {
     try {
+      // 1. [DATA] Resolution
       const type = await unitTypeModel.findById(req.params.id);
-      if (!type) {
-        return res.status(404).json({ error: 'Unit type not found' });
-      }
+      if (!type) return res.status(404).json({ error: 'Unit type not found' });
       res.json(type);
     } catch (error) {
       res.status(500).json({ error: error.message });
@@ -35,9 +35,9 @@ class UnitTypeController {
   async createUnitType(req, res) {
     try {
       const { name, description } = req.body;
-      if (!name) {
-        return res.status(400).json({ error: 'Name is required' });
-      }
+      if (!name) return res.status(400).json({ error: 'Name is required' });
+
+      // 1. [DATA] Persistence
       const typeId = await unitTypeModel.create({ name, description });
       res.status(201).json({ id: typeId, name, description });
     } catch (error) {
@@ -54,16 +54,15 @@ class UnitTypeController {
   async updateUnitType(req, res) {
     try {
       const { name, description } = req.body;
-      if (!name) {
-        return res.status(400).json({ error: 'Name is required' });
-      }
+      if (!name) return res.status(400).json({ error: 'Name is required' });
+
+      // 1. [DATA] Vault Update
       const success = await unitTypeModel.update(req.params.id, {
         name,
         description,
       });
-      if (!success) {
+      if (!success)
         return res.status(404).json({ error: 'Unit type not found' });
-      }
       res.json({ message: 'Unit type updated successfully' });
     } catch (error) {
       if (error.code === 'ER_DUP_ENTRY') {
@@ -78,13 +77,13 @@ class UnitTypeController {
   // DELETE UNIT TYPE: Attempts to remove a unit type (blocks if associated units exist).
   async deleteUnitType(req, res) {
     try {
+      // 1. [DATA] Purge Logic
       const success = await unitTypeModel.delete(req.params.id);
-      if (!success) {
+      if (!success)
         return res.status(404).json({ error: 'Unit type not found' });
-      }
       res.json({ message: 'Unit type deleted successfully' });
     } catch (error) {
-      // Check if FK constraint violation
+      // 2. [VALIDATION] Integrity Check: MySQL returns this code if a unit is still linked to this type
       if (error.code === 'ER_ROW_IS_REFERENCED_2') {
         return res
           .status(400)

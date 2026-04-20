@@ -9,11 +9,7 @@
 import pool from '../config/db.js';
 
 class LedgerModel {
-  /**
-   * Create a new ledger entry.
-   * @param {Object} data - { paymentId, invoiceId, leaseId, accountType, category, debit, credit, description, entryDate }
-   * @param {Object} [connection] - Optional DB connection for transactions
-   */
+  // CREATE: Records a new double-entry record into the financial foundation.
   async create(data, connection = null) {
     const {
       paymentId = null,
@@ -26,9 +22,10 @@ class LedgerModel {
       description,
       entryDate,
     } = data;
-
     const db = connection || pool;
+
     try {
+      // 1. [DATA] Persistence: Insert the entry into the primary audit table
       const [result] = await db.query(
         `INSERT INTO accounting_ledger 
          (payment_id, invoice_id, lease_id, account_type, category, debit, credit, description, entry_date) 
@@ -47,10 +44,8 @@ class LedgerModel {
       );
       return result.insertId;
     } catch (err) {
+      // 2. [INTEGRITY] Duplicate Guard: Prevent double-posting for the same logical event
       if (err.code === 'ER_DUP_ENTRY') {
-        // Silently ignore or log warning for double-posting in ledger if it's the exact same entry.
-        // Usually, double-posting is an error, but we want the outer transaction to succeed if possible or handle it.
-        // For audit trail, let's log but don't strictly crash if it's already recorded.
         console.warn('Attempted to double-post to ledger:', description);
         return null;
       }
@@ -58,6 +53,7 @@ class LedgerModel {
     }
   }
 
+  // MAP ROW: Data transfer object (DTO) transformer for camelCase consistency.
   mapRow(row) {
     if (!row) return null;
     return {
@@ -67,17 +63,16 @@ class LedgerModel {
       leaseId: row.lease_id.toString(),
       accountType: row.account_type,
       category: row.category,
-      debit: roundToCents(row.debit),
-      credit: roundToCents(row.credit),
+      debit: row.debit,
+      credit: row.credit,
       description: row.description,
       entryDate: row.entry_date,
     };
   }
 
-  /**
-   * Get all ledger entries for a specific lease.
-   */
+  // FIND BY LEASE ID: Lists the full financial history for a specific contract.
   async findByLeaseId(leaseId) {
+    // 1. [QUERY] Extraction
     const [rows] = await pool.query(
       `SELECT * FROM accounting_ledger WHERE lease_id = ? ORDER BY entry_date DESC, entry_id DESC`,
       [leaseId]
@@ -85,10 +80,7 @@ class LedgerModel {
     return rows.map((row) => this.mapRow(row));
   }
 
-  /**
-   * Get aggregated financial summary per property for a given year.
-   * Returns: { propertyName: { revenue, liability, expense } }
-   */
+  // GET SUMMARY BY PROPERTY: Categorizes income and debt for property-level reporting.
   async getSummaryByProperty(
     propertyIds,
     year,
@@ -97,6 +89,7 @@ class LedgerModel {
   ) {
     if (!propertyIds || propertyIds.length === 0) return {};
 
+    // 1. [QUERY] Aggregation: Joins ledger entries to properties through units and leases
     let query = `SELECT 
          p.name AS property_name,
          al.account_type,
@@ -121,15 +114,15 @@ class LedgerModel {
     query += ` GROUP BY p.name, al.account_type`;
 
     const [rows] = await pool.query(query, params);
-
     const summary = {};
 
+    // 2. [TRANSFORMATION] Data Categorization: Distributes totals into revenue, liability, and expense buckets
     rows.forEach((row) => {
       const name = row.property_name;
       if (!summary[name]) {
         summary[name] = {
-          revenue: 0, // Collected (Credits)
-          revenueEarned: 0, // Invoiced (Debits)
+          revenue: 0,
+          revenueEarned: 0,
           liabilityHeld: 0,
           liabilityRefunded: 0,
           expense: 0,
@@ -140,14 +133,9 @@ class LedgerModel {
         summary[name].revenue += Number(row.total_credit);
         summary[name].revenueEarned += Number(row.total_debit);
       } else if (row.account_type === 'liability') {
-        // Credits increase liability (deposit received)
-        // Debits decrease liability (deposit refunded)
         summary[name].liabilityHeld += Number(row.total_credit);
         summary[name].liabilityRefunded += Number(row.total_debit);
       } else if (row.account_type === 'expense') {
-        // Expenses increase with credit (in our payments-are-credits logic?)
-        // Actually paymentService.js Case 'maintenance' -> Account 'expense', Credit: amount.
-        // So Expenses are Credits.
         summary[name].expense +=
           Number(row.total_credit) - Number(row.total_debit);
       }
@@ -156,9 +144,7 @@ class LedgerModel {
     return summary;
   }
 
-  /**
-   * Get a full ledger summary for a given year (totals only).
-   */
+  // GET YEARLY SUMMARY: High-level financial totals for a portfolio-wide report.
   async getYearlySummary(propertyIds, year, startDate = null, endDate = null) {
     if (!propertyIds || propertyIds.length === 0) {
       return {
@@ -170,11 +156,8 @@ class LedgerModel {
       };
     }
 
-    let query = `SELECT 
-         al.account_type,
-         al.category,
-         SUM(al.credit) AS total_credit,
-         SUM(al.debit) AS total_debit
+    // 1. [QUERY] Filtered Aggregation
+    let query = `SELECT al.account_type, al.category, SUM(al.credit) AS total_credit, SUM(al.debit) AS total_debit
        FROM accounting_ledger al
        JOIN leases l ON al.lease_id = l.lease_id
        JOIN units u ON l.unit_id = u.unit_id
@@ -193,15 +176,15 @@ class LedgerModel {
 
     query += ` GROUP BY al.account_type, al.category`;
 
-    // Note: The values of `debit` and `credit` are stored as cents in the database.
     const [rows] = await pool.query(query, params);
 
-    let totalRevenueCollected = 0;
-    let totalRevenueEarned = 0;
-    let totalLiabilityHeld = 0;
-    let totalLiabilityRefunded = 0;
-    let totalExpense = 0;
+    let totalRevenueCollected = 0,
+      totalRevenueEarned = 0,
+      totalLiabilityHeld = 0,
+      totalLiabilityRefunded = 0,
+      totalExpense = 0;
 
+    // 2. [TRANSFORMATION] Financial Resolution
     rows.forEach((row) => {
       const credit = Number(row.total_credit);
       const debit = Number(row.total_debit);
@@ -228,13 +211,11 @@ class LedgerModel {
     };
   }
 
-  /**
-   * Get monthly aggregated totals for the last N months.
-   * Returns: [ { month: '2025-01', revenue: 100, expense: 50 }, ... ]
-   */
+  // GET MONTHLY STATS: Time-series data for income/expense trends.
   async getMonthlyStats(propertyIds, monthsLimit = 12) {
     if (!propertyIds || propertyIds.length === 0) return [];
 
+    // 1. [QUERY] Historical Aggregate
     const [rows] = await pool.query(
       `SELECT 
          DATE_FORMAT(al.entry_date, '%Y-%m') AS month_label,
@@ -253,11 +234,11 @@ class LedgerModel {
 
     const monthlyData = {};
 
+    // 2. [TRANSFORMATION] Pivot Data by Month
     rows.forEach((row) => {
       const month = row.month_label;
-      if (!monthlyData[month]) {
+      if (!monthlyData[month])
         monthlyData[month] = { month, revenue: 0, expense: 0 };
-      }
 
       if (row.account_type === 'revenue') {
         monthlyData[month].revenue += Number(row.total_credit);
@@ -270,11 +251,9 @@ class LedgerModel {
     return Object.values(monthlyData);
   }
 
-  /**
-   * Internal Audit Tool: Finds verified payments that don't have a corresponding ledger entry.
-   */
+  // FIND MISMATCHES: Audit utility to find payments/invoices that fell through the ledger cracks.
   async findMismatches() {
-    // 1. Find verified payments without ledger entries (Credits)
+    // 1. [QUERY] Credit Gap Detection: Verified payments without ledger offsets
     const [payments] = await pool.query(`
         SELECT p.payment_id, p.amount, p.invoice_id, p.status, 'payment' as record_type
         FROM payments p
@@ -282,7 +261,7 @@ class LedgerModel {
         WHERE p.status = 'verified' AND al.entry_id IS NULL
     `);
 
-    // 2. Find invoices without ledger entries (Debits)
+    // 2. [QUERY] Debit Gap Detection: Outstanding invoices without accrual ledger entries
     const [invoices] = await pool.query(`
         SELECT ri.invoice_id, ri.amount, ri.lease_id, ri.status, 'invoice' as record_type
         FROM rent_invoices ri

@@ -107,16 +107,22 @@ const PropertyContext = createContext<PropertyContextType | undefined>(
 );
 
 export function PropertyProvider({ children }: { children: ReactNode }) {
+  // 1. [DEPENDENCIES] Context Injection: Accesses global identity to scope inventory visibility
   const { user } = useAuth();
+
+  // 2. [STATE] Inventory Buffers: Holds the master list of assets, classifications, and rental units
   const [properties, setProperties] = useState<Property[]>([]);
   const [propertyTypes, setPropertyTypes] = useState<PropertyType[]>([]);
   const [unitTypes, setUnitTypes] = useState<UnitType[]>([]);
   const [units, setUnits] = useState<Unit[]>([]);
 
+  // FETCH PROPERTIES: Retrieves the high-level building registry.
   const fetchProperties = async () => {
     try {
+      // 1. [API] Extraction
       const response = await apiClient.get('/properties');
       if (response.data) {
+        // 2. [TRANSFORMATION] Data Normalization: converts row-level cents to display LKR
         setProperties(
           response.data.map((p: any) => ({
             ...p,
@@ -130,6 +136,7 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // FETCH PROPERTY TYPES: Loads the static classification registry (e.g., Apartments, Offices).
   const fetchPropertyTypes = async () => {
     try {
       const response = await apiClient.get('/property-types');
@@ -139,6 +146,7 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // FETCH UNIT TYPES: Loads room-level classifications (e.g., Studio, 1BR).
   const fetchUnitTypes = async () => {
     try {
       const response = await apiClient.get('/unit-types');
@@ -148,10 +156,13 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // FETCH UNITS: Retrieves the granular rental inventory across all properties.
   const fetchUnits = async () => {
     try {
+      // 1. [API] Extraction
       const response = await apiClient.get('/units');
       if (response.data) {
+        // 2. [TRANSFORMATION] Data Normalization: standardizes IDs and resolves rental amounts to LKR
         setUnits(
           response.data.map((u: any) => ({
             ...u,
@@ -166,19 +177,22 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // INITIALIZATION EFFECT: Refresh inventory state on identity change.
   useEffect(() => {
     if (!user) return;
-    // Sequential fetch via shared queue to prevent request storms on mount
+    // 1. [OPTIMIZATION] Sequential Execution: utilizes a shared global queue to prevent API request storms on app boot
     enqueueFetch(fetchPropertyTypes);
     enqueueFetch(fetchProperties);
     enqueueFetch(fetchUnitTypes);
     enqueueFetch(fetchUnits);
   }, [user]);
 
+  // ADD PROPERTY: Registers a new building in the portfolio.
   const addProperty = async (
     property: Omit<Property, 'id' | 'createdAt'>
   ): Promise<Property | undefined> => {
     try {
+      // 1. [API] Persistence: with currency normalization (LKR to Cents)
       const response = await apiClient.post('/properties', {
         ...property,
         lateFeeAmount: property.lateFeeAmount
@@ -186,6 +200,7 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
           : 0,
       });
       if (response.status === 201) {
+        // 2. [SYNC] Local State Update
         const mapped = response.data;
         setProperties((prev) => [...prev, mapped]);
         return mapped;
@@ -196,18 +211,22 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // UPDATE PROPERTY: Modifies building metadata and fee structures.
   const updateProperty = async (id: string, updates: Partial<Property>) => {
     try {
+      // 1. [API] Persistence: ensures cents-integrity for late fee amounts
       await apiClient.put(`/properties/${id}`, {
         ...updates,
         lateFeeAmount: updates.lateFeeAmount
           ? toCentsFromLKR(updates.lateFeeAmount)
           : undefined,
       });
+      // 2. [TRANSFORMATION] UI Logic: resolves the human-readable type name if the ID changed
       if (updates.propertyTypeId) {
         const type = propertyTypes.find((t) => t.id === updates.propertyTypeId);
         if (type) updates.typeName = type.name;
       }
+      // 3. [SYNC] Selective state update
       setProperties((prev) =>
         prev.map((p) => (p.id === id ? { ...p, ...updates } : p))
       );
@@ -217,6 +236,7 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // DELETE PROPERTY: Removes a building from management (Soft-deletion usually handled on backend).
   const deleteProperty = async (id: string) => {
     try {
       await apiClient.delete(`/properties/${id}`);
@@ -227,14 +247,18 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // UPLOAD PROPERTY IMAGES: Handles bulk photo gallery submissions and primary cover resolution.
   const uploadPropertyImages = async (propertyId: string, files: File[]) => {
     try {
+      // 1. [TRANSFORMATION] Multipart Prep
       const formData = new FormData();
       files.forEach((file) => formData.append('images', file));
+      // 2. [API] Execution
       const response = await apiClient.post(
         `/properties/${propertyId}/images`,
         formData
       );
+      // 3. [SYNC] UI Logic: resolve the new primary image to show in the building cards
       if (response.status === 201 && response.data.images?.length > 0) {
         const primary = response.data.images.find((img: any) => img.isPrimary);
         if (primary) {
@@ -252,10 +276,12 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // GET PROPERTY IMAGES: Retrieves the photo gallery for a specific building.
   const getPropertyImages = async (propertyId: string) => {
     try {
       const response = await apiClient.get(`/properties/${propertyId}/images`);
       if (response.data && response.data.images) {
+        // 1. [TRANSFORMATION] Standardize backend rows to frontend Image models
         return response.data.images.map((img: any) => ({
           id: img.image_id?.toString(),
           propertyId: img.property_id?.toString(),
@@ -272,6 +298,7 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // SET PROPERTY PRIMARY IMAGE: Rotates the building's main cover photo.
   const setPropertyPrimaryImage = async (
     propertyId: string,
     imageId: string
@@ -286,6 +313,7 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // DELETE PROPERTY IMAGE: Permanently removes a photo from the building's gallery.
   const deletePropertyImage = async (propertyId: string, imageId: string) => {
     try {
       await apiClient.delete(`/properties/images/${imageId}`);
@@ -295,15 +323,18 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // ADD UNIT: Registers a new rental room within a building.
   const addUnit = async (
     unit: Omit<Unit, 'id' | 'createdAt'>
   ): Promise<Unit | undefined> => {
     try {
+      // 1. [API] Persistence: normalized rent to storage-side cents
       const response = await apiClient.post('/units', {
         ...unit,
         monthlyRent: toCentsFromLKR(unit.monthlyRent),
       });
       if (response.status === 201) {
+        // 2. [SYNC] Local state update
         const newUnit: Unit = { ...response.data, id: response.data.id };
         setUnits((prev) => [...prev, newUnit]);
         return newUnit;
@@ -314,14 +345,17 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // UPDATE UNIT: Modifies room details (Rent, Type, or Operational Status).
   const updateUnit = async (id: string, updates: Partial<Unit>) => {
     try {
+      // 1. [API] Persistence
       const response = await apiClient.put(`/units/${id}`, {
         ...updates,
         monthlyRent: updates.monthlyRent
           ? toCentsFromLKR(updates.monthlyRent)
           : undefined,
       });
+      // 2. [SYNC]
       if (response.status === 200) {
         setUnits((prev) =>
           prev.map((u) =>
@@ -337,6 +371,7 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // DELETE UNIT: Removes a specialized rental room.
   const deleteUnit = async (id: string) => {
     try {
       await apiClient.delete(`/units/${id}`);
@@ -347,10 +382,11 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // MARK UNIT AVAILABLE: Quick-status toggle for vacant rooms.
   const markUnitAvailable = async (unitId: string) => {
     try {
       await apiClient.patch(`/units/${unitId}/mark-available`);
-      // Optimistically update local state
+      // 1. [UI] Optimistic Update
       setUnits((prev) =>
         prev.map((u) => (u.id === unitId ? { ...u, status: 'available' } : u))
       );
@@ -360,6 +396,7 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // UPLOAD UNIT IMAGES: Manages bulk photo uploads for rental units.
   const uploadUnitImages = async (unitId: string, files: File[]) => {
     try {
       const formData = new FormData();
@@ -368,6 +405,7 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
         `/units/${unitId}/images`,
         formData
       );
+      // 1. [SYNC] resolve unit thumbnail
       if (response.status === 201 && response.data.images?.length > 0) {
         const primary =
           response.data.images.find((img: any) => img.is_primary) ||
@@ -387,6 +425,7 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // GET UNIT IMAGES: Retrieves the photo gallery for a room.
   const getUnitImages = async (unitId: string) => {
     try {
       const response = await apiClient.get(`/units/${unitId}/images`);
@@ -407,6 +446,7 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // SET UNIT PRIMARY IMAGE: Rotates the room's main cover photo.
   const setUnitPrimaryImage = async (unitId: string, imageId: string) => {
     try {
       await apiClient.put(`/units/${unitId}/images/${imageId}/primary`);
@@ -416,6 +456,7 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // DELETE UNIT IMAGE: Removes a photo from the room's gallery.
   const deleteUnitImage = async (unitId: string, imageId: string) => {
     try {
       await apiClient.delete(`/units/images/${imageId}`);
@@ -425,6 +466,7 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // TYPE MANAGEMENT: CRUD for building and room classifications.
   const addPropertyType = async (type: Omit<PropertyType, 'id'>) => {
     try {
       const response = await apiClient.post('/property-types', type);

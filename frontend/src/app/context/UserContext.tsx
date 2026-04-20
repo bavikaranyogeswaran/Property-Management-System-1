@@ -64,15 +64,19 @@ interface UserContextType {
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
 export function UserProvider({ children }: { children: ReactNode }) {
+  // 1. [DEPENDENCIES] Context Injection: Accesses global identity for role-based scoping (Owner vs Staff)
   const { user } = useAuth();
+
+  // 2. [STATE] Persona Registers: Holds reactive lists of stakeholders (Tenants, Treasurers, Owners)
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [treasurers, setTreasurers] = useState<Treasurer[]>([]);
   const [owners, setOwners] = useState<any[]>([]);
 
+  // FETCH USERS: Retrieves stakeholder data based on requester's permissions.
   const fetchUsers = useCallback(async () => {
     if (!user) return;
 
-    // Fetch Treasurers (Only for Owner)
+    // 1. [SECURITY] Role Gate: Only the building owner can manage treasury staff
     if (user.role === 'owner') {
       try {
         const trRes = await apiClient.get('/users/treasurers');
@@ -84,11 +88,13 @@ export function UserProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    // Fetch Tenants (Owner and Treasurer)
+    // 2. [SECURITY] Role Gate: Management roles can access tenant and partner owner lists
     if (user.role === 'owner' || user.role === 'treasurer') {
       try {
+        // [TENANT FETCH] Retrieves all active renters with financial normalization
         const tRes = await apiClient.get('/users/tenants');
         if (tRes.data) {
+          // 3. [TRANSFORMATION] Data Normalization: standardizes IDs and monthly income formats
           setTenants(
             tRes.data.map((t: any) => ({
               ...t,
@@ -103,8 +109,8 @@ export function UserProvider({ children }: { children: ReactNode }) {
         console.error('Failed to fetch tenants', e);
       }
 
-      // [NEW] Fetch Owners for Treasurers (to select for payout)
       try {
+        // [OWNER FETCH] Retrieves all property owners (Used by Treasurers for payout steering)
         const oRes = await apiClient.get('/users/owners');
         if (oRes.data) {
           setOwners(oRes.data);
@@ -115,11 +121,14 @@ export function UserProvider({ children }: { children: ReactNode }) {
     }
   }, [user]);
 
+  // INITIALIZATION EFFECT: Refresh persona data on identity change via global fetch queue.
   useEffect(() => {
     if (user) enqueueFetch(fetchUsers);
   }, [fetchUsers]);
 
+  // ADD TENANT: Registers a new renter profile (Local state update).
   const addTenant = (tenant: Omit<Tenant, 'id' | 'createdAt'>) => {
+    // 1. [SYNC] Local update for UI responsiveness
     const newTenant: Tenant = {
       ...tenant,
       id: `tenant-${Date.now()}`,
@@ -128,9 +137,11 @@ export function UserProvider({ children }: { children: ReactNode }) {
     setTenants((prev) => [...prev, newTenant]);
   };
 
+  // ADD TREASURER: Onboards a new staff member (Local state update).
   const addTreasurer = (
     treasurer: Omit<Treasurer, 'id' | 'createdAt'> & { id?: string }
   ) => {
+    // 1. [SYNC] Local update
     const newTreasurer: Treasurer = {
       ...treasurer,
       id: treasurer.id || `treasurer-${Date.now()}`,
@@ -139,6 +150,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
     setTreasurers((prev) => [...prev, newTreasurer]);
   };
 
+  // STAFF MANAGEMENT: Local CRUD operations for treasurer roles.
   const updateTreasurer = (id: string, updates: Partial<Treasurer>) => {
     setTreasurers((prev) =>
       prev.map((t) => (t.id === id ? { ...t, ...updates } : t))

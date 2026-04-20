@@ -8,9 +8,8 @@
 import db from '../config/db.js';
 
 class UnitModel {
-  //  CREATE UNIT: Adding a new room to the system.
+  // CREATE UNIT: Adds a new rental inventory item to a property.
   async create(data) {
-    // data: propertyId, unitNumber, unitTypeId, monthlyRent, status, imageUrl
     const {
       propertyId,
       unitNumber,
@@ -19,6 +18,7 @@ class UnitModel {
       status,
       imageUrl,
     } = data;
+    // 1. [DATA] Persistence: records the core unit attributes with an initial availability state
     const [result] = await db.query(
       `INSERT INTO units (property_id, unit_number, unit_type_id, monthly_rent, status, image_url)
              VALUES (?, ?, ?, ?, ?, ?)`,
@@ -34,11 +34,10 @@ class UnitModel {
     return result.insertId;
   }
 
-  /**
-   * [BASE QUERY] Centralized definition of what a "Rich Unit Object" looks like.
-   * Includes Property details, Unit Type, primary image resolution, and lease occupancy counts.
-   */
+  // BASE QUERY: Centralizes the complex SELECT logic for resolution across all find methods.
   _getBaseQuery() {
+    // 1. [QUERY] Multi-Join: Resolves property metadata, unit types, and occupancy counts (active/future/pending)
+    // Supports primary image resolution and dynamic status calculation.
     return `
       SELECT u.*, 
              p.name as property_name, 
@@ -59,7 +58,9 @@ class UnitModel {
     `;
   }
 
+  // FIND ALL: Lists all active inventory across the portfolio.
   async findAll() {
+    // 1. [QUERY] Extraction using base query with group-by for lease counts
     const [rows] = await db.query(`
       ${this._getBaseQuery()}
       WHERE u.is_archived = FALSE
@@ -69,8 +70,10 @@ class UnitModel {
     return this.mapRows(rows);
   }
 
+  // FIND BY ID: Fetches a single unit profile.
   async findById(id, connection = null) {
     const dbConn = connection || db;
+    // 1. [QUERY] Filtered Retrieval
     const [rows] = await dbConn.query(
       `
       ${this._getBaseQuery()}
@@ -83,7 +86,9 @@ class UnitModel {
     return this.mapRows(rows)[0];
   }
 
+  // FIND BY ID FOR UPDATE: Forces row-level locking for transactional unit status changes.
   async findByIdForUpdate(id, connection) {
+    // 1. [SECURITY] Locking: Execute SELECT FOR UPDATE to prevent concurrent over-leasing
     const [rows] = await connection.query(
       `
       ${this._getBaseQuery()}
@@ -97,7 +102,9 @@ class UnitModel {
     return this.mapRows(rows)[0];
   }
 
+  // FIND BY PROPERTY ID: Lists the inventory for a specific building.
   async findByPropertyId(propertyId) {
+    // 1. [QUERY] Grouped Retrieval sorted by unit identity
     const [rows] = await db.query(
       `
       ${this._getBaseQuery()}
@@ -110,10 +117,12 @@ class UnitModel {
     return this.mapRows(rows);
   }
 
+  // UPDATE: Modifies unit metadata and performs automated rent auditing.
   async update(id, updates, connection = null) {
     const fields = [];
     const values = [];
 
+    // 1. [TRANSFORMATION] Field Mapping
     if (updates.unitNumber !== undefined) {
       fields.push('unit_number = ?');
       values.push(updates.unitNumber);
@@ -141,7 +150,7 @@ class UnitModel {
 
     if (fields.length === 0) return false;
 
-    // [AUDIT] If rent is changing, log the change before applying
+    // 2. [AUDIT] Rent Change Detection: Snapshot history if pricing is updated
     if (updates.monthlyRent !== undefined) {
       const dbConnForHistory = connection || db;
       const [currentUnit] = await dbConnForHistory.query(
@@ -163,8 +172,8 @@ class UnitModel {
     }
 
     values.push(id);
-
     const dbConn = connection || db;
+    // 3. [DATA] Persistence
     const [result] = await dbConn.query(
       `UPDATE units SET ${fields.join(', ')} WHERE unit_id = ? AND is_archived = FALSE`,
       values
@@ -172,24 +181,24 @@ class UnitModel {
     return result.affectedRows > 0;
   }
 
+  // DELETE: Soft-archives a unit and cleans up storage assets.
   async delete(id, connection = null) {
     const dbConn = connection || db;
 
-    // 1. Fetch all associated image URLs before archival/deletion
+    // 1. [QUERY] Capture associated image assets for cleanup
     const [images] = await dbConn.query(
       'SELECT image_url FROM unit_images WHERE unit_id = ?',
       [id]
     );
 
-    // 2. Perform the soft-delete
+    // 2. [DATA] Archival: Flags unit as hidden while maintaining historical lease links
     const [result] = await dbConn.query(
       "UPDATE units SET archived_at = NOW(), is_archived = TRUE, status = 'inactive' WHERE unit_id = ?",
       [id]
     );
-
     const success = result.affectedRows > 0;
 
-    // 3. Enqueue Cloudinary cleanup if archival was successful
+    // 3. [SIDE-EFFECT] Storage Cleanup: Queue Cloudinary deletion tasks
     if (success && images.length > 0) {
       const { mainQueue } = await import('../config/queue.js');
       const { extractPublicId } = await import('../utils/cronJobs.js');
@@ -209,8 +218,10 @@ class UnitModel {
     return success;
   }
 
+  // ARCHIVE BY PROPERTY ID: Bulk soft-delete of all units when a property is decommissioned.
   async archiveByPropertyId(propertyId, connection = null) {
     const dbConn = connection || db;
+    // 1. [DATA] Persistence
     const [result] = await dbConn.query(
       "UPDATE units SET archived_at = NOW(), is_archived = TRUE, status = 'inactive' WHERE property_id = ? AND is_archived = FALSE",
       [propertyId]
@@ -218,15 +229,10 @@ class UnitModel {
     return result.affectedRows >= 0;
   }
 
+  // MAP ROWS: Standardizes the rich join results and resolves virtual occupancy states.
   mapRows(rows) {
     return rows.map((row) => {
-      // Dynamic Status Logic:
-      // If active_lease_count > 0, override status to 'occupied'.
-      // EXCEPT if status is 'maintenance' (Maintenance usually overrides Occupancy? Or concurrent?)
-      // Assuming Maintenance blocks occupancy, so if it is 'maintenance', kept it.
-      // But if there is an ACTIVE lease, it really should be occupied.
-      // Let's say Active Lease > All.
-
+      // 1. [LOGIC] Dynamic Status Resolution: Occupancy/Lease counts take precedence over manual status flags
       let status = row.status;
       if (row.active_lease_count > 0) {
         status = 'occupied';
@@ -256,8 +262,10 @@ class UnitModel {
     });
   }
 
+  // UPDATE IMAGE URL: Fast-path for updating the legacy fallback image field.
   async updateImageUrl(unitId, imageUrl, connection = null) {
     const dbConn = connection || db;
+    // 1. [DATA] Persistence
     const [result] = await dbConn.query(
       'UPDATE units SET image_url = ? WHERE unit_id = ?',
       [imageUrl, unitId]
@@ -265,9 +273,7 @@ class UnitModel {
     return result.affectedRows > 0;
   }
 
-  /**
-   * Logs a rent change to the unit_rent_history table for auditing.
-   */
+  // LOG RENT CHANGE: Administrative audit of pricing history.
   async _logRentChange(
     unitId,
     previousRent,
@@ -277,12 +283,12 @@ class UnitModel {
   ) {
     const dbConn = connection || db;
     try {
+      // 1. [DATA] Append entry to the unit pricing ledger
       await dbConn.query(
         'INSERT INTO unit_rent_history (unit_id, previous_rent, new_rent, changed_by) VALUES (?, ?, ?, ?)',
         [unitId, previousRent, newRent, changedBy]
       );
     } catch (err) {
-      // Non-critical: don't break the update if history logging fails
       console.error(
         `[RentHistory] Failed to log rent change for unit ${unitId}:`,
         err.message
@@ -290,7 +296,9 @@ class UnitModel {
     }
   }
 
+  // COUNT OCCUPIED: Aggregate count of non-vacant units at the building level.
   async countOccupied(propertyId) {
+    // 1. [QUERY] Logic: counts units that are either blocked by status or tied to an active/active-pending lease
     const [rows] = await db.query(
       `SELECT COUNT(DISTINCT u.unit_id) as count 
        FROM units u
@@ -307,13 +315,13 @@ class UnitModel {
     return rows[0].count;
   }
 
-  // Analytics optimized query to avoid O(N) memory buildup
+  // GET OCCUPANCY STATS: Analytics optimized dump of portfolio utilization.
   async getOccupancyStats(propertyIds = []) {
     if (!propertyIds || propertyIds.length === 0) return {};
 
+    // 1. [QUERY] Massive Aggregation: Performs unit-level checks for the entire portfolio in one round-trip
     const [rows] = await db.query(
-      `
-      SELECT 
+      `SELECT 
         COALESCE(p.name, CONCAT('Property ', u.property_id)) AS propertyName,
         COUNT(DISTINCT u.unit_id) AS total,
         COUNT(DISTINCT CASE 
@@ -335,12 +343,11 @@ class UnitModel {
       LEFT JOIN properties p ON u.property_id = p.property_id
       LEFT JOIN leases l ON u.unit_id = l.unit_id
       WHERE u.property_id IN (?) AND u.is_archived = FALSE
-      GROUP BY u.property_id
-      `,
+      GROUP BY u.property_id`,
       [propertyIds]
     );
 
-    // Transform string vacancies back into array mapping Report Service expectations
+    // 2. [TRANSFORMATION] Post-Processing: Resolves string-concatenated vacancies back into a clean report structure
     const propertyStats = {};
     rows.forEach((row) => {
       propertyStats[row.propertyName] = {

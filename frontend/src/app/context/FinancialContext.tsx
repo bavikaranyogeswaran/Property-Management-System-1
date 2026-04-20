@@ -98,16 +98,25 @@ const FinancialContext = createContext<FinancialContextType | undefined>(
 );
 
 export function FinancialProvider({ children }: { children: ReactNode }) {
+  // 1. [DEPENDENCIES] Context Injection: Accesses global identity to scope financial records
   const { user } = useAuth();
+
+  // 2. [STATE] Ledger Buffers: Holds the reactive lists of financial instruments
   const [invoices, setInvoices] = useState<RentInvoice[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [receipts, setReceipts] = useState<Receipt[]>([]);
 
+  // FETCH FINANCIAL DATA: Hydrates the various ledgers with normalized amounts.
   const fetchFinancialData = React.useCallback(async () => {
     try {
-      // Invoices
-      const invRes = await invoiceApi.getInvoices();
-      console.log('[FinancialContext] Fetched invoices:', invRes.data);
+      // 1. [QUERY] Extraction: Fetch Invoices, Payments, and Receipts in parallel
+      const [invRes, payRes, receiptRes] = await Promise.all([
+        invoiceApi.getInvoices(),
+        paymentApi.getPayments(),
+        receiptApi.getReceipts(),
+      ]);
+
+      // 2. [TRANSFORMATION] Invoice Normalization: Resolves raw database cents into UI decimals [E4]
       if (invRes.data) {
         setInvoices(
           invRes.data.map((i: any) => ({
@@ -128,8 +137,7 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
         );
       }
 
-      // Payments
-      const payRes = await paymentApi.getPayments();
+      // 3. [TRANSFORMATION] Payment Normalization: resolve submission dates and amounts
       if (payRes.data) {
         setPayments(
           payRes.data.map((p: any) => ({
@@ -145,8 +153,7 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
         );
       }
 
-      // Receipts
-      const receiptRes = await receiptApi.getReceipts();
+      // 4. [TRANSFORMATION] Receipt Normalization: link finalized proofs to UI models
       if (receiptRes.data) {
         setReceipts(
           receiptRes.data.map((r: any) => ({
@@ -166,15 +173,18 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // INITIALIZATION EFFECT: Refresh financial state on identity change.
   useEffect(() => {
     if (user) enqueueFetch(fetchFinancialData);
   }, [user]);
 
+  // FETCH LEDGER SUMMARY: Aggregates portfolio-wide financial performance for reporting.
   const fetchLedgerSummary = async (year: number): Promise<LedgerSummary> => {
+    // 1. [API] Extraction
     const { data } = await apiClient.get(
       `/reports/ledger-summary?year=${year}`
     );
-    // Normalize subunit cents to display decimals
+    // 2. [TRANSFORMATION] Normalization: Convert reporting-level sums from cents to display LKR
     return {
       totalRevenue: toLKRFromCents(data.totalRevenue),
       totalLiabilityHeld: toLKRFromCents(data.totalLiabilityHeld),
@@ -185,20 +195,25 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
     };
   };
 
+  // GENERATE MONTHLY INVOICES: Manual trigger for the automated billing cycle.
   const generateMonthlyInvoices = async () => {
     try {
+      // 1. [API] Execution
       await invoiceApi.generateInvoices();
+      // 2. [SYNC] Refresh Ledger
       await fetchFinancialData();
     } catch (e: any) {
       toast.error(e.response?.data?.error || 'Failed to generate invoices');
     }
   };
 
+  // SUBMIT PAYMENT: Handles payment proof uploads with currency normalization and idempotency.
   const submitPayment = async (
     payment: Omit<Payment, 'id' | 'submittedAt'> | FormData,
     idempotencyKey?: string
   ) => {
     try {
+      // 1. [SECURITY] Idempotency: prevent double-clicks from double-charging or duplicate entries
       const headers: any = {};
       if (idempotencyKey) {
         headers['X-Idempotency-Key'] = idempotencyKey;
@@ -206,22 +221,16 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
 
       let res;
       if (payment instanceof FormData) {
-        // [HARDENED] Ensure amount is in cents if it's a raw LKR string in FormData
-        // However, TenantInvoicesPage already passed it.
-        // We assume the caller handles the conversion if using FormData,
-        // but for consistency with the object-based path, we'll try to convert if possible.
-        // Actually, FinancialContext should be the one doing the Cents conversion to keep it central.
+        // 2. [TRANSFORMATION] Multipart Conversion: Manually patch decimal LKR to integer Cents for storage
         const amount = payment.get('amount');
         if (amount) {
           payment.set('amount', toCentsFromLKR(Number(amount)).toString());
         }
         res = await paymentApi.submitPayment(payment, headers);
       } else {
+        // 3. [TRANSFORMATION] Object Conversion: Convert LKR buffer to storage-side cents [E4]
         res = await paymentApi.submitPayment(
-          {
-            ...payment,
-            amount: toCentsFromLKR(payment.amount),
-          },
+          { ...payment, amount: toCentsFromLKR(payment.amount) },
           headers
         );
       }
@@ -239,22 +248,29 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // VERIFY PAYMENT: Admin workflow to approve bank slips and trigger receipt generation.
   const verifyPayment = async (id: string, approved: boolean) => {
     try {
       const status = approved ? 'verified' : 'rejected';
+      // 1. [API] Status Update
       await paymentApi.verifyPayment(id, status);
+      // 2. [UI] Feedback
       toast.success(`Payment ${status}`);
+      // 3. [SYNC] Refresh Ledger: backend handles receipts automatically on verification
       await fetchFinancialData();
     } catch (e: any) {
       toast.error(e.response?.data?.error || 'Failed to verify payment');
     }
   };
 
+  // RUN LATE FEE AUDIT: Scans for overdue liabilities and appends automated fines.
   const runLateFeeAudit = async () => {
     try {
       const { adminApi } = await import('../../services/api');
+      // 1. [API] Execution
       await adminApi.triggerLateFees();
       toast.success('Late fee audit completed');
+      // 2. [SYNC] Refresh state
       await fetchFinancialData();
     } catch (e: any) {
       toast.error(e.response?.data?.error || 'Failed to run late fee audit');

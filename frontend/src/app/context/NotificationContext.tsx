@@ -46,18 +46,23 @@ const NotificationContext = createContext<NotificationContextType | undefined>(
 );
 
 export function NotificationProvider({ children }: { children: ReactNode }) {
+  // 1. [DEPENDENCIES] Context Injection: Consumes other domains to calculate derived alerts (Lease, User, Property)
   const { user } = useAuth();
   const { properties, units } = useProperty();
   const { leases } = useLease();
   const { tenants } = useUser();
+
+  // 2. [STATE] Global Alert Queue: Holds a unified list of backend-stored and locally-generated notifications
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
-  // 1. Fetch backend notifications
+  // FETCH BACKEND NOTIFICATIONS: Retrieves persistent alerts (Payments, Invoices) from the database.
   const fetchBackendNotifications = async () => {
     if (!user) return;
     try {
+      // 1. [API] Extraction
       const res = await notificationApi.getNotifications();
       if (res.data && Array.isArray(res.data)) {
+        // 2. [TRANSFORMATION] Data Normalization: converts row objects to app-standard Notification types
         const backendNotifs = res.data
           .filter((n: any) => n && n.id !== undefined)
           .map((n: any) => ({
@@ -65,6 +70,8 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
             id: n.id.toString(),
             read: Boolean(n.isRead),
           }));
+
+        // 3. [SYNC] Selective Merge: preserves locally-generated transient alerts while updating stored ones
         setNotifications((prev) => {
           const local = prev.filter((n) => n.id.startsWith('notif-'));
           return [...local, ...backendNotifs];
@@ -75,12 +82,13 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // 2. Local notification generation (e.g. Lease expiry)
+  // LOCAL NOTIFICATION GENERATOR: Derived logic to flag expiring leases without backend polling.
   useEffect(() => {
     if (leases.length === 0) return;
     const today = new Date();
     const generatedNotifications: Notification[] = [];
 
+    // 1. [LOGIC] Expiry Sweep: Iterates through active contracts to identify proximity triggers
     leases.forEach((lease) => {
       if (lease.status !== 'active' || !lease.endDate) return;
       const endDate = new Date(lease.endDate);
@@ -89,6 +97,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       );
       if (daysUntilExpiry < 0) return;
 
+      // 2. [STATE] Severity Resolution: determine urgency based on time-window thresholds
       let shouldNotify = false;
       let severity: 'info' | 'warning' | 'urgent' = 'info';
 
@@ -110,6 +119,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
           ? properties.find((p) => p.id === unit.propertyId)
           : null;
 
+        // 3. [DEDUPLICATION] check if an alert for this lease window already exists in the queue
         const existingNotification = notifications.find(
           (n) =>
             n.leaseId === lease.id &&
@@ -140,6 +150,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       }
     });
 
+    // 4. [SYNC] UI State Update: append new transient notifications to the global queue
     if (generatedNotifications.length > 0) {
       setNotifications((prev) => {
         const filtered = prev.filter(
@@ -153,24 +164,31 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     }
   }, [leases, units, tenants, properties]);
 
+  // INITIALIZATION EFFECT: Refresh the list on identity change.
   useEffect(() => {
     fetchBackendNotifications();
   }, [user]);
 
+  // MARK AS READ: Synchronizes user interaction with the server for persistent alerts.
   const markNotificationAsRead = async (id: string) => {
     try {
+      // 1. [SYNC] Local Optimistic Update
       setNotifications((prev) =>
         prev.map((n) => (n.id === id ? { ...n, read: true } : n))
       );
+      // 2. [API] Persistence: only send to server if it's not a locally-generated transient notif
       if (!id.startsWith('notif-')) await notificationApi.markAsRead(id);
     } catch (e) {
       console.error('Failed to mark notification as read', e);
     }
   };
 
+  // MARK ALL AS READ: Batch update of all present notifications.
   const markAllAsRead = async () => {
     try {
+      // 1. [SYNC] Local Optimistic Update
       setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+      // 2. [API] Persistence
       await notificationApi.markAllAsRead();
     } catch (e) {
       console.error('Failed to mark all notifications as read', e);

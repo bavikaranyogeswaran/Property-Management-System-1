@@ -88,18 +88,25 @@ interface LeadContextType {
 const LeadContext = createContext<LeadContextType | undefined>(undefined);
 
 export function LeadProvider({ children }: { children: ReactNode }) {
+  // 1. [DEPENDENCIES] Context Injection: Accesses global user role for scoping lead visibility
   const { user } = useAuth();
+
+  // 2. [STATE] Marketing Buffers: Holds the sales funnel, event history, and property tour schedules
   const [leads, setLeads] = useState<Lead[]>([]);
   const [leadStageHistory, setLeadStageHistory] = useState<LeadStageHistory[]>(
     []
   );
   const [visits, setVisits] = useState<Visit[]>([]);
 
+  // FETCH LEADS: Retrieves prospects from the CRM.
   const fetchLeads = async () => {
     try {
+      // 1. [SECURITY] Role Gate: Leads are typically restricted to administrative roles
       if (user?.role !== 'owner' && user?.role !== 'treasurer') return;
+      // 2. [API] Extraction
       const response = await apiClient.get('/leads');
       if (response.data) {
+        // 3. [TRANSFORMATION] Data Normalization: standardizes composite IDs for frontend state
         setLeads(
           response.data.map((l: any) => ({
             ...l,
@@ -115,6 +122,7 @@ export function LeadProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // FETCH STAGE HISTORY: Loads the audit trail for funnel progression.
   const fetchStageHistory = async () => {
     try {
       if (user?.role !== 'owner' && user?.role !== 'treasurer') return;
@@ -125,6 +133,7 @@ export function LeadProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // FETCH VISITS: Retrieves the property viewing calendar.
   const fetchVisits = async () => {
     try {
       if (user?.role !== 'owner' && user?.role !== 'treasurer') return;
@@ -135,24 +144,29 @@ export function LeadProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // INITIALIZATION EFFECT: Refresh marketing data on identity change.
   useEffect(() => {
     if (user) {
-      // Sequential fetch via shared queue to prevent request storms on mount
+      // 1. [OPTIMIZATION] Sequential Execution: utilizes a shared global queue to prevent API request storms on login
       enqueueFetch(fetchLeads);
       enqueueFetch(fetchStageHistory);
       enqueueFetch(fetchVisits);
     }
   }, [user]);
 
+  // ADD LEAD: Registers a new prospect in the funnel.
   const addLead = async (lead: Omit<Lead, 'id' | 'createdAt'>) => {
     try {
+      // 1. [API] Persistence
       const response = await apiClient.post('/leads', lead);
+      // 2. [SYNC] Local State Update with server-assigned ID
       const newLead: Lead = {
         ...lead,
         id: response.data.id.toString(),
         createdAt: new Date().toISOString().split('T')[0],
       };
       setLeads((prev) => [...prev, newLead]);
+      // 3. [AUDIT] Manual Stage Logging: recording the initial funnel entry
       setLeadStageHistory((prev) => [
         ...prev,
         {
@@ -169,19 +183,19 @@ export function LeadProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // UPDATE LEAD: Modifies prospect details and funnel status.
   const updateLead = async (id: string, updates: Partial<Lead>) => {
     try {
+      // 1. [API] Persistence
       await apiClient.put(`/leads/${id}`, updates);
 
-      // Optimistic local update for instant UI feedback
+      // 2. [UI] Optimistic Update: Provides instant visual feedback for status changes
       setLeads((prev) =>
         prev.map((l) => (l.id === id ? { ...l, ...updates } : l))
       );
 
-      // Re-fetch all relevant data in the background to ensure frontend is perfectly in sync
-      // with backend side effects (e.g. cancelled visits, new history records, etc.)
-      // Note: We don't await this if we want absolute instant response, but awaiting ensures
-      // we don't finish the function until the data is "officially" refreshed.
+      // 3. [SYNC] Verification: Re-fetches the entire domain to reconcile server-side side effects
+      // (e.g., status changes that trigger automatic visit cancellations or history logging)
       await Promise.all([fetchLeads(), fetchVisits(), fetchStageHistory()]);
     } catch (error) {
       console.error('Failed to update lead:', error);
@@ -189,6 +203,7 @@ export function LeadProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // CONVERT LEAD TO TENANT: Orchestrates the transformation of a prospect into a customer.
   const convertLeadToTenant = async (
     leadId: string,
     startDate?: string,
@@ -196,13 +211,18 @@ export function LeadProvider({ children }: { children: ReactNode }) {
     data?: any
   ) => {
     try {
+      // 1. [TRANSFORMATION] Payload Prep: Combines rental terms and unit selection
       const payload: any = { startDate, endDate };
       if (typeof data === 'string') payload.unitId = data;
       else if (data) Object.assign(payload, data);
+
+      // 2. [API] Conversion: Triggers complex backend routine (Unit status change, Lease generation, User creation)
       const response = await apiClient.post(
         `/leads/${leadId}/convert`,
         payload
       );
+
+      // 3. [LIFECYCLE] Hard Reset: Forced reload to ensure the new user context (Tenant dashboard) is initialized
       window.location.reload();
       return response.data.tenantId;
     } catch (error) {
@@ -211,9 +231,12 @@ export function LeadProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // SCHEDULE VISIT: Adds a viewing appointment to the calendar.
   const scheduleVisit = async (visitData: any) => {
     try {
+      // 1. [API] Persistence
       const response = await apiClient.post('/visits', visitData);
+      // 2. [SYNC] Refresh Calendar
       await fetchVisits();
       return response.data;
     } catch (error) {
@@ -222,9 +245,12 @@ export function LeadProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // UPDATE VISIT STATUS: Manually updates the state of a property tour.
   const updateVisitStatus = async (id: string, status: Visit['status']) => {
     try {
+      // 1. [API] Update
       await apiClient.patch(`/visits/${id}/status`, { status });
+      // 2. [SYNC] Selective state update
       setVisits((prev) =>
         prev.map((v) => (v.id === id ? { ...v, status } : v))
       );

@@ -11,18 +11,16 @@ import authorizationService from '../services/authorizationService.js';
 
 class PayoutController {
   // 1. Preview (Calculate but don't save)
-  // PREVIEW PAYOUT: Calculates the expected profit sharing before officially saving it.
+  // PREVIEW PAYOUT: Calculates the expected profit sharing (Rent minus Expenses) before officially saving it.
   async previewPayout(req, res) {
     try {
       const { ownerId, startDate, endDate } = req.query;
-
-      if (!ownerId || !endDate) {
+      if (!ownerId || !endDate)
         return res
           .status(400)
           .json({ error: 'Owner ID and End date are required' });
-      }
 
-      // [HARDENED] Verify Staff Assignment
+      // 1. [SECURITY] Deployment Guard: Verify the staff member is assigned to at least one of this owner's properties
       if (
         !(await authorizationService.canAccessOwner(
           req.user.id,
@@ -30,10 +28,12 @@ class PayoutController {
           ownerId
         ))
       ) {
-        return res.status(403).json({
-          error:
-            'Access denied: You are not assigned to any properties for this owner',
-        });
+        return res
+          .status(403)
+          .json({
+            error:
+              'Access denied: You are not assigned to any properties for this owner',
+          });
       }
 
       const selection = {
@@ -49,6 +49,7 @@ class PayoutController {
           : null,
       };
 
+      // 2. [DELEGATION] Virtual Ledger: Run the math on the global income/expense pool without committing to a payout record
       const calculation = await payoutService.previewPayout(
         ownerId,
         startDate,
@@ -62,17 +63,14 @@ class PayoutController {
     }
   }
 
-  // 2. Create (Calculate and Save)
   // CREATE PAYOUT: Officially records a payout which then needs to be paid by the bank.
   async createPayout(req, res) {
     try {
       const { ownerId, startDate, endDate, selection } = req.body;
-
-      if (!ownerId) {
+      if (!ownerId)
         return res.status(400).json({ error: 'Owner ID is required' });
-      }
 
-      // [HARDENED] Verify Staff Assignment
+      // 1. [SECURITY] Authorization Guard
       if (
         !(await authorizationService.canAccessOwner(
           req.user.id,
@@ -80,12 +78,15 @@ class PayoutController {
           ownerId
         ))
       ) {
-        return res.status(403).json({
-          error:
-            'Access denied: You are not assigned to any properties for this owner',
-        });
+        return res
+          .status(403)
+          .json({
+            error:
+              'Access denied: You are not assigned to any properties for this owner',
+          });
       }
 
+      // 2. [DELEGATION] Financial Commitment: Seal the income/expense records and create the payout header
       const { payoutId, netPayout } = await payoutService.createPayout(
         ownerId,
         startDate,
@@ -107,7 +108,7 @@ class PayoutController {
     try {
       const ownerId = req.query.ownerId || req.user.id;
 
-      // [HARDENED] Assignment Check
+      // 1. [SECURITY] Scope Guard
       if (
         !(await authorizationService.canAccessOwner(
           req.user.id,
@@ -115,12 +116,15 @@ class PayoutController {
           ownerId
         ))
       ) {
-        return res.status(403).json({
-          error:
-            "Access denied: You do not have permission to view this owner's data",
-        });
+        return res
+          .status(403)
+          .json({
+            error:
+              "Access denied: You do not have permission to view this owner's data",
+          });
       }
 
+      // 2. [DATA] Narrative Resolver
       const payouts = await payoutService.getHistory(ownerId);
       res.json(payouts);
     } catch (error) {
@@ -135,7 +139,7 @@ class PayoutController {
       const { id } = req.params;
       const { bankReference, proofUrl } = req.body;
 
-      // [HARDENED] Verify Access to Payout Resource
+      // 1. [SECURITY] Resolve record and verify access
       const fullPayout = await payoutService.getPayoutById(id);
       if (!fullPayout)
         return res.status(404).json({ error: 'Payout not found' });
@@ -147,17 +151,21 @@ class PayoutController {
           fullPayout.owner_id
         ))
       ) {
-        return res.status(403).json({
-          error: 'Access denied: You are not assigned to this property owner',
-        });
+        return res
+          .status(403)
+          .json({
+            error: 'Access denied: You are not assigned to this property owner',
+          });
       }
 
-      if (!bankReference) {
-        return res.status(400).json({
-          error: 'Bank reference is required for payment verification',
-        });
-      }
+      if (!bankReference)
+        return res
+          .status(400)
+          .json({
+            error: 'Bank reference is required for payment verification',
+          });
 
+      // 2. [DELEGATION] State Finalization: Record the transaction ID and move status to 'paid'
       await payoutService.markAsPaid(id, req.user.id, bankReference, proofUrl);
       res.json({
         message: 'Payout marked as paid and sent to owner for acknowledgment',
@@ -168,15 +176,15 @@ class PayoutController {
     }
   }
 
+  // GET PAYOUT DETAILS: Retrieves the itemized list of rents and maintenance costs that make up a payout.
   async getPayoutDetails(req, res) {
     try {
       const { id } = req.params;
-      // Get internal details then check ownerId
       const fullPayout = await payoutService.getPayoutById(id);
       if (!fullPayout)
         return res.status(404).json({ error: 'Payout not found' });
 
-      // [HARDENED] RBAC & Assignment check
+      // 1. [SECURITY] RBAC & Assignment check
       if (
         !(await authorizationService.canAccessOwner(
           req.user.id,
@@ -184,11 +192,15 @@ class PayoutController {
           fullPayout.owner_id
         ))
       ) {
-        return res.status(403).json({
-          error: 'Access denied: You are not authorized to view these details',
-        });
+        return res
+          .status(403)
+          .json({
+            error:
+              'Access denied: You are not authorized to view these details',
+          });
       }
 
+      // 2. [DELEGATION] Line Item Resolver
       const details = await payoutService.getPayoutDetails(
         fullPayout.owner_id,
         id
@@ -200,9 +212,11 @@ class PayoutController {
     }
   }
 
+  // ACKNOWLEDGE PAYOUT: Owner confirming they received their monthly profit.
   async acknowledgePayout(req, res) {
     try {
       const { id } = req.params;
+      // 1. [DATA] Receipting Logic
       await payoutService.acknowledgePayout(req.user.id, id);
       res.json({ message: 'Payout acknowledged successfully' });
     } catch (error) {
@@ -210,6 +224,7 @@ class PayoutController {
     }
   }
 
+  // DISPUTE PAYOUT: Allows the owner to flag a payout if they think the expenses are too high.
   async disputePayout(req, res) {
     try {
       const { id } = req.params;
@@ -218,6 +233,8 @@ class PayoutController {
         return res
           .status(400)
           .json({ error: 'Reason for dispute is required' });
+
+      // 1. [DATA] Conflict Marker
       await payoutService.disputePayout(req.user.id, id, reason);
       res.json({ message: 'Payout marked as disputed' });
     } catch (error) {
@@ -225,6 +242,7 @@ class PayoutController {
     }
   }
 
+  // EXPORT PAYOUT CSV: Generates a reconciliation sheet for owner's bookkeeping.
   async exportPayoutCSV(req, res) {
     try {
       const { id } = req.params;
@@ -232,7 +250,7 @@ class PayoutController {
       if (!fullPayout)
         return res.status(404).json({ error: 'Payout not found' });
 
-      // [HARDENED] Assignment Check
+      // 1. [SECURITY] Guard
       if (
         !(await authorizationService.canAccessOwner(
           req.user.id,
@@ -240,11 +258,14 @@ class PayoutController {
           fullPayout.owner_id
         ))
       ) {
-        return res.status(403).json({
-          error: 'Access denied: You are not authorized to export this data',
-        });
+        return res
+          .status(403)
+          .json({
+            error: 'Access denied: You are not authorized to export this data',
+          });
       }
 
+      // 2. [DELEGATION] Report Generation
       const csv = await payoutService.exportPayoutCSV(fullPayout.owner_id, id);
 
       res.setHeader('Content-Type', 'text/csv');

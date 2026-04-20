@@ -9,15 +9,14 @@ import unitModel from '../models/unitModel.js';
 import propertyModel from '../models/propertyModel.js';
 
 class UnitController {
-  //  ADD UNIT: Adding a new room/house to the system.
+  // ADD UNIT: Adding a new room/house to the system.
   async createUnit(req, res) {
     try {
-      // Ownership check: verify the property belongs to the requesting owner
+      // 1. [SECURITY] Ownership check: verify the property belongs to the requesting owner
       if (req.body.propertyId) {
         const property = await propertyModel.findById(req.body.propertyId);
-        if (!property) {
+        if (!property)
           return res.status(404).json({ error: 'Property not found' });
-        }
         if (String(property.ownerId) !== String(req.user.id)) {
           return res
             .status(403)
@@ -25,6 +24,7 @@ class UnitController {
         }
       }
 
+      // 2. [DELEGATION] Vault Persistence
       const unit = await unitModel.create(req.body);
       const newUnit = await unitModel.findById(unit);
       res.status(201).json(newUnit);
@@ -41,11 +41,14 @@ class UnitController {
     }
   }
 
+  // GET UNITS: Lists all apartments, potentially filtered by staff assignments.
   async getUnits(req, res) {
     try {
+      // 1. [DATA] Collection Retrieval
       const units = await unitModel.findAll();
       const isPublic = req.query.public === 'true';
 
+      // 2. [SECURITY] Portfolio visibility filter for staff members
       if (!isPublic && req.user && req.user.role === 'treasurer') {
         const staffModel = (await import('../models/staffModel.js')).default;
         const assigned = await staffModel.getAssignedProperties(req.user.id);
@@ -63,8 +66,10 @@ class UnitController {
     }
   }
 
+  // GET UNIT BY ID: Fetch detail view for a specific apartment.
   async getUnitById(req, res) {
     try {
+      // 1. [DATA] Resolution
       const unit = await unitModel.findById(req.params.id);
       if (!unit) return res.status(404).json({ error: 'Unit not found' });
       res.json(unit);
@@ -73,24 +78,25 @@ class UnitController {
     }
   }
 
+  // UPDATE UNIT: Modifies room details (e.g., area, status, descriptive tags).
   async updateUnit(req, res) {
     try {
-      // 1. Fetch unit to check ownership
+      // 1. [SECURITY] Resolve unit and verify ownership/access
       const unit = await unitModel.findById(req.params.id);
-      if (!unit) {
-        return res.status(404).json({ error: 'Unit not found' });
-      }
+      if (!unit) return res.status(404).json({ error: 'Unit not found' });
 
-      // 2. Ownership check
       if (req.user.role === 'owner') {
         const property = await propertyModel.findById(unit.propertyId);
         if (!property || String(property.ownerId) !== String(req.user.id)) {
-          return res.status(403).json({
-            error: 'You do not own the property associated with this unit.',
-          });
+          return res
+            .status(403)
+            .json({
+              error: 'You do not own the property associated with this unit.',
+            });
         }
       }
 
+      // 2. [DELEGATION] State Persistence
       const success = await unitModel.update(req.params.id, req.body);
       if (!success)
         return res.status(404).json({ error: 'Unit not found or no changes' });
@@ -101,35 +107,38 @@ class UnitController {
     }
   }
 
+  // DELETE UNIT: Archives a unit (soft delete).
   async deleteUnit(req, res) {
     try {
       const unit = await unitModel.findById(req.params.id);
-      if (!unit) {
-        return res.status(404).json({ error: 'Unit not found' });
-      }
+      if (!unit) return res.status(404).json({ error: 'Unit not found' });
 
-      // 1. Ownership check
+      // 1. [SECURITY] Authorization Guard
       if (req.user.role === 'owner') {
         const property = await propertyModel.findById(unit.propertyId);
         if (!property || String(property.ownerId) !== String(req.user.id)) {
-          return res.status(403).json({
-            error: 'You do not own the property associated with this unit.',
-          });
+          return res
+            .status(403)
+            .json({
+              error: 'You do not own the property associated with this unit.',
+            });
         }
       }
 
-      // 2. Lease check: Block if any active or pending leases exist
+      // 2. [VALIDATION] Integrity Check: Block archiving if there's an active financial liability (lease)
       const leaseModel = (await import('../models/leaseModel.js')).default;
       const activeLeaseCount = await leaseModel.countActiveByUnitId(
         req.params.id
       );
       if (activeLeaseCount > 0) {
-        return res.status(400).json({
-          error:
-            'Cannot archive unit with active or pending leases. Please terminate or finish leases first.',
-        });
+        return res
+          .status(400)
+          .json({
+            error: 'Cannot archive unit with active or pending leases.',
+          });
       }
 
+      // 3. [DELEGATION] Purge Logic
       const success = await unitModel.delete(req.params.id);
       if (!success) return res.status(404).json({ error: 'Unit not found' });
       res.json({ message: 'Unit archived successfully' });
@@ -138,42 +147,48 @@ class UnitController {
     }
   }
 
-  // Mark a maintenance unit as available so leads can submit interest
+  // MARK AVAILABLE: Releases a unit from 'maintenance' back into the pool.
   async markAvailable(req, res) {
     try {
       const unit = await unitModel.findById(req.params.id);
-      if (!unit) {
-        return res.status(404).json({ error: 'Unit not found' });
-      }
+      if (!unit) return res.status(404).json({ error: 'Unit not found' });
 
-      // Ownership check for owners
+      // 1. [SECURITY] Guard
       if (req.user.role === 'owner') {
         const property = await propertyModel.findById(unit.propertyId);
         if (!property || String(property.ownerId) !== String(req.user.id)) {
-          return res.status(403).json({
-            error: 'You do not own the property associated with this unit.',
-          });
+          return res
+            .status(403)
+            .json({
+              error: 'You do not own the property associated with this unit.',
+            });
         }
       }
 
+      // 2. [VALIDATION] State Check: Only 'maintenance' units can be unlocked manually here
       if (unit.status !== 'maintenance') {
-        return res.status(400).json({
-          error: `Unit is currently '${unit.status}', not 'maintenance'. Only maintenance units can be marked available.`,
-        });
+        return res
+          .status(400)
+          .json({
+            error: `Unit is currently '${unit.status}', not 'maintenance'.`,
+          });
       }
 
-      // Safety: ensure no active lease is running on this unit
+      // 3. [VALIDATION] Safety check: ensure no active lease is running on this unit
       const leaseModel = (await import('../models/leaseModel.js')).default;
       const activeLeaseCount = await leaseModel.countActiveByUnitId(
         req.params.id
       );
       if (activeLeaseCount > 0) {
-        return res.status(409).json({
-          error:
-            'Cannot mark unit as available — it still has an active lease.',
-        });
+        return res
+          .status(409)
+          .json({
+            error:
+              'Cannot mark unit as available — it still has an active lease.',
+          });
       }
 
+      // 4. [DELEGATION] State Transition
       await unitModel.update(req.params.id, { status: 'available' });
       res.json({
         message: 'Unit marked as available successfully',
@@ -183,19 +198,22 @@ class UnitController {
       res.status(500).json({ error: error.message });
     }
   }
-  // Clear a turnover lock after a lease expiration/inspection
+
+  // CLEAR TURNOVER: Confirms that an inspection/cleaning is complete after a tenant moved out.
   async clearTurnover(req, res) {
     try {
       const unit = await unitModel.findById(req.params.id);
       if (!unit) return res.status(404).json({ error: 'Unit not found' });
 
-      // Ownership/Staff check
+      // 1. [SECURITY] Resolve access rights (Owner or assigned Staff)
       if (req.user.role === 'owner') {
         const property = await propertyModel.findById(unit.propertyId);
         if (!property || String(property.ownerId) !== String(req.user.id)) {
-          return res.status(403).json({
-            error: 'You do not own the property associated with this unit.',
-          });
+          return res
+            .status(403)
+            .json({
+              error: 'You do not own the property associated with this unit.',
+            });
         }
       } else if (req.user.role === 'treasurer') {
         const staffModel = (await import('../models/staffModel.js')).default;
@@ -210,13 +228,14 @@ class UnitController {
         }
       }
 
-      // Check if it's actually locked
+      // 2. [VALIDATION] Check if it's actually locked in a turnover state
       if (unit.isTurnoverCleared && unit.status !== 'maintenance') {
         return res
           .status(400)
           .json({ error: 'Unit does not have a pending turnover clearance.' });
       }
 
+      // 3. [DELEGATION] State Transition: Move to 'reserved' if there's a pipeline lease, otherwise 'available'
       await unitModel.update(req.params.id, {
         isTurnoverCleared: true,
         status:

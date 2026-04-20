@@ -29,10 +29,12 @@ interface AppProviderProps {
 }
 
 /**
- * AppProvider aggregates all domain-specific contexts.
- * The order of providers matters if there are dependencies between them.
+ * AppProvider aggregates all domain-specific contexts into a single unified tree.
+ * The hierarchy is ordered to satisfy inter-context dependencies (e.g., Notification depends on Lease).
  */
 export function AppProvider({ children }: AppProviderProps) {
+  // 1. [COMPOSITION] Provider Nesting: Establishes the cascading reactive state for the entire application.
+  // Order: Base Data (Property/User) -> Contractual Assets (Lease/Lead) -> Financials/Operations (Financial/Maintenance) -> System Events (Notification)
   return (
     <PropertyProvider>
       <UserProvider>
@@ -51,10 +53,11 @@ export function AppProvider({ children }: AppProviderProps) {
 }
 
 /**
- * useApp is a backward-compatibility hook that aggregates all domain-specific hooks.
- * This allows existing components to continue working without changes.
+ * useApp is a Façade hook that aggregates all domain-specific hooks into one interface.
+ * Implemented for backward compatibility and to serve as a 'Super Hook' for complex views.
  */
 export function useApp() {
+  // 1. [INJECTION] Domain Hook Resolution
   const property = useProperty();
   const user = useUser();
   const lease = useLease();
@@ -63,6 +66,7 @@ export function useApp() {
   const maintenance = useMaintenance();
   const notification = useNotification();
 
+  // 2. [COMBINATION] Flattened API: Merges all domain states and methods into a single accessible object.
   return {
     ...property,
     ...user,

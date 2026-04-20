@@ -7,6 +7,7 @@
 import pool from '../config/db.js';
 
 class OwnerModel {
+  // CREATE: Establishes the investment profile for a user, including financial and tax metadata.
   async create(ownerData, connection) {
     const {
       userId,
@@ -19,13 +20,14 @@ class OwnerModel {
       tin_url,
     } = ownerData;
 
+    // 1. [VALIDATION] ID Verification: Ensures legal identification (NIC) is provided
     if (!nic) {
       const error = new Error('NIC is required for creating an owner profile.');
-      error.status = 400; // Bad Request
+      error.status = 400;
       throw error;
     }
 
-    // Uses the provided connection for transaction support
+    // 2. [DATA] Persistence: Insert financial vault data using the provided transaction connection
     const query = `
             INSERT INTO owners 
             (user_id, nic, tin, tin_url, bank_name, branch_name, account_holder_name, account_number) 
@@ -46,12 +48,16 @@ class OwnerModel {
     return userId;
   }
 
+  // FIND BY USER ID: Fetches the investor's bank and tax profile.
   async findByUserId(userId) {
+    // 1. [QUERY] Direct Retrieval
     const [rows] = await pool.query('SELECT * FROM owners WHERE user_id = ?', [
       userId,
     ]);
     const row = rows[0];
     if (!row) return null;
+
+    // 2. [TRANSFORMATION] DTO Mapping
     return {
       userId: row.user_id,
       nic: row.nic,
@@ -61,12 +67,6 @@ class OwnerModel {
       accountHolderName: row.account_holder_name,
       accountNumber: row.account_number,
       tinUrl: row.tin_url,
-      // residenceAddress removed from findByUserId return as strictly strictly schema doesn't seem to have it in CREATE TABLE owners above?
-      // Wait, looking at schema.sql line 58...
-      // CREATE TABLE owners ( user_id, nic, tin, bank_name... )
-      // It does NOT have residence_address in schema.sql!
-      // But OwnerModel.create tries to insert it.
-      // I should remove residenceAddress from create too.
     };
   }
 }

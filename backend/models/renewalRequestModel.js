@@ -7,6 +7,7 @@
 import pool from '../config/db.js';
 
 class RenewalRequestModel {
+  // CREATE: Records a new intent to extend a lease, capturing current vs proposed terms.
   async create(data, connection = null) {
     const {
       leaseId,
@@ -15,9 +16,10 @@ class RenewalRequestModel {
       proposedEndDate,
       status,
       notes,
-      requestedBy, // [H19] Who initiated this renewal: 'tenant' | 'staff' | 'system'
+      requestedBy,
     } = data;
     const conn = connection || pool;
+    // 1. [DATA] Persistence: Logs the initiator (tenant/staff/system) and the initial offer
     const [result] = await conn.query(
       `INSERT INTO renewal_requests 
              (lease_id, requested_by, current_monthly_rent, proposed_monthly_rent, proposed_end_date, status, negotiation_notes)
@@ -35,7 +37,9 @@ class RenewalRequestModel {
     return result.insertId;
   }
 
+  // FIND BY ID: Fetches a single negotiation thread with building context.
   async findById(id) {
+    // 1. [QUERY] Multi-Join: Resolves the unit and tenant identity for context
     const [rows] = await pool.query(
       `SELECT rr.*, l.unit_id, u.unit_number, p.name as property_name, usr.name as tenant_name
              FROM renewal_requests rr
@@ -49,7 +53,9 @@ class RenewalRequestModel {
     return rows[0] ? this.mapRow(rows[0]) : null;
   }
 
+  // FIND BY LEASE ID: Retrieves the most recent active proposal for a specific lease.
   async findByLeaseId(leaseId) {
+    // 1. [QUERY] Retrieval: Most recent first
     const [rows] = await pool.query(
       `SELECT * FROM renewal_requests WHERE lease_id = ? ORDER BY created_at DESC LIMIT 1`,
       [leaseId]
@@ -57,8 +63,10 @@ class RenewalRequestModel {
     return rows[0] ? this.mapRow(rows[0]) : null;
   }
 
+  // FIND ALL: Dashboard listing for all negotiations, filtered by access control.
   async findAll(filter = {}) {
     const { ownerId, treasurerId } = filter;
+    // 1. [QUERY] Complex Extraction with optional RBAC Joins
     let query = `
             SELECT rr.*, l.unit_id, u.unit_number, p.name as property_name, usr.name as tenant_name
             FROM renewal_requests rr
@@ -70,6 +78,7 @@ class RenewalRequestModel {
     const params = [];
     const conditions = [];
 
+    // 2. [SECURITY] Role Filtering: owners see their portfolio; treasurers see their assignments
     if (ownerId) {
       conditions.push(`p.owner_id = ?`);
       params.push(ownerId);
@@ -90,11 +99,12 @@ class RenewalRequestModel {
     return rows.map((row) => this.mapRow(row));
   }
 
+  // MAP ROW: Standardizes the database row into a structured renewal DTO.
   mapRow(row) {
     return {
       id: row.request_id.toString(),
       leaseId: row.lease_id.toString(),
-      requestedBy: row.requested_by || 'system', // [H19]
+      requestedBy: row.requested_by || 'system',
       currentMonthlyRent: parseFloat(row.current_monthly_rent),
       proposedMonthlyRent: row.proposed_monthly_rent
         ? parseFloat(row.proposed_monthly_rent)
@@ -112,14 +122,17 @@ class RenewalRequestModel {
     };
   }
 
+  // UPDATE STATUS: Moves the negotiation through states (Accepted, Rejected, Terminated).
   async updateStatus(id, status, connection = null) {
     const conn = connection || pool;
+    // 1. [DATA] Progress Update
     await conn.query(
       `UPDATE renewal_requests SET status = ? WHERE request_id = ?`,
       [status, id]
     );
   }
 
+  // UPDATE TERMS: Overwrites the negotiation offer during active back-and-forth communication.
   async updateTerms(id, data, connection = null) {
     const {
       proposedMonthlyRent,
@@ -129,6 +142,7 @@ class RenewalRequestModel {
       acceptanceDeadline,
     } = data;
     const conn = connection || pool;
+    // 1. [DATA] State Persistence: Finalize the offer update and set the expiration timer
     await conn.query(
       `UPDATE renewal_requests 
              SET proposed_monthly_rent = ?, proposed_end_date = ?, negotiation_notes = ?, status = ?, acceptance_deadline = ?

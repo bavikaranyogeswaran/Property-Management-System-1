@@ -7,16 +7,11 @@
 import db from '../config/db.js';
 
 class LeadStageHistoryModel {
-  /**
-   * Create a new stage history record
-   * @param {number} leadId - Lead ID
-   * @param {string|null} fromStatus - Previous status (null for lead creation)
-   * @param {string} toStatus - New status
-   * @param {string} notes - Optional notes about the transition
-   */
+  // CREATE: Records a snapshot of a status change in the lead lifecycle.
   async create(leadId, fromStatus, toStatus, notes = '', connection = null) {
     const dbConn = connection || db;
     try {
+      // 1. [DATA] Persistence: Log the transition from one state to another with a timestamp
       const [result] = await dbConn.query(
         `INSERT INTO lead_stage_history 
                  (lead_id, from_status, to_status, changed_at, notes) 
@@ -31,11 +26,9 @@ class LeadStageHistoryModel {
     }
   }
 
-  /**
-   * Get all stage history for a specific lead
-   * @param {number} leadId - Lead ID
-   */
+  // FIND BY LEAD ID: List every stage the individual has passed through.
   async findByLeadId(leadId) {
+    // 1. [QUERY] Extraction: Selecting with aliasing for DTO consistency
     const [rows] = await db.query(
       `SELECT 
                 history_id as id,
@@ -52,13 +45,10 @@ class LeadStageHistoryModel {
     return rows;
   }
 
-  /**
-   * Get all stage history records
-   * @param {number|null} ownerId - Optional owner ID to filter by
-   */
+  // FIND ALL: System-wide audit log of all lead transitions.
   async findAll(ownerId = null) {
+    // 1. [QUERY] Filtered Join for Owners: Isolates history records to properties they manage
     if (ownerId) {
-      // Filter by owner through leads and properties
       const [rows] = await db.query(
         `SELECT 
                     h.history_id as id,
@@ -77,7 +67,7 @@ class LeadStageHistoryModel {
       return rows;
     }
 
-    // Return all history (for admin or backward compatibility)
+    // 2. [QUERY] Global Retrieval for Admins
     const [rows] = await db.query(
       `SELECT 
                 history_id as id,

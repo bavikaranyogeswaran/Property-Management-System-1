@@ -40,9 +40,10 @@ const extractPublicId = (url) => {
 class ImageController {
   // General File Upload
   uploadGeneralFile = catchAsync(async (req, res, next) => {
-    if (!req.file) {
-      return next(new AppError('No file uploaded', 400));
-    }
+    // 1. [VALIDATION] Verify multpart payload contains a file
+    if (!req.file) return next(new AppError('No file uploaded', 400));
+
+    // 2. [RESPONSE] Dispatch the Cloudinary URL
     res.status(201).json({ url: req.file.url });
   });
 
@@ -50,63 +51,49 @@ class ImageController {
   // UPLOAD PROPERTY IMAGES: Receives multiple files and saves them to a building profile.
   uploadPropertyImages = catchAsync(async (req, res, next) => {
     const { propertyId } = req.params;
-
-    if (!req.files || req.files.length === 0) {
+    if (!req.files || req.files.length === 0)
       return next(new AppError('No files uploaded', 400));
-    }
 
-    // Validate max 10 images total
+    // 1. [VALIDATION] Capacity Guard: Max 10 images per property
     const existing = await propertyImageModel.findByPropertyId(propertyId);
-    if (existing.length + req.files.length > 10) {
-      return next(
-        new AppError(
-          `Maximum 10 images allowed. Currently ${existing.length} images, trying to add ${req.files.length}`,
-          400
-        )
-      );
-    }
+    if (existing.length + req.files.length > 10)
+      return next(new AppError(`Limit reached (Max 10).`, 400));
 
-    // Create image records with uploaded file paths
+    // 2. [TRANSFORMATION] Map uploaded files to database schema
     const images = req.files.map((file, index) => ({
       imageUrl: file.url,
-      isPrimary: existing.length === 0 && index === 0, // First image of first batch is primary
+      isPrimary: existing.length === 0 && index === 0, // Auto-primary for first image
       displayOrder: existing.length + index,
     }));
 
-    // If any new image is primary, clear existing ones first
-    const hasNewPrimary = images.some((img) => img.isPrimary);
-    if (hasNewPrimary) {
-      // Direct update to FALSE is safer/easier here
-      await (
-        await import('../config/db.js')
-      ).default.query(
+    // 3. [SIDE EFFECT] Atomically clear existing primary flag if new images contain a primary
+    if (images.some((img) => img.isPrimary)) {
+      const db = (await import('../config/db.js')).default;
+      await db.query(
         'UPDATE property_images SET is_primary = FALSE WHERE property_id = ?',
         [propertyId]
       );
     }
 
+    // 4. [DATA] Persist batch records
     await propertyImageModel.createMultiple(propertyId, images);
-
     const allImages = await propertyImageModel.findByPropertyId(propertyId);
 
-    // [LEGACY SYNC] Keep properties.image_url in sync for backward compat
+    // 5. [LEGACY SYNC] Update properties table for backward compatibility with older UI components
     try {
       const currentPrimary = allImages.find((img) => img.is_primary);
-      if (currentPrimary) {
+      if (currentPrimary)
         await propertyModel.update(propertyId, {
           imageUrl: currentPrimary.image_url,
         });
-      }
     } catch (syncErr) {
-      logger.warn(
-        `Legacy property image sync failed for property ${propertyId}:`,
-        syncErr.message
-      );
+      logger.warn(`Legacy sync failed: ${syncErr.message}`);
     }
 
     res.status(201).json({ images: allImages });
   });
 
+  // GET PROPERTY IMAGES: Lists all photos associated with a building.
   getPropertyImages = catchAsync(async (req, res, next) => {
     const { propertyId } = req.params;
     const images = await propertyImageModel.findByPropertyId(propertyId);
@@ -116,188 +103,146 @@ class ImageController {
   // SET PRIMARY IMAGE: Chooses which photo shows up first for a property.
   setPropertyPrimaryImage = catchAsync(async (req, res, next) => {
     const { propertyId, imageId } = req.params;
+
+    // 1. [DATA] Atomic primary swap in the image table
     const success = await propertyImageModel.setPrimary(imageId, propertyId);
+    if (!success) return next(new AppError('Image not found', 404));
 
-    if (!success) {
-      return next(new AppError('Image not found', 404));
-    }
-
-    // [LEGACY SYNC] Keep properties.image_url in sync for backward compat
+    // 2. [LEGACY SYNC] Propagate new hero image to the property main record
     try {
       const images = await propertyImageModel.findByPropertyId(propertyId);
       const primary = images.find((img) => img.is_primary);
-      if (primary) {
+      if (primary)
         await propertyModel.update(propertyId, { imageUrl: primary.image_url });
-      }
     } catch (syncErr) {
-      logger.warn(
-        `Legacy property image sync failed for property ${propertyId}:`,
-        syncErr.message
-      );
+      logger.warn(`Legacy sync failed: ${syncErr.message}`);
     }
 
     res.json({ message: 'Primary image updated' });
   });
 
+  // DELETE PROPERTY IMAGE: Drops the record and purges the file from Cloudinary.
   deletePropertyImage = catchAsync(async (req, res, next) => {
     const { imageId } = req.params;
 
-    // Get image details first to get the URL
-    const [rows] = await (
-      await import('../config/db.js')
-    ).default.query(
+    // 1. [DATA] Resolve identity and existing URL
+    const db = (await import('../config/db.js')).default;
+    const [rows] = await db.query(
       'SELECT image_url FROM property_images WHERE image_id = ?',
       [imageId]
     );
-
-    if (rows.length === 0) {
-      return next(new AppError('Image not found', 404));
-    }
+    if (rows.length === 0) return next(new AppError('Image not found', 404));
 
     const imageUrl = rows[0].image_url;
+
+    // 2. [DATA] Remove database record
     const success = await propertyImageModel.deleteById(imageId);
+    if (!success) return next(new AppError('Deletion failed', 500));
 
-    if (!success) {
-      return next(new AppError('Image deletion failed', 500));
-    }
-
-    // Cleanup Cloudinary
+    // 3. [SIDE EFFECT] Cloudinary Purge: Extract ID and call remote delete
     const publicId = extractPublicId(imageUrl);
     if (publicId) {
       try {
         await cloudinary.uploader.destroy(publicId);
-        logger.info(`Cloudinary asset deleted: ${publicId}`);
-      } catch (cloudinaryErr) {
-        logger.error(
-          `Failed to delete Cloudinary asset ${publicId}:`,
-          cloudinaryErr
-        );
+        logger.info(`Asset purged: ${publicId}`);
+      } catch (err) {
+        logger.error(`Cloudinary cleanup failed: ${publicId}`, err);
       }
     }
 
     res.json({ message: 'Image deleted' });
   });
 
-  // Unit Images
+  // UPLOAD UNIT IMAGES: Similar to property upload but for specific apartment units.
   uploadUnitImages = catchAsync(async (req, res, next) => {
     const { unitId } = req.params;
-
-    if (!req.files || req.files.length === 0) {
+    if (!req.files || req.files.length === 0)
       return next(new AppError('No files uploaded', 400));
-    }
 
-    // Validate max 10 images total
+    // 1. [VALIDATION] Capacity Guard
     const existing = await unitImageModel.findByUnitId(unitId);
-    if (existing.length + req.files.length > 10) {
-      return next(
-        new AppError(
-          `Maximum 10 images allowed. Currently ${existing.length} images, trying to add ${req.files.length}`,
-          400
-        )
-      );
-    }
+    if (existing.length + req.files.length > 10)
+      return next(new AppError(`Limit reached (Max 10).`, 400));
 
-    // Create image records with uploaded file paths
+    // 2. [TRANSFORMATION] Map files
     const images = req.files.map((file, index) => ({
       imageUrl: file.url,
       isPrimary: existing.length === 0 && index === 0,
       displayOrder: existing.length + index,
     }));
 
-    // If any new image is primary, clear existing ones first
-    const hasNewPrimary = images.some((img) => img.isPrimary);
-    if (hasNewPrimary) {
-      await (
-        await import('../config/db.js')
-      ).default.query(
+    // 3. [SIDE EFFECT] Reset primary states
+    if (images.some((img) => img.isPrimary)) {
+      const db = (await import('../config/db.js')).default;
+      await db.query(
         'UPDATE unit_images SET is_primary = FALSE WHERE unit_id = ?',
         [unitId]
       );
     }
 
+    // 4. [DATA] Persist
     await unitImageModel.createMultiple(unitId, images);
     const allImages = await unitImageModel.findByUnitId(unitId);
 
-    // [LEGACY SYNC] Keep units.image_url in sync for backward compat
+    // 5. [LEGACY SYNC] Update unit record
     try {
       const currentPrimary =
         allImages.find((img) => img.is_primary) || allImages[0];
-      if (currentPrimary) {
+      if (currentPrimary)
         await unitModel.updateImageUrl(unitId, currentPrimary.image_url);
-      }
     } catch (syncErr) {
-      logger.warn(
-        `Legacy unit image sync failed for unit ${unitId}:`,
-        syncErr.message
-      );
+      logger.warn(`Legacy sync failed: ${syncErr.message}`);
     }
 
     res.status(201).json({ images: allImages });
   });
 
+  // GET UNIT IMAGES: Lists photos for a specific unit.
   getUnitImages = catchAsync(async (req, res, next) => {
     const { unitId } = req.params;
     const images = await unitImageModel.findByUnitId(unitId);
     res.json({ images });
   });
 
+  // SET UNIT PRIMARY: Hero image selector for units.
   setUnitPrimaryImage = catchAsync(async (req, res, next) => {
     const { unitId, imageId } = req.params;
     const success = await unitImageModel.setPrimary(imageId, unitId);
+    if (!success) return next(new AppError('Image not found', 404));
 
-    if (!success) {
-      return next(new AppError('Image not found', 404));
-    }
-
-    // [LEGACY SYNC] Keep units.image_url in sync for backward compat
+    // 1. [LEGACY SYNC]
     try {
       const images = await unitImageModel.findByUnitId(unitId);
       const primary = images.find((img) => img.is_primary);
-      if (primary) {
-        await unitModel.updateImageUrl(unitId, primary.image_url);
-      }
-    } catch (syncErr) {
-      logger.warn(
-        `Legacy unit image sync failed for unit ${unitId}:`,
-        syncErr.message
-      );
+      if (primary) await unitModel.updateImageUrl(unitId, primary.image_url);
+    } catch (err) {
+      logger.warn(`Legacy sync failed: ${err.message}`);
     }
 
     res.json({ message: 'Primary image updated' });
   });
 
+  // DELETE UNIT IMAGE: Removes record and purges Cloudinary asset.
   deleteUnitImage = catchAsync(async (req, res, next) => {
     const { imageId } = req.params;
-
-    // Get image details first to get the URL
-    const [rows] = await (
-      await import('../config/db.js')
-    ).default.query('SELECT image_url FROM unit_images WHERE image_id = ?', [
-      imageId,
-    ]);
-
-    if (rows.length === 0) {
-      return next(new AppError('Image not found', 404));
-    }
+    const db = (await import('../config/db.js')).default;
+    const [rows] = await db.query(
+      'SELECT image_url FROM unit_images WHERE image_id = ?',
+      [imageId]
+    );
+    if (rows.length === 0) return next(new AppError('Image not found', 404));
 
     const imageUrl = rows[0].image_url;
     const success = await unitImageModel.deleteById(imageId);
+    if (!success) return next(new AppError('Deletion failed', 500));
 
-    if (!success) {
-      return next(new AppError('Image deletion failed', 500));
-    }
-
-    // Cleanup Cloudinary
+    // 1. [SIDE EFFECT] Remote Purge
     const publicId = extractPublicId(imageUrl);
     if (publicId) {
       try {
         await cloudinary.uploader.destroy(publicId);
-        logger.info(`Cloudinary asset deleted: ${publicId}`);
-      } catch (cloudinaryErr) {
-        logger.error(
-          `Failed to delete Cloudinary asset ${publicId}:`,
-          cloudinaryErr
-        );
+      } catch (err) {
+        logger.error(`Cloudinary cleanup failed`, err);
       }
     }
 

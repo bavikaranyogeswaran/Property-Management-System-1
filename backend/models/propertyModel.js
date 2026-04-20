@@ -9,7 +9,7 @@ import db from '../config/db.js';
 import cacheService from '../services/cacheService.js';
 
 class PropertyModel {
-  //  CREATE PROPERTY: Filing a deed for a new building.
+  // CREATE PROPERTY: Filing a deed for a new building with financial policy defaults.
   async create(propertyData) {
     const {
       ownerId,
@@ -27,6 +27,7 @@ class PropertyModel {
 
     let result;
     try {
+      // 1. [DATA] Persistence: Insert core building metadata with late fee and management configurations
       [result] = await db.query(
         `INSERT INTO properties 
                 (owner_id, name, property_type_id, property_no, street, city, district, image_url, description, late_fee_percentage, late_fee_type, late_fee_amount, late_fee_grace_period, tenant_deactivation_days, management_fee_percentage) 
@@ -39,7 +40,7 @@ class PropertyModel {
           street,
           city,
           district,
-          imageUrl, // [DEPRECATED] source of truth is property_images
+          imageUrl,
           description,
           propertyData.lateFeePercentage !== undefined
             ? propertyData.lateFeePercentage
@@ -54,6 +55,7 @@ class PropertyModel {
         ]
       );
     } catch (err) {
+      // 2. [SECURITY] Duplicate Guard: Catch portfolio-level naming collisions
       if (
         err.code === 'ER_DUP_ENTRY' &&
         err.message.includes('unique_property_no')
@@ -69,7 +71,7 @@ class PropertyModel {
 
     const propertyId = result.insertId;
 
-    // [1NF FIX] Write features to the normalized amenities table
+    // 3. [1NF] Normalization: Sync associated amenities into the dedicated relational table
     if (Array.isArray(features) && features.length > 0) {
       await this._syncAmenities(propertyId, features);
     }
@@ -77,32 +79,20 @@ class PropertyModel {
     return propertyId;
   }
 
+  // FIND ALL: Registry of all buildings, optionally filtered by owner.
   async findAll(ownerId = null) {
+    // 1. [QUERY] Extraction: Joins types and performs a subquery for the primary image cover
     let query = `
             SELECT 
-                p.property_id, 
-                p.owner_id, 
-                p.name, 
-                p.property_no,
-                p.street,
-                p.city,
-                p.district,
+                p.property_id, p.owner_id, p.name, p.property_no, p.street, p.city, p.district,
                 COALESCE(
                   (SELECT pi.image_url FROM property_images pi WHERE pi.property_id = p.property_id AND pi.is_primary = TRUE LIMIT 1),
                   p.image_url
                 ) AS image_url,
-                p.description,
-                p.status, 
-                p.created_at,
-                p.property_type_id,
-                p.late_fee_percentage,
-                p.late_fee_type,
-                p.late_fee_amount,
-                p.late_fee_grace_period,
-                p.tenant_deactivation_days,
-                p.management_fee_percentage,
-                pt.name as type_name,
-                pt.type_id as type_id
+                p.description, p.status, p.created_at, p.property_type_id,
+                p.late_fee_percentage, p.late_fee_type, p.late_fee_amount, p.late_fee_grace_period,
+                p.tenant_deactivation_days, p.management_fee_percentage,
+                pt.name as type_name, pt.type_id as type_id
             FROM properties p
             LEFT JOIN property_types pt ON p.property_type_id = pt.type_id
             WHERE p.is_archived = FALSE
@@ -116,7 +106,7 @@ class PropertyModel {
 
     const [rows] = await db.query(query, params);
 
-    // Batch fetch amenities for all property IDs
+    // 2. [QUERY] Batch Load: Fetches amenities for all resolved properties in a single round-trip
     const propertyIds = rows.map((r) => r.property_id);
     const amenitiesMap = await this._getAmenitiesBatch(propertyIds);
 
@@ -144,46 +134,32 @@ class PropertyModel {
     }));
   }
 
+  // FIND BY ID: Fetches a single property profile with heavy caching to reduce DB load on public listings.
   async findById(id) {
+    // 1. [CACHE] Layer: Checks the 15-minute TTL vault before querying SQL
     return await cacheService.getOrSet(
       cacheService.getPropertyKey(id),
       async () => {
+        // 2. [QUERY] Extraction with Cover-Image resolution
         const [rows] = await db.query(
-          `
-                SELECT 
-                    p.property_id, 
-                    p.owner_id, 
-                    p.name, 
-                    p.property_no,
-                    p.street,
-                    p.city,
-                    p.district,
+          `SELECT p.property_id, p.owner_id, p.name, p.property_no, p.street, p.city, p.district,
                     COALESCE(
                       (SELECT pi.image_url FROM property_images pi WHERE pi.property_id = p.property_id AND pi.is_primary = TRUE LIMIT 1),
                       p.image_url
                     ) AS image_url,
-                    p.description,
-                    p.status, 
-                    p.created_at,
-                    p.property_type_id,
-                    p.late_fee_percentage,
-                    p.late_fee_type,
-                    p.late_fee_amount,
-                    p.late_fee_grace_period,
-                    p.tenant_deactivation_days,
-                    p.management_fee_percentage,
-                    pt.name as type_name,
-                    pt.type_id as type_id
+                    p.description, p.status, p.created_at, p.property_type_id,
+                    p.late_fee_percentage, p.late_fee_type, p.late_fee_amount, p.late_fee_grace_period,
+                    p.tenant_deactivation_days, p.management_fee_percentage,
+                    pt.name as type_name, pt.type_id as type_id
                 FROM properties p
                 JOIN property_types pt ON p.property_type_id = pt.type_id
-                WHERE p.property_id = ? AND p.is_archived = FALSE
-            `,
+                WHERE p.property_id = ? AND p.is_archived = FALSE`,
           [id]
         );
 
         if (!rows[0]) return null;
 
-        // Fetch amenities for this property
+        // 3. [QUERY] Entity Resolution: Fetch the normalized amenity set
         const amenities = await this._getAmenities(id);
 
         return {
@@ -211,7 +187,7 @@ class PropertyModel {
           ),
         };
       },
-      900 // 15 Minute TTL
+      900
     );
   }
 
@@ -222,10 +198,9 @@ class PropertyModel {
     street: 'street',
     city: 'city',
     district: 'district',
-    imageUrl: 'image_url', // [DEPRECATED]
+    imageUrl: 'image_url',
     status: 'status',
     description: 'description',
-    // features: 'features', // [REMOVED] Sync via _syncAmenities
     lateFeePercentage: 'late_fee_percentage',
     lateFeeType: 'late_fee_type',
     lateFeeAmount: 'late_fee_amount',
@@ -234,13 +209,13 @@ class PropertyModel {
     managementFeePercentage: 'management_fee_percentage',
   };
 
+  // UPDATE: Modifies building metadata and refreshes relational amenities.
   async update(id, updates) {
     const fields = [];
     const values = [];
-
-    // Extract features for separate amenity table processing
     const featuresToSync = updates.features;
 
+    // 1. [TRANSFORMATION] Dynamic Query Builder
     Object.keys(updates).forEach((key) => {
       const column = PropertyModel.UPDATE_KEY_MAP[key];
       if (column && updates[key] !== undefined && key !== 'features') {
@@ -251,7 +226,7 @@ class PropertyModel {
 
     if (fields.length === 0 && !featuresToSync) return false;
 
-    // [HARDENED] Invalidate cache
+    // 2. [CACHE] Invalidation: Purge stale property data from the cache layer
     await cacheService.invalidate(cacheService.getPropertyKey(id));
 
     if (fields.length > 0) {
@@ -277,7 +252,7 @@ class PropertyModel {
       }
     }
 
-    // [1NF FIX] Sync amenities table whenever features are updated
+    // 3. [1NF] Normalization Sync: Update features table if modified
     if (Array.isArray(featuresToSync)) {
       await this._syncAmenities(id, featuresToSync);
     }
@@ -285,27 +260,27 @@ class PropertyModel {
     return true;
   }
 
+  // DELETE: Soft-archives a property and triggers asset cleanup in the background.
   async delete(id, connection = null) {
     const dbConn = connection || db;
 
-    // 1. Fetch all associated image URLs before archival/deletion
+    // 1. [QUERY] Pre-Archival Snapshot: Capture all image URLs for storage cleanup
     const [images] = await dbConn.query(
       'SELECT image_url FROM property_images WHERE property_id = ?',
       [id]
     );
 
-    // [HARDENED] Invalidate cache
+    // 2. [CACHE] Cleanse
     await cacheService.invalidate(cacheService.getPropertyKey(id));
 
-    // 2. Perform the soft-delete
+    // 3. [DATA] Archival: Flag as archived to hide from active listings while preserving audit history
     const [result] = await dbConn.query(
       "UPDATE properties SET archived_at = NOW(), is_archived = TRUE, status = 'inactive' WHERE property_id = ?",
       [id]
     );
-
     const success = result.affectedRows > 0;
 
-    // 3. Enqueue Cloudinary cleanup if archival was successful
+    // 4. [SIDE-EFFECT] Background Task: Queue Cloudinary deletions for all archived images
     if (success && images.length > 0) {
       const { mainQueue } = await import('../config/queue.js');
       const { extractPublicId } = await import('../utils/cronJobs.js');
@@ -325,7 +300,9 @@ class PropertyModel {
     return success;
   }
 
+  // GET TYPES: Registry of property categories (e.g., Residential, Commercial).
   async getTypes() {
+    // 1. [CACHE] Layer: Long-term cache for static type data
     return await cacheService.getOrSet(
       'cache:property_types',
       async () => {
@@ -336,13 +313,14 @@ class PropertyModel {
           description: row.description,
         }));
       },
-      86400 // 24 Hour TTL (Static data)
+      86400
     );
   }
 
+  // ADD IMAGES: Attaches new photos to the property gallery in bulk.
   async addImages(propertyId, imagesData) {
     if (!imagesData || imagesData.length === 0) return [];
-
+    // 1. [DATA] Batch Transformation
     const values = imagesData.map((img) => [
       img.propertyId,
       img.imageUrl,
@@ -350,13 +328,13 @@ class PropertyModel {
       img.displayOrder,
     ]);
 
-    // Bulk insert
+    // 2. [DATA] Multi-Persistence
     await db.query(
       'INSERT INTO property_images (property_id, image_url, is_primary, display_order) VALUES ?',
       [values]
     );
 
-    // Fetch and return created images
+    // 3. [QUERY] Refreshed List Retrieval
     const [rows] = await db.query(
       'SELECT * FROM property_images WHERE property_id = ? ORDER BY display_order ASC',
       [propertyId]
@@ -370,7 +348,10 @@ class PropertyModel {
       uploadedAt: row.created_at,
     }));
   }
+
+  // FIND OWNER DETAILS: Resolves contact information for the building's investor.
   async findOwnerDetails(propertyId) {
+    // 1. [QUERY] Filtered Join
     const [rows] = await db.query(
       `SELECT p.name as property_name, u.email as owner_email, u.user_id as owner_id 
              FROM properties p
@@ -386,7 +367,9 @@ class PropertyModel {
     };
   }
 
+  // CLEAR PRIMARY IMAGES: Resets primary status across the gallery before setting a new cover.
   async clearPrimaryImages(propertyId) {
+    // 1. [DATA] State Reset
     await db.query(
       'UPDATE property_images SET is_primary = 0 WHERE property_id = ?',
       [propertyId]
@@ -394,18 +377,14 @@ class PropertyModel {
     return true;
   }
 
-  /**
-   * [HIGH-PERFORMANCE] Checks if a staff member is assigned to ANY property owned by a specific owner.
-   * Replaces dual-model fetching and in-memory comparisons with a single JOIN check.
-   */
+  // IS STAFF ASSIGNED TO OWNER: RBAC check to see if a treasurer has access to an investor's properties.
   async isStaffAssignedToOwner(staffId, ownerId) {
+    // 1. [SECURITY] Join-Based Validation: Efficient cross-lookup through assignments
     const [rows] = await db.query(
-      `
-            SELECT 1 FROM staff_property_assignments spa
+      `SELECT 1 FROM staff_property_assignments spa
             JOIN properties p ON spa.property_id = p.property_id
             WHERE spa.user_id = ? AND p.owner_id = ? AND p.is_archived = FALSE
-            LIMIT 1
-        `,
+            LIMIT 1`,
       [staffId, ownerId]
     );
     return rows.length > 0;
@@ -415,22 +394,21 @@ class PropertyModel {
   //  AMENITY HELPERS (1NF Normalization)
   // ============================================================================
 
-  /**
-   * Syncs the property_amenities table with the provided feature list.
-   * Replaces all existing amenities with the new set (delete + re-insert).
-   */
+  // SYNC AMENITIES: Reconciles the property_amenities table against a list of features.
   async _syncAmenities(propertyId, features) {
+    // 1. [DATA] Cleanup: Purge existing amenities to allow fresh sync
     await db.query('DELETE FROM property_amenities WHERE property_id = ?', [
       propertyId,
     ]);
-
     if (!features || features.length === 0) return;
 
+    // 2. [SANITY] Filter & De-dupe: Ensure safe string storage
     const uniqueFeatures = [
       ...new Set(features.filter((f) => f && typeof f === 'string')),
     ];
     if (uniqueFeatures.length === 0) return;
 
+    // 3. [DATA] Batch Persistence
     const values = uniqueFeatures.map((name) => [propertyId, name]);
     await db.query(
       'INSERT IGNORE INTO property_amenities (property_id, name) VALUES ?',
@@ -438,10 +416,9 @@ class PropertyModel {
     );
   }
 
-  /**
-   * Fetches amenities for a single property as an array of strings.
-   */
+  // GET AMENITIES: Resolve features for a specific property.
   async _getAmenities(propertyId) {
+    // 1. [QUERY] Retrieval
     const [rows] = await db.query(
       'SELECT name FROM property_amenities WHERE property_id = ? ORDER BY name ASC',
       [propertyId]
@@ -449,18 +426,16 @@ class PropertyModel {
     return rows.map((r) => r.name);
   }
 
-  /**
-   * Batch fetches amenities for multiple property IDs.
-   * Returns a map: { propertyId: [featureName, ...] }
-   */
+  // GET AMENITIES BATCH: High-performance bucketed retrieval for multiple buildings.
   async _getAmenitiesBatch(propertyIds) {
     if (!propertyIds || propertyIds.length === 0) return {};
-
+    // 1. [QUERY] Set-Based Retrieval
     const [rows] = await db.query(
       'SELECT property_id, name FROM property_amenities WHERE property_id IN (?) ORDER BY name ASC',
       [propertyIds]
     );
 
+    // 2. [TRANSFORMATION] Bucket mapping: Grouping rows by Property ID
     const map = {};
     for (const row of rows) {
       if (!map[row.property_id]) map[row.property_id] = [];

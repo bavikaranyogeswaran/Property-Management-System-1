@@ -16,16 +16,15 @@ class MessageController {
       const { content } = req.body;
       const senderId = req.user.id;
 
-      if (!content) {
+      // 1. [VALIDATION] Integrity Guard
+      if (!content)
         return res.status(400).json({ error: 'Message content is required' });
-      }
 
-      // Verify lead exists
+      // 2. [DATA] Verification: Ensure the recipient exists
       const lead = await leadModel.findById(leadId);
-      if (!lead) {
-        return res.status(404).json({ error: 'Lead not found' });
-      }
+      if (!lead) return res.status(404).json({ error: 'Lead not found' });
 
+      // 3. [DATA] Persistence: Record the outbound communication
       const messageId = await messageModel.create({
         leadId,
         senderId,
@@ -33,7 +32,7 @@ class MessageController {
         senderType: 'user',
       });
 
-      // Update last contacted
+      // 4. [SIDE EFFECT] CRM logic: Update the "Last Contacted" timestamp to keep the lead pipeline fresh
       await leadModel.update(leadId, { lastContactedAt: new Date() });
 
       const newMessage = {
@@ -60,6 +59,7 @@ class MessageController {
       const lead = await leadModel.findById(leadId);
       if (!lead) return res.status(404).json({ error: 'Lead not found' });
 
+      // 1. [DATA] Conversation retrieval: Fetch all notes in the prospect's thread
       const messages = await messageModel.findByLeadId(leadId);
       res.json(messages);
     } catch (error) {
@@ -67,9 +67,11 @@ class MessageController {
     }
   }
 
+  // MARK READ: Updates the status of all messages in a lead thread.
   async markRead(req, res) {
     try {
       const { leadId } = req.params;
+      // 1. [DATA] Bulk status update
       await messageModel.markAllAsRead(leadId, req.user.id);
       res.json({ success: true });
     } catch (error) {
@@ -79,12 +81,14 @@ class MessageController {
 
   // --- TENANT SPECIFIC ENDPOINTS ---
 
-  // For tenant fetching their own messages
   // GET TENANT MESSAGES: Retrieves the chat history for a verified Tenant.
   async getTenantMessages(req, res) {
     try {
+      // 1. [SECURITY] ID Resolution: Use session ID for tenants, or URL param for staff/owners
       const tenantId =
         req.user.role === 'tenant' ? req.user.id : req.params.tenantId;
+
+      // 2. [DATA] Narrative Resolver
       const messages = await messageModel.findByTenantId(tenantId);
       res.json(messages);
     } catch (error) {
@@ -92,10 +96,10 @@ class MessageController {
     }
   }
 
-  // For anyone sending a message in a tenant thread
   // SEND TENANT MESSAGE: Dispatches a new note into a verified Tenant's thread.
   async sendTenantMessage(req, res) {
     try {
+      // 1. [SECURITY] ID Resolution
       const tenantId =
         req.user.role === 'tenant' ? req.user.id : req.params.tenantId;
       const { content } = req.body;
@@ -104,6 +108,7 @@ class MessageController {
       if (!content)
         return res.status(400).json({ error: 'Message content required' });
 
+      // 2. [DATA] Persistence
       const messageId = await messageModel.create({
         tenantId,
         senderId,
@@ -127,10 +132,14 @@ class MessageController {
     }
   }
 
+  // MARK TENANT READ: Specifically marks the verified tenant's conversation as seen.
   async markTenantRead(req, res) {
     try {
+      // 1. [SECURITY] Context selection
       const tenantId =
         req.user.role === 'tenant' ? req.user.id : req.params.tenantId;
+
+      // 2. [DATA] Atomic update
       await messageModel.markAllAsReadForTenant(tenantId, req.user.id);
       res.json({ success: true });
     } catch (error) {

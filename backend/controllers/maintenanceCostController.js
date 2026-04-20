@@ -27,6 +27,7 @@ class MaintenanceCostController {
         await import('../services/maintenanceService.js')
       ).default;
 
+      // 1. [DELEGATION] Cost Recording: Atomically record the repair expense
       const { costId, billingSuccess } = await maintenanceService.recordCost(
         {
           requestId,
@@ -38,12 +39,12 @@ class MaintenanceCostController {
         req.user
       );
 
+      // 2. [RESPONSE] Construct detail payload including conditional billing status
       const response = { message: 'Cost recorded', costId };
       if (isBillableToTenant) {
         response.billingSuccess = billingSuccess;
-        if (!billingSuccess) {
+        if (!billingSuccess)
           response.billingError = 'No active lease found to bill the tenant.';
-        }
       }
       res.status(201).json(response);
     } catch (error) {
@@ -52,17 +53,18 @@ class MaintenanceCostController {
     }
   }
 
-  // GET COSTS: Shows all repair bills.
+  // GET COSTS: Shows all repair bills (Self-scoped for Tenants).
   async getCosts(req, res) {
     try {
       const { requestId } = req.query;
 
+      // 1. [SECURITY] Scope Guard: Tenants only see costs they are responsible for
       if (req.user.role === 'tenant') {
         const costs = await maintenanceCostModel.findByTenantId(req.user.id);
         return res.json(costs);
       }
 
-      // If no requestId provided, return all costs for Owner/Treasurer (scoped)
+      // 2. [DATA] Multi-role Listing: Handle Owners vs Treasurers vs specific Request filters
       if (!requestId) {
         if (req.user.role === 'owner') {
           const costs = await maintenanceCostModel.findAllWithDetails();
@@ -88,6 +90,7 @@ class MaintenanceCostController {
     try {
       const { id } = req.params;
 
+      // 1. [SECURITY] RBAC Check: Ensure Treasurers only delete costs within their assigned properties
       if (req.user.role === 'treasurer') {
         const cost = await maintenanceCostModel.findByIdWithDetails(id);
         if (!cost) return res.status(404).json({ error: 'Cost not found' });
@@ -98,19 +101,18 @@ class MaintenanceCostController {
           (p) => p.property_id === cost.property_id
         );
 
-        if (!isAssigned) {
-          return res.status(403).json({
-            error: 'Access denied. You are not assigned to this property.',
-          });
-        }
+        if (!isAssigned)
+          return res
+            .status(403)
+            .json({
+              error: 'Access denied. You are not assigned to this property.',
+            });
       }
 
+      // 2. [DATA] Mark as void (soft-delete ledger pattern)
       const successfullyVoided = await maintenanceCostModel.void(id);
-      if (successfullyVoided) {
-        res.json({ message: 'Cost marked as voided' });
-      } else {
-        res.status(404).json({ error: 'Cost not found' });
-      }
+      if (successfullyVoided) res.json({ message: 'Cost marked as voided' });
+      else res.status(404).json({ error: 'Cost not found' });
     } catch (error) {
       console.error(error);
       res.status(500).json({ error: 'Failed to delete cost' });

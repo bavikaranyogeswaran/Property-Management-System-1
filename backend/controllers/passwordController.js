@@ -15,10 +15,10 @@ class PasswordController {
   // FORGOT PASSWORD: Sends a secure reset link to the user's email.
   forgotPassword = catchAsync(async (req, res, next) => {
     const { email } = req.body;
-    if (!email) {
-      return next(new AppError('Email is required', 400));
-    }
+    // 1. [VALIDATION] Verify identity input
+    if (!email) return next(new AppError('Email is required', 400));
 
+    // 2. [DELEGATION] Generation Logic: Create an ephemeral token and dispatch the reset email
     const result = await authService.requestPasswordReset(email);
     res.json(result);
   });
@@ -27,10 +27,11 @@ class PasswordController {
   resetPassword = catchAsync(async (req, res, next) => {
     const { token, newPassword } = req.body;
 
-    if (!token || !newPassword) {
+    // 1. [VALIDATION] Require both the secret token and the new credential
+    if (!token || !newPassword)
       return next(new AppError('Token and new password are required', 400));
-    }
 
+    // 2. [DELEGATION] Vault Update: Verify token validity, hash the new password, and update the record
     const result = await authService.resetPassword(token, newPassword);
     res.json(result);
   });
@@ -40,31 +41,28 @@ class PasswordController {
     const { currentPassword, newPassword } = req.body;
     const userId = req.user.id;
 
-    if (!currentPassword || !newPassword) {
+    // 1. [VALIDATION] Complexity and requirements check
+    if (!currentPassword || !newPassword)
       return next(new AppError('Current and new password are required', 400));
-    }
-
-    if (newPassword.length < 8) {
+    if (newPassword.length < 8)
       return next(new AppError('Password must be at least 8 characters', 400));
-    }
 
+    // 2. [SECURITY] Credential Verification: Fetch user and compare provided current password against stored hash
     const user = await userModel.findById(userId);
-    if (!user) {
-      return next(new AppError('User not found', 404));
-    }
+    if (!user) return next(new AppError('User not found', 404));
 
     const validPassword = await bcrypt.compare(
       currentPassword,
       user.passwordHash || user.password_hash
     );
-    if (!validPassword) {
+    if (!validPassword)
       return next(new AppError('Incorrect current password', 401));
-    }
 
-    // Hash new password
+    // 3. [SECURITY] One-way Hashing: Salt and hash the new password before storing
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(newPassword, salt);
 
+    // 4. [DATA] Vault Update
     await userModel.updatePassword(userId, passwordHash);
 
     res.json({ message: 'Password updated successfully' });

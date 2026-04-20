@@ -12,6 +12,7 @@ import catchAsync from '../utils/catchAsync.js';
 class RenewalController {
   // GET REQUESTS: Lists all active lease renewal negotiations for a user.
   getRequests = catchAsync(async (req, res) => {
+    // 1. [DELEGATION] Scope Resolver: Fetch negotiations filtered by user role and property assignments
     const results = await renewalService.getRequests(req.user);
     res.json(results);
   });
@@ -21,19 +22,17 @@ class RenewalController {
     const { id } = req.params;
     const { proposedMonthlyRent, proposedEndDate, notes } = req.body;
 
+    // 1. [VALIDATION] Integrity check
     if (!proposedMonthlyRent || !proposedEndDate) {
       return res
         .status(400)
         .json({ error: 'Proposed rent and end date are required' });
     }
 
+    // 2. [DELEGATION] State Transition: Move status to 'proposed' and record the staff's offer
     await renewalService.proposeTerms(
       id,
-      {
-        proposedMonthlyRent,
-        proposedEndDate,
-        notes,
-      },
+      { proposedMonthlyRent, proposedEndDate, notes },
       req.user
     );
 
@@ -43,6 +42,7 @@ class RenewalController {
   // APPROVE RENEWAL: Final staff step. Turns the accepted terms into an active lease contract.
   approveRenewal = catchAsync(async (req, res) => {
     const { id } = req.params;
+    // 1. [DELEGATION] Agreement Finalization: Generate the new lease record and close the negotiation thread
     const result = await renewalService.approve(id, req.user);
     res.json({
       message: 'Renewal approved and draft lease created',
@@ -53,6 +53,7 @@ class RenewalController {
   // TENANT ACCEPT: Tenant agrees to the newly proposed rent and duration.
   tenantAccept = catchAsync(async (req, res) => {
     const { id } = req.params;
+    // 1. [DELEGATION] State Transition: Move status to 'tenant_accepted'
     await renewalService.tenantAccept(id, req.user);
     res.json({
       message: 'Renewal terms accepted. Awaiting final staff approval.',
@@ -62,6 +63,7 @@ class RenewalController {
   // TENANT DECLINE: Tenant rejects the offer, allowing staff to revise it.
   tenantDecline = catchAsync(async (req, res) => {
     const { id } = req.params;
+    // 1. [DELEGATION] Conflict Marker
     await renewalService.tenantDecline(id, req.user);
     res.json({
       message: 'Renewal terms declined. Staff will be notified to revise.',
@@ -71,6 +73,7 @@ class RenewalController {
   // REJECT RENEWAL: Staff abruptly terminates the negotiation process.
   rejectRenewal = catchAsync(async (req, res) => {
     const { id } = req.params;
+    // 1. [DELEGATION] Termination Logic
     await renewalService.reject(id, req.user);
     res.json({ message: 'Renewal request rejected' });
   });

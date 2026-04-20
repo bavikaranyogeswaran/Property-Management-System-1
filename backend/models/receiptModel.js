@@ -8,6 +8,7 @@ import pool from '../config/db.js';
 import { getLocalTime, parseLocalDate } from '../utils/dateUtils.js';
 
 class ReceiptModel {
+  // CREATE: Records a formal proof of payment after verification.
   async create(data, connection = null) {
     const {
       paymentId,
@@ -17,12 +18,13 @@ class ReceiptModel {
       generatedDate,
       receiptNumber,
     } = data;
-    // generatedDate becomes receipt_date. Ensure valid date linked to payment.
+    // 1. [DATA] Transformation: Ensure valid receipt timestamp linked to the payment event
     const dateValue = generatedDate
       ? parseLocalDate(generatedDate)
       : getLocalTime();
 
     const db = connection || pool;
+    // 2. [DATA] Persistence
     const [result] = await db.query(
       'INSERT INTO receipts (payment_id, receipt_date, receipt_number) VALUES (?, ?, ?)',
       [paymentId, dateValue, receiptNumber]
@@ -30,10 +32,11 @@ class ReceiptModel {
     return result.insertId;
   }
 
+  // FIND BY ID: Fetches a single receipt with full contextual metadata for PDF generation.
   async findById(id) {
+    // 1. [QUERY] Massive Join: Resolves payment, invoice, lease, and tenant details for the document body
     const [rows] = await pool.query(
-      `
-            SELECT r.*, p.amount, p.invoice_id, l.tenant_id, 
+      `SELECT r.*, p.amount, p.invoice_id, l.tenant_id, 
                    pr.name as property_name, u.unit_number,
                    tu.name as tenant_name, tu.email as tenant_email,
                    p.payment_method, p.payment_date, i.description
@@ -44,14 +47,15 @@ class ReceiptModel {
             LEFT JOIN units u ON l.unit_id = u.unit_id
             LEFT JOIN properties pr ON u.property_id = pr.property_id
             LEFT JOIN users tu ON l.tenant_id = tu.user_id
-            WHERE r.receipt_id = ?
-        `,
+            WHERE r.receipt_id = ?`,
       [id]
     );
     return this.mapRow(rows[0]);
   }
 
+  // FIND ALL: System-wide registry of all generated receipts.
   async findAll() {
+    // 1. [QUERY] Global Extraction with multi-level joins
     const [rows] = await pool.query(`
             SELECT r.*, p.amount, p.invoice_id, l.tenant_id, 
                    pr.name as property_name, u.unit_number,
@@ -69,10 +73,11 @@ class ReceiptModel {
     return rows.map((row) => this.mapRow(row));
   }
 
+  // FIND BY OWNER ID: Filters proofs to those belonging to an investor's properties.
   async findByOwnerId(ownerId) {
+    // 1. [QUERY] Ownership Filtered Join
     const [rows] = await pool.query(
-      `
-            SELECT r.*, p.amount, p.invoice_id, l.tenant_id, 
+      `SELECT r.*, p.amount, p.invoice_id, l.tenant_id, 
                    pr.name as property_name, u.unit_number,
                    tu.name as tenant_name, tu.email as tenant_email,
                    p.payment_method, p.payment_date, i.description
@@ -84,17 +89,17 @@ class ReceiptModel {
             LEFT JOIN properties pr ON u.property_id = pr.property_id
             LEFT JOIN users tu ON l.tenant_id = tu.user_id
             WHERE pr.owner_id = ?
-            ORDER BY r.receipt_date DESC
-        `,
+            ORDER BY r.receipt_date DESC`,
       [ownerId]
     );
     return rows.map((row) => this.mapRow(row));
   }
 
+  // FIND BY TREASURER ID: Limits visibility to receipts assigned to the specific treasurer.
   async findByTreasurerId(treasurerId) {
+    // 1. [QUERY] RBAC Filtered Join: Resolves via property-staff assignment
     const [rows] = await pool.query(
-      `
-            SELECT r.*, p.amount, p.invoice_id, l.tenant_id, 
+      `SELECT r.*, p.amount, p.invoice_id, l.tenant_id, 
                    pr.name as property_name, u.unit_number,
                    tu.name as tenant_name, tu.email as tenant_email,
                    p.payment_method, p.payment_date, i.description
@@ -107,13 +112,13 @@ class ReceiptModel {
             LEFT JOIN staff_property_assignments spa ON pr.property_id = spa.property_id
             LEFT JOIN users tu ON l.tenant_id = tu.user_id
             WHERE spa.user_id = ?
-            ORDER BY r.receipt_date DESC
-        `,
+            ORDER BY r.receipt_date DESC`,
       [treasurerId]
     );
     return rows.map((row) => this.mapRow(row));
   }
 
+  // MAP ROW: Standardizes the complex join result into a flattened proof DTO.
   mapRow(row) {
     if (!row) return null;
     return {
@@ -129,14 +134,16 @@ class ReceiptModel {
       unitNumber: row.unit_number || null,
       tenantName: row.tenant_name || null,
       tenantEmail: row.tenant_email || null,
-      // Added payment details
       paymentMethod: row.payment_method || null,
       paymentDate: row.payment_date || null,
       description: row.description || `Invoice #${row.invoice_id}`,
     };
   }
+
+  // FIND BY PAYMENT ID: Fetches the receipt linked to a specific verified payment.
   async findByPaymentId(paymentId, connection = null) {
     const db = connection || pool;
+    // 1. [QUERY] Filtered Retrieval
     const [rows] = await db.query(
       'SELECT r.*, p.amount FROM receipts r JOIN payments p ON r.payment_id = p.payment_id WHERE r.payment_id = ?',
       [paymentId]

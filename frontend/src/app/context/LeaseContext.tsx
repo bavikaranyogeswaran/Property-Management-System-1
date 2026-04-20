@@ -141,14 +141,19 @@ interface LeaseContextType {
 const LeaseContext = createContext<LeaseContextType | undefined>(undefined);
 
 export function LeaseProvider({ children }: { children: ReactNode }) {
+  // 1. [DEPENDENCIES] Context Injection: Accesses global identity for scoping and unit status synchronization
   const { user } = useAuth();
   const { updateUnit } = useProperty();
+
+  // 2. [STATE] Contractual Registers: Holds the master list of leases, custom terms, and ongoing renewal negotiations
   const [leases, setLeases] = useState<Lease[]>([]);
   const [leaseTerms, setLeaseTerms] = useState<LeaseTerm[]>([]);
   const [renewalRequests, setRenewalRequests] = useState<RenewalRequest[]>([]);
 
+  // FETCH LEASE TERMS: Retrieves property-specific rental rules (Notice periods, fixed/periodic types).
   const fetchLeaseTerms = async () => {
     try {
+      // 1. [API] Extraction
       const response = await apiClient.get('/lease-terms');
       setLeaseTerms(response.data);
     } catch (e) {
@@ -156,10 +161,13 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // FETCH LEASES: Retrieves all active and historical rental contracts with currency normalization.
   const fetchLeases = async () => {
     try {
+      // 1. [API] Extraction
       const lRes = await apiClient.get('/leases');
       if (lRes.data) {
+        // 2. [TRANSFORMATION] Data Normalization: Resolves raw database cents into UI decimals [E19]
         setLeases(
           lRes.data.map((l: any) => ({
             ...l,
@@ -180,9 +188,10 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // INITIALIZATION EFFECT: Refresh lease data on identity change.
   useEffect(() => {
     if (user) {
-      // Sequential fetch via shared queue to prevent request storms on mount
+      // 1. [OPTIMIZATION] Sequential Execution via global fetch queue
       enqueueFetch(fetchLeases);
       enqueueFetch(fetchRenewalRequests);
       if (user.role === 'owner' || user.role === 'treasurer') {
@@ -191,19 +200,23 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
     }
   }, [user]);
 
+  // ADD LEASE: Registers a new rental agreement and reserves the unit.
   const addLease = async (lease: Omit<Lease, 'id' | 'createdAt'>) => {
     try {
+      // 1. [TRANSFORMATION] Normalization: Convert UI decimals to storage cents
       const response = await apiClient.post('/leases', {
         ...lease,
         monthlyRent: toCentsFromLKR(lease.monthlyRent),
         targetDeposit: toCentsFromLKR(lease.targetDeposit || 0),
       });
+      // 2. [SYNC] Local State Update
       const constructedLease: Lease = {
         ...lease,
         id: response.data.id,
         createdAt: new Date().toISOString().split('T')[0],
       };
       setLeases((prev) => [...prev, constructedLease]);
+      // 3. [SIDE-EFFECT] Unit Status Sync: Mark the room as occupied to prevent double-booking
       await updateUnit(lease.unitId, { status: 'occupied' });
     } catch (error) {
       console.error('Failed to create lease:', error);
@@ -211,19 +224,23 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // END LEASE: Terminates an active contract and reconciles final fees.
   const endLease = async (
     id: string,
     terminationDate: string,
     terminationFee: number
   ) => {
     try {
+      // 1. [API] Execution: Triggers termination logic and potential early-exit penalties
       await apiClient.post(`/leases/${id}/terminate`, {
         terminationDate,
         terminationFee,
       });
+      // 2. [SYNC] Status Update: immediately reflect 'ended' state in UI
       setLeases((prev) =>
         prev.map((l) => (l.id === id ? { ...l, status: 'ended' } : l))
       );
+      // 3. [SIDE-EFFECT] Unit Release: make the room available for new prospects
       const lease = leases.find((l) => l.id === id);
       if (lease) await updateUnit(lease.unitId, { status: 'available' });
       toast.success('Lease ended successfully');
@@ -234,18 +251,21 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // RENEW LEASE: Bypasses negotiation for instant contract extension.
   const renewLease = async (
     id: string,
     newEndDate: string,
     newMonthlyRent?: number
   ) => {
     try {
+      // 1. [API] Execution with optional rent escalation
       await apiClient.post(`/leases/${id}/instant-renew`, {
         newEndDate,
         newMonthlyRent: newMonthlyRent
           ? toCentsFromLKR(newMonthlyRent)
           : undefined,
       });
+      // 2. [SYNC] Full Refresh: Reload leases to capture the new contract period
       await fetchLeases();
       toast.success('Renewal approved. A new draft lease is ready.');
     } catch (e: any) {
@@ -255,13 +275,16 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // REFUND DEPOSIT: Triggers the check-out financial settlement process.
   const refundDeposit = async (id: string, amount: number, notes?: string) => {
     try {
+      // 1. [API] Execution
       await apiClient.post(`/leases/${id}/refund`, {
         amount: toCentsFromLKR(amount),
         notes,
       });
-      await fetchLeases(); // Easier to refetch instead of manual mapping
+      // 2. [SYNC]
+      await fetchLeases();
       toast.success('Refund requested successfully');
     } catch (e: any) {
       const msg = e.response?.data?.error || 'Failed to refund deposit';
@@ -270,6 +293,7 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // APPROVE REFUND: Administrator confirmation of a check-out settlement.
   const approveRefund = async (id: string) => {
     try {
       await apiClient.patch(`/leases/${id}/refund/approve`);
@@ -284,6 +308,7 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // ACKNOWLEDGE REFUND: Tenant confirmation of receipt of funds.
   const acknowledgeRefund = async (id: string) => {
     try {
       await apiClient.patch(`/leases/${id}/acknowledge-refund`);
@@ -296,6 +321,7 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // DISPUTE REFUND: Tenant objection to proposed deductions.
   const disputeRefund = async (id: string, notes: string) => {
     try {
       await apiClient.patch(`/leases/${id}/refund/dispute`, { notes });
@@ -308,9 +334,11 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // UPDATE LEASE DOCUMENT: Stores the signed contract URL.
   const updateLeaseDocument = async (id: string, documentUrl: string) => {
     try {
       await apiClient.patch(`/leases/${id}/document`, { documentUrl });
+      // 1. [SYNC] Selective state update for UI responsiveness
       setLeases((prev) =>
         prev.map((l) => (l.id === id ? { ...l, documentUrl } : l))
       );
@@ -321,6 +349,7 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // UPDATE NOTICE STATUS: Records the tenant's intent at the end of a term.
   const updateNoticeStatus = async (
     id: string,
     status: 'undecided' | 'vacating' | 'renewing'
@@ -337,6 +366,7 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // LEASE TERM CRUD: Manages the library of standard contract templates.
   const addLeaseTerm = async (
     term: Omit<LeaseTerm, 'id' | 'ownerId' | 'createdAt' | 'leaseTermId'>
   ) => {
@@ -372,12 +402,16 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // FINALIZE CHECKOUT: Closes the lease lifecycle and triggers unit release after final inspection.
   const finalizeCheckout = async (id: string) => {
     try {
+      // 1. [API] Execution
       await apiClient.post(`/leases/${id}/finalize-checkout`);
+      // 2. [SYNC] Status Change
       setLeases((prev) =>
         prev.map((l) => (l.id === id ? { ...l, status: 'ended' } : l))
       );
+      // 3. [SIDE-EFFECT] Unit Release
       const lease = leases.find((l) => l.id === id);
       if (lease) await updateUnit(lease.unitId, { status: 'available' });
       toast.success('Lease checkout finalized. Unit is now available.');
@@ -388,6 +422,7 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // ACTIVATE LEASE: Moves a draft/pending contract to 'active' status upon signing.
   const activateLease = async (id: string) => {
     try {
       await apiClient.post(`/leases/${id}/sign`);
@@ -400,6 +435,7 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // VERIFY LEASE DOCUMENTS: Admin check of tenant-uploaded proofs (NIC, Employment).
   const verifyLeaseDocuments = async (id: string) => {
     try {
       const response = await apiClient.patch(`/leases/${id}/verify-documents`);
@@ -430,6 +466,7 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // WITHDRAW APPLICATION: Tenant-initiated rollback of a pending lease request.
   const withdrawApplication = async (id: string) => {
     try {
       await apiClient.post(`/leases/${id}/withdraw`);
@@ -442,6 +479,7 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // CANCEL LEASE: Administrative removal of a reservation.
   const cancelLease = async (id: string) => {
     try {
       await apiClient.delete(`/leases/${id}`);
@@ -454,6 +492,7 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // RECORD DISBURSEMENT: Logs the physical bank transfer of a security deposit refund.
   const recordDisbursement = async (
     id: string,
     data: { bankReferenceId: string; disbursementDate?: string }
@@ -469,9 +508,11 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // RENEWAL NEGOTIATION HUB
   const fetchRenewalRequests = async () => {
     try {
       const response = await apiClient.get('/renewal-requests');
+      // 1. [TRANSFORMATION] Currency Normalization
       setRenewalRequests(
         response.data.map((r: any) => ({
           ...r,
@@ -495,6 +536,7 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
     }
   ) => {
     try {
+      // 1. [API] Proposal Submission: with LKR-to-Cents conversion
       await apiClient.post(`/renewal-requests/${id}/propose`, {
         proposedMonthlyRent: toCentsFromLKR(data.proposedMonthlyRent),
         proposedEndDate: data.proposedEndDate,
@@ -510,10 +552,12 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
 
   const approveRenewal = async (id: string) => {
     try {
+      // 1. [API] Approval: Backend converts renewal into a new 'draft' lease
       await apiClient.post(`/renewal-requests/${id}/approve`);
       toast.success('Renewal approved. New draft lease created.');
+      // 2. [SYNC] Full Refresh
       fetchRenewalRequests();
-      fetchLeases(); // New draft lease should appear
+      fetchLeases();
     } catch (e: any) {
       toast.error(e.response?.data?.error || 'Failed to approve renewal');
       throw e;

@@ -57,26 +57,34 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  // 1. [STATE] Global Identity: Holds the verified user profile and session loading states
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  // 2. [STATE] Tenant Context: Manages units assigned to the user (supporting multi-unit occupants)
   const [tenantLeases, setTenantLeases] = useState<Lease[]>([]);
   const [activeLeaseId, setActiveLeaseIdState] = useState<string | null>(null);
   const [isLoadingLeases, setIsLoadingLeases] = useState(false);
+
+  // 3. [REF] Lifecycle Management: Timer for automatic session invalidation
   const logoutTimerRef = useRef<number | null>(null);
 
+  // SET ACTIVE LEASE: Switches the global context to a specific unit's view.
   const setActiveLeaseId = (id: string) => {
+    // 1. [SYNC] Local State: Update transient UI state
     setActiveLeaseIdState(id);
+    // 2. [PERSISTENCE] Local Storage: Ensure the choice survives page reloads
     storage.setActiveLeaseId(id);
   };
 
+  // FETCH LEASES: Resolves all active contracts for a tenant to support unit switching.
   const fetchLeases = async (userId: string) => {
     try {
       setIsLoadingLeases(true);
+      // 1. [API] Extraction: Fetch raw lease data from the backend
       const res = await leaseApi.getLeases();
-      console.log(
-        '[AuthContext] Fetched leases, normalizing amounts...',
-        res.data
-      );
+
+      // 2. [TRANSFORMATION] Data Normalization: Converts cents values to UI-ready LKR numbers [E7/E19]
       const activeOnly = res.data
         .map((l: any) => ({
           ...l,
@@ -95,9 +103,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             l.status === 'draft' ||
             l.status === 'pending'
         );
+
+      // 3. [SYNC] Local State: Store the filtered list of managing units
       setTenantLeases(activeOnly);
 
-      // Select active lease: Persisted > First Active > First found
+      // 4. [LOGIC] Default Selection: Select active lease based on Persisted Preference > First Active > None
       const storedId = storage.getActiveLeaseId();
       if (storedId && activeOnly.some((l: any) => l.id === storedId)) {
         setActiveLeaseIdState(storedId);
@@ -111,6 +121,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // CLEAR LOGOUT TIMER: Cleanup routine to prevent memory leaks or incorrect logouts.
   const clearLogoutTimer = () => {
     if (logoutTimerRef.current) {
       window.clearTimeout(logoutTimerRef.current);
@@ -118,8 +129,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // SCHEDULE LOGOUT: Sets an automated trigger based on JWT expiration.
   const scheduleLogout = (remainingTime: number) => {
+    // 1. [CLEANUP] Reset existing timers
     clearLogoutTimer();
+    // 2. [LIFECYCLE] Timer Setup: triggers global logout when the clock runs out
     if (remainingTime > 0) {
       logoutTimerRef.current = window.setTimeout(() => {
         console.warn('Session expired. Logging out automatically.');
@@ -128,14 +142,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // LOGOUT: Full session teardown and identity clearing.
   const logout = () => {
+    // 1. [CLEANUP] Clear timers and storage tokens
     clearLogoutTimer();
     authService.logout();
+    // 2. [SYNC] Local State: Clear the user object to trigger UI redirects
     setUser(null);
   };
 
+  // INITIALIZATION EFFECT: Hydrates the identity state on application load.
   useEffect(() => {
     const initAuth = () => {
+      // 1. [SYNC] Recovery: Check local storage for existing session tokens
       const storedUser = authService.getCurrentUser();
       const isAuth = authService.isAuthenticated();
 
@@ -144,11 +163,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const remainingTime = authService.getTokenRemainingTime();
         scheduleLogout(remainingTime);
 
+        // 2. [HYDRATION] Context Loading: Fetch leases if the user is a tenant
         if (storedUser.role === 'tenant') {
           fetchLeases(storedUser.id);
         }
 
-        // Sync with backend to ensure the local user data is not stale
+        // 3. [VERIFICATION] Background Sync: Ensure the local data matches the server's truth
         authService
           .getProfile()
           .then((user) => {
@@ -160,7 +180,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           })
           .catch((err) => {
             console.error('[AuthContext] Initial sync failed:', err);
-            // If 401, the interceptor will handle it, otherwise keep local for now
           });
       } else {
         if (storedUser) {
@@ -176,13 +195,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => clearLogoutTimer();
   }, []);
 
+  // LOGIN: Authenticates credentials and boots the user session.
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
+      // 1. [API] Verification
       const { user } = await authService.login({ email, password });
+      // 2. [SYNC] Local State
       setUser(user);
+      // 3. [HYDRATION] Load situational context
       if (user.role === 'tenant') {
         await fetchLeases(user.id);
       }
+      // 4. [LIFECYCLE] Start security timers
       const remainingTime = authService.getTokenRemainingTime();
       scheduleLogout(remainingTime);
       return true;
@@ -192,6 +216,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // UPDATE PROFILE: Synchronizes local user state after a successful modification.
   const updateProfile = async (data: Partial<User>) => {
     try {
       const updatedUser = await authService.updateProfile(data);
@@ -202,6 +227,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // CHANGE PASSWORD: Proxy for credential rotation.
   const changePassword = async (data: any) => {
     try {
       await authService.changePassword(data);
@@ -211,6 +237,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // REFRESH USER: Explicitly pulls the latest profile from the server.
   const refreshUser = async () => {
     try {
       const user = await authService.getProfile();

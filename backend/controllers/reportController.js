@@ -24,6 +24,7 @@ class ReportController {
     let endDate = null;
     let periodTitle = `${year}`;
 
+    // 1. [TRANSFORMATION] Period resolution: Convert year/month params into ISO string markers for database filtering
     if (month) {
       const lastDay = new Date(year, month, 0).getDate();
       startDate = `${year}-${String(month).padStart(2, '0')}-01`;
@@ -34,6 +35,7 @@ class ReportController {
       periodTitle = `${monthLabel} ${year}`;
     }
 
+    // 2. [DELEGATION] Computation: Aggregate incomes, expenses, and margins across property portfolios
     const data = await reportService.getFinancialReportData(
       year,
       req.user,
@@ -41,6 +43,7 @@ class ReportController {
       endDate
     );
 
+    // 3. [ORCHESTRATION] PDF Generation: Initialize drawing engine with responsive layout headers
     const gen = new ReportGenerator(
       res,
       `financial_report_${year}_${month || 'full'}.pdf`,
@@ -50,7 +53,7 @@ class ReportController {
 
     gen.generateHeader();
 
-    // --- KPI Panel ---
+    // 4. [VISUAL] KPI Panel: Draw the top-level financial highlights
     gen.drawKpiPanel([
       {
         label: 'TOTAL REVENUE',
@@ -74,7 +77,7 @@ class ReportController {
       },
     ]);
 
-    // --- Property Breakdown Table ---
+    // 5. [VISUAL] Tabular breakdown: Iterate through property metrics and draw ledger rows
     gen.drawSectionTitle('Property Breakdown');
 
     gen.doc.fontSize(9).font('Helvetica-Bold');
@@ -109,7 +112,6 @@ class ReportController {
           width: 110,
           align: 'right',
         });
-
       gen.doc
         .fillColor(
           p.margin < 10 ? '#ef4444' : p.margin < 30 ? '#f59e0b' : '#22c55e'
@@ -131,19 +133,13 @@ class ReportController {
       `LKR ${fromCents(data.totalIncome).toLocaleString()}`,
       200,
       gen.y,
-      {
-        width: 85,
-        align: 'right',
-      }
+      { width: 85, align: 'right' }
     );
     gen.doc.text(
       `LKR ${fromCents(data.totalExpense).toLocaleString()}`,
       285,
       gen.y,
-      {
-        width: 85,
-        align: 'right',
-      }
+      { width: 85, align: 'right' }
     );
     gen.doc
       .fillColor(data.totalNet >= 0 ? '#22c55e' : '#ef4444')
@@ -157,9 +153,10 @@ class ReportController {
     gen.doc.fillColor('black');
     gen.y += 30;
 
-    // --- Insights & Recommendations ---
+    // 6. [VISUAL] Insights: Draw AI-generated or rule-based trends analysis
     gen.drawInsights(data.insights);
 
+    // 7. [FINALIZE] Buffer completion and stream to client
     gen.finalize();
   });
 
@@ -181,8 +178,10 @@ class ReportController {
       periodTitle = `${year}`;
     }
 
+    // 1. [DELEGATION] State Inspection: Resolve status of all units across all properties
     const data = await reportService.getOccupancyReportData(req.user);
 
+    // 2. [ORCHESTRATION] PDF Generation
     const gen = new ReportGenerator(
       res,
       'occupancy_report.pdf',
@@ -192,7 +191,7 @@ class ReportController {
 
     gen.generateHeader();
 
-    // --- KPI Panel ---
+    // 3. [VISUAL] KPI Panel
     gen.drawKpiPanel([
       {
         label: 'PORTFOLIO OCCUPANCY',
@@ -213,7 +212,7 @@ class ReportController {
       },
     ]);
 
-    // --- Property Details ---
+    // 4. [VISUAL] Sectioning: Detail every property's specific performance
     gen.drawSectionTitle('Property-Level Analysis');
 
     for (const p of data.propertyMetrics) {
@@ -251,7 +250,7 @@ class ReportController {
       gen.y += 12;
     }
 
-    // --- Recommendations ---
+    // 5. [VISUAL] Predictions/Advice
     gen.drawInsights(data.insights);
 
     gen.finalize();
@@ -262,8 +261,10 @@ class ReportController {
   // =========================================================================
   // TENANT RISK REPORT: Generates a PDF flagging tenants with poor payment histories.
   generateTenantRiskReport = catchAsync(async (req, res, next) => {
+    // 1. [DELEGATION] Behavioral Analysis: Compute scores based on late payments and maintenance disputes
     const data = await reportService.getTenantRiskStats(req.user);
 
+    // 2. [ORCHESTRATION] PDF Generation
     const gen = new ReportGenerator(
       res,
       'tenant_risk_report.pdf',
@@ -273,7 +274,7 @@ class ReportController {
 
     gen.generateHeader();
 
-    // --- KPI Panel ---
+    // 3. [VISUAL] KPI Panel
     gen.drawKpiPanel([
       {
         label: 'TOTAL TENANTS',
@@ -302,7 +303,7 @@ class ReportController {
       },
     ]);
 
-    // --- Tenant Table ---
+    // 4. [VISUAL] Risk Matrix Table: Itemize individual tenant reliability scores
     gen.drawSectionTitle('Tenant Risk Assessment');
 
     gen.doc.fontSize(9).font('Helvetica-Bold').fillColor('#64748b');
@@ -372,7 +373,7 @@ class ReportController {
       gen.y += 18;
     }
 
-    // --- Recommendations ---
+    // 5. [VISUAL] Remediation Strategy
     gen.drawInsights(data.insights);
 
     gen.finalize();
@@ -381,6 +382,7 @@ class ReportController {
   // =========================================================================
   //  4. MAINTENANCE COST ANALYSIS REPORT
   // =========================================================================
+  // MAINTENANCE REPORT: Categorizes repair spend to find cost leaks.
   generateMaintenanceCategoryReport = catchAsync(async (req, res, next) => {
     const year = parseInt(req.query.year) || new Date().getFullYear();
     const month = req.query.month ? parseInt(req.query.month) : null;
@@ -389,6 +391,7 @@ class ReportController {
     let endDate = null;
     let periodTitle = `${year}`;
 
+    // 1. [TRANSFORMATION]
     if (month) {
       const lastDay = new Date(year, month, 0).getDate();
       startDate = `${year}-${String(month).padStart(2, '0')}-01`;
@@ -399,6 +402,7 @@ class ReportController {
       periodTitle = `${monthLabel} ${year}`;
     }
 
+    // 2. [DELEGATION] Cost Aggregation
     const data = await reportService.getMaintenanceReportData(
       req.user,
       year,
@@ -406,6 +410,7 @@ class ReportController {
       endDate
     );
 
+    // 3. [ORCHESTRATION] PDF Generation
     const gen = new ReportGenerator(
       res,
       `maintenance_report_${year}_${month || 'full'}.pdf`,
@@ -415,7 +420,7 @@ class ReportController {
 
     gen.generateHeader();
 
-    // --- KPI Panel ---
+    // 4. [VISUAL] KPI Panel
     gen.drawKpiPanel([
       {
         label: 'TOTAL SPEND',
@@ -441,7 +446,7 @@ class ReportController {
     if (data.totalCost === 0) {
       gen.drawSectionTitle('Analysis');
     } else {
-      // --- Category Breakdown Table ---
+      // 5. [VISUAL] Category Chart: Draw horizontal bars representing share of spend
       gen.drawSectionTitle('Cost Breakdown by Category');
 
       const barColors = [
@@ -487,7 +492,7 @@ class ReportController {
       gen.y += 10;
     }
 
-    // --- Recommendations ---
+    // 6. [VISUAL] Optimization Advice
     gen.drawInsights(data.insights);
 
     gen.finalize();
@@ -496,9 +501,12 @@ class ReportController {
   // =========================================================================
   //  5. LEASE EXPIRATION FORECAST REPORT
   // =========================================================================
+  // LEASE EXPIRATION REPORT: Forecasts which rental agreements are ending soon.
   generateLeaseExpirationReport = catchAsync(async (req, res, next) => {
+    // 1. [DELEGATION] Pipeline Analysis: Interrogate all active leases for end dates within 90 days
     const data = await reportService.getLeaseExpirationReportData(req.user);
 
+    // 2. [ORCHESTRATION] PDF Generation
     const gen = new ReportGenerator(
       res,
       'lease_expiration_report.pdf',
@@ -508,7 +516,7 @@ class ReportController {
 
     gen.generateHeader();
 
-    // --- KPI Panel ---
+    // 3. [VISUAL] KPI Panel
     gen.drawKpiPanel([
       {
         label: 'TOTAL EXPIRING',
@@ -532,7 +540,7 @@ class ReportController {
       },
     ]);
 
-    // --- Expiration Table ---
+    // 4. [VISUAL] Pipeline Analysis: Detail units by urgency (Days Left)
     gen.drawSectionTitle('Expiration Pipeline (Next 90 Days)');
 
     gen.doc.fontSize(9).font('Helvetica-Bold').fillColor('#64748b');
@@ -578,7 +586,7 @@ class ReportController {
       gen.y += 22;
     }
 
-    // --- Recommendations ---
+    // 5. [VISUAL] Renewal Strategy
     gen.drawInsights(data.insights);
 
     gen.finalize();
@@ -596,6 +604,7 @@ class ReportController {
     let endDate = null;
     let periodTitle = 'All Time';
 
+    // 1. [TRANSFORMATION]
     if (month) {
       const lastDay = new Date(year, month, 0).getDate();
       startDate = `${year}-${String(month).padStart(2, '0')}-01`;
@@ -610,12 +619,14 @@ class ReportController {
       periodTitle = `${year}`;
     }
 
+    // 2. [DELEGATION] Funnel Analysis: Compare leads to applications to signed contracts
     const data = await reportService.getLeadConversionReportData(
       req.user,
       startDate,
       endDate
     );
 
+    // 3. [ORCHESTRATION] PDF Generation
     const gen = new ReportGenerator(
       res,
       'marketing_funnel_report.pdf',
@@ -625,7 +636,7 @@ class ReportController {
 
     gen.generateHeader();
 
-    // --- KPI Panel ---
+    // 4. [VISUAL] KPI Panel
     gen.drawKpiPanel([
       { label: 'TOTAL LEADS', value: `${data.stats.Total}`, color: '#2563eb' },
       {
@@ -641,7 +652,7 @@ class ReportController {
       { label: 'DROPPED', value: `${data.stats.Dropped}`, color: '#ef4444' },
     ]);
 
-    // --- Funnel Visualization ---
+    // 5. [VISUAL] Funnel Visualization: Draw the drop-off at each stage of the prospect journey
     gen.drawSectionTitle('Marketing Funnel Breakdown');
 
     const funnel = [
@@ -708,7 +719,7 @@ class ReportController {
       gen.y += 28;
     });
 
-    // --- Recommendations ---
+    // 6. [VISUAL] Marketing Insights
     gen.drawInsights(data.insights);
 
     gen.finalize();
@@ -718,6 +729,7 @@ class ReportController {
   //  JSON ENDPOINTS
   // =========================================================================
 
+  // GET LEDGER SUMMARY: JSON data for the dashboard charts (Income vs Expense).
   getLedgerSummary = catchAsync(async (req, res, next) => {
     const year = parseInt(req.query.year) || new Date().getFullYear();
     const month = req.query.month ? parseInt(req.query.month) : null;
@@ -725,12 +737,14 @@ class ReportController {
     let startDate = null;
     let endDate = null;
 
+    // 1. [TRANSFORMATION]
     if (month) {
       const lastDay = new Date(year, month, 0).getDate();
       startDate = `${year}-${String(month).padStart(2, '0')}-01`;
       endDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
     }
 
+    // 2. [DELEGATION] Computation resolver
     const summary = await reportService.getLedgerSummary(
       year,
       req.user,
@@ -740,7 +754,9 @@ class ReportController {
     res.json(summary);
   });
 
+  // GET MONTHLY CASH FLOW: JSON data for the trend line charts.
   getMonthlyCashFlow = catchAsync(async (req, res, next) => {
+    // 1. [DELEGATION] Time-series aggregation
     const stats = await reportService.getMonthlyCashFlow(req.user);
     res.json(stats);
   });

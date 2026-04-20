@@ -11,6 +11,7 @@ import { executeNightlyPayload } from '../utils/cronJobs.js';
 // GET CRON LOGS: Returns a history of all background jobs executed.
 export const getCronLogs = async (req, res) => {
   try {
+    // 1. [DATA] Collection Retrieval: Fetch the last 50 execution attempts for audit purposes
     const [logs] = await db.query(
       'SELECT * FROM cron_logs ORDER BY execution_date DESC, started_at DESC LIMIT 50'
     );
@@ -25,11 +26,14 @@ export const getCronLogs = async (req, res) => {
 export const triggerCron = async (req, res) => {
   try {
     console.log(`[Admin] Manual cron trigger by User ${req.user.id}`);
+
+    // 1. [SIDE EFFECT] Orchestration: Launch the nightly payload (rent generation, penalties, etc.)
     // We run this asynchronously so the request doesn't timeout
     executeNightlyPayload().catch((err) => {
       console.error('[Admin] Manual cron trigger failed:', err);
     });
 
+    // 2. [RESPONSE] Immediate acknowledgement while the task runs in background
     res.status(202).json({
       message: 'Cron job manual trigger accepted and running in background.',
     });

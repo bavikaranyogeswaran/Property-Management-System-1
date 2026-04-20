@@ -8,7 +8,9 @@
 import pool from '../config/db.js';
 
 class MaintenanceRequestModel {
+  // FIND ALL: System-wide registry of all maintenance tickets.
   async findAll() {
+    // 1. [QUERY] Aggregate Subquery: Embeds image objects directly into the request rows
     const [rows] = await pool.query(`
             SELECT mr.*, 
             COALESCE(
@@ -30,17 +32,18 @@ class MaintenanceRequestModel {
       status: row.status,
       assignedTo: row.assigned_to ? row.assigned_to.toString() : null,
       assignedBy: row.assigned_by ? row.assigned_by.toString() : null,
-      images: row.images, // Already JSON
+      images: row.images,
       eta: row.eta,
       resolutionNotes: row.resolution_notes,
       resolvedAt: row.resolved_at,
     }));
   }
 
+  // FIND BY OWNER ID: Filters tickets to those within properties owned by the specific user.
   async findByOwnerId(ownerId) {
+    // 1. [QUERY] Filtered Join
     const [rows] = await pool.query(
-      `
-            SELECT mr.*, 
+      `SELECT mr.*, 
             u.unit_number,
             p.name as property_name,
             COALESCE(
@@ -53,8 +56,7 @@ class MaintenanceRequestModel {
             JOIN units u ON mr.unit_id = u.unit_id
             JOIN properties p ON u.property_id = p.property_id
             WHERE p.owner_id = ?
-            ORDER BY mr.created_at DESC
-        `,
+            ORDER BY mr.created_at DESC`,
       [ownerId]
     );
     return rows.map((row) => ({
@@ -76,10 +78,11 @@ class MaintenanceRequestModel {
     }));
   }
 
+  // FIND BY TREASURER ID: Limits view to tickets in properties assigned to the specific staff member.
   async findByTreasurerId(treasurerId) {
+    // 1. [QUERY] RBAC Filtered Retrieval
     const [rows] = await pool.query(
-      `
-            SELECT mr.*, 
+      `SELECT mr.*, 
             COALESCE(
                 (SELECT JSON_ARRAYAGG(JSON_OBJECT('id', mi.image_id, 'url', mi.image_url)) 
                  FROM maintenance_images mi 
@@ -90,8 +93,7 @@ class MaintenanceRequestModel {
             JOIN units u ON mr.unit_id = u.unit_id
             JOIN staff_property_assignments spa ON u.property_id = spa.property_id
             WHERE spa.user_id = ?
-            ORDER BY mr.created_at DESC
-        `,
+            ORDER BY mr.created_at DESC`,
       [treasurerId]
     );
     return rows.map((row) => ({
@@ -107,10 +109,11 @@ class MaintenanceRequestModel {
     }));
   }
 
+  // FIND BY ID: Fetches a single ticket with its full image gallery.
   async findById(id) {
+    // 1. [QUERY] Direct Retrieval
     const [rows] = await pool.query(
-      `
-            SELECT mr.*, 
+      `SELECT mr.*, 
             COALESCE(
                 (SELECT JSON_ARRAYAGG(JSON_OBJECT('id', mi.image_id, 'url', mi.image_url)) 
                  FROM maintenance_images mi 
@@ -118,8 +121,7 @@ class MaintenanceRequestModel {
                 JSON_ARRAY()
             ) as images
             FROM maintenance_requests mr 
-            WHERE mr.request_id = ?
-        `,
+            WHERE mr.request_id = ?`,
       [id]
     );
 
@@ -138,17 +140,18 @@ class MaintenanceRequestModel {
       assignedTo: row.assigned_to ? row.assigned_to.toString() : null,
       assignedBy: row.assigned_by ? row.assigned_by.toString() : null,
       createdAt: row.created_at,
-      images: row.images, // Already JSON
+      images: row.images,
       eta: row.eta,
       resolutionNotes: row.resolution_notes,
       resolvedAt: row.resolved_at,
     };
   }
 
+  // FIND BY PROPERTY ID: Lists all ongoing maintenance for a specific apartment block.
   async findByPropertyId(propertyId) {
+    // 1. [QUERY] Filtered Join
     const [rows] = await pool.query(
-      `
-            SELECT mr.*,
+      `SELECT mr.*,
             COALESCE(
                 (SELECT JSON_ARRAYAGG(JSON_OBJECT('id', mi.image_id, 'url', mi.image_url)) 
                  FROM maintenance_images mi 
@@ -158,8 +161,7 @@ class MaintenanceRequestModel {
             FROM maintenance_requests mr
             JOIN units u ON mr.unit_id = u.unit_id
             WHERE u.property_id = ?
-            ORDER BY mr.created_at DESC
-                `,
+            ORDER BY mr.created_at DESC`,
       [propertyId]
     );
     return rows.map((row) => ({
@@ -176,10 +178,11 @@ class MaintenanceRequestModel {
     }));
   }
 
+  // FIND BY TENANT ID: Registry of issues reported by a specific occupant.
   async findByTenantId(tenantId) {
+    // 1. [QUERY] Direct Filtered Retrieval
     const [rows] = await pool.query(
-      `
-            SELECT mr.*,
+      `SELECT mr.*,
             COALESCE(
                 (SELECT JSON_ARRAYAGG(JSON_OBJECT('id', mi.image_id, 'url', mi.image_url)) 
                  FROM maintenance_images mi 
@@ -188,8 +191,7 @@ class MaintenanceRequestModel {
             ) as images
             FROM maintenance_requests mr 
             WHERE mr.tenant_id = ?
-            ORDER BY mr.created_at DESC
-                `,
+            ORDER BY mr.created_at DESC`,
       [tenantId]
     );
     return rows.map((row) => ({
@@ -206,7 +208,7 @@ class MaintenanceRequestModel {
     }));
   }
 
-  //  CREATE REQUEST: Writing down a new complaint card.
+  // CREATE REQUEST: Writing down a new complaint card with transactional image embedding.
   async create(data) {
     const {
       unitId,
@@ -219,11 +221,13 @@ class MaintenanceRequestModel {
       assignedTo,
       assignedBy,
     } = data;
-
     const connection = await pool.getConnection();
+
     try {
+      // 1. [ATOMIC] Begin Transaction: Ensure request and images are saved together
       await connection.beginTransaction();
 
+      // 2. [DATA] Persistence: Insert the primary request metadata
       const [result] = await connection.query(
         'INSERT INTO maintenance_requests (unit_id, tenant_id, title, description, priority, category, status, assigned_to, assigned_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [
@@ -240,6 +244,7 @@ class MaintenanceRequestModel {
       );
       const requestId = result.insertId;
 
+      // 3. [DATA] Multi-Persistence: Batch insert image URLs if provided
       if (images && images.length > 0) {
         const imageValues = images.map((url) => [requestId, url]);
         await connection.query(
@@ -251,6 +256,7 @@ class MaintenanceRequestModel {
       await connection.commit();
       return requestId;
     } catch (error) {
+      // 4. [ROLLBACK] Failure Guard: Atomic cleanup on error
       await connection.rollback();
       throw error;
     } finally {
@@ -258,12 +264,13 @@ class MaintenanceRequestModel {
     }
   }
 
+  // UPDATE STATUS: Moves a ticket through the lifecycle (e.g., submitted -> in_progress -> completed).
   async updateStatus(id, status, assignmentData = {}) {
     const { assignedTo, assignedBy, eta, resolutionNotes } = assignmentData;
-
     let query = 'UPDATE maintenance_requests SET status = ?';
     const params = [status];
 
+    // 1. [TRANSFORMATION] Dynamic Field Application: Only update provided metadata
     if (assignedTo !== undefined) {
       query += ', assigned_to = ?';
       params.push(assignedTo);
@@ -288,14 +295,15 @@ class MaintenanceRequestModel {
     query += ' WHERE request_id = ?';
     params.push(id);
 
+    // 2. [DATA] State Persistence
     await pool.query(query, params);
     return this.findById(id);
   }
 
+  // UPDATE: Simple metadata update (currently mainly focused on status).
   async update(id, data) {
-    // Generic update if needed, currently mainly status
-    // Add more fields as needed
     const { status } = data;
+    // 1. [DATA] Persistence
     if (status) {
       await pool.query(
         'UPDATE maintenance_requests SET status = ? WHERE request_id = ?',
@@ -305,8 +313,10 @@ class MaintenanceRequestModel {
     return this.findById(id);
   }
 
+  // COUNT OPEN BY UNIT: Real-time tally of unresolved issues for a specific unit.
   async countOpenByUnitId(unitId, connection = null) {
     const db = connection || pool;
+    // 1. [QUERY] Filtered Aggregation
     const [rows] = await db.query(
       "SELECT COUNT(*) as count FROM maintenance_requests WHERE unit_id = ? AND status IN ('submitted', 'in_progress')",
       [unitId]
@@ -314,10 +324,9 @@ class MaintenanceRequestModel {
     return rows[0].count;
   }
 
+  // FIND RECENT DUPLICATE: Anti-spam lock to prevent identical reports within 5 minutes.
   async findRecentDuplicate(unitId, tenantId, title, description) {
-    // [HARDENED ANTI-SPAM] Check for EXACT Title + Description match within last 5 minutes
-    // This allows different issues (different descriptions) with the same title,
-    // but prevents accidental double-clicks or identical spam.
+    // 1. [SECURITY] Throttling Lock: Checks for exact content match within a small time window
     const [rows] = await pool.query(
       `SELECT request_id FROM maintenance_requests 
        WHERE unit_id = ? AND tenant_id = ? AND title = ? AND description = ? 

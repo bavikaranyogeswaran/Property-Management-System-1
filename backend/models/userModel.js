@@ -10,9 +10,12 @@ import cacheService from '../services/cacheService.js';
 import { ROLES } from '../utils/roleUtils.js';
 
 class UserModel {
+  // FIND BY EMAIL: Authenticates a user or checks for existing identity.
   async findByEmail(email, connection = null) {
     const db = connection || pool;
+    // 1. [DATA] Normalization: Ensures case-insensitive lookup
     const normalizedEmail = email ? email.toLowerCase().trim() : null;
+    // 2. [QUERY] Extraction: Retrieves core credentials and security tokens
     const [rows] = await db.query(
       'SELECT user_id as id, name, email, phone, role, password_hash as passwordHash, is_email_verified as isEmailVerified, status, token_version as tokenVersion, created_at as createdAt FROM users WHERE email = ? AND is_archived = FALSE',
       [normalizedEmail]
@@ -20,19 +23,9 @@ class UserModel {
     return rows[0];
   }
 
+  // FIND BY ROLE: Lists all active individuals belonging to a specific system category (Owner, Tenant, etc).
   async findByRole(role) {
-    // Exclude inactive/deleted users?
-    // The user wants to see "active" and "inactive", but maybe not "deleted" (which are soft deleted with status 'inactive' AND email renamed).
-    // Actually, soft delete logic sets status='inactive' and email='deleted_...'.
-    // If we just show all users with role=?, we clearly see them.
-    // But usually we don't want to show soft-deleted users.
-    // Let's assume soft-deleted users are identified by 'deleted_' prefix in email or we rely on status.
-    // But regular inactive users are also 'inactive'.
-    // Let's filter out those with 'deleted_%' email pattern if possible, or just return all and let service filter.
-    // Better: The requirement was "owner remove a treasurer... email must be able to be used again".
-    // The soft delete implementation renames the email.
-    // So we should probably exclude users where email LIKE 'deleted_%'.
-
+    // 1. [QUERY] Filtered Extraction: excludes archived profiles
     const [rows] = await pool.query(
       'SELECT user_id as id, name, email, phone, role, status, created_at as createdAt FROM users WHERE role = ? AND is_archived = FALSE',
       [role]
@@ -43,8 +36,9 @@ class UserModel {
     }));
   }
 
+  // FIND TENANTS BY OWNER: Resolves the customer list for an investor across their entire property portfolio.
   async findTenantsByOwner(ownerId) {
-    // Get tenants who have leases on this owner's properties
+    // 1. [QUERY] Deep Join: Navigates User -> Tenant -> Lease -> Unit -> Property -> Owner
     const [rows] = await pool.query(
       `
             SELECT DISTINCT 
@@ -80,8 +74,9 @@ class UserModel {
     }));
   }
 
+  // FIND TENANTS BY TREASURER: Limits visibility to residents in buildings assigned to the staff member.
   async findTenantsByTreasurer(treasurerId) {
-    // Get tenants relevant to this treasurer's assigned properties
+    // 1. [QUERY] RBAC Filtered Join: Filters via staff-property assignment table
     const [rows] = await pool.query(
       `
             SELECT DISTINCT 
@@ -121,8 +116,10 @@ class UserModel {
     }));
   }
 
+  // FIND BY ID: Hydrates a complex composite profile (User + Tenant/Owner/Staff metadata).
   async findById(id, connection = null) {
     const db = connection || pool;
+    // 1. [QUERY] Massive Multi-Role Join: Resolves identity fragments from all subtype tables
     const query = `
             SELECT u.user_id as id, u.name, u.email, u.phone, u.role, u.status, u.is_email_verified as isEmailVerified, u.token_version as tokenVersion, u.created_at as createdAt,
                    t.nic, t.nic_url as nicUrl, t.permanent_address as permanentAddress, 
@@ -141,7 +138,7 @@ class UserModel {
     return rows[0];
   }
 
-  //  CREATE USER: Making a new file for a person.
+  // CREATE USER: Initializes the core digital identity for a person.
   async create(userData, connection) {
     const {
       name,
@@ -153,12 +150,14 @@ class UserModel {
       status = 'active',
     } = userData;
 
+    // 1. [DATA] Normalization
     const normalizedEmail = email ? email.toLowerCase().trim() : null;
 
     // Use provided connection or default pool (for non-transactional calls)
     const db = connection || pool;
 
     try {
+      // 2. [DATA] Persistence
       const [result] = await db.query(
         'INSERT INTO users (name, email, phone, password_hash, role, is_email_verified, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
         [
@@ -173,6 +172,7 @@ class UserModel {
       );
       return result.insertId;
     } catch (error) {
+      // 3. [SECURITY] Constraint Handling: prevents duplicate identity registration
       if (error.code === 'ER_DUP_ENTRY') {
         throw new Error('Email address is already in use.');
       }
@@ -180,6 +180,7 @@ class UserModel {
     }
   }
 
+  // COUNT BY ROLE: Aggregate statistic for dashboard reporting.
   async countByRole(role) {
     const [rows] = await pool.query(
       'SELECT COUNT(*) as count FROM users WHERE role = ?',
@@ -188,14 +189,16 @@ class UserModel {
     return rows[0].count;
   }
 
+  // UPDATE: Modifies basic contact details and synchronizes status-based cache invalidation.
   async update(id, updateData, connection = null) {
     const db = connection || pool;
     const { name, email, phone, status } = updateData;
     const normalizedEmail = email ? email.toLowerCase().trim() : null;
 
-    // [HARDENED] Invalidate cache before sync
+    // 1. [CACHE] Invalidation: Ensures immediate visibility of profile changes across the system
     await cacheService.invalidate(cacheService.getUserKey(id));
 
+    // 2. [DATA] Persistence + Security: Increments token_version if status changes to force re-authentication
     const [result] = await db.query(
       'UPDATE users SET name = ?, email = ?, phone = ?, status = ?, token_version = CASE WHEN status != ? THEN token_version + 1 ELSE token_version END WHERE user_id = ? AND is_archived = FALSE',
       [name, normalizedEmail, phone, status, status, id]
@@ -203,13 +206,14 @@ class UserModel {
     return result.affectedRows > 0;
   }
 
+  // UPDATE PASSWORD: Securely rotates credentials and invalidates all active sessions.
   async updatePassword(id, passwordHash, connection = null) {
     const db = connection || pool;
 
-    // [HARDENED] Invalidate cache
+    // 1. [CACHE] Invalidation
     await cacheService.invalidate(cacheService.getUserKey(id));
 
-    // [HARDENED] Increment token_version on password change to invalidate other sessions
+    // 2. [DATA] Persistence + Global Session Invalidation via token_version bump
     const [result] = await db.query(
       'UPDATE users SET password_hash = ?, token_version = token_version + 1 WHERE user_id = ?',
       [passwordHash, id]
@@ -217,12 +221,14 @@ class UserModel {
     return result.affectedRows > 0;
   }
 
+  // UPDATE ROLE: Modifies the person's authorization level.
   async updateRole(id, role, connection = null) {
     const db = connection || pool;
 
-    // [HARDENED] Invalidate cache
+    // 1. [CACHE] Invalidation
     await cacheService.invalidate(cacheService.getUserKey(id));
 
+    // 2. [DATA] Persistence
     const [result] = await db.query(
       'UPDATE users SET role = ? WHERE user_id = ?',
       [role, id]
@@ -230,33 +236,38 @@ class UserModel {
     return result.affectedRows > 0;
   }
 
+  // DELETE: Soft-archives a user profile, renaming the email to free it for future use.
   async delete(id, connection = null) {
     const db = connection || pool;
-    // Soft delete to preserve financial history and audit trail
+    // 1. [QUERY] Capture current state
     const user = await this.findById(id);
     if (!user) return false;
 
-    // Archive email to allow reusing the same email for new registrations
+    // 2. [DATA] Anonymization: Prepare unique archived email format
     const archivedEmail = `deleted_${id}_${Date.now()}_${user.email}`.substring(
       0,
       100
     );
 
-    // [HARDENED] Invalidate cache
+    // 3. [CACHE] Invalidation
     await cacheService.invalidate(cacheService.getUserKey(id));
 
+    // 4. [DATA] Archival: Marks as hidden and bumps token_version to boot user from all devices
     const [result] = await db.query(
       'UPDATE users SET archived_at = NOW(), is_archived = TRUE, email = ?, status = ?, name = CONCAT(name, " (Deleted)"), token_version = token_version + 1 WHERE user_id = ?',
       [archivedEmail, 'inactive', id]
     );
     return result.affectedRows > 0;
   }
+
+  // VERIFY EMAIL: Flags the identity as confirmed via a verification event.
   async verifyEmail(id, connection = null) {
     const db = connection || pool;
 
-    // [HARDENED] Invalidate cache
+    // 1. [CACHE] Invalidation
     await cacheService.invalidate(cacheService.getUserKey(id));
 
+    // 2. [DATA] Progress Update
     const [result] = await db.query(
       'UPDATE users SET is_email_verified = TRUE, email_verified_at = NOW(), status = "active" WHERE user_id = ?',
       [id]
@@ -264,13 +275,14 @@ class UserModel {
     return result.affectedRows > 0;
   }
 
+  // SETUP PASSWORD: Initial credential setting for invited users.
   async setupPassword(id, passwordHash, connection = null) {
     const db = connection || pool;
 
-    // [HARDENED] Invalidate cache
+    // 1. [CACHE] Invalidation
     await cacheService.invalidate(cacheService.getUserKey(id));
 
-    // [HARDENED] Reset token_version on setup to ensure a clean state
+    // 2. [DATA] Persistence + Activation
     const [result] = await db.query(
       'UPDATE users SET password_hash = ?, is_email_verified = TRUE, email_verified_at = NOW(), status = "active", token_version = 1 WHERE user_id = ?',
       [passwordHash, id]
@@ -278,12 +290,14 @@ class UserModel {
     return result.affectedRows > 0;
   }
 
+  // INCREMENT TOKEN VERSION: Manual trigger to force re-authentication (e.g., security breach).
   async incrementTokenVersion(id, connection = null) {
     const db = connection || pool;
 
-    // [HARDENED] Invalidate cache
+    // 1. [CACHE] Invalidation
     await cacheService.invalidate(cacheService.getUserKey(id));
 
+    // 2. [DATA] Session Revocation
     const [result] = await db.query(
       'UPDATE users SET token_version = token_version + 1 WHERE user_id = ?',
       [id]

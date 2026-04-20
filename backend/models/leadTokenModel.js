@@ -30,18 +30,14 @@ if (!JWT_SECRET) {
 }
 
 class LeadTokenModel {
-  /**
-   * Create a new portal access token for a lead.
-   * Invalidates any existing token (rotation) by overwriting the column.
-   *
-   * @param {number} leadId
-   * @returns {Promise<string>} The signed JWT string
-   */
+  // CREATE: Generates a new cryptographically signed JWT for guest portal access.
   async create(leadId) {
+    // 1. [DELEGATION] Crypto Generation: Sign a token with a 30-day lifecycle
     const token = jwt.sign({ leadId }, JWT_SECRET, {
       expiresIn: `${TOKEN_EXPIRY_DAYS}d`,
     });
 
+    // 2. [DATA] Persistence: Update the column (triggers rotation by overwriting any old token)
     await db.query('UPDATE leads SET portal_token = ? WHERE lead_id = ?', [
       token,
       leadId,
@@ -50,66 +46,44 @@ class LeadTokenModel {
     return token;
   }
 
-  /**
-   * Validate a portal token and return the associated lead context.
-   *
-   * Two-step verification:
-   *  1. JWT signature + expiry (stateless)
-   *  2. Stored token match (ensures revoked/rotated tokens are rejected)
-   *
-   * @param {string} token
-   * @returns {Promise<{ leadId: number } | null>}
-   */
+  // FIND BY TOKEN: Validates a presented string against the signature and vault record.
   async findByToken(token) {
     if (!token) return null;
 
     let payload;
     try {
+      // 1. [SECURITY] Stateless Verification: Check JWT signature and expiration
       payload = jwt.verify(token, JWT_SECRET);
     } catch {
-      // Expired or tampered token
       return null;
     }
 
     const { leadId } = payload;
 
-    // Revocation check: confirm stored token still matches
+    // 2. [SECURITY] Revocation Check: Ensure the vault still contains THIS exact token (blocking old rotated versions)
     const [rows] = await db.query(
       'SELECT portal_token FROM leads WHERE lead_id = ? AND portal_token IS NOT NULL',
       [leadId]
     );
 
-    if (!rows.length || rows[0].portal_token !== token) {
-      return null;
-    }
+    if (!rows.length || rows[0].portal_token !== token) return null;
 
     return { leadId };
   }
 
-  /**
-   * Revoke the active portal token for a lead by NULLing the column.
-   * Preserves no audit trail (unlike the old is_revoked approach) — call this
-   * only when the token is superseded (rotation) or the lead is closed/converted.
-   *
-   * @param {number} leadId
-   * @param {import('mysql2').Connection | null} connection  Optional transaction connection
-   */
+  // INVALIDATE FOR LEAD: Revokes all portal access for a specific individual.
   async invalidateForLead(leadId, connection = null) {
     const dbConn = connection || db;
+    // 1. [DATA] Purge Logic: NULLing the column instantly invalidates any distributed JWT
     await dbConn.query(
       'UPDATE leads SET portal_token = NULL WHERE lead_id = ?',
       [leadId]
     );
   }
 
-  /**
-   * Get the active (non-expired) portal token for a lead, if one exists.
-   * Used when re-sending a portal link without rotating the token.
-   *
-   * @param {number} leadId
-   * @returns {Promise<string | null>}
-   */
+  // FIND BY LEAD ID: Fetches an existing valid token for re-transmission without rotation.
   async findByLeadId(leadId) {
+    // 1. [DATA] Resolution
     const [rows] = await db.query(
       'SELECT portal_token FROM leads WHERE lead_id = ? AND portal_token IS NOT NULL',
       [leadId]
@@ -118,7 +92,7 @@ class LeadTokenModel {
     const storedToken = rows[0]?.portal_token || null;
     if (!storedToken) return null;
 
-    // Verify the stored token is still valid (not expired)
+    // 2. [SECURITY] Sanity Check: Ensure the stored string hasn't expired since it was issued
     try {
       jwt.verify(storedToken, JWT_SECRET);
       return storedToken;

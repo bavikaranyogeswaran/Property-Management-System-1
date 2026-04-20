@@ -10,7 +10,7 @@ import { getCurrentDateString, parseLocalDate } from '../utils/dateUtils.js';
 import { fromCents, roundToCents } from '../utils/moneyUtils.js';
 
 class InvoiceModel {
-  //  CREATE: Writing a new bill to the ledger.
+  // CREATE: Writing a new bill to the ledger.
   // NOTE: Email notifications are handled by the caller (service/controller/cron layer).
   async create(data, connection = null) {
     const {
@@ -22,13 +22,15 @@ class InvoiceModel {
       magicTokenHash,
       magicTokenExpiresAt,
     } = data;
-    // Need to determine year/month from dueDate if not explicitly provided
+
+    // 1. [TRANSFORMATION] Time Normalization: Derive accounting period from the due date
     const date = parseLocalDate(dueDate);
     const year = data.year || date.getFullYear();
     const month = data.month || date.getMonth() + 1; // 1-12
 
     const db = connection || pool;
     try {
+      // 2. [DATA] Persistence: Insert the invoice into the primary tracking table
       const [result] = await db.query(
         'INSERT INTO rent_invoices (lease_id, year, month, amount, due_date, status, invoice_type, description, magic_token_hash, magic_token_expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [
@@ -46,12 +48,11 @@ class InvoiceModel {
       );
       const invoiceId = result.insertId;
 
-      // [NEW] Post to Ledger (Debit Revenue/Liability to track accrual/debt)
+      // 3. [SIDE EFFECT] Ledger Posting: Mirror the invoice into the general ledger for financial reporting
       if (invoiceId) {
         try {
           const ledgerModel = (await import('./ledgerModel.js')).default;
           // Use dynamic import to avoid potential circular dependencies
-
           const accountType = type === 'deposit' ? 'liability' : 'revenue';
           const category =
             type === 'deposit' ? 'deposit_accrued' : type || 'rent';
@@ -78,16 +79,18 @@ class InvoiceModel {
 
       return invoiceId;
     } catch (error) {
+      // 4. [INTEGRITY] Duplicate Guard: Prevent double-billing for the same period/type
       if (error.code === 'ER_DUP_ENTRY') {
         console.warn(
           `Duplicate invoice detected: Lease ${leaseId}, Period ${year}-${month}, Type ${type}`
         );
-        return null; // Signals that creation was skipped due to existing record
+        return null;
       }
       throw error;
     }
   }
 
+  // EXISTS: Collision check to see if a bill already covers a specific month.
   async exists(leaseId, year, month, type = null, connection = null) {
     let query =
       'SELECT invoice_id FROM rent_invoices WHERE lease_id = ? AND year = ? AND month = ?';
@@ -99,11 +102,14 @@ class InvoiceModel {
     }
 
     const db = connection || pool;
+    // 1. [QUERY] Execution
     const [rows] = await db.query(query, params);
     return rows.length > 0;
   }
 
+  // GET PENDING TOTAL: Calculates the outstanding debt for a specific lease.
   async getPendingTotal(leaseId) {
+    // 1. [QUERY] Aggregation
     const [rows] = await pool.query(
       'SELECT SUM(amount) as total FROM rent_invoices WHERE lease_id = ? AND status = ?',
       [leaseId, 'pending']
@@ -111,6 +117,7 @@ class InvoiceModel {
     return rows[0].total || 0;
   }
 
+  // MAP ROW: Data transfer object (DTO) transformer for camelCase consistency.
   mapRow(row) {
     if (!row) return null;
     return {
@@ -125,14 +132,12 @@ class InvoiceModel {
       invoiceType: row.invoice_type,
       description: row.description,
       createdAt: row.created_at,
-      // Joined fields
       tenantId: row.tenant_id?.toString(),
       unitId: row.unit_id?.toString(),
       tenantName: row.tenant_name,
       propertyName: row.property_name,
       unitNumber: row.unit_number,
       unitStatus: row.unit_status,
-      // Late Fee Config (if joined)
       lateFeePercentage: row.late_fee_percentage
         ? parseFloat(row.late_fee_percentage)
         : null,
@@ -143,15 +148,14 @@ class InvoiceModel {
     };
   }
 
-  /**
-   * [NEW] Atomic Retrieval with Row Locking.
-   * Use this to serialize concurrent payment gateway notifications.
-   */
+  // FIND BY ID FOR UPDATE: Atomic Retrieval with SELECT ... FOR UPDATE row locking.
   async findByIdForUpdate(id, connection) {
     if (!connection)
       throw new Error(
         'findByIdForUpdate requires an active transaction connection.'
       );
+
+    // 1. [QUERY] Locked Retrieval: Prevents concurrent payment processing race conditions
     const [rows] = await connection.query(
       `SELECT ri.*, u.property_id, l.unit_id 
        FROM rent_invoices ri 
@@ -164,47 +168,42 @@ class InvoiceModel {
     return this.mapRow(rows[0]);
   }
 
+  // FIND BY ID: Fetch an invoice by its unique key.
   async findById(id, connection = null) {
     const db = connection || pool;
+    // 1. [QUERY] Joined Retrieval
     const [rows] = await db.query(
-      `
-            SELECT ri.*, l.tenant_id
-            FROM rent_invoices ri 
-            JOIN leases l ON ri.lease_id = l.lease_id 
-            WHERE ri.invoice_id = ?
-        `,
+      `SELECT ri.*, l.tenant_id FROM rent_invoices ri 
+       JOIN leases l ON ri.lease_id = l.lease_id WHERE ri.invoice_id = ?`,
       [id]
     );
     return this.mapRow(rows[0]);
   }
 
+  // FIND BY MAGIC TOKEN: Authenticates a tenant for a public "Pay Now" link.
   async findByMagicToken(rawToken, connection = null) {
     const crypto = await import('crypto');
     const hash = crypto.createHash('sha256').update(rawToken).digest('hex');
     const db = connection || pool;
+
+    // 1. [QUERY] Complex Resolution: Authenticates valid tokens that haven't expired or are still unpaid
     const [rows] = await db.query(
-      `
-             SELECT ri.*, l.tenant_id, l.unit_id,
-                    u.name as tenant_name, p.name as property_name, un.unit_number, un.status as unit_status
-             FROM rent_invoices ri 
-             JOIN leases l ON ri.lease_id = l.lease_id 
-             JOIN users u ON l.tenant_id = u.user_id
-             JOIN units un ON l.unit_id = un.unit_id
-             JOIN properties p ON un.property_id = p.property_id
-             WHERE ri.magic_token_hash = ? 
-             AND l.status IN ('draft', 'pending')
-             AND (
-               ri.magic_token_expires_at IS NULL 
-               OR ri.magic_token_expires_at > NOW() 
-               OR ri.status != 'pending'
-               OR EXISTS (SELECT 1 FROM payments pay WHERE pay.invoice_id = ri.invoice_id)
-             )
-         `,
+      `SELECT ri.*, l.tenant_id, l.unit_id,
+              u.name as tenant_name, p.name as property_name, un.unit_number, un.status as unit_status
+       FROM rent_invoices ri 
+       JOIN leases l ON ri.lease_id = l.lease_id 
+       JOIN users u ON l.tenant_id = u.user_id
+       JOIN units un ON l.unit_id = un.unit_id
+       JOIN properties p ON un.property_id = p.property_id
+       WHERE ri.magic_token_hash = ? 
+       AND l.status IN ('draft', 'pending')
+       AND (ri.magic_token_expires_at IS NULL OR ri.magic_token_expires_at > NOW() OR ri.status != 'pending')`,
       [hash]
     );
     return rows.length > 0 ? this.mapRow(rows[0]) : null;
   }
 
+  // CLEAR MAGIC TOKEN: Invalidates an invitation link after use or security trigger.
   async clearMagicToken(invoiceId, connection = null) {
     const db = connection || pool;
     await db.query(
@@ -213,6 +212,7 @@ class InvoiceModel {
     );
   }
 
+  // UPDATE LAST ORDER ID: Caches a payment gateway session ID to track pending attempts.
   async updateLastOrderId(invoiceId, orderId, connection = null) {
     const db = connection || pool;
     await db.query(
@@ -221,41 +221,41 @@ class InvoiceModel {
     );
   }
 
+  // FIND BY ORDER ID: Resolves an invoice from a gateway notification payload.
   async findByOrderId(orderId, connection = null) {
     const db = connection || pool;
+    // 1. [QUERY] Data Mapping
     const [rows] = await db.query(
-      `
-              SELECT ri.*, l.tenant_id, l.unit_id,
-                     u.name as tenant_name, p.name as property_name, un.unit_number, un.status as unit_status
-              FROM rent_invoices ri 
-              JOIN leases l ON ri.lease_id = l.lease_id 
-              JOIN users u ON l.tenant_id = u.user_id
-              JOIN units un ON l.unit_id = un.unit_id
-              JOIN properties p ON un.property_id = p.property_id
-              WHERE ri.last_order_id = ?
-          `,
+      `SELECT ri.*, l.tenant_id, l.unit_id,
+              u.name as tenant_name, p.name as property_name, un.unit_number, un.status as unit_status
+       FROM rent_invoices ri 
+       JOIN leases l ON ri.lease_id = l.lease_id 
+       JOIN users u ON l.tenant_id = u.user_id
+       JOIN units un ON l.unit_id = un.unit_id
+       JOIN properties p ON un.property_id = p.property_id
+       WHERE ri.last_order_id = ?`,
       [orderId]
     );
     return rows.length > 0 ? this.mapRow(rows[0]) : null;
   }
 
+  // FIND BY TENANT ID: Lists the billing history for a specific inhabitant.
   async findByTenantId(tenantId) {
+    // 1. [QUERY] Filtered Retrieval
     const [rows] = await pool.query(
-      `
-            SELECT ri.*, l.tenant_id, l.unit_id, u.name as tenant_name, p.name as property_name, un.unit_number
-            FROM rent_invoices ri
-            JOIN leases l ON ri.lease_id = l.lease_id
-            JOIN users u ON l.tenant_id = u.user_id
-            JOIN units un ON l.unit_id = un.unit_id
-            JOIN properties p ON un.property_id = p.property_id
-            WHERE l.tenant_id = ? 
-            ORDER BY ri.due_date ASC
-        `,
+      `SELECT ri.*, l.tenant_id, l.unit_id, u.name as tenant_name, p.name as property_name, un.unit_number
+       FROM rent_invoices ri
+       JOIN leases l ON ri.lease_id = l.lease_id
+       JOIN users u ON l.tenant_id = u.user_id
+       JOIN units un ON l.unit_id = un.unit_id
+       JOIN properties p ON un.property_id = p.property_id
+       WHERE l.tenant_id = ? ORDER BY ri.due_date ASC`,
       [tenantId]
     );
     return rows.map((row) => this.mapRow(row));
   }
 
+  // FIND ALL: System-wide billing registry (Admin/Super-Owner view).
   async findAll() {
     const [rows] = await pool.query(`
             SELECT ri.*, l.tenant_id, l.unit_id, u.name as tenant_name, p.name as property_name, un.unit_number
@@ -269,43 +269,41 @@ class InvoiceModel {
     return rows.map((row) => this.mapRow(row));
   }
 
+  // FIND BY OWNER ID: Lists all bills within an Owner's entire portfolio.
   async findByOwnerId(ownerId) {
     const [rows] = await pool.query(
-      `
-            SELECT ri.*, l.tenant_id, l.unit_id, u.name as tenant_name, p.name as property_name, un.unit_number
-            FROM rent_invoices ri
-            JOIN leases l ON ri.lease_id = l.lease_id
-            JOIN users u ON l.tenant_id = u.user_id
-            JOIN units un ON l.unit_id = un.unit_id
-            JOIN properties p ON un.property_id = p.property_id
-            WHERE p.owner_id = ?
-            ORDER BY ri.due_date DESC
-        `,
+      `SELECT ri.*, l.tenant_id, l.unit_id, u.name as tenant_name, p.name as property_name, un.unit_number
+       FROM rent_invoices ri
+       JOIN leases l ON ri.lease_id = l.lease_id
+       JOIN users u ON l.tenant_id = u.user_id
+       JOIN units un ON l.unit_id = un.unit_id
+       JOIN properties p ON un.property_id = p.property_id
+       WHERE p.owner_id = ? ORDER BY ri.due_date DESC`,
       [ownerId]
     );
     return rows.map((row) => this.mapRow(row));
   }
 
+  // FIND BY TREASURER ID: Limits billing view to properties explicitly assigned to the staff member.
   async findByTreasurerId(treasurerId) {
     const [rows] = await pool.query(
-      `
-            SELECT ri.*, l.tenant_id, l.unit_id, u.name as tenant_name, p.name as property_name, un.unit_number
-            FROM rent_invoices ri
-            JOIN leases l ON ri.lease_id = l.lease_id
-            JOIN users u ON l.tenant_id = u.user_id
-            JOIN units un ON l.unit_id = un.unit_id
-            JOIN properties p ON un.property_id = p.property_id
-            JOIN staff_property_assignments spa ON p.property_id = spa.property_id
-            WHERE spa.user_id = ?
-            ORDER BY ri.due_date DESC
-        `,
+      `SELECT ri.*, l.tenant_id, l.unit_id, u.name as tenant_name, p.name as property_name, un.unit_number
+       FROM rent_invoices ri
+       JOIN leases l ON ri.lease_id = l.lease_id
+       JOIN users u ON l.tenant_id = u.user_id
+       JOIN units un ON l.unit_id = un.unit_id
+       JOIN properties p ON un.property_id = p.property_id
+       JOIN staff_property_assignments spa ON p.property_id = spa.property_id
+       WHERE spa.user_id = ? ORDER BY ri.due_date DESC`,
       [treasurerId]
     );
     return rows.map((row) => this.mapRow(row));
   }
 
+  // UPDATE STATUS: Moves a bill through its lifecycle (Pending -> Paid/Void/Partially Paid).
   async updateStatus(id, status, connection = null) {
     const db = connection || pool;
+    // 1. [DATA] State Persistence
     await db.query('UPDATE rent_invoices SET status = ? WHERE invoice_id = ?', [
       status,
       id,
@@ -313,31 +311,27 @@ class InvoiceModel {
     return this.findById(id, db);
   }
 
+  // CREATE LATE FEE INVOICE: Specialized factory for penalty charges.
   async createLateFeeInvoice(data, connection = null) {
-    return await this.create(
-      {
-        ...data,
-        type: 'late_fee',
-      },
-      connection
-    );
+    return await this.create({ ...data, type: 'late_fee' }, connection);
   }
 
+  // FIND OVERDUE: Identifies bills that have passed their grace period date.
   async findOverdue() {
+    // 1. [QUERY] Filtered Aggregation: Calculates overdue status based on per-property grace period settings
     const [rows] = await pool.query(
-      `
-            SELECT ri.*, l.tenant_id, p.late_fee_percentage, p.late_fee_type, p.late_fee_amount, p.late_fee_grace_period
-            FROM rent_invoices ri
-            JOIN leases l ON ri.lease_id = l.lease_id
-            JOIN units un ON l.unit_id = un.unit_id
-            JOIN properties p ON un.property_id = p.property_id
-            WHERE ri.status IN ('pending', 'partially_paid')
-            AND ri.due_date < DATE_SUB(CURDATE(), INTERVAL p.late_fee_grace_period DAY)
-        `
+      `SELECT ri.*, l.tenant_id, p.late_fee_percentage, p.late_fee_type, p.late_fee_amount, p.late_fee_grace_period
+       FROM rent_invoices ri
+       JOIN leases l ON ri.lease_id = l.lease_id
+       JOIN units un ON l.unit_id = un.unit_id
+       JOIN properties p ON un.property_id = p.property_id
+       WHERE ri.status IN ('pending', 'partially_paid')
+       AND ri.due_date < DATE_SUB(CURDATE(), INTERVAL p.late_fee_grace_period DAY)`
     );
     return rows.map((row) => this.mapRow(row));
   }
 
+  // FIND BY LEASE AND DESCRIPTION: Search utility for specific historical adjustments.
   async findByLeaseAndDescription(leaseId, description) {
     const [rows] = await pool.query(
       'SELECT * FROM rent_invoices WHERE lease_id = ? AND description LIKE ?',
@@ -345,6 +339,8 @@ class InvoiceModel {
     );
     return rows.map((row) => this.mapRow(row));
   }
+
+  // SYNC FUTURE RENT INVOICES: Propagates a base rent change to all upcoming billing cycles.
   async syncFutureRentInvoices(
     leaseId,
     newAmount,
@@ -352,17 +348,15 @@ class InvoiceModel {
     connection = null
   ) {
     const db = connection || pool;
+    // 1. [DATA] Bulk Update
     await db.query(
-      `UPDATE rent_invoices 
-             SET amount = ?, description = CONCAT(description, ' (Rent Adjusted)')
-             WHERE lease_id = ? 
-             AND status = 'pending' 
-             AND invoice_type = 'rent'
-             AND due_date > ?`,
+      `UPDATE rent_invoices SET amount = ?, description = CONCAT(description, ' (Rent Adjusted)')
+       WHERE lease_id = ? AND status = 'pending' AND invoice_type = 'rent' AND due_date > ?`,
       [newAmount, leaseId, fromDate]
     );
   }
 
+  // VOID PENDING BY LEASE ID: Cancels all liabilities for a terminated lease.
   async voidPendingByLeaseId(leaseId, connection = null) {
     const db = connection || pool;
     await db.query(
@@ -371,6 +365,7 @@ class InvoiceModel {
     );
   }
 
+  // VOID FUTURE PENDING BY LEASE ID: Truncates billing schedule after a specific move-out date.
   async voidFuturePendingByLeaseId(leaseId, date, connection = null) {
     const db = connection || pool;
     await db.query(
@@ -379,6 +374,7 @@ class InvoiceModel {
     );
   }
 
+  // VOID ALL PENDING BY LEASE ID: Aggressive cleanup for legal or administrative overrides.
   async voidAllPendingByLeaseId(leaseId, connection = null) {
     const db = connection || pool;
     await db.query(
@@ -386,18 +382,19 @@ class InvoiceModel {
       [leaseId]
     );
   }
+
+  // FIND PENDING DEBTS: Lists unpaid balances in chronological order for payment allocation.
   async findPendingDebts(leaseId, connection = null) {
     const db = connection || pool;
     const [rows] = await db.query(
-      `SELECT ri.* 
-       FROM rent_invoices ri
+      `SELECT ri.* FROM rent_invoices ri
        WHERE ri.lease_id = ? AND ri.status IN ('pending', 'partially_paid') ORDER BY ri.due_date ASC`,
       [leaseId]
     );
     return rows.map((row) => this.mapRow(row));
   }
 
-  // Analytics optimized query to avoid O(N) memory buildup
+  // ANALYTICS STATS: High-performance aggregation for property-level income reports.
   async getFinancialStats(year, startDate = null, endDate = null) {
     let query = `
       SELECT p.property_id, p.name AS property_name, SUM(ri.amount) AS total_income
@@ -409,6 +406,7 @@ class InvoiceModel {
     `;
     const params = [];
 
+    // 1. [QUERY] Filter Application
     if (startDate && endDate) {
       query += ` AND ri.due_date BETWEEN ? AND ?`;
       params.push(startDate, endDate);
@@ -419,6 +417,7 @@ class InvoiceModel {
 
     query += ` GROUP BY p.property_id, p.name`;
 
+    // 2. [DATA] Collection
     const [rows] = await pool.query(query, params);
     return rows.map((row) => ({
       propertyId: row.property_id,

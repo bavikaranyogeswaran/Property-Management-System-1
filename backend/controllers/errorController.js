@@ -23,7 +23,7 @@ const handleJWTExpiredError = () =>
   new AppError('Your token has expired! Please log in again.', 401);
 
 /**
- * Send Detailed Error for Development
+ * Send Detailed Error for Development: Verbose output for debugging.
  */
 const sendErrorDev = (err, req, res) => {
   return res.status(err.statusCode).json({
@@ -35,35 +35,34 @@ const sendErrorDev = (err, req, res) => {
 };
 
 /**
- * Send Sanitized Error for Production
+ * Send Sanitized Error for Production: Protective output for end-users.
  */
 const sendErrorProd = (err, req, res) => {
-  // 1. Operational, trusted error: send message to client
+  // 1. [SECURITY] Operational Check: Only leak messages for "Trusted" errors (Validation, etc.)
   if (err.isOperational) {
-    return res.status(err.statusCode).json({
-      status: err.status,
-      message: err.message,
-    });
+    return res
+      .status(err.statusCode)
+      .json({ status: err.status, message: err.message });
   }
 
-  // 2. Programming or other unknown error: don't leak details
-  logger.error('ERROR 💥', {
+  // 2. [AUDIT] System Error Logging: Ship full details to the central log aggregator
+  logger.error('CRITICAL_SYSTEM_ERROR', {
     status: err.status,
     message: err.message,
     stack: err.stack,
   });
 
-  return res.status(500).json({
-    status: 'error',
-    message: 'Something went very wrong!',
-  });
+  // 3. [RESPONSE] Opaque generic message to prevent information leakage
+  return res
+    .status(500)
+    .json({ status: 'error', message: 'Something went very wrong!' });
 };
 
 /**
- * Global Error Handler Middleware
+ * Global Error Handler Middleware: The system's final safety net.
  */
 export default async (err, req, res, next) => {
-  // Fire-and-forget immediate cleanup of orphaned files
+  // 1. [SIDE EFFECT] Memory Cleanup: Kill any Cloudinary uploads that were part of the failed request
   cleanupRequestAssets(req);
 
   err.statusCode = err.statusCode || 500;
@@ -74,13 +73,13 @@ export default async (err, req, res, next) => {
     error.message = err.message;
     error.stack = err.stack;
 
-    // Map Specific Library Errors to AppError
+    // 2. [TRANSFORMATION] Type Mapping: Convert raw library errors (DB, JWT) into standardized AppErrors
     if (err.name === 'CastError') error = handleCastErrorDB(error);
     if (err.code === 'ER_DUP_ENTRY') error = handleDuplicateFieldsDB(error);
     if (err.name === 'JsonWebTokenError') error = handleJWTError();
     if (err.name === 'TokenExpiredError') error = handleJWTExpiredError();
 
-    // Joi Validation Errors
+    // 3. [VALIDATION] Standardize input validation errors as operational
     if (err.isJoi || err.name === 'ValidationError') {
       error.statusCode = 400;
       error.isOperational = true;
