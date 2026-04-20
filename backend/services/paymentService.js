@@ -22,6 +22,7 @@ import paymentOperationalService from './paymentOperationalService.js';
 import { ROLES, isAtLeast } from '../utils/roleUtils.js';
 import authorizationService from './authorizationService.js';
 import staffModel from '../models/staffModel.js';
+import propertyModel from '../models/propertyModel.js';
 
 // Restored for un-refactored methods
 import notificationModel from '../models/notificationModel.js';
@@ -562,20 +563,32 @@ class PaymentService {
         conn
       );
 
-      const assignedProperties = await staffModel.getAssignedProperties(
-        user.id,
-        conn
-      );
-      if (
-        !assignedProperties.some(
-          (p) =>
-            String(p.property_id) ===
-            String(unit.propertyId || unit.property_id)
-        )
-      ) {
-        throw new Error(
-          'Access denied. You are not assigned to this property.'
+      if (user.role === ROLES.OWNER) {
+        const property = await propertyModel.findById(
+          unit.propertyId || unit.property_id,
+          conn
         );
+        if (
+          !property ||
+          String(property.ownerId || property.owner_id) !==
+            String(user.id || user.user_id)
+        ) {
+          throw new Error('Access denied. You do not own this property.');
+        }
+      } else {
+        const assignedProperties = await staffModel.getAssignedProperties(
+          user.id || user.user_id,
+          conn
+        );
+        if (
+          !assignedProperties.some(
+            (p) => String(p.id) === String(unit.propertyId || unit.property_id)
+          )
+        ) {
+          throw new Error(
+            'Access denied. You are not assigned to this property.'
+          );
+        }
       }
 
       const { payment: updatedPayment, changed } =

@@ -36,12 +36,12 @@ export function PaymentVerificationPage() {
   const verifiedPayments = payments.filter((p) => p.status === 'verified');
   const rejectedPayments = payments.filter((p) => p.status === 'rejected');
 
-  const handleVerify = (paymentId: string, approved: boolean) => {
-    verifyPayment(paymentId, approved);
-    if (approved) {
-      toast.success('Payment verified and receipt generated');
-    } else {
-      toast.error('Payment rejected');
+  const handleVerify = async (paymentId: string, approved: boolean) => {
+    try {
+      await verifyPayment(paymentId, approved);
+      // Removed the custom success toast here because FinancialContext already toast.success() inside verifyPayment.
+    } catch (e) {
+      // Failed toast is also handled by FinancialContext
     }
     setSelectedPayment(null);
   };
