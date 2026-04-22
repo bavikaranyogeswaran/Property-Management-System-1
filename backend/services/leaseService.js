@@ -191,7 +191,7 @@ class LeaseService {
 
   // REGENERATE LINK: Issues a new secure magic link (e.g., if previous expired).
   async regenerateMagicLink(leaseId, user) {
-    // 1. [DELEGATION] SharedService: Generates a new secure token for PayHere checkout.
+    // 1. [DELEGATION] SharedService: Generates a new secure token for checkout.
     return this.sharedService.regenerateMagicLink(leaseId, user);
   }
 

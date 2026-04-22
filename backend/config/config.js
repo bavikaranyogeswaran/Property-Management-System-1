@@ -37,9 +37,10 @@ export const config = {
     apiKey: process.env.CLOUDINARY_API_KEY,
     apiSecret: process.env.CLOUDINARY_API_SECRET,
   },
-  payhere: {
-    merchantId: process.env.PAYHERE_MERCHANT_ID,
-    secret: process.env.PAYHERE_SECRET,
+  stripe: {
+    secretKey: process.env.STRIPE_SECRET_KEY,
+    publishableKey: process.env.STRIPE_PUBLISHABLE_KEY,
+    webhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
   },
   smtp: {
     user: process.env.SMTP_USER,
@@ -78,9 +79,9 @@ export const validateConfig = () => {
       errors.push('CLOUDINARY_API_SECRET is missing');
 
     // Payment Gateway is required in production
-    if (!config.payhere.merchantId)
-      errors.push('PAYHERE_MERCHANT_ID is missing');
-    if (!config.payhere.secret) errors.push('PAYHERE_SECRET is missing');
+    if (!config.stripe.secretKey) errors.push('STRIPE_SECRET_KEY is missing');
+    if (!config.stripe.publishableKey)
+      errors.push('STRIPE_PUBLISHABLE_KEY is missing');
   }
 
   if (errors.length > 0) {

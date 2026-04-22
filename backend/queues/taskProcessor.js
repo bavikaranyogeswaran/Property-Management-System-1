@@ -32,7 +32,7 @@ export const jobProcessor = async (job) => {
 
   try {
     const startTime = Date.now();
-    await taskFn();
+    await taskFn(job);
     const duration = Date.now() - startTime;
     logger.info(`[Queue] SUCCESS: Job [${name}] finished in ${duration}ms.`);
   } catch (error) {

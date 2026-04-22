@@ -65,8 +65,7 @@ export function TenantInvoicesPage() {
     paymentDate: new Date().toISOString().split('T')[0],
   });
 
-  const [preparingPayHere, setPreparingPayHere] = useState(false);
-  const [payHereData, setPayHereData] = useState<any>(null);
+  const [preparingStripe, setPreparingStripe] = useState(false);
   const [idempotencyKey, setIdempotencyKey] = useState<string>('');
 
   // Multi-Unit Logic (E19): Use active lease from context
@@ -211,51 +210,25 @@ export function TenantInvoicesPage() {
     if (!selectedInvoice) return;
 
     try {
-      setPreparingPayHere(true);
-      const response = await apiClient.post('/payhere/checkout', {
+      setPreparingStripe(true);
+      const response = await apiClient.post('/stripe/checkout', {
         invoiceId: selectedInvoice,
       });
-      const checkoutData = response.data.data;
 
-      setPayHereData(checkoutData);
+      const { url } = response.data.data;
 
-      // Simulation mode bypass (Forced in development or if flag is set)
-      const SHOULD_SIMULATE =
-        String(import.meta.env.VITE_ENABLE_PAYMENT_SIMULATION) === 'true' ||
-        import.meta.env.DEV;
-
-      if (SHOULD_SIMULATE) {
-        console.log(
-          '%c[PAYMENT SIMULATOR] Redirecting...',
-          'background: #2563eb; color: #fff; padding: 5px; border-radius: 5px; font-weight: bold;'
-        );
-        const queryParams = new URLSearchParams({
-          ...checkoutData,
-          items: checkoutData.items || `Invoice #${selectedInvoice}`,
-        }).toString();
-
-        setTimeout(() => {
-          // Close dialog then navigate
-          setIsPaymentDialogOpen(false);
-          window.location.href = `/payhere-simulation?${queryParams}`;
-        }, 500);
-        return;
+      if (url) {
+        window.location.href = url;
+      } else {
+        throw new Error('No checkout URL received');
       }
-
-      // Auto-submit PayHere form after a short delay
-      setTimeout(() => {
-        const form = document.getElementById(
-          'payhere-checkout-tenant-form'
-        ) as HTMLFormElement;
-        if (form) form.submit();
-      }, 100);
     } catch (err: any) {
       toast.error(
         'Failed to initialize online payment. Please use bank transfer or try again.'
       );
-      console.error('PayHere Tenant Init Error:', err);
+      console.error('Stripe Tenant Init Error:', err);
     } finally {
-      setPreparingPayHere(false);
+      setPreparingStripe(false);
     }
   };
 
@@ -553,26 +526,22 @@ export function TenantInvoicesPage() {
                 <SelectContent>
                   <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
                   <SelectItem value="Online Payment">
-                    Online Payment (PayHere)
+                    Online Payment (Stripe)
                   </SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             {paymentData.paymentMethod === 'Online Payment' ? (
-              <div className="p-6 bg-blue-50 rounded-xl border border-blue-100 flex flex-col items-center text-center space-y-4 animate-in zoom-in duration-300">
-                <img
-                  src="https://www.payhere.lk/downloads/images/payhere_short_banner.png"
-                  alt="PayHere"
-                  className="h-8"
-                />
+              <div className="p-6 bg-indigo-50 rounded-xl border border-indigo-100 flex flex-col items-center text-center space-y-4 animate-in zoom-in duration-300">
+                <CreditCard className="size-10 text-indigo-600" />
                 <div>
-                  <h4 className="font-bold text-blue-900">
+                  <h4 className="font-bold text-indigo-900">
                     Secure Instant Payment
                   </h4>
-                  <p className="text-xs text-blue-700">
-                    Pay using Visa or Mastercard. Your invoice will be marked as
-                    paid <strong>immediately</strong>.
+                  <p className="text-xs text-indigo-700">
+                    Powered by <strong>Stripe</strong>. Pay securely using your
+                    credit or debit card.
                   </p>
                 </div>
               </div>
@@ -640,10 +609,10 @@ export function TenantInvoicesPage() {
                 <Button
                   type="button"
                   onClick={handlePayOnline}
-                  disabled={preparingPayHere}
-                  className="bg-blue-600 hover:bg-blue-700 font-bold"
+                  disabled={preparingStripe}
+                  className="bg-indigo-600 hover:bg-indigo-700 font-bold"
                 >
-                  {preparingPayHere ? 'Redirecting...' : 'Pay Online Now'}
+                  {preparingStripe ? 'Redirecting...' : 'Pay Online Now'}
                 </Button>
               ) : (
                 <Button type="submit">Submit Payment</Button>
@@ -651,68 +620,7 @@ export function TenantInvoicesPage() {
             </div>
           </form>
 
-          {/* PayHere Hidden Form for Tenant Portal */}
-          {payHereData && (
-            <form
-              id="payhere-checkout-tenant-form"
-              method="post"
-              action="https://sandbox.payhere.lk/pay/checkout"
-              className="hidden"
-            >
-              <input
-                type="hidden"
-                name="merchant_id"
-                value={payHereData.merchant_id}
-              />
-              <input
-                type="hidden"
-                name="return_url"
-                value={payHereData.return_url}
-              />
-              <input
-                type="hidden"
-                name="cancel_url"
-                value={payHereData.cancel_url}
-              />
-              <input
-                type="hidden"
-                name="notify_url"
-                value={payHereData.notify_url}
-              />
-              <input
-                type="hidden"
-                name="order_id"
-                value={payHereData.order_id}
-              />
-              <input type="hidden" name="items" value={payHereData.items} />
-              <input
-                type="hidden"
-                name="currency"
-                value={payHereData.currency}
-              />
-              <input type="hidden" name="amount" value={payHereData.amount} />
-              <input
-                type="hidden"
-                name="first_name"
-                value={payHereData.first_name}
-              />
-              <input
-                type="hidden"
-                name="last_name"
-                value={payHereData.last_name}
-              />
-              <input type="hidden" name="email" value={payHereData.email} />
-              <input
-                type="hidden"
-                name="phone"
-                value={payHereData.phone || ''}
-              />
-              <input type="hidden" name="address" value={payHereData.address} />
-              <input type="hidden" name="city" value={payHereData.city} />
-              <input type="hidden" name="country" value={payHereData.country} />
-              <input type="hidden" name="hash" value={payHereData.hash} />
-            </form>
-          )}
+          {/* Stripe Hidden Form - Removed as we use Direct Redirect */}
         </DialogContent>
       </Dialog>
 

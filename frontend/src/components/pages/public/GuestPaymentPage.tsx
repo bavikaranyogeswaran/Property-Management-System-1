@@ -54,9 +54,8 @@ export function GuestPaymentPage() {
   const [referenceNumber, setReferenceNumber] = useState('');
   const [file, setFile] = useState<File | null>(null);
 
-  // PayHere State
-  const [payHereData, setPayHereData] = useState<any>(null);
-  const [preparingPayHere, setPreparingPayHere] = useState(false);
+  // Stripe State
+  const [preparingStripe, setPreparingStripe] = useState(false);
 
   useEffect(() => {
     const fetchInvoice = async () => {
@@ -114,54 +113,22 @@ export function GuestPaymentPage() {
     }
   };
 
-  const handlePayOnline = async () => {
+  const handleOnlinePayment = async () => {
     try {
-      setPreparingPayHere(true);
-      const response = await apiClient.get(`/payhere/checkout/public/${token}`);
-      const checkoutData = response.data.data;
+      setPreparingStripe(true);
+      const response = await apiClient.get(`/stripe/checkout/public/${token}`);
 
-      // Save token to localStorage so PaymentSuccessPage can find it if PayHere strips URL params
-      if (token) {
-        localStorage.setItem('last_payment_token', token);
+      const { url } = response.data.data;
+      if (url) {
+        window.location.href = url;
+      } else {
+        throw new Error('No checkout URL received');
       }
-
-      setPayHereData(checkoutData);
-
-      // Simulation mode bypass (Forced in development or if flag is set)
-      const SHOULD_SIMULATE =
-        String(import.meta.env.VITE_ENABLE_PAYMENT_SIMULATION) === 'true' ||
-        import.meta.env.DEV;
-
-      if (SHOULD_SIMULATE) {
-        console.log(
-          '%c[PAYMENT SIMULATOR] Redirecting...',
-          'background: #2563eb; color: #fff; padding: 5px; border-radius: 5px; font-weight: bold;'
-        );
-        const queryParams = new URLSearchParams({
-          ...checkoutData,
-          items: checkoutData.items || 'Security Deposit',
-        }).toString();
-
-        setTimeout(() => {
-          navigate(`/payhere-simulation?${queryParams}`);
-        }, 500);
-        return;
-      }
-
-      // We'll use a timeout to let the form render before submitting
-      setTimeout(() => {
-        const form = document.getElementById(
-          'payhere-checkout-form'
-        ) as HTMLFormElement;
-        if (form) form.submit();
-      }, 100);
     } catch (err: any) {
-      toast.error(
-        'Failed to initialize online payment. Please use bank transfer or try again.'
-      );
-      console.error('PayHere Init Error:', err);
+      toast.error('Failed to initialize payment gateway. Please try again.');
+      console.error('Stripe Init Error:', err);
     } finally {
-      setPreparingPayHere(false);
+      setPreparingStripe(false);
     }
   };
 
@@ -392,20 +359,15 @@ export function GuestPaymentPage() {
 
                 {paymentMethod === 'online' ? (
                   <div className="p-6 bg-blue-50 rounded-2xl border border-blue-100 space-y-4 animate-in fade-in zoom-in duration-300">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-white rounded-lg shadow-sm">
-                        <img
-                          src="https://www.payhere.lk/downloads/images/payhere_short_banner.png"
-                          alt="PayHere"
-                          className="h-6"
-                        />
-                      </div>
-                      <div>
-                        <p className="text-sm font-bold text-blue-900">
-                          Instant Activation
-                        </p>
-                        <p className="text-xs text-blue-700">
-                          Pay using Visa, Mastercard, or Mobile Wallets.
+                    <div className="p-2 bg-white rounded-lg shadow-sm">
+                      <CreditCard className="size-10 text-indigo-600 mb-2" />
+                      <div className="text-center">
+                        <h4 className="font-bold text-indigo-900 leading-tight">
+                          Secure Card Payment
+                        </h4>
+                        <p className="text-[10px] text-indigo-700 mt-1">
+                          Instant confirmation powered by{' '}
+                          <strong>Stripe</strong>
                         </p>
                       </div>
                     </div>
@@ -480,11 +442,11 @@ export function GuestPaymentPage() {
                 {paymentMethod === 'online' ? (
                   <Button
                     type="button"
-                    onClick={handlePayOnline}
-                    className="w-full h-12 text-lg font-bold bg-blue-600 hover:bg-blue-700 transition-all shadow-lg group"
-                    disabled={preparingPayHere}
+                    onClick={handleOnlinePayment}
+                    disabled={preparingStripe}
+                    className="w-full bg-indigo-600 hover:bg-indigo-700 text-white h-12 rounded-xl font-bold text-lg shadow-lg shadow-indigo-200 transition-all active:scale-[0.98]"
                   >
-                    {preparingPayHere ? (
+                    {preparingStripe ? (
                       <>
                         <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
                         Redirecting to Secure Gateway...
@@ -519,73 +481,7 @@ export function GuestPaymentPage() {
             </Card>
           </form>
 
-          {/* PayHere Hidden Form */}
-          {payHereData && (
-            <form
-              id="payhere-checkout-form"
-              method="post"
-              action="https://sandbox.payhere.lk/pay/checkout"
-              className="hidden"
-            >
-              <input
-                type="hidden"
-                name="merchant_id"
-                value={payHereData.merchant_id}
-              />
-              <input
-                type="hidden"
-                name="return_url"
-                value={payHereData.return_url}
-              />
-              <input
-                type="hidden"
-                name="cancel_url"
-                value={payHereData.cancel_url}
-              />
-              <input
-                type="hidden"
-                name="notify_url"
-                value={payHereData.notify_url}
-              />
-              <input
-                type="hidden"
-                name="order_id"
-                value={payHereData.order_id}
-              />
-              <input type="hidden" name="items" value={payHereData.items} />
-              <input
-                type="hidden"
-                name="currency"
-                value={payHereData.currency}
-              />
-              <input type="hidden" name="amount" value={payHereData.amount} />
-              <input
-                type="hidden"
-                name="first_name"
-                value={payHereData.first_name}
-              />
-              <input
-                type="hidden"
-                name="last_name"
-                value={payHereData.last_name}
-              />
-              <input type="hidden" name="email" value={payHereData.email} />
-              <input
-                type="hidden"
-                name="phone"
-                value={payHereData.phone || ''}
-              />
-              <input type="hidden" name="address" value={payHereData.address} />
-              <input type="hidden" name="city" value={payHereData.city} />
-              <input type="hidden" name="country" value={payHereData.country} />
-              <input type="hidden" name="hash" value={payHereData.hash} />
-              <input
-                type="hidden"
-                name="custom_1"
-                value={payHereData.custom_1}
-              />
-            </form>
-          )}
+          {/* Stripe Logic - Managed via server redirect */}
         </div>
       </div>
 

@@ -329,7 +329,7 @@ class PaymentService {
    * Records a payment that has already been verified by an automated gateway (e.g. PayHere).
    * Skips manual treasurer verification and triggers all post-payment workflows.
    */
-  // RECORD AUTOMATED PAYMENT: Instantly logs a payment confirmed by an online gateway like PayHere.
+  // RECORD AUTOMATED PAYMENT: Instantly logs a payment confirmed by an online gateway like Stripe.
   async recordAutomatedPayment(data, connection = null) {
     // 1. Setup transaction context
     const { invoiceId, amount, paymentMethod, referenceNumber } = data;

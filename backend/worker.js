@@ -99,7 +99,7 @@ const initWorker = async () => {
             userId: staff.id,
             message: `URGENT: Background task [${name}] failed after ${job.attemptsMade} retries. Reason: ${err.message}`,
             type: 'system',
-            severity: 'error',
+            severity: 'urgent',
             entityType: 'system',
             entityId: id,
           });

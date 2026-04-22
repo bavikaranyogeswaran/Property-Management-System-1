@@ -55,7 +55,6 @@ import PaymentSuccessPage from '@/components/pages/public/PaymentSuccessPage';
 import AuditLogsPage from '@/components/pages/AuditLogsPage';
 import { GuestPaymentPage } from '@/components/pages/public/GuestPaymentPage';
 import { OnboardingStatusPage } from '@/components/pages/public/OnboardingStatusPage';
-import PayHereSimulationPage from '@/components/pages/public/PayHereSimulationPage';
 
 // Lead Pages
 import { LeadPortalPage } from '@/components/pages/lead/LeadPortalPage';
@@ -118,7 +117,6 @@ export function AppRoutes() {
           </PublicPropertiesWrapper>
         }
       />
-      <Route path="/payhere-simulation" element={<PayHereSimulationPage />} />
 
       {/* Public Listings */}
       <Route

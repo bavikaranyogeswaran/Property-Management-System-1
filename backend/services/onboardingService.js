@@ -59,7 +59,7 @@ class OnboardingService {
   /**
    * Checks activation status via Order ID (PayHere).
    */
-  // STATUS BY ORDER: PayHere callback handler to verify activation state via external reference.
+  // STATUS BY ORDER: Stripe callback handler to verify activation state via external reference.
   async getActivationStatusByOrder(orderId) {
     const invoice = await invoiceModel.findByOrderId(orderId);
     if (!invoice) throw new AppError('Order not found.', 404);

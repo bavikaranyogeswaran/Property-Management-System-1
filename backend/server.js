@@ -84,18 +84,20 @@ app.use(
           'data:',
           'blob:',
           'https://res.cloudinary.com',
-          '*.payhere.lk',
+          'https://*.stripe.com',
         ],
         'connect-src': [
           "'self'",
           ...allowedOrigins,
           'https://api.cloudinary.com',
+          'https://*.stripe.com',
         ],
         'script-src': [
           "'self'",
-          'https://www.payhere.lk',
+          'https://js.stripe.com',
           'https://www.googletagmanager.com',
         ],
+        'frame-src': ["'self'", 'https://js.stripe.com'],
         'style-src': [
           "'self'",
           "'unsafe-inline'",
@@ -117,7 +119,7 @@ app.use((req, res, next) => {
 });
 
 app.use(json());
-app.use(express.urlencoded({ extended: true })); // Added for PayHere form data
+app.use(express.urlencoded({ extended: true }));
 // Apply Correlation ID Middleware (First)
 app.use(correlationIdMiddleware);
 
@@ -156,7 +158,7 @@ import payoutRoutes from './routes/payoutRoutes.js';
 import messageRoutes from './routes/messageRoutes.js';
 import leaseTermRoutes from './routes/leaseTermRoutes.js';
 import documentRoutes from './routes/documentRoutes.js';
-import payhereRoutes from './routes/payhereRoutes.js';
+import stripeRoutes from './routes/stripeRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import renewalRoutes from './routes/renewalRoutes.js';
 import systemRoutes from './routes/systemRoutes.js';
@@ -251,7 +253,7 @@ app.use('/api/payouts', payoutRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/lease-terms', leaseTermRoutes);
 app.use('/api/documents', documentRoutes);
-app.use('/api/payhere', payhereRoutes);
+app.use('/api/stripe', stripeRoutes);
 app.use('/api/renewal-requests', renewalRoutes);
 app.use('/api/system', systemRoutes);
 app.use('/api/audit-logs', auditRoutes);

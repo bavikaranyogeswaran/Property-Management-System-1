@@ -37,9 +37,9 @@ export default function PaymentSuccessPage() {
     }
   }, [user, refreshData]);
 
-  // Potential tokens from URL (sent by PayHere or our Simulator)
+  // Potential tokens from URL (sent by Stripe or our system)
   const token = searchParams.get('token');
-  const orderId = searchParams.get('order_id');
+  const sessionId = searchParams.get('session_id'); // Stripe session
   const setupToken = searchParams.get('setupToken');
 
   // Logic to determine where to send the user back
@@ -94,7 +94,7 @@ export default function PaymentSuccessPage() {
                 Confirmation Code
               </span>
               <span className="text-sm font-mono font-bold text-slate-700 break-all">
-                {orderId || 'PMS-AUTO-' + Date.now().toString().slice(-6)}
+                {sessionId || 'PMS-AUTO-' + Date.now().toString().slice(-6)}
               </span>
             </div>
 
