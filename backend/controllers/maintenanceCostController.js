@@ -102,11 +102,9 @@ class MaintenanceCostController {
         );
 
         if (!isAssigned)
-          return res
-            .status(403)
-            .json({
-              error: 'Access denied. You are not assigned to this property.',
-            });
+          return res.status(403).json({
+            error: 'Access denied. You are not assigned to this property.',
+          });
       }
 
       // 2. [DATA] Mark as void (soft-delete ledger pattern)

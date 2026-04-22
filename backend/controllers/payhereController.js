@@ -70,12 +70,10 @@ class PayHereController {
       console.warn(
         '[PayHereController] Simulation Attempt Denied. Simulations are disabled in production.'
       );
-      return res
-        .status(403)
-        .json({
-          status: 'error',
-          message: 'Simulation is disabled in this environment.',
-        });
+      return res.status(403).json({
+        status: 'error',
+        message: 'Simulation is disabled in this environment.',
+      });
     }
 
     const { order_id, status_code, amount, payment_id, magic_token } = req.body;
@@ -112,12 +110,10 @@ class PayHereController {
     }
 
     if (!authorized)
-      return res
-        .status(403)
-        .json({
-          status: 'error',
-          message: 'Access denied: Unauthorized simulation.',
-        });
+      return res.status(403).json({
+        status: 'error',
+        message: 'Access denied: Unauthorized simulation.',
+      });
 
     // 4. [DATA] Verification
     const invoice = await invoiceModel.findById(invoiceId);

@@ -28,12 +28,10 @@ class PayoutController {
           ownerId
         ))
       ) {
-        return res
-          .status(403)
-          .json({
-            error:
-              'Access denied: You are not assigned to any properties for this owner',
-          });
+        return res.status(403).json({
+          error:
+            'Access denied: You are not assigned to any properties for this owner',
+        });
       }
 
       const selection = {
@@ -78,12 +76,10 @@ class PayoutController {
           ownerId
         ))
       ) {
-        return res
-          .status(403)
-          .json({
-            error:
-              'Access denied: You are not assigned to any properties for this owner',
-          });
+        return res.status(403).json({
+          error:
+            'Access denied: You are not assigned to any properties for this owner',
+        });
       }
 
       // 2. [DELEGATION] Financial Commitment: Seal the income/expense records and create the payout header
@@ -116,12 +112,10 @@ class PayoutController {
           ownerId
         ))
       ) {
-        return res
-          .status(403)
-          .json({
-            error:
-              "Access denied: You do not have permission to view this owner's data",
-          });
+        return res.status(403).json({
+          error:
+            "Access denied: You do not have permission to view this owner's data",
+        });
       }
 
       // 2. [DATA] Narrative Resolver
@@ -151,19 +145,15 @@ class PayoutController {
           fullPayout.owner_id
         ))
       ) {
-        return res
-          .status(403)
-          .json({
-            error: 'Access denied: You are not assigned to this property owner',
-          });
+        return res.status(403).json({
+          error: 'Access denied: You are not assigned to this property owner',
+        });
       }
 
       if (!bankReference)
-        return res
-          .status(400)
-          .json({
-            error: 'Bank reference is required for payment verification',
-          });
+        return res.status(400).json({
+          error: 'Bank reference is required for payment verification',
+        });
 
       // 2. [DELEGATION] State Finalization: Record the transaction ID and move status to 'paid'
       await payoutService.markAsPaid(id, req.user.id, bankReference, proofUrl);
@@ -192,12 +182,9 @@ class PayoutController {
           fullPayout.owner_id
         ))
       ) {
-        return res
-          .status(403)
-          .json({
-            error:
-              'Access denied: You are not authorized to view these details',
-          });
+        return res.status(403).json({
+          error: 'Access denied: You are not authorized to view these details',
+        });
       }
 
       // 2. [DELEGATION] Line Item Resolver
@@ -258,11 +245,9 @@ class PayoutController {
           fullPayout.owner_id
         ))
       ) {
-        return res
-          .status(403)
-          .json({
-            error: 'Access denied: You are not authorized to export this data',
-          });
+        return res.status(403).json({
+          error: 'Access denied: You are not authorized to export this data',
+        });
       }
 
       // 2. [DELEGATION] Report Generation

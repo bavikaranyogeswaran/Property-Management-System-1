@@ -88,11 +88,9 @@ class UnitController {
       if (req.user.role === 'owner') {
         const property = await propertyModel.findById(unit.propertyId);
         if (!property || String(property.ownerId) !== String(req.user.id)) {
-          return res
-            .status(403)
-            .json({
-              error: 'You do not own the property associated with this unit.',
-            });
+          return res.status(403).json({
+            error: 'You do not own the property associated with this unit.',
+          });
         }
       }
 
@@ -117,11 +115,9 @@ class UnitController {
       if (req.user.role === 'owner') {
         const property = await propertyModel.findById(unit.propertyId);
         if (!property || String(property.ownerId) !== String(req.user.id)) {
-          return res
-            .status(403)
-            .json({
-              error: 'You do not own the property associated with this unit.',
-            });
+          return res.status(403).json({
+            error: 'You do not own the property associated with this unit.',
+          });
         }
       }
 
@@ -131,11 +127,9 @@ class UnitController {
         req.params.id
       );
       if (activeLeaseCount > 0) {
-        return res
-          .status(400)
-          .json({
-            error: 'Cannot archive unit with active or pending leases.',
-          });
+        return res.status(400).json({
+          error: 'Cannot archive unit with active or pending leases.',
+        });
       }
 
       // 3. [DELEGATION] Purge Logic
@@ -157,21 +151,17 @@ class UnitController {
       if (req.user.role === 'owner') {
         const property = await propertyModel.findById(unit.propertyId);
         if (!property || String(property.ownerId) !== String(req.user.id)) {
-          return res
-            .status(403)
-            .json({
-              error: 'You do not own the property associated with this unit.',
-            });
+          return res.status(403).json({
+            error: 'You do not own the property associated with this unit.',
+          });
         }
       }
 
       // 2. [VALIDATION] State Check: Only 'maintenance' units can be unlocked manually here
       if (unit.status !== 'maintenance') {
-        return res
-          .status(400)
-          .json({
-            error: `Unit is currently '${unit.status}', not 'maintenance'.`,
-          });
+        return res.status(400).json({
+          error: `Unit is currently '${unit.status}', not 'maintenance'.`,
+        });
       }
 
       // 3. [VALIDATION] Safety check: ensure no active lease is running on this unit
@@ -180,12 +170,10 @@ class UnitController {
         req.params.id
       );
       if (activeLeaseCount > 0) {
-        return res
-          .status(409)
-          .json({
-            error:
-              'Cannot mark unit as available — it still has an active lease.',
-          });
+        return res.status(409).json({
+          error:
+            'Cannot mark unit as available — it still has an active lease.',
+        });
       }
 
       // 4. [DELEGATION] State Transition
@@ -209,11 +197,9 @@ class UnitController {
       if (req.user.role === 'owner') {
         const property = await propertyModel.findById(unit.propertyId);
         if (!property || String(property.ownerId) !== String(req.user.id)) {
-          return res
-            .status(403)
-            .json({
-              error: 'You do not own the property associated with this unit.',
-            });
+          return res.status(403).json({
+            error: 'You do not own the property associated with this unit.',
+          });
         }
       } else if (req.user.role === 'treasurer') {
         const staffModel = (await import('../models/staffModel.js')).default;

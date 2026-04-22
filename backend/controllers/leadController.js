@@ -26,11 +26,9 @@ class LeadController {
       // 2. [SECURITY] Ownership Verification: Ensure the lead is actually managed by the requesting owner
       const isOwner = await leadModel.verifyOwnership(id, req.user.id);
       if (!isOwner)
-        return res
-          .status(403)
-          .json({
-            error: 'Access denied. This lead does not belong to your property.',
-          });
+        return res.status(403).json({
+          error: 'Access denied. This lead does not belong to your property.',
+        });
 
       const {
         startDate,
@@ -56,11 +54,9 @@ class LeadController {
           unit.propertyId !== lead.propertyId &&
           unit.property_id !== lead.property_id
         ) {
-          return res
-            .status(400)
-            .json({
-              error: "Target unit does not belong to the lead's property.",
-            });
+          return res.status(400).json({
+            error: "Target unit does not belong to the lead's property.",
+          });
         }
       }
 
