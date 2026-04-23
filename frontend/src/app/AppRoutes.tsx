@@ -285,7 +285,7 @@ export function AppRoutes() {
         path="/reports"
         element={
           <ProtectedRoute>
-            <RoleRoute allowedRoles={['owner']}>
+            <RoleRoute allowedRoles={['owner', 'treasurer']}>
               <OwnerReportsPage />
             </RoleRoute>
           </ProtectedRoute>

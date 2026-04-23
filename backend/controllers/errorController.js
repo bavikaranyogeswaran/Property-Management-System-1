@@ -85,6 +85,16 @@ export default async (err, req, res, next) => {
       error.isOperational = true;
     }
 
+    // [C11 FIX] Safety Net: Ensure all unmapped 4xx client errors are treated as operational
+    // This prevents generic 500s for valid but unmapped business logic exceptions.
+    if (
+      !error.isOperational &&
+      error.statusCode >= 400 &&
+      error.statusCode < 500
+    ) {
+      error.isOperational = true;
+    }
+
     sendErrorProd(error, req, res);
   } else {
     sendErrorDev(err, req, res);

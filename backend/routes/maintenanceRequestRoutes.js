@@ -3,7 +3,9 @@ import maintenanceRequestController from '../controllers/maintenanceRequestContr
 import {
   authenticateToken,
   authorizeResource,
+  authorizeRoles,
 } from '../middleware/authMiddleware.js';
+import { ROLES } from '../utils/roleUtils.js';
 
 import upload from '../middleware/upload.js';
 
@@ -25,6 +27,7 @@ router.put(
 router.post(
   '/invoice',
   authenticateToken,
+  authorizeRoles(ROLES.OWNER, ROLES.TREASURER),
   maintenanceRequestController.createInvoice
 );
 

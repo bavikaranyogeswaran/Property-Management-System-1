@@ -75,6 +75,12 @@ class PaymentOperationalService {
       try {
         const leaseService = (await import('./leaseService.js')).default;
         await leaseService.signLease(lease.id, user, connection);
+
+        // [C9 FIX] Clear magic tokens after successful lease activation
+        await connection.query(
+          'UPDATE rent_invoices SET magic_token_hash = NULL, magic_token_expires_at = NULL WHERE lease_id = ?',
+          [lease.id]
+        );
       } catch (activationErr) {
         // 3. [SCENARIO FAIL] Unit blocked: Notify staff if unit status prevents activation
         await this._notifyStaffOfBlockedActivation(

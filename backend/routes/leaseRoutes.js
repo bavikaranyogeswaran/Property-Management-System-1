@@ -60,12 +60,14 @@ router.patch(
 router.post(
   '/:id/refund/disburse',
   authenticateToken,
+  authorizeRoles(ROLES.OWNER, ROLES.TREASURER),
   authorizeResource('lease', 'id', 'params'),
   leaseController.recordDisbursement
 );
 router.post(
   '/:id/refund/resolve',
   authenticateToken,
+  authorizeRoles(ROLES.OWNER, ROLES.TREASURER),
   authorizeResource('lease', 'id', 'params'),
   leaseController.resolveRefundDispute
 );
@@ -86,6 +88,7 @@ router.post(
 router.patch(
   '/:id/notice-status',
   authenticateToken,
+  authorizeRoles(ROLES.OWNER, ROLES.TREASURER, ROLES.TENANT),
   authorizeResource('lease', 'id', 'params'),
   leaseController.updateNoticeStatus
 );
@@ -98,6 +101,7 @@ router.get(
 router.post(
   '/:id/adjustments',
   authenticateToken,
+  authorizeRoles(ROLES.OWNER, ROLES.TREASURER),
   authorizeResource('lease', 'id', 'params'),
   leaseController.addRentAdjustment
 );

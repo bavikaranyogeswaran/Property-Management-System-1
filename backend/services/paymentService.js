@@ -142,6 +142,14 @@ class PaymentService {
       );
       if (!invoice) throw new Error('Invalid or expired payment link.');
 
+      // [C9 FIX] Explicit expiry check as defense-in-depth
+      if (
+        invoice.magic_token_expires_at &&
+        new Date(invoice.magic_token_expires_at) < new Date()
+      ) {
+        throw new Error('Payment link expired.');
+      }
+
       if (invoice.status === 'paid') {
         throw new Error('This invoice has already been paid.');
       }
@@ -539,6 +547,7 @@ class PaymentService {
 
     const conn = connection || (await pool.getConnection());
     const isOwnTransaction = !connection;
+    let connReleased = false;
     try {
       if (isOwnTransaction) await conn.beginTransaction();
 
@@ -724,7 +733,11 @@ class PaymentService {
         }
       }
 
-      if (isOwnTransaction) await conn.commit();
+      if (isOwnTransaction) {
+        await conn.commit();
+        conn.release();
+        connReleased = true;
+      }
 
       // 8. Communication Side Effects: Send Confirmation or Rejection emails
       if (status === 'verified') {
@@ -747,7 +760,7 @@ class PaymentService {
             invoice.tenantId || invoice.tenant_id,
             emailErr,
             'Payment Confirmation',
-            conn
+            null
           );
         }
       } else if (status === 'rejected') {
@@ -769,18 +782,18 @@ class PaymentService {
             invoice.tenantId || invoice.tenant_id,
             emailErr,
             'Payment Rejection',
-            conn
+            null
           );
         }
       }
 
       return updatedPayment;
     } catch (error) {
-      if (isOwnTransaction) await conn.rollback();
+      if (isOwnTransaction && !connReleased) await conn.rollback();
       console.error('Verify Payment Transaction Failed:', error);
       throw error;
     } finally {
-      if (isOwnTransaction) conn.release();
+      if (isOwnTransaction && !connReleased) conn.release();
     }
   }
 

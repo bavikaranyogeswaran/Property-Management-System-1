@@ -11,6 +11,7 @@ import leaseModel from '../models/leaseModel.js';
 import unitModel from '../models/unitModel.js';
 import tenantModel from '../models/tenantModel.js';
 import pool from '../config/db.js';
+import { acquireLock, releaseLock } from '../config/redis.js';
 import invoiceModel from '../models/invoiceModel.js';
 import visitModel from '../models/visitModel.js';
 import leadModel from '../models/leadModel.js';
@@ -44,25 +45,14 @@ class LeaseTerminationService {
     terminationFee = 0,
     user = null
   ) {
-    // 1. Fetch lease and validate current status
-    const lease = await leaseModel.findById(leaseId);
-    if (!lease) throw new AppError('Lease not found', 404);
-
-    if (lease.status !== 'active') {
-      throw new AppError('Only active leases can be terminated', 400);
-    }
-
-    // 2. Validate termination date logic
     if (!terminationDate) {
       throw new AppError('Termination date is required.', 400);
     }
-    const termDate = parseLocalDate(terminationDate);
-    const leaseEnd = parseLocalDate(lease.endDate);
-    if (termDate > leaseEnd) {
-      throw new AppError(
-        `Termination date (${terminationDate}) cannot be after the lease's original end date (${lease.endDate}).`,
-        400
-      );
+
+    const lockKey = `terminate_lease_${leaseId}`;
+    const acquired = await acquireLock(lockKey, 30000);
+    if (!acquired) {
+      throw new AppError('Lease termination already in progress', 409);
     }
 
     const connection = await pool.getConnection();
@@ -72,8 +62,24 @@ class LeaseTerminationService {
 
       // [HARDENED] 3. Deterministic Locking Order (Unit -> Lease)
       // Lock Unit first (Parent) then Lease (Child) to prevent deadlocks with Payment flows.
-      await unitModel.findByIdForUpdate(lease.unitId, connection);
-      await leaseModel.findByIdForUpdate(leaseId, connection);
+      const baseLease = await leaseModel.findById(leaseId, connection);
+      if (!baseLease) throw new AppError('Lease not found', 404);
+
+      if (baseLease.status !== 'active') {
+        throw new AppError('Only active leases can be terminated', 400);
+      }
+
+      const termDate = parseLocalDate(terminationDate);
+      const leaseEnd = parseLocalDate(baseLease.endDate);
+      if (termDate > leaseEnd) {
+        throw new AppError(
+          `Termination date (${terminationDate}) cannot be after the lease's original end date (${baseLease.endDate}).`,
+          400
+        );
+      }
+
+      await unitModel.findByIdForUpdate(baseLease.unitId, connection);
+      const lease = await leaseModel.findByIdForUpdate(leaseId, connection);
 
       const todayDate = getLocalTime();
       const start = parseLocalDate(lease.startDate);
@@ -177,6 +183,7 @@ class LeaseTerminationService {
       throw error;
     } finally {
       connection.release();
+      await releaseLock(lockKey);
     }
   }
 
@@ -514,32 +521,45 @@ class LeaseTerminationService {
 
   // UPDATE NOTICE STATUS: Records the tenant's intent (Renew vs Vacate) at lease end.
   async updateNoticeStatus(leaseId, status, user) {
-    // 1. Ownership & Authorization checks
-    const lease = await leaseModel.findById(leaseId);
-    if (!lease) throw new AppError('Lease not found', 404);
-    if (
-      user.role === ROLES.TENANT &&
-      String(lease.tenantId) !== String(user.id)
-    )
-      throw new AppError('Access denied', 403);
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
 
-    // 2. Perform the update
-    if (!['undecided', 'vacating', 'renewing'].includes(status))
-      throw new AppError('Invalid notice status', 400);
+      // 1. Ownership & Authorization checks
+      const lease = await leaseModel.findById(leaseId, connection);
+      if (!lease) throw new AppError('Lease not found', 404);
+      if (
+        user.role === ROLES.TENANT &&
+        String(lease.tenantId) !== String(user.id)
+      )
+        throw new AppError('Access denied', 403);
 
-    await leaseModel.update(leaseId, { noticeStatus: status });
+      // 2. Perform the update
+      if (!['undecided', 'vacating', 'renewing'].includes(status))
+        throw new AppError('Invalid notice status', 400);
 
-    // 3. [SIDE EFFECT] Clean up pending renewals if tenant decides to vacate
-    if (status === 'vacating') {
-      await renewalService.cancelPendingRenewals(leaseId);
+      await leaseModel.update(leaseId, { noticeStatus: status }, connection);
+
+      // 3. [SIDE EFFECT] Clean up pending renewals if tenant decides to vacate
+      if (status === 'vacating') {
+        await renewalService.cancelPendingRenewals(leaseId, connection);
+      }
+
+      await connection.commit();
+
+      // 4. [SIDE EFFECT] Trigger Negotiated Renewal Flow if renewing
+      // Run outside transaction since it's idempotent and handles its own errors
+      if (status === 'renewing' && lease.status === 'active' && lease.endDate) {
+        await renewalService.createFromNotice(leaseId, user);
+      }
+
+      return true;
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
     }
-
-    // 4. [SIDE EFFECT] Trigger Negotiated Renewal Flow if renewing
-    if (status === 'renewing' && lease.status === 'active' && lease.endDate) {
-      await renewalService.createFromNotice(leaseId, user);
-    }
-
-    return true;
   }
 }
 

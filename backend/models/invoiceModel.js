@@ -197,7 +197,7 @@ class InvoiceModel {
        JOIN properties p ON un.property_id = p.property_id
        WHERE ri.magic_token_hash = ? 
        AND l.status IN ('draft', 'pending')
-       AND (ri.magic_token_expires_at IS NULL OR ri.magic_token_expires_at > NOW() OR ri.status != 'pending')`,
+       AND (ri.magic_token_expires_at IS NULL OR ri.magic_token_expires_at > NOW())`,
       [hash]
     );
     return rows.length > 0 ? this.mapRow(rows[0]) : null;

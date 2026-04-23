@@ -3,15 +3,23 @@ import invoiceController from '../controllers/invoiceController.js';
 import {
   authenticateToken,
   authorizeResource,
+  authorizeRoles,
 } from '../middleware/authMiddleware.js';
+import { ROLES } from '../utils/roleUtils.js';
 
 const router = Router();
 
 router.get('/', authenticateToken, invoiceController.getInvoices);
-router.post('/', authenticateToken, invoiceController.createInvoice); // Manual trigger
+router.post(
+  '/',
+  authenticateToken,
+  authorizeRoles(ROLES.OWNER, ROLES.TREASURER),
+  invoiceController.createInvoice
+); // Manual trigger
 router.post(
   '/generate',
   authenticateToken,
+  authorizeRoles(ROLES.OWNER, ROLES.TREASURER),
   invoiceController.generateMonthlyInvoices
 ); // Bulk generation
 router.patch(
