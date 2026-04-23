@@ -6,6 +6,7 @@ import {
   authorizeRoles,
   authorizeResource,
 } from '../middleware/authMiddleware.js';
+import { ROLES } from '../utils/roleUtils.js';
 
 import validateRequest from '../middleware/validateRequest.js';
 import {
@@ -21,6 +22,8 @@ import upload from '../middleware/upload.js';
 router.post(
   '/',
   authenticateToken,
+  // [S3 FIX] Only tenants can submit payments — prevents confusing errors for staff
+  authorizeRoles(ROLES.TENANT),
   upload.single('proof'),
   idempotencyMiddleware(),
   validateRequest(submitPaymentSchema),
@@ -31,7 +34,8 @@ router.get('/', authenticateToken, paymentController.getPayments);
 router.put(
   '/:id/verify',
   authenticateToken,
-  authorizeRoles('owner', 'treasurer'),
+  // [S3 FIX] Replace hardcoded strings with ROLES constants
+  authorizeRoles(ROLES.OWNER, ROLES.TREASURER),
   authorizeResource('payment', 'id', 'params'),
   validateRequest(verifyPaymentSchema),
   paymentController.verifyPayment

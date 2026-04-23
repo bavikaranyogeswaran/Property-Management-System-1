@@ -67,6 +67,31 @@ class PayoutService {
       if (incomeIds.length === 0 && expenseIds.length === 0)
         throw new Error('No eligible records found.');
 
+      // [S4 FIX] Ownership validation: Warn if requested IDs were silently excluded
+      // The SQL already filters by owner_id, so mismatched IDs simply won't appear.
+      // We surface this as an explicit error to prevent silent underpayment.
+      if (selection?.incomeIds?.length) {
+        const requested = selection.incomeIds.length;
+        const found = incomeIds.length;
+        if (found !== requested) {
+          throw new Error(
+            `Income selection mismatch: ${found} of ${requested} selected payment(s) matched this owner. ` +
+              `${requested - found} payment(s) were excluded — they may belong to another owner or have already been disbursed.`
+          );
+        }
+      }
+
+      if (selection?.expenseIds?.length) {
+        const requested = selection.expenseIds.length;
+        const found = expenseIds.length;
+        if (found !== requested) {
+          throw new Error(
+            `Expense selection mismatch: ${found} of ${requested} selected expense(s) matched this owner. ` +
+              `${requested - found} expense(s) were excluded — they may belong to another owner or have already been disbursed.`
+          );
+        }
+      }
+
       // 3. Persist the high-level Payout record
       const payoutId = await payoutModel.create(
         {

@@ -12,6 +12,7 @@ import React, {
   useState,
   useEffect,
   useRef,
+  useCallback,
   ReactNode,
 } from 'react';
 import authService from '../../services/auth';
@@ -143,13 +144,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   // LOGOUT: Full session teardown and identity clearing.
-  const logout = async () => {
+  // [S5 FIX] Wrapped in useCallback to stabilise the function reference across renders.
+  // This prevents scheduleLogout's setTimeout from capturing a stale closure.
+  // All internal dependencies (clearLogoutTimer, authService, setUser) have stable references.
+  const logout = useCallback(async () => {
     // 1. [CLEANUP] Clear timers and storage tokens
     clearLogoutTimer();
     await authService.logout();
     // 2. [SYNC] Local State: Clear the user object to trigger UI redirects
     setUser(null);
-  };
+  }, []);
 
   // INITIALIZATION EFFECT: Hydrates the identity state on application load.
   useEffect(() => {

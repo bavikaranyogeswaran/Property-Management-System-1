@@ -11,29 +11,47 @@ import ReportGenerator from '../utils/pdfGenerator.js';
 import { fromCents } from '../utils/moneyUtils.js';
 import catchAsync from '../utils/catchAsync.js';
 
+// ============================================================================
+//  [S1 FIX] PERIOD RESOLUTION UTILITY (Single Source of Truth)
+//  Converts raw query params into ISO date boundaries and a human-readable label.
+//  Handles month-specific, year-only, and all-time filtering consistently.
+// ============================================================================
+function resolvePeriod(query, defaultTitle = null) {
+  const year = parseInt(query.year) || new Date().getFullYear();
+  const month = query.month ? parseInt(query.month) : null;
+  let startDate = null;
+  let endDate = null;
+  let periodTitle = defaultTitle !== null ? defaultTitle : `${year}`;
+
+  if (month && month >= 1 && month <= 12) {
+    // Month-specific filter
+    const lastDay = new Date(year, month, 0).getDate();
+    startDate = `${year}-${String(month).padStart(2, '0')}-01`;
+    endDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+    const monthLabel = new Date(year, month - 1).toLocaleString('default', {
+      month: 'long',
+    });
+    periodTitle = `${monthLabel} ${year}`;
+  } else if (query.year) {
+    // Year-only filter
+    startDate = `${year}-01-01`;
+    endDate = `${year}-12-31`;
+    periodTitle = `${year}`;
+  }
+
+  return { year, month, startDate, endDate, periodTitle };
+}
+
 class ReportController {
   // =========================================================================
   //  1. FINANCIAL PERFORMANCE REPORT
   // =========================================================================
   // FINANCIAL REPORT: Generates a PDF showing income vs expenses for a specific year.
   generateFinancialReport = catchAsync(async (req, res, next) => {
-    const year = parseInt(req.query.year) || new Date().getFullYear();
-    const month = req.query.month ? parseInt(req.query.month) : null;
-
-    let startDate = null;
-    let endDate = null;
-    let periodTitle = `${year}`;
-
-    // 1. [TRANSFORMATION] Period resolution: Convert year/month params into ISO string markers for database filtering
-    if (month) {
-      const lastDay = new Date(year, month, 0).getDate();
-      startDate = `${year}-${String(month).padStart(2, '0')}-01`;
-      endDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
-      const monthLabel = new Date(year, month - 1).toLocaleString('default', {
-        month: 'long',
-      });
-      periodTitle = `${monthLabel} ${year}`;
-    }
+    // 1. [TRANSFORMATION] Period resolution via shared utility (S1 fix)
+    const { year, month, startDate, endDate, periodTitle } = resolvePeriod(
+      req.query
+    );
 
     // 2. [DELEGATION] Computation: Aggregate incomes, expenses, and margins across property portfolios
     const data = await reportService.getFinancialReportData(
@@ -165,18 +183,12 @@ class ReportController {
   // =========================================================================
   // OCCUPANCY REPORT: Generates a PDF showing which units are empty and which are generating money.
   generateOccupancyReport = catchAsync(async (req, res, next) => {
-    const year = parseInt(req.query.year) || new Date().getFullYear();
-    const month = req.query.month ? parseInt(req.query.month) : null;
-    let periodTitle = 'Current Snapshot';
-
-    if (month) {
-      const monthLabel = new Date(year, month - 1).toLocaleString('default', {
-        month: 'long',
-      });
-      periodTitle = `${monthLabel} ${year}`;
-    } else if (req.query.year) {
-      periodTitle = `${year}`;
-    }
+    // 1. [TRANSFORMATION] Period resolution via shared utility (S1 fix)
+    // Default title is 'Current Snapshot' when no period params are supplied
+    const { year, month, startDate, endDate, periodTitle } = resolvePeriod(
+      req.query,
+      req.query.year || req.query.month ? null : 'Current Snapshot'
+    );
 
     // 1. [DELEGATION] State Inspection: Resolve status of all units across all properties
     const data = await reportService.getOccupancyReportData(
@@ -388,23 +400,10 @@ class ReportController {
   // =========================================================================
   // MAINTENANCE REPORT: Categorizes repair spend to find cost leaks.
   generateMaintenanceCategoryReport = catchAsync(async (req, res, next) => {
-    const year = parseInt(req.query.year) || new Date().getFullYear();
-    const month = req.query.month ? parseInt(req.query.month) : null;
-
-    let startDate = null;
-    let endDate = null;
-    let periodTitle = `${year}`;
-
-    // 1. [TRANSFORMATION]
-    if (month) {
-      const lastDay = new Date(year, month, 0).getDate();
-      startDate = `${year}-${String(month).padStart(2, '0')}-01`;
-      endDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
-      const monthLabel = new Date(year, month - 1).toLocaleString('default', {
-        month: 'long',
-      });
-      periodTitle = `${monthLabel} ${year}`;
-    }
+    // 1. [TRANSFORMATION] Period resolution via shared utility (S1 fix)
+    const { year, month, startDate, endDate, periodTitle } = resolvePeriod(
+      req.query
+    );
 
     // 2. [DELEGATION] Cost Aggregation
     const data = await reportService.getMaintenanceReportData(
@@ -601,27 +600,12 @@ class ReportController {
   // =========================================================================
   // LEAD CONVERSION REPORT: Generates a PDF showing how many inquiries turn into signed leases.
   generateLeadConversionReport = catchAsync(async (req, res, next) => {
-    const year = parseInt(req.query.year) || new Date().getFullYear();
-    const month = req.query.month ? parseInt(req.query.month) : null;
-
-    let startDate = null;
-    let endDate = null;
-    let periodTitle = 'All Time';
-
-    // 1. [TRANSFORMATION]
-    if (month) {
-      const lastDay = new Date(year, month, 0).getDate();
-      startDate = `${year}-${String(month).padStart(2, '0')}-01`;
-      endDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
-      const monthLabel = new Date(year, month - 1).toLocaleString('default', {
-        month: 'long',
-      });
-      periodTitle = `${monthLabel} ${year}`;
-    } else if (req.query.year) {
-      startDate = `${year}-01-01`;
-      endDate = `${year}-12-31`;
-      periodTitle = `${year}`;
-    }
+    // 1. [TRANSFORMATION] Period resolution via shared utility (S1 fix)
+    // Default title is 'All Time' when no period params are supplied
+    const { year, month, startDate, endDate, periodTitle } = resolvePeriod(
+      req.query,
+      req.query.year || req.query.month ? null : 'All Time'
+    );
 
     // 2. [DELEGATION] Funnel Analysis: Compare leads to applications to signed contracts
     const data = await reportService.getLeadConversionReportData(

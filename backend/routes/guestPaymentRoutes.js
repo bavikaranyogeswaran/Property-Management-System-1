@@ -8,6 +8,15 @@ import {
 
 const router = Router();
 
+// [S6 FIX] Defense-in-depth: Prevent magic token leakage via Referer headers.
+// The magic token already provides CSRF-equivalent protection (unguessable URL),
+// but setting Referrer-Policy ensures the token doesn't leak to third-party
+// analytics or ad scripts embedded on referral pages.
+router.use((req, res, next) => {
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  next();
+});
+
 // Apply general rate limiting to all guest payment routes
 router.use(guestApiLimiter);
 

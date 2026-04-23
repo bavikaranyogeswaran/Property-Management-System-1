@@ -34,28 +34,49 @@ apiClient.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Add response interceptor to handle auth errors
-
+// Add response interceptor to handle auth errors and transient failures
 apiClient.interceptors.response.use(
   (response) => response,
-  (error: any) => {
-    if (error.response && error.response.status === 401) {
-      // Check if it's a login request/verify request - if so, DON'T redirect
-      // as the component will handle the error (show invalid credentials etc)
-      const url = error.config?.url || '';
+  async (error: any) => {
+    const { config, response } = error;
+
+    // 1. [S8 FIX] Fail-fast Retry Mechanism
+    // If the error is transient (502, 503, 504 or timeout) and we haven't reached retry limit
+    const MAX_RETRIES = 3;
+    config._retryCount = config._retryCount || 0;
+
+    const isTransientError =
+      !response ||
+      [502, 503, 504].includes(response.status) ||
+      error.code === 'ECONNABORTED';
+
+    if (isTransientError && config._retryCount < MAX_RETRIES) {
+      config._retryCount++;
+      const delay = Math.pow(2, config._retryCount) * 1000; // Exponential backoff: 2s, 4s, 8s
+
+      console.warn(
+        `Transient error (${response?.status || error.code}). Retrying request (${config._retryCount}/${MAX_RETRIES}) in ${delay}ms: ${config.url}`
+      );
+
+      await new Promise((resolve) => setTimeout(resolve, delay));
+      return apiClient(config);
+    }
+
+    // 2. Handle Authentication Errors (401)
+    if (response && response.status === 401) {
+      const url = config?.url || '';
       const isLoginRequest = url.includes('auth/login');
 
       if (!isLoginRequest) {
-        // Clear token if invalid/expired for non-login requests
         console.warn(
           'Authentication failed (401), clearing token and redirecting to login.'
         );
         localStorage.removeItem('authToken');
         localStorage.removeItem('user');
-        // Redirect to login
         window.location.href = '/login';
       }
     }
+
     // 403 = valid token but insufficient role permissions — let component handle it
     return Promise.reject(error);
   }

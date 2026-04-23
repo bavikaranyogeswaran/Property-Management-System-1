@@ -22,12 +22,8 @@ class RenewalController {
     const { id } = req.params;
     const { proposedMonthlyRent, proposedEndDate, notes } = req.body;
 
-    // 1. [VALIDATION] Integrity check
-    if (!proposedMonthlyRent || !proposedEndDate) {
-      return res
-        .status(400)
-        .json({ error: 'Proposed rent and end date are required' });
-    }
+    // [S2 FIX] Manual validation removed — input is now validated by proposeTermsSchema
+    // via validateRequest() middleware in renewalRoutes.js before reaching this handler.
 
     // 2. [DELEGATION] State Transition: Move status to 'proposed' and record the staff's offer
     await renewalService.proposeTerms(

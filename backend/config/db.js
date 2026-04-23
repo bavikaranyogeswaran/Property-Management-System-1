@@ -8,8 +8,12 @@ const dbConfig = {
   password: config.db.password,
   database: config.db.name,
   waitForConnections: true,
-  connectionLimit: 10,
+  // [S9 FIX] Pool Optimization
+  connectionLimit: 20, // Increased from 10 to 20 for better concurrency
+  idleTimeout: 60000, // Close idle connections after 60 seconds
   queueLimit: 0,
+  enableKeepAlive: true, // Keep connections alive to prevent TCP timeout
+  keepAliveInitialDelay: 10000,
   timezone: '+05:30',
   ssl: config.db.ssl ? { rejectUnauthorized: false } : undefined,
 };
