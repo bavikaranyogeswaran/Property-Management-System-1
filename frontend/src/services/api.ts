@@ -66,8 +66,10 @@ apiClient.interceptors.response.use(
     if (response && response.status === 401) {
       const url = config?.url || '';
       const isLoginRequest = url.includes('auth/login');
+      const isMeRequest = url.includes('auth/me');
+      const isPublicPath = window.location.pathname === '/login';
 
-      if (!isLoginRequest) {
+      if (!isLoginRequest && !isMeRequest && !isPublicPath) {
         console.warn(
           'Authentication failed (401), clearing token and redirecting to login.'
         );

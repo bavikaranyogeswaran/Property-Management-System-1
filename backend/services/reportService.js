@@ -320,7 +320,7 @@ class ReportService {
               (SELECT COUNT(*) FROM rent_invoices ri JOIN leases l2 ON ri.lease_id = l2.lease_id WHERE l2.tenant_id = t.user_id AND ri.status = 'overdue') as overdue_count
        FROM tenants t JOIN users u ON t.user_id = u.user_id JOIN leases l ON t.user_id = l.tenant_id JOIN units un ON l.unit_id = un.unit_id
        WHERE un.property_id IN (${placeholders}) AND l.status = 'active' GROUP BY t.user_id, u.name, t.behavior_score`,
-      [propertyIds]
+      propertyIds
     );
 
     // 3. Classify risk levels based on multi-factor thresholds

@@ -5,41 +5,25 @@
 //  It handles downloading them or opening them in a new tab.
 // ============================================================================
 
-import axios from 'axios';
-
-const API_URL = 'http://localhost:3000/api/reports';
-
-const getAuthHeader = () => {
-  const token = localStorage.getItem('authToken');
-  return { Authorization: `Bearer ${token}` };
-};
-
-const downloadFile = (response: any, filename: string) => {
-  const url = window.URL.createObjectURL(new Blob([response.data]));
-  const link = document.createElement('a');
-  link.href = url;
-  link.setAttribute('download', filename);
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-};
-
-const openInNewTab = (response: any) => {
-  const url = window.URL.createObjectURL(
-    new Blob([response.data], { type: 'application/pdf' })
-  );
-  window.open(url, '_blank');
-};
+import apiClient from './api';
 
 const handleResponse = (
   response: any,
   filename: string,
   action: 'view' | 'download'
 ) => {
+  const url = window.URL.createObjectURL(
+    new Blob([response.data], { type: 'application/pdf' })
+  );
   if (action === 'view') {
-    openInNewTab(response);
+    window.open(url, '_blank');
   } else {
-    downloadFile(response, filename);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
   }
 };
 
@@ -51,11 +35,10 @@ export const reportService = {
   }) => {
     const { year = new Date().getFullYear(), month, action = 'view' } = options;
     try {
-      let url = `${API_URL}/financial?year=${year}`;
+      let url = `/reports/financial?year=${year}`;
       if (month) url += `&month=${month}`;
 
-      const response = await axios.get(url, {
-        headers: getAuthHeader(),
+      const response = await apiClient.get(url, {
         responseType: 'blob',
       });
       handleResponse(
@@ -77,12 +60,11 @@ export const reportService = {
   }) => {
     const { year, month, action = 'view' } = options;
     try {
-      let url = `${API_URL}/occupancy?`;
+      let url = `/reports/occupancy?`;
       if (year) url += `year=${year}`;
       if (month) url += `&month=${month}`;
 
-      const response = await axios.get(url, {
-        headers: getAuthHeader(),
+      const response = await apiClient.get(url, {
         responseType: 'blob',
       });
       handleResponse(response, `occupancy_report.pdf`, action);
@@ -98,8 +80,7 @@ export const reportService = {
   }) => {
     const { action = 'view' } = options;
     try {
-      const response = await axios.get(`${API_URL}/tenant-risk`, {
-        headers: getAuthHeader(),
+      const response = await apiClient.get(`/reports/tenant-risk`, {
         responseType: 'blob',
       });
       handleResponse(response, `tenant_risk_report.pdf`, action);
@@ -117,11 +98,10 @@ export const reportService = {
   }) => {
     const { year = new Date().getFullYear(), month, action = 'view' } = options;
     try {
-      let url = `${API_URL}/maintenance?year=${year}`;
+      let url = `/reports/maintenance?year=${year}`;
       if (month) url += `&month=${month}`;
 
-      const response = await axios.get(url, {
-        headers: getAuthHeader(),
+      const response = await apiClient.get(url, {
         responseType: 'blob',
       });
       handleResponse(response, `maintenance_category_report.pdf`, action);
@@ -135,8 +115,7 @@ export const reportService = {
   downloadLeaseReport: async (options: { action?: 'view' | 'download' }) => {
     const { action = 'view' } = options;
     try {
-      const response = await axios.get(`${API_URL}/leases`, {
-        headers: getAuthHeader(),
+      const response = await apiClient.get(`/reports/leases`, {
         responseType: 'blob',
       });
       handleResponse(response, `lease_expiration_forecast.pdf`, action);
@@ -159,8 +138,7 @@ export const reportService = {
       if (month) query.push(`month=${month}`);
       const queryString = query.length > 0 ? `?${query.join('&')}` : '';
 
-      const response = await axios.get(`${API_URL}/leads${queryString}`, {
-        headers: getAuthHeader(),
+      const response = await apiClient.get(`/reports/leads${queryString}`, {
         responseType: 'blob',
       });
       handleResponse(response, `lead_conversion_report.pdf`, action);
