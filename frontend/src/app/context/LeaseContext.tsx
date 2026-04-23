@@ -143,7 +143,7 @@ const LeaseContext = createContext<LeaseContextType | undefined>(undefined);
 export function LeaseProvider({ children }: { children: ReactNode }) {
   // 1. [DEPENDENCIES] Context Injection: Accesses global identity for scoping and unit status synchronization
   const { user } = useAuth();
-  const { updateUnit } = useProperty();
+  const { fetchUnits } = useProperty();
 
   // 2. [STATE] Contractual Registers: Holds the master list of leases, custom terms, and ongoing renewal negotiations
   const [leases, setLeases] = useState<Lease[]>([]);
@@ -216,8 +216,8 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
         createdAt: new Date().toISOString().split('T')[0],
       };
       setLeases((prev) => [...prev, constructedLease]);
-      // 3. [SIDE-EFFECT] Unit Status Sync: Mark the room as occupied to prevent double-booking
-      await updateUnit(lease.unitId, { status: 'occupied' });
+      // 3. [SIDE-EFFECT] Unit Status Sync: Fetch updated server-driven status (M3/M14 fix)
+      await fetchUnits();
     } catch (error) {
       console.error('Failed to create lease:', error);
       throw error;
@@ -240,9 +240,8 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
       setLeases((prev) =>
         prev.map((l) => (l.id === id ? { ...l, status: 'ended' } : l))
       );
-      // 3. [SIDE-EFFECT] Unit Release: make the room available for new prospects
-      const lease = leases.find((l) => l.id === id);
-      if (lease) await updateUnit(lease.unitId, { status: 'available' });
+      // 3. [SIDE-EFFECT] Unit Release: Fetch updated server-driven status (M3 fix)
+      await fetchUnits();
       toast.success('Lease ended successfully');
     } catch (e) {
       console.error('Failed to end lease', e);
@@ -411,9 +410,8 @@ export function LeaseProvider({ children }: { children: ReactNode }) {
       setLeases((prev) =>
         prev.map((l) => (l.id === id ? { ...l, status: 'ended' } : l))
       );
-      // 3. [SIDE-EFFECT] Unit Release
-      const lease = leases.find((l) => l.id === id);
-      if (lease) await updateUnit(lease.unitId, { status: 'available' });
+      // 3. [SIDE-EFFECT] Unit Release: Fetch updated server-driven status (M3 fix)
+      await fetchUnits();
       toast.success('Lease checkout finalized. Unit is now available.');
     } catch (e: any) {
       const msg = e.response?.data?.error || 'Failed to finalize checkout';

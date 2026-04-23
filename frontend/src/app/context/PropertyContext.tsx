@@ -70,6 +70,7 @@ interface PropertyContextType {
   propertyTypes: PropertyType[];
   unitTypes: UnitType[];
   units: Unit[];
+  fetchUnits: () => Promise<void>;
 
   // Property operations
   addProperty: (
@@ -516,6 +517,7 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
         propertyTypes,
         unitTypes,
         units,
+        fetchUnits,
         addProperty,
         updateProperty,
         deleteProperty,

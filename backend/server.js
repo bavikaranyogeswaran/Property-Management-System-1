@@ -11,6 +11,7 @@ import express, { json } from 'express';
 import cors from 'cors';
 import logger from './utils/logger.js';
 import helmet from 'helmet';
+import cookieParser from 'cookie-parser';
 import { apiLimiter, publicPortalLimiter } from './utils/rateLimiters.js';
 import { correlationIdMiddleware } from './utils/correlation.js';
 import { config, validateConfig } from './config/config.js';
@@ -120,6 +121,7 @@ app.use((req, res, next) => {
 
 app.use(json());
 app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
 // Apply Correlation ID Middleware (First)
 app.use(correlationIdMiddleware);
 

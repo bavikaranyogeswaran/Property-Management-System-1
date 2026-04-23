@@ -179,7 +179,11 @@ class ReportController {
     }
 
     // 1. [DELEGATION] State Inspection: Resolve status of all units across all properties
-    const data = await reportService.getOccupancyReportData(req.user);
+    const data = await reportService.getOccupancyReportData(
+      req.user,
+      year,
+      month
+    );
 
     // 2. [ORCHESTRATION] PDF Generation
     const gen = new ReportGenerator(

@@ -19,6 +19,7 @@ import AppError from '../utils/AppError.js';
 
 import securityTokenService from './securityTokenService.js';
 import emailService from '../utils/emailService.js';
+import redis from '../config/redis.js';
 
 const JWT_SECRET = config.jwt.secret;
 
@@ -26,14 +27,31 @@ class AuthService {
   // LOGIN: Verifies credentials and issues a JWT "Access Card".
   // LOGIN: Primary entry point for user sessions. Verifies credentials and issues a multi-factor-ready JWT.
   async login(email, password) {
+    // 0. [SECURITY] Check for account lockout (Defense against brute-force)
+    const normalizedEmail = email ? email.toLowerCase().trim() : '';
+    const lockoutKey = `lockout:login:${normalizedEmail}`;
+    const failedAttempts = await redis.get(lockoutKey);
+
+    if (failedAttempts && parseInt(failedAttempts) >= 5) {
+      logger.warn('[AUTH] Login blocked: Account locked', {
+        email: normalizedEmail,
+      });
+      throw new AppError(
+        'Account temporarily locked due to multiple failed login attempts. Please try again in 15 minutes.',
+        429
+      );
+    }
+
     // 1. [SECURITY] Identify user and verify active status (Block locked/purged accounts)
-    const user = await userModel.findByEmail(email);
+    const user = await userModel.findByEmail(normalizedEmail);
     if (!user || user.status !== 'active') {
       logger.warn('[AUTH] Login failed: User not found or inactive', {
-        email,
+        email: normalizedEmail,
         exists: !!user,
         status: user?.status,
       });
+      // We still increment attempts even for non-existent users to prevent enumeration if needed,
+      // but here we just throw to match existing logic.
       throw new AppError('Invalid credentials', 401);
     }
 
@@ -41,14 +59,27 @@ class AuthService {
     const isValid = await bcrypt.compare(password, user.passwordHash);
     if (!isValid) {
       logger.warn('[AUTH] Login failed: Invalid password', {
-        email,
+        email: normalizedEmail,
         userId: user.id,
       });
+
+      // [NEW] Increment failed attempts and set 15-minute TTL on first failure
+      const attempts = await redis.incr(lockoutKey);
+      if (attempts === 1) {
+        await redis.expire(lockoutKey, 900);
+      }
+
       throw new AppError('Invalid credentials', 401);
     }
 
-    // 3. [AUDIT] Log successful entry
-    logger.info('[AUTH] Login successful', { email, userId: user.id });
+    // 3. [SECURITY] Reset failed attempts on success
+    await redis.del(lockoutKey);
+
+    // 4. [AUDIT] Log successful entry
+    logger.info('[AUTH] Login successful', {
+      email: normalizedEmail,
+      userId: user.id,
+    });
 
     // 4. [SECURITY] Issue JWT with Token Versioning (Allows global logout by incrementing token version in DB)
     const token = sign(

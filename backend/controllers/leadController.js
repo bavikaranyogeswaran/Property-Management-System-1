@@ -18,73 +18,11 @@ import AppError from '../utils/AppError.js';
 class LeadController {
   // CONVERT LEAD: The critical transition. Turns a prospect into a tenant and starts their lease.
   convertLead = catchAsync(async (req, res) => {
-    // 1. [SECURITY] Role Guard: Only Owners can authorize the conversion of a lead to a tenant
-    if (req.user.role !== ROLES.OWNER) {
-      throw new AppError('Access denied. Only Owners can convert leads.', 403);
-    }
-
-    const { id } = req.params;
-
-    // 2. [SECURITY] Ownership Verification: Ensure the lead is actually managed by the requesting owner
-    const isOwner = await leadModel.verifyOwnership(id, req.user.id);
-    if (!isOwner) {
-      throw new AppError(
-        'Access denied. This lead does not belong to your property.',
-        403
-      );
-    }
-
-    const {
-      startDate,
-      endDate,
-      nic,
-      permanentAddress,
-      emergencyContactName,
-      emergencyContactPhone,
-      monthlyIncome,
-      unitId,
-    } = req.body;
-
-    // 3. [VALIDATION] Context check: Ensure the lead exists and the target unit is within the same property
-    const lead = await leadModel.findById(id);
-    if (!lead) {
-      throw new AppError('Lead not found.', 404);
-    }
-
-    const targetUnitId = unitId || lead.interestedUnit;
-    if (targetUnitId) {
-      const unit = await unitModel.findById(targetUnitId);
-      if (!unit) {
-        throw new AppError('Target unit not found.', 404);
-      }
-      if (
-        unit.propertyId !== lead.propertyId &&
-        unit.property_id !== lead.property_id
-      ) {
-        throw new AppError(
-          "Target unit does not belong to the lead's property.",
-          400
-        );
-      }
-    }
-
-    // 4. [DELEGATION] Transformation: Start the complex cross-service workflow to create user, tenant, and draft lease
-    const result = await userService.convertLeadToTenant(
-      id,
-      startDate,
-      endDate,
-      {
-        nic,
-        permanentAddress,
-        emergencyContactName,
-        emergencyContactPhone,
-        monthlyIncome,
-        unitId,
-        documentUrl: req.body.documentUrl,
-      },
+    const result = await leadService.convertLead(
+      req.params.id,
+      req.body,
       req.user
     );
-
     res.status(200).json(result);
   });
 

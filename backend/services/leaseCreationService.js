@@ -555,12 +555,15 @@ class LeaseCreationService {
         );
       });
 
-      if (isOwnTransaction) await conn.commit();
+      if (isOwnTransaction) {
+        await conn.commit();
+        conn.release();
+      }
 
       // [SIDE EFFECT] Notify dropped leads of unit unavailability
       if (parseLocalDate(lease.startDate) <= getLocalTime()) {
         await this._safelyExecute('Notify Dropped Leads', async () => {
-          const [droppedLeads] = await conn.query(
+          const [droppedLeads] = await pool.query(
             `SELECT l.email, l.name, u.unit_number, p.name AS property_name FROM leads l JOIN units u ON l.unit_id = u.unit_id JOIN properties p ON l.property_id = p.property_id WHERE l.unit_id = ? AND l.status = 'dropped' AND l.notes LIKE '%Unit Leased%'`,
             [lease.unitId]
           );
@@ -581,7 +584,9 @@ class LeaseCreationService {
       throw error;
     } finally {
       if (isOwnTransaction) {
-        conn.release();
+        try {
+          conn.release();
+        } catch (e) {}
         await redis.releaseLock(lockKey, lockToken);
       }
     }

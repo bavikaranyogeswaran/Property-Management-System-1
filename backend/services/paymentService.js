@@ -132,6 +132,8 @@ class PaymentService {
     let evidenceUrl = data.evidenceUrl;
 
     const connection = await pool.getConnection();
+    let lockUnitId = null;
+    let lockLeadId = null;
     try {
       await connection.beginTransaction();
 
@@ -141,6 +143,8 @@ class PaymentService {
         connection
       );
       if (!invoice) throw new Error('Invalid or expired payment link.');
+
+      lockUnitId = invoice.unitId || invoice.unit_id;
 
       // [C9 FIX] Explicit expiry check as defense-in-depth
       if (
@@ -224,6 +228,7 @@ class PaymentService {
           unit.propertyId || unit.property_id
         );
         if (leadId) {
+          lockLeadId = leadId;
           await leadModel.update(
             leadId,
             {
@@ -306,28 +311,35 @@ class PaymentService {
       await connection.rollback();
       throw error;
     } finally {
+      // [FIX] Release database connection first to avoid holding it during external network calls
+      connection.release();
+
       // [NEW] Release Redis Lock unconditionally after checkout completes (success or fail)
       // The database state now reflects the pending payment, so the "soft lock" is no longer needed.
-      try {
-        if (magicToken) {
-          // We must query fresh or safely, without connection as it might be released soon, or before release
-          // Actually, we can just use the provided parameters if we hoisted invoice, but we didn't. Let's fetch invoice briefly if needed.
-          const invoice = await invoiceModel.findByMagicToken(magicToken, pool); // grab a quick query from pool
-          if (invoice && invoice.unitId) {
-            const leadId = await leadModel.findIdByEmailAndProperty(
-              invoice.tenant_email || invoice.email,
-              invoice.propertyId || invoice.property_id || invoice.unitId // rough fallback
+      if (lockUnitId) {
+        try {
+          // If lockLeadId wasn't set during the try block (e.g. error happened early),
+          // we attempt a lightweight background query using the pool, NOT the transaction connection.
+          if (!lockLeadId && magicToken) {
+            const invoice = await invoiceModel.findByMagicToken(
+              magicToken,
+              pool
             );
-            await unitLockService.releaseLock(invoice.unitId, leadId);
+            if (invoice && invoice.unitId) {
+              lockLeadId = await leadModel.findIdByEmailAndProperty(
+                invoice.tenant_email || invoice.email,
+                invoice.propertyId || invoice.property_id || invoice.unitId
+              );
+            }
           }
+          await unitLockService.releaseLock(lockUnitId, lockLeadId);
+        } catch (lockErr) {
+          console.error(
+            '[PaymentService] Failed to release Redis lock:',
+            lockErr
+          );
         }
-      } catch (lockErr) {
-        console.error(
-          '[PaymentService] Failed to release Redis lock:',
-          lockErr
-        );
       }
-      connection.release();
     }
   }
 

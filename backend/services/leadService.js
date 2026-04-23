@@ -29,8 +29,71 @@ import { isAtLeast, ROLES } from '../utils/roleUtils.js';
 import userService from './userService.js';
 import leaseService from './leaseService.js';
 import leaseModel from '../models/leaseModel.js';
+import AppError from '../utils/AppError.js';
 
 class LeadService {
+  async convertLead(id, data, user) {
+    // 1. [SECURITY] Ownership Verification: Ensure the lead is actually managed by the requesting owner
+    const isOwner = await leadModel.verifyOwnership(id, user.id);
+    if (!isOwner) {
+      throw new AppError(
+        'Access denied. This lead does not belong to your property.',
+        403
+      );
+    }
+
+    const {
+      startDate,
+      endDate,
+      nic,
+      permanentAddress,
+      emergencyContactName,
+      emergencyContactPhone,
+      monthlyIncome,
+      unitId,
+    } = data;
+
+    // 2. [VALIDATION] Context check: Ensure the lead exists and the target unit is within the same property
+    const lead = await leadModel.findById(id);
+    if (!lead) {
+      throw new AppError('Lead not found.', 404);
+    }
+
+    const targetUnitId = unitId || lead.interestedUnit;
+    if (targetUnitId) {
+      const unit = await unitModel.findById(targetUnitId);
+      if (!unit) {
+        throw new AppError('Target unit not found.', 404);
+      }
+      if (
+        unit.propertyId !== lead.propertyId &&
+        unit.property_id !== lead.property_id
+      ) {
+        throw new AppError(
+          "Target unit does not belong to the lead's property.",
+          400
+        );
+      }
+    }
+
+    // 3. [DELEGATION] Transformation: Start the complex cross-service workflow to create user, tenant, and draft lease
+    return await userService.convertLeadToTenant(
+      id,
+      startDate,
+      endDate,
+      {
+        nic,
+        permanentAddress,
+        emergencyContactName,
+        emergencyContactPhone,
+        monthlyIncome,
+        unitId,
+        documentUrl: data.documentUrl,
+      },
+      user
+    );
+  }
+
   // REGISTER INTEREST: The "Landing Page" entry point. Captures public inquiries and initializes CRM tracking.
   async registerInterest(data) {
     const {

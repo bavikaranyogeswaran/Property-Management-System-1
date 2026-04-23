@@ -249,27 +249,33 @@ export const checkLeaseExpiration = async () => {
 
           // Notify Owner
           if (lease.owner_id) {
-            await notificationModel.create({
-              userId: lease.owner_id,
-              message: `Lease for Unit ${lease.unit_id} has EXPIRED. Unit is now in Maintenance for turnover. Please process checkout.`,
-              type: 'lease',
-              severity: 'info',
-            });
+            await notificationModel.create(
+              {
+                userId: lease.owner_id,
+                message: `Lease for Unit ${lease.unit_id} has EXPIRED. Unit is now in Maintenance for turnover. Please process checkout.`,
+                type: 'lease',
+                severity: 'info',
+              },
+              connection
+            );
           }
 
           // Notify Treasurers (Refund Alert)
-          const treasurers = await db
+          const treasurers = await connection
             .query('SELECT user_id FROM users WHERE role = ?', [
               ROLES.TREASURER,
             ])
             .then(([rows]) => rows);
           for (const t of treasurers) {
-            await notificationModel.create({
-              userId: t.user_id,
-              message: `Lease #${lease.lease_id} has EXPIRED. Please prepare for Security Deposit Refund.`,
-              type: 'lease',
-              severity: 'warning',
-            });
+            await notificationModel.create(
+              {
+                userId: t.user_id,
+                message: `Lease #${lease.lease_id} has EXPIRED. Please prepare for Security Deposit Refund.`,
+                type: 'lease',
+                severity: 'warning',
+              },
+              connection
+            );
           }
         }
       }
@@ -1168,6 +1174,16 @@ export const activateUpcomingLeases = async () => {
         );
 
         for (const lease of pendingLeases) {
+          // [M5] Deterministic Locking Order (Unit -> Lease) to prevent deadlocks
+          await connection.query(
+            'SELECT unit_id FROM units WHERE unit_id = ? FOR UPDATE',
+            [lease.unit_id]
+          );
+          await connection.query(
+            'SELECT lease_id FROM leases WHERE lease_id = ? FOR UPDATE',
+            [lease.lease_id]
+          );
+
           // Update Lease Status
           await connection.query(
             "UPDATE leases SET status = 'active' WHERE lease_id = ?",

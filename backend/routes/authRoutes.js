@@ -26,6 +26,8 @@ router.post(
   validateRequest(loginSchema),
   authController.login
 );
+router.post('/logout', authController.logout);
+router.get('/me', authenticateToken, authController.me);
 router.post(
   '/verify-email',
   sensitiveActionLimiter,

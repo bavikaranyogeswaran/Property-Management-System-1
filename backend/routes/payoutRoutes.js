@@ -4,6 +4,7 @@ import {
   authenticateToken,
   authorizeRoles,
 } from '../middleware/authMiddleware.js';
+import idempotencyMiddleware from '../middleware/idempotencyMiddleware.js';
 import { ROLES } from '../utils/roleUtils.js';
 
 const router = express.Router();
@@ -21,6 +22,7 @@ router.post(
   '/create',
   authenticateToken,
   authorizeRoles(ROLES.TREASURER),
+  idempotencyMiddleware(),
   payoutController.createPayout
 );
 

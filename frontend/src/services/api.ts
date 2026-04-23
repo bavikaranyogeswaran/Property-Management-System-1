@@ -17,11 +17,14 @@ export const API_BASE_URL =
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
+  withCredentials: true, // [M9] Allow sending cookies with requests
 });
 
-// Add request interceptor to include auth token
+// Add request interceptor (Legacy support for Authorization header if still needed, but cookies take precedence)
 apiClient.interceptors.request.use(
   (config) => {
+    // [M9] The browser automatically sends the HTTP-only cookie now.
+    // We keep this for any manual token usage or transitional grace period.
     const token = localStorage.getItem('authToken');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;

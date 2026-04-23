@@ -143,51 +143,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   // LOGOUT: Full session teardown and identity clearing.
-  const logout = () => {
+  const logout = async () => {
     // 1. [CLEANUP] Clear timers and storage tokens
     clearLogoutTimer();
-    authService.logout();
+    await authService.logout();
     // 2. [SYNC] Local State: Clear the user object to trigger UI redirects
     setUser(null);
   };
 
   // INITIALIZATION EFFECT: Hydrates the identity state on application load.
   useEffect(() => {
-    const initAuth = () => {
-      // 1. [SYNC] Recovery: Check local storage for existing session tokens
-      const storedUser = authService.getCurrentUser();
-      const isAuth = authService.isAuthenticated();
-
-      if (storedUser && isAuth) {
-        setUser(storedUser);
-        const remainingTime = authService.getTokenRemainingTime();
-        scheduleLogout(remainingTime);
-
-        // 2. [HYDRATION] Context Loading: Fetch leases if the user is a tenant
-        if (storedUser.role === 'tenant') {
-          fetchLeases(storedUser.id);
-        }
-
-        // 3. [VERIFICATION] Background Sync: Ensure the local data matches the server's truth
-        authService
-          .getProfile()
-          .then((user) => {
-            if (user) {
-              setUser(user);
-              if (user.role === 'tenant' && tenantLeases.length === 0)
-                fetchLeases(user.id);
-            }
-          })
-          .catch((err) => {
-            console.error('[AuthContext] Initial sync failed:', err);
-          });
-      } else {
-        if (storedUser) {
-          authService.logout();
+    const initAuth = async () => {
+      // [M9] Use /auth/me to restore session from cookie
+      try {
+        const user = await authService.getMe();
+        if (user) {
+          setUser(user);
+          // 2. [HYDRATION] Context Loading: Fetch leases if the user is a tenant
+          if (user.role === 'tenant') {
+            fetchLeases(user.id);
+          }
+        } else {
           setUser(null);
         }
+      } catch (err) {
+        console.error('[AuthContext] Initial session recovery failed:', err);
+        setUser(null);
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     };
 
     initAuth();
@@ -206,9 +190,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (user.role === 'tenant') {
         await fetchLeases(user.id);
       }
-      // 4. [LIFECYCLE] Start security timers
-      const remainingTime = authService.getTokenRemainingTime();
-      scheduleLogout(remainingTime);
       return true;
     } catch (error) {
       console.error('Login failed', error);

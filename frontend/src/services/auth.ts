@@ -18,12 +18,11 @@ export const authService = {
   login: async (credentials: LoginCredentials) => {
     try {
       const response = await apiClient.post('/auth/login', credentials);
-      const { token, user } = response.data;
+      const { user } = response.data;
 
-      if (token && user) {
-        storage.setToken(token);
+      if (user) {
         storage.setUser(user);
-        return { token, user };
+        return { user };
       }
       throw new Error('Invalid response from server');
     } catch (error) {
@@ -32,8 +31,13 @@ export const authService = {
     }
   },
 
-  // Logout
-  logout: () => {
+  // Logout: Informs the server to clear the session cookie
+  logout: async () => {
+    try {
+      await apiClient.post('/auth/logout');
+    } catch (err) {
+      console.warn('Backend logout failed', err);
+    }
     storage.clear();
   },
 
@@ -42,34 +46,29 @@ export const authService = {
     return storage.getUser();
   },
 
-  // Check if user is authenticated
+  // Check if user is authenticated (Check for local user object as a hint,
+  // but the real source of truth is the HTTP-only cookie and the /me endpoint)
   isAuthenticated: () => {
-    const token = storage.getToken();
-    if (!token) return false;
-
-    try {
-      const payload = JSON.parse(atob(token.split('.')[1]));
-      const expiry = payload.exp * 1000;
-
-      if (Date.now() >= expiry) {
-        storage.clear();
-        return false;
-      }
-      return true;
-    } catch (error) {
-      storage.clear();
-      return false;
-    }
+    return !!storage.getUser();
   },
 
+  // [REMOVED] Token remaining time is not accessible from client-side for HTTP-only cookies
   getTokenRemainingTime: () => {
-    const token = storage.getToken();
-    if (!token) return 0;
+    return 0;
+  },
+
+  // Fetch current user from /me (Backend cookie check)
+  getMe: async () => {
     try {
-      const payload = JSON.parse(atob(token.split('.')[1]));
-      return Math.max(0, payload.exp * 1000 - Date.now());
+      const response = await apiClient.get('/auth/me');
+      const { user } = response.data;
+      if (user) {
+        storage.setUser(user);
+      }
+      return user;
     } catch (error) {
-      return 0;
+      storage.clear();
+      return null;
     }
   },
 

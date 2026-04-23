@@ -220,21 +220,28 @@ class ReportService {
     );
   }
 
-  // GET OCCUPANCY STATS: Calculates how many units are rented vs vacant.
   // GET OCCUPANCY STATS: Direct breakdown of rented vs vacant units.
-  async getOccupancyStats(user) {
+  async getOccupancyStats(user, targetDate = null) {
     const propertyIds = await this._getAccessiblePropertyIds(user);
     if (propertyIds.length === 0) return {};
-    return await unitModel.getOccupancyStats(propertyIds);
+    return await unitModel.getOccupancyStats(propertyIds, targetDate);
   }
 
   /**
    * Analytics: Occupancy Review
    */
   // OCCUPANCY ANALYTICS: Forecasts portfolio health based on vacancy and reservation rates.
-  async getOccupancyReportData(user) {
+  async getOccupancyReportData(user, year = null, month = null) {
+    let targetDate = null;
+    if (year && month) {
+      const lastDay = new Date(year, month, 0).getDate();
+      targetDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+    } else if (year) {
+      targetDate = `${year}-12-31`;
+    }
+
     // 1. Fetch raw data
-    const propertyStats = await this.getOccupancyStats(user);
+    const propertyStats = await this.getOccupancyStats(user, targetDate);
     const entries = Object.entries(propertyStats);
     let totalUnits = 0,
       totalOccupied = 0,

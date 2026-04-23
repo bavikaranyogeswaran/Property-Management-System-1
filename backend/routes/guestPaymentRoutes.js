@@ -1,8 +1,15 @@
 import { Router } from 'express';
 import guestPaymentController from '../controllers/guestPaymentController.js';
 import upload from '../middleware/upload.js';
+import {
+  guestApiLimiter,
+  guestSubmitLimiter,
+} from '../middleware/guestLimiter.js';
 
 const router = Router();
+
+// Apply general rate limiting to all guest payment routes
+router.use(guestApiLimiter);
 
 // GET /api/public/invoice/:token
 router.get('/:token', guestPaymentController.getInvoiceDetails);
@@ -10,6 +17,7 @@ router.get('/:token', guestPaymentController.getInvoiceDetails);
 // POST /api/public/invoice/:token/submit
 router.post(
   '/:token/submit',
+  guestSubmitLimiter,
   upload.single('proof'),
   guestPaymentController.submitPayment
 );

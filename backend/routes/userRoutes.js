@@ -32,21 +32,12 @@ router.put(
   userController.updateProfile
 );
 
-// Treasurer update (Owner only)
-router.put(
-  '/:id',
+// Property Assignments
+router.post(
+  '/assign-property',
   authenticateToken,
   authorizeRoles(ROLES.OWNER),
-  validateRequest(updateTreasurerSchema),
-  userController.updateTreasurer
-);
-
-// Treasurer deletion (Owner only)
-router.delete(
-  '/:id',
-  authenticateToken,
-  authorizeRoles(ROLES.OWNER),
-  userController.deleteTreasurer
+  userController.assignProperty
 );
 
 // Get all treasurers (Owner only)
@@ -73,32 +64,31 @@ router.get(
   userController.getOwners
 );
 
-// Get user by ID (Generic)
-router.get('/:id', authenticateToken, userController.getUserById);
+// --- GENERIC PARAMETER ROUTES (MUST BE AT THE BOTTOM) ---
 
-// Property Assignments
-router.post(
-  '/assign-property',
+// Get user by ID (Generic)
+router.get('/:id(\\d+)', authenticateToken, userController.getUserById);
+
+// Treasurer update (Owner only)
+router.put(
+  '/:id(\\d+)',
   authenticateToken,
   authorizeRoles(ROLES.OWNER),
-  userController.assignProperty
+  validateRequest(updateTreasurerSchema),
+  userController.updateTreasurer
 );
+
+// Treasurer deletion (Owner only)
 router.delete(
-  '/:userId/assign-property/:propertyId',
+  '/:id(\\d+)',
   authenticateToken,
   authorizeRoles(ROLES.OWNER),
-  userController.removeProperty
-);
-router.get(
-  '/:userId/assigned-properties',
-  authenticateToken,
-  authorizeRoles(ROLES.OWNER, ROLES.TREASURER),
-  userController.getAssignedProperties
+  userController.deleteTreasurer
 );
 
 // Security: Force Logout / Session Revocation
 router.post(
-  '/:id/force-logout',
+  '/:id(\\d+)/force-logout',
   authenticateToken,
   authorizeRoles(ROLES.OWNER),
   userController.forceLogout
@@ -106,10 +96,24 @@ router.post(
 
 // Resend invitation email (Owner only) — for users who haven't set up yet
 router.post(
-  '/:id/resend-invitation',
+  '/:id(\\d+)/resend-invitation',
   authenticateToken,
   authorizeRoles(ROLES.OWNER),
   userController.resendInvitation
+);
+
+router.delete(
+  '/:userId(\\d+)/assign-property/:propertyId(\\d+)',
+  authenticateToken,
+  authorizeRoles(ROLES.OWNER),
+  userController.removeProperty
+);
+
+router.get(
+  '/:userId(\\d+)/assigned-properties',
+  authenticateToken,
+  authorizeRoles(ROLES.OWNER, ROLES.TREASURER),
+  userController.getAssignedProperties
 );
 
 export default router;

@@ -8,7 +8,12 @@ const { verify } = jwt;
 
 export const authenticateToken = async (req, res, next) => {
   const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+  let token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+
+  // [M9] Check cookie if header is missing
+  if (!token && req.cookies) {
+    token = req.cookies.token;
+  }
 
   if (!token) {
     return res.status(401).json({ error: 'Access token required' });
@@ -58,7 +63,12 @@ export const authenticateToken = async (req, res, next) => {
 
 export const optionalAuthenticateToken = async (req, res, next) => {
   const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
+  let token = authHeader && authHeader.split(' ')[1];
+
+  // [M9] Check cookie if header is missing
+  if (!token && req.cookies) {
+    token = req.cookies.token;
+  }
 
   if (!token) {
     req.user = null;

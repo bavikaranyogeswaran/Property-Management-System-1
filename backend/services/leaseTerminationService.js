@@ -158,7 +158,10 @@ class LeaseTerminationService {
         connection
       );
 
-      const treasurers = await userModel.findByRole(ROLES.TREASURER);
+      const treasurers = await userModel.findByRole(
+        ROLES.TREASURER,
+        connection
+      );
       for (const t of treasurers) {
         await notificationModel.create(
           {
@@ -292,7 +295,7 @@ class LeaseTerminationService {
           conn
         );
 
-        const treasurers = await userModel.findByRole(ROLES.TREASURER);
+        const treasurers = await userModel.findByRole(ROLES.TREASURER, conn);
         for (const t of treasurers) {
           await notificationModel.create(
             {
@@ -392,7 +395,7 @@ class LeaseTerminationService {
           conn
         );
 
-        const treasurers = await userModel.findByRole(ROLES.TREASURER);
+        const treasurers = await userModel.findByRole(ROLES.TREASURER, conn);
         for (const t of treasurers) {
           await notificationModel.create(
             {

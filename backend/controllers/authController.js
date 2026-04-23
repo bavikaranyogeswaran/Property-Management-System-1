@@ -21,8 +21,32 @@ class AuthController {
     // 2. [DELEGATION] Verification: Delegate identity check to AuthService
     const result = await authService.login(normalizedEmail, password);
 
-    // 3. [RESPONSE] Dispatch the session token and user profile
-    res.json(result);
+    // 3. [SECURITY] Set HTTP-only cookie
+    res.cookie('token', result.token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 24 * 60 * 60 * 1000, // 1 day (matches config.jwt.expiresIn usually)
+    });
+
+    // 4. [RESPONSE] Dispatch the user profile (token is now hidden in cookie)
+    res.json({
+      user: result.user,
+    });
+  });
+
+  // LOGOUT: Clears the digital "Key" (Cookie).
+  logout = catchAsync(async (req, res) => {
+    res.clearCookie('token');
+    res.json({ message: 'Logged out successfully' });
+  });
+
+  // ME: Returns the current user profile based on the verified token.
+  me = catchAsync(async (req, res) => {
+    if (!req.user) {
+      throw new AppError('Not authenticated', 401);
+    }
+    res.json({ user: req.user });
   });
 
   // VERIFY EMAIL: Confirm user identity via an out-of-band token link.

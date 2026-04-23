@@ -1,6 +1,10 @@
 import express from 'express';
 import leadController from '../controllers/leadController.js';
-import { authenticateToken } from '../middleware/authMiddleware.js';
+import {
+  authenticateToken,
+  authorizeRoles,
+} from '../middleware/authMiddleware.js';
+import { ROLES } from '../utils/roleUtils.js';
 
 import messageController from '../controllers/messageController.js';
 
@@ -16,7 +20,11 @@ router.get('/', leadController.getLeads);
 router.get('/stage-history', leadController.getLeadStageHistory);
 router.get('/my-profile', leadController.getMyLead);
 router.put('/:id', leadController.updateLead);
-router.post('/:id/convert', leadController.convertLead);
+router.post(
+  '/:id/convert',
+  authorizeRoles(ROLES.OWNER),
+  leadController.convertLead
+);
 router.post('/:id/resend-portal', leadController.resendPortalLink);
 
 // Follow-up Routes
