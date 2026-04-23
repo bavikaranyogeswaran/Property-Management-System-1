@@ -160,6 +160,33 @@ class ReportGenerator {
     return this;
   }
 
+  /**
+   * [Q5 FIX] Draw a standardized table row with width constraints and alignment.
+   * Prevents column overlapping by enforcing widths and using ellipsis.
+   */
+  drawTableRow(columns, options = {}) {
+    const {
+      fontSize = 9,
+      font = 'Helvetica',
+      bold = false,
+      textColor = '#334155',
+    } = options;
+    this.doc.fontSize(fontSize).font(bold ? 'Helvetica-Bold' : font);
+
+    columns.forEach((col) => {
+      this.doc.fillColor(col.color || textColor).text(col.text, col.x, this.y, {
+        width: col.width,
+        align: col.align || 'left',
+        ellipsis: true,
+        lineBreak: false,
+      });
+    });
+
+    this.doc.fillColor('black').font('Helvetica');
+    this.y += 16;
+    return this;
+  }
+
   /** End the PDF stream */
   finalize() {
     this.doc.end();

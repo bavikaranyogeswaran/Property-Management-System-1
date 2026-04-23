@@ -8,12 +8,12 @@
 
 import leadService from '../services/leadService.js';
 import userService from '../services/userService.js';
-import leadModel from '../models/leadModel.js';
-import unitModel from '../models/unitModel.js';
-
 import { ROLES } from '../utils/roleUtils.js';
 import catchAsync from '../utils/catchAsync.js';
 import AppError from '../utils/AppError.js';
+
+// [Q6 FIX] Removed direct model imports (leadModel, unitModel) as business logic
+// has been moved to leadService.js (M2/Q6 hardening).
 
 class LeadController {
   // CONVERT LEAD: The critical transition. Turns a prospect into a tenant and starts their lease.

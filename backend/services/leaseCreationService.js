@@ -32,8 +32,10 @@ import userModel from '../models/userModel.js';
 import emailService from '../utils/emailService.js';
 import billingEngine from '../utils/billingEngine.js';
 import userService from './userService.js';
+import logger from '../utils/logger.js';
 import AppError from '../utils/AppError.js';
 import redis from '../config/redis.js';
+import { LEASE_STATUS, UNIT_STATUS } from '../utils/statusConstants.js';
 
 class LeaseCreationService {
   constructor(facade) {
@@ -93,10 +95,10 @@ class LeaseCreationService {
       if (!unit) throw new AppError('Unit not found', 404);
 
       // [SECURITY] Block leasing for maintenance or inactive units
-      if (unit.status === 'maintenance') {
+      if (unit.status === UNIT_STATUS.MAINTENANCE) {
         throw new AppError('Unit is currently under maintenance.', 409);
       }
-      if (unit.status === 'inactive') {
+      if (unit.status === UNIT_STATUS.INACTIVE) {
         throw new AppError('Unit is no longer available (inactive).', 409);
       }
 
@@ -537,7 +539,7 @@ class LeaseCreationService {
           cursorDate.setMonth(cursorDate.getMonth() + 1);
         }
       } catch (backfillErr) {
-        console.error('Rent backfill failed', backfillErr);
+        logger.error('Rent backfill failed', { error: backfillErr.message });
       }
 
       // 11. [AUDIT] Log final activation
@@ -601,10 +603,9 @@ class LeaseCreationService {
     try {
       await fn();
     } catch (err) {
-      console.error(
-        `[LeaseCreationService] Non-critical failure in ${label}:`,
-        err.message
-      );
+      logger.warn(`[LeaseCreationService] Non-critical failure in ${label}:`, {
+        error: err.message,
+      });
     }
   }
 }

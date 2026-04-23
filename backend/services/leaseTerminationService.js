@@ -32,6 +32,7 @@ import { toCentsFromMajor, moneyMath, fromCents } from '../utils/moneyUtils.js';
 import renewalService from './renewalService.js';
 import AppError from '../utils/AppError.js';
 import { ROLES } from '../utils/roleUtils.js';
+import { LEASE_STATUS, UNIT_STATUS } from '../utils/statusConstants.js';
 
 class LeaseTerminationService {
   constructor(facade) {
@@ -65,7 +66,7 @@ class LeaseTerminationService {
       const baseLease = await leaseModel.findById(leaseId, connection);
       if (!baseLease) throw new AppError('Lease not found', 404);
 
-      if (baseLease.status !== 'active') {
+      if (baseLease.status !== LEASE_STATUS.ACTIVE) {
         throw new AppError('Only active leases can be terminated', 400);
       }
 
@@ -89,7 +90,7 @@ class LeaseTerminationService {
         // [SIDE EFFECT] Move to 'cancelled' status directly
         await leaseModel.update(
           leaseId,
-          { status: 'cancelled', endDate: terminationDate },
+          { status: LEASE_STATUS.CANCELLED, endDate: terminationDate },
           connection
         );
         await invoiceModel.voidAllPendingByLeaseId(leaseId, connection);

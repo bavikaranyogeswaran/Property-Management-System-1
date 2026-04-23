@@ -283,7 +283,7 @@ class PropertyModel {
     // 4. [SIDE-EFFECT] Background Task: Queue Cloudinary deletions for all archived images
     if (success && images.length > 0) {
       const { mainQueue } = await import('../config/queue.js');
-      const { extractPublicId } = await import('../utils/cronJobs.js');
+      const { extractPublicId } = await import('../utils/cloudinaryUtils.js');
 
       for (const img of images) {
         const publicId = extractPublicId(img.image_url);

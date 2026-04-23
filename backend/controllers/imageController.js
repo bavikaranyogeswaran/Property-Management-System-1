@@ -10,6 +10,7 @@ import propertyModel from '../models/propertyModel.js';
 import unitModel from '../models/unitModel.js';
 import unitImageModel from '../models/unitImageModel.js';
 import { v2 as cloudinary } from 'cloudinary';
+import { extractPublicId } from '../utils/cloudinaryUtils.js';
 
 import { config } from '../config/config.js';
 import logger from '../utils/logger.js';
@@ -22,20 +23,6 @@ cloudinary.config({
   api_key: config.cloudinary.apiKey,
   api_secret: config.cloudinary.apiSecret,
 });
-
-// Helper to extract Cloudinary public_id from URL
-const extractPublicId = (url) => {
-  if (!url || !url.includes('cloudinary.com')) return null;
-  // URL format: .../upload/v12345/pms_uploads/filename.ext
-  const parts = url.split('/');
-  const uploadIndex = parts.indexOf('upload');
-  if (uploadIndex === -1) return null;
-
-  // Public ID starts after the version (v12345)
-  // Everything after upload/v... until the last dot
-  const publicIdWithExt = parts.slice(uploadIndex + 2).join('/');
-  return publicIdWithExt.split('.')[0];
-};
 
 class ImageController {
   // General File Upload

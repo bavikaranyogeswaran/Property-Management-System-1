@@ -23,6 +23,7 @@ import { ROLES, isAtLeast } from '../utils/roleUtils.js';
 import authorizationService from './authorizationService.js';
 import staffModel from '../models/staffModel.js';
 import propertyModel from '../models/propertyModel.js';
+import logger from '../utils/logger.js';
 
 // Restored for un-refactored methods
 import notificationModel from '../models/notificationModel.js';
@@ -240,10 +241,9 @@ class PaymentService {
           );
         }
       } catch (leadErr) {
-        console.error(
-          '[PaymentService] Failed to update lead status note:',
-          leadErr
-        );
+        logger.warn('[PaymentService] Failed to update lead status note:', {
+          error: leadErr.message,
+        });
       }
 
       // 9. Process file attachment
@@ -334,10 +334,9 @@ class PaymentService {
           }
           await unitLockService.releaseLock(lockUnitId, lockLeadId);
         } catch (lockErr) {
-          console.error(
-            '[PaymentService] Failed to release Redis lock:',
-            lockErr
-          );
+          logger.error('[PaymentService] Failed to release Redis lock:', {
+            error: lockErr.message,
+          });
         }
       }
     }
@@ -401,7 +400,7 @@ class PaymentService {
 
         // [FIX] RECOVERY LOGIC: If a previously REJECTED or PENDING payment is confirmed by the gateway,
         // we update the existing record to 'verified' instead of trying to create a new one.
-        console.log(
+        logger.info(
           `[PaymentService] Recovery trigger: Updating existing ${existingPayment.status} payment (Ref: ${referenceNumber}) to verified.`
         );
         await paymentModel.updateStatus(
@@ -423,7 +422,7 @@ class PaymentService {
       const isUnderpayment = Number(amount) < expectedCents;
       if (isUnderpayment) {
         // 4. Security Check: Handle discrepancy between paid amount vs expected
-        console.warn(
+        logger.warn(
           `[Security Alert] Gateway underpayment for Invoice #${invoiceId}. Expected: ${expectedCents}, Received: ${amount}. Recording and flagging.`
         );
         if (data.guaranteeFullSettlement) {
@@ -535,7 +534,9 @@ class PaymentService {
       } else {
         await conn.query('ROLLBACK TO SAVEPOINT record_automated_payment');
       }
-      console.error('[PaymentService] Automated Payment Failed:', error);
+      logger.error('[PaymentService] Automated Payment Failed:', {
+        error: error.message,
+      });
       throw error;
     } finally {
       if (!isExternalConn) conn.release();
@@ -1020,9 +1021,9 @@ class PaymentService {
       return { paymentId: payId, amountApplied: amountToApply };
     } catch (error) {
       if (!isExternalConn) await conn.rollback();
-      console.error(
+      logger.error(
         `[PaymentService] Failed to apply tenant credit to Invoice #${invoiceId}:`,
-        error
+        { error: error.message }
       );
       throw error;
     } finally {
@@ -1046,9 +1047,9 @@ class PaymentService {
     const isOwnConn = !connection;
 
     try {
-      console.error(
+      logger.error(
         `[Communication Failure] ${emailType} for Invoice #${invoiceId}:`,
-        error.message
+        { error: error.message }
       );
 
       // 1. [AUDIT] Log failure for staff visibility in Recent Activity
@@ -1095,10 +1096,9 @@ class PaymentService {
         );
       }
     } catch (handlerErr) {
-      console.error(
-        '[Critical] Failed to handle communication failure:',
-        handlerErr
-      );
+      logger.error('[Critical] Failed to handle communication failure:', {
+        error: handlerErr.message,
+      });
     } finally {
       if (isOwnConn) conn.release();
     }

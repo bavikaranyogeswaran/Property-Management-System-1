@@ -98,45 +98,51 @@ class ReportController {
     // 5. [VISUAL] Tabular breakdown: Iterate through property metrics and draw ledger rows
     gen.drawSectionTitle('Property Breakdown');
 
-    gen.doc.fontSize(9).font('Helvetica-Bold');
-    gen.doc.text('Property', 50, gen.y);
-    gen.doc.text('Income', 200, gen.y, { width: 85, align: 'right' });
-    gen.doc.text('Expenses', 285, gen.y, { width: 85, align: 'right' });
-    gen.doc.text('Net Income', 370, gen.y, { width: 110, align: 'right' });
-    gen.doc.text('Margin', 485, gen.y, { width: 65, align: 'right' });
+    const columns = [
+      { x: 50, width: 145, align: 'left' },
+      { x: 200, width: 85, align: 'right' },
+      { x: 285, width: 85, align: 'right' },
+      { x: 370, width: 110, align: 'right' },
+      { x: 485, width: 65, align: 'right' },
+    ];
+
+    gen.drawTableRow(
+      [
+        { ...columns[0], text: 'Property' },
+        { ...columns[1], text: 'Income' },
+        { ...columns[2], text: 'Expenses' },
+        { ...columns[3], text: 'Net Income' },
+        { ...columns[4], text: 'Margin' },
+      ],
+      { bold: true }
+    );
+
     gen.doc
-      .moveTo(50, gen.y + 14)
-      .lineTo(550, gen.y + 14)
+      .moveTo(50, gen.y - 2)
+      .lineTo(550, gen.y - 2)
       .strokeColor('#e2e8f0')
       .stroke();
-    gen.y += 22;
+    gen.y += 4;
 
-    gen.doc.font('Helvetica').fontSize(9);
     for (const p of data.propertyMetrics) {
       gen.checkPageBreak(20);
       const isLoss = p.net < 0;
-      gen.doc.fillColor('#334155').text(p.name, 50, gen.y, { width: 145 });
-      gen.doc.text(`LKR ${fromCents(p.income).toLocaleString()}`, 200, gen.y, {
-        width: 85,
-        align: 'right',
-      });
-      gen.doc.text(`LKR ${fromCents(p.expense).toLocaleString()}`, 285, gen.y, {
-        width: 85,
-        align: 'right',
-      });
-      gen.doc
-        .fillColor(isLoss ? '#ef4444' : '#22c55e')
-        .text(`LKR ${fromCents(p.net).toLocaleString()}`, 370, gen.y, {
-          width: 110,
-          align: 'right',
-        });
-      gen.doc
-        .fillColor(
-          p.margin < 10 ? '#ef4444' : p.margin < 30 ? '#f59e0b' : '#22c55e'
-        )
-        .text(`${p.margin}%`, 485, gen.y, { width: 65, align: 'right' });
-      gen.doc.fillColor('black');
-      gen.y += 18;
+      gen.drawTableRow([
+        { ...columns[0], text: p.name },
+        { ...columns[1], text: `LKR ${fromCents(p.income).toLocaleString()}` },
+        { ...columns[2], text: `LKR ${fromCents(p.expense).toLocaleString()}` },
+        {
+          ...columns[3],
+          text: `LKR ${fromCents(p.net).toLocaleString()}`,
+          color: isLoss ? '#ef4444' : '#22c55e',
+        },
+        {
+          ...columns[4],
+          text: `${p.margin}%`,
+          color:
+            p.margin < 10 ? '#ef4444' : p.margin < 30 ? '#f59e0b' : '#22c55e',
+        },
+      ]);
     }
 
     gen.doc
@@ -322,21 +328,34 @@ class ReportController {
     // 4. [VISUAL] Risk Matrix Table: Itemize individual tenant reliability scores
     gen.drawSectionTitle('Tenant Risk Assessment');
 
-    gen.doc.fontSize(9).font('Helvetica-Bold').fillColor('#64748b');
-    gen.doc.text('Tenant Name', 50, gen.y);
-    gen.doc.text('Score', 220, gen.y, { width: 50, align: 'center' });
-    gen.doc.text('Overdue', 280, gen.y, { width: 50, align: 'center' });
-    gen.doc.text('Paid', 340, gen.y, { width: 50, align: 'center' });
-    gen.doc.text('Risk Level', 410, gen.y, { width: 70, align: 'center' });
-    gen.doc.text('Action', 485, gen.y, { width: 70, align: 'center' });
+    const columns = [
+      { x: 50, width: 165, align: 'left' },
+      { x: 220, width: 50, align: 'center' },
+      { x: 280, width: 50, align: 'center' },
+      { x: 340, width: 50, align: 'center' },
+      { x: 410, width: 70, align: 'center' },
+      { x: 485, width: 70, align: 'center' },
+    ];
+
+    gen.drawTableRow(
+      [
+        { ...columns[0], text: 'Tenant Name' },
+        { ...columns[1], text: 'Score' },
+        { ...columns[2], text: 'Overdue' },
+        { ...columns[3], text: 'Paid' },
+        { ...columns[4], text: 'Risk Level' },
+        { ...columns[5], text: 'Action' },
+      ],
+      { bold: true }
+    );
+
     gen.doc
-      .moveTo(50, gen.y + 14)
-      .lineTo(550, gen.y + 14)
+      .moveTo(50, gen.y - 2)
+      .lineTo(550, gen.y - 2)
       .strokeColor('#e2e8f0')
       .stroke();
-    gen.y += 22;
+    gen.y += 4;
 
-    gen.doc.font('Helvetica').fontSize(9);
     for (const tenant of data.tenants) {
       gen.checkPageBreak(20);
       const action =
@@ -352,41 +371,32 @@ class ReportController {
             ? '#f59e0b'
             : '#22c55e';
 
-      gen.doc.fillColor('#334155').text(tenant.name, 50, gen.y, { width: 165 });
-      gen.doc
-        .fillColor(
-          tenant.behavior_score < 50
-            ? '#ef4444'
-            : tenant.behavior_score < 70
-              ? '#f59e0b'
-              : '#334155'
-        )
-        .text(tenant.behavior_score.toString(), 220, gen.y, {
-          width: 50,
-          align: 'center',
-        });
-      gen.doc
-        .fillColor(tenant.overdue_count > 0 ? '#ef4444' : '#334155')
-        .text(tenant.overdue_count.toString(), 280, gen.y, {
-          width: 50,
-          align: 'center',
-        });
-      gen.doc
-        .fillColor('#334155')
-        .text(tenant.paid_count.toString(), 340, gen.y, {
-          width: 50,
-          align: 'center',
-        });
-      gen.doc
-        .fillColor(tenant.color)
-        .font('Helvetica-Bold')
-        .text(tenant.riskLevel, 410, gen.y, { width: 70, align: 'center' });
-      gen.doc
-        .fillColor(actionColor)
-        .font('Helvetica-Bold')
-        .text(action, 485, gen.y, { width: 70, align: 'center' });
-      gen.doc.font('Helvetica').fillColor('black');
-      gen.y += 18;
+      gen.drawTableRow([
+        { ...columns[0], text: tenant.name },
+        {
+          ...columns[1],
+          text: tenant.behavior_score.toString(),
+          color:
+            tenant.behavior_score < 50
+              ? '#ef4444'
+              : tenant.behavior_score < 70
+                ? '#f59e0b'
+                : '#334155',
+        },
+        {
+          ...columns[2],
+          text: tenant.overdue_count.toString(),
+          color: tenant.overdue_count > 0 ? '#ef4444' : '#334155',
+        },
+        { ...columns[3], text: tenant.paid_count.toString() },
+        {
+          ...columns[4],
+          text: tenant.riskLevel,
+          color: tenant.color,
+          bold: true,
+        },
+        { ...columns[5], text: action, color: actionColor, bold: true },
+      ]);
     }
 
     // 5. [VISUAL] Remediation Strategy
@@ -452,6 +462,13 @@ class ReportController {
       // 5. [VISUAL] Category Chart: Draw horizontal bars representing share of spend
       gen.drawSectionTitle('Cost Breakdown by Category');
 
+      const columns = [
+        { x: 50, width: 145, align: 'left' },
+        { x: 200, width: 90, align: 'right' },
+        { x: 300, width: 50, align: 'right' },
+        { x: 370, width: 180, align: 'left' },
+      ];
+
       const barColors = [
         '#2563eb',
         '#7c3aed',
@@ -461,36 +478,43 @@ class ReportController {
         '#22c55e',
         '#64748b',
       ];
-      gen.doc.fontSize(9).font('Helvetica-Bold').fillColor('#64748b');
-      gen.doc.text('Category', 50, gen.y);
-      gen.doc.text('Amount (LKR)', 200, gen.y, { width: 90, align: 'right' });
-      gen.doc.text('Share', 300, gen.y, { width: 50, align: 'right' });
-      gen.doc.text('Distribution', 370, gen.y, { width: 180 });
+
+      gen.drawTableRow(
+        [
+          { ...columns[0], text: 'Category' },
+          { ...columns[1], text: 'Amount (LKR)' },
+          { ...columns[2], text: 'Share' },
+          { ...columns[3], text: 'Distribution' },
+        ],
+        { bold: true }
+      );
+
       gen.doc
-        .moveTo(50, gen.y + 14)
-        .lineTo(550, gen.y + 14)
+        .moveTo(50, gen.y - 2)
+        .lineTo(550, gen.y - 2)
         .strokeColor('#e2e8f0')
         .stroke();
-      gen.y += 22;
+      gen.y += 4;
 
-      gen.doc.font('Helvetica').fontSize(9);
       data.sorted.forEach(([cat, amount], index) => {
         gen.checkPageBreak(22);
         const percent = ((amount / data.totalCost) * 100).toFixed(1);
         const barWidth = Math.max(2, (amount / data.totalCost) * 180);
         const barColor = barColors[index % barColors.length];
 
-        gen.doc.fillColor('#334155').text(cat, 50, gen.y, { width: 145 });
-        gen.doc.text(fromCents(amount).toLocaleString(), 200, gen.y, {
-          width: 90,
-          align: 'right',
-        });
-        gen.doc.text(`${percent}%`, 300, gen.y, { width: 50, align: 'right' });
+        gen.drawTableRow([
+          { ...columns[0], text: cat },
+          { ...columns[1], text: fromCents(amount).toLocaleString() },
+          { ...columns[2], text: `${percent}%` },
+          { ...columns[3], text: '' }, // Placeholder for bar
+        ]);
+
+        // Overlay the distribution bar on the last column
         gen.doc.save();
-        gen.doc.roundedRect(370, gen.y + 1, barWidth, 10, 3).fill(barColor);
+        gen.doc
+          .roundedRect(columns[3].x, gen.y - 15, barWidth, 10, 3)
+          .fill(barColor);
         gen.doc.restore();
-        gen.doc.fillColor('black');
-        gen.y += 22;
       });
       gen.y += 10;
     }

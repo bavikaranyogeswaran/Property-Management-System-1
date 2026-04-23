@@ -9,6 +9,7 @@
 
 import db from '../db.js';
 import { v2 as cloudinary } from 'cloudinary';
+import { extractPublicId } from '../cloudinaryUtils.js';
 
 // Configure Cloudinary for background cleanup operations
 cloudinary.config({
@@ -17,7 +18,7 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-export { cloudinary };
+export { cloudinary, extractPublicId };
 
 // [B5 FIX] Write checkpoint to cron_checkpoints table (UPSERT — one row per job)
 export const logCronExecution = async (
@@ -36,14 +37,4 @@ export const logCronExecution = async (
   } catch (err) {
     console.error('[Cron] Failed to write checkpoint:', err);
   }
-};
-
-// Helper to extract Cloudinary public_id from a CDN URL
-export const extractPublicId = (url) => {
-  if (!url || !url.includes('cloudinary.com')) return null;
-  const parts = url.split('/');
-  const uploadIndex = parts.indexOf('upload');
-  if (uploadIndex === -1) return null;
-  const publicIdWithExt = parts.slice(uploadIndex + 2).join('/');
-  return publicIdWithExt.split('.')[0];
 };

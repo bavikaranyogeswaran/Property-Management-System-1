@@ -1,4 +1,8 @@
 /**
+ * MANDATORY WRAPPER: ALL controller methods MUST use this wrapper.
+ * Direct try-catch blocks in controllers bypass the centralised error handler
+ * and risk leaking internal error details to clients.
+ *
  * Wraps an asynchronous function (like an Express route handler) to catch any
  * errors and pass them to the next middleware (the global error handler).
  * This eliminates the need for try-catch blocks in every controller method.

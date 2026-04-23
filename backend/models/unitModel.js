@@ -201,7 +201,7 @@ class UnitModel {
     // 3. [SIDE-EFFECT] Storage Cleanup: Queue Cloudinary deletion tasks
     if (success && images.length > 0) {
       const { mainQueue } = await import('../config/queue.js');
-      const { extractPublicId } = await import('../utils/cronJobs.js');
+      const { extractPublicId } = await import('../utils/cloudinaryUtils.js');
 
       for (const img of images) {
         const publicId = extractPublicId(img.image_url);

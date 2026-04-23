@@ -6,6 +6,14 @@ import Decimal from 'decimal.js';
  */
 
 /**
+ * [GUIDELINE] Standard LKR Money Formatting
+ * 1. Internal Logic: ALWAYS stay in cents (integers). Use toCentsFromMajor(input) immediately.
+ * 2. Math Operations: Use moneyMath() for any arithmetic to avoid float errors.
+ * 3. Database: Storage column must be BIGINT or DECIMAL(19,0) representing cents.
+ * 4. Display: Use fromCents(val).toLocaleString('en-LK', { style: 'currency', currency: 'LKR' })
+ */
+
+/**
  * Converts a major unit amount (LKR 100.50) to cents (10050).
  * Use this only for USER INPUT or EXTERNAL API data that is in major units.
  */
@@ -18,8 +26,13 @@ export const toCentsFromMajor = (amount) => {
 };
 
 /**
+ * ALIAS for toCentsFromMajor. Use this for clarity when converting user-facing LKR inputs.
+ */
+export const lkrToCents = toCentsFromMajor;
+
+/**
  * Legacy alias for toCentsFromMajor.
- * @deprecated Use toCentsFromMajor for clarity.
+ * @deprecated Use toCentsFromMajor or lkrToCents for clarity.
  */
 export const toCents = toCentsFromMajor;
 
@@ -64,6 +77,7 @@ export const moneyMath = (amountInCents) => {
 
 export default {
   toCentsFromMajor,
+  lkrToCents,
   toCents,
   fromCents,
   roundToCents,

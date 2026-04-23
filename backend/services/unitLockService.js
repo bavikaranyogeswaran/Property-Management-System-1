@@ -7,6 +7,7 @@
 // ============================================================================
 
 import { connection as redis } from '../config/queue.js';
+import logger from '../utils/logger.js';
 
 class UnitLockService {
   /**
@@ -40,7 +41,7 @@ class UnitLockService {
 
       return false;
     } catch (err) {
-      console.error('Lock Acquisition Error:', err);
+      logger.error('Lock Acquisition Error:', { error: err.message });
       return false;
     }
   }
@@ -65,7 +66,7 @@ class UnitLockService {
         expiresAt: new Date(Date.now() + (ttl > 0 ? ttl : 0) * 1000),
       };
     } catch (err) {
-      console.error('Lock Check Error:', err);
+      logger.error('Lock Check Error:', { error: err.message });
       // 4. [CONCURRENCY] Fail-Closed Guard: If Redis is unreachable, assume LOCKED to prevent race conditions
       return {
         leadId: 'SYSTEM_LOCK_ERROR',
@@ -89,7 +90,7 @@ class UnitLockService {
         await redis.del(lockKey);
       }
     } catch (err) {
-      console.error('Lock Release Error:', err);
+      logger.error('Lock Release Error:', { error: err.message });
     }
   }
 

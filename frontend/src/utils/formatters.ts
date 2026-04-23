@@ -6,6 +6,13 @@
 //  It also handles the critical conversion between Backend Cents and Frontend Major units.
 // ============================================================================
 
+/**
+ * [GUIDELINE] LKR Display Pattern
+ * 1. Conversion: Use toLKRFromCents(val) for ALL data coming from Backend.
+ * 2. Display: Use formatLKR(toLKRFromCents(val)) for currency strings.
+ * 3. Submission: Use toCentsFromLKR(val) before sending back to API.
+ */
+
 export const formatLKR = (amount: number): string => {
   return new Intl.NumberFormat('en-LK', {
     style: 'currency',
@@ -17,6 +24,7 @@ export const formatLKR = (amount: number): string => {
 
 /**
  * Converts backend cent values (integers) to LKR (major units).
+ * Always use this when rendering financial data from the API.
  */
 export const toLKRFromCents = (cents: number | string | any): number => {
   if (cents === null || cents === undefined || cents === '') return 0;
