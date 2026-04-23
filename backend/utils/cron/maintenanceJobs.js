@@ -2,7 +2,7 @@
 //  MAINTENANCE JOBS (SLA Monitoring & Escalations)
 // ============================================================================
 
-import db from '../db.js';
+import db from '../../config/db.js';
 import notificationModel from '../../models/notificationModel.js';
 import logger from '../logger.js';
 import { getLocalTime } from '../dateUtils.js';

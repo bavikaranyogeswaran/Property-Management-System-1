@@ -2,7 +2,7 @@
 //  BILLING JOBS (Rent Invoicing & Late Fee Automation)
 // ============================================================================
 
-import db from '../db.js';
+import db from '../../config/db.js';
 import leaseModel from '../../models/leaseModel.js';
 import invoiceModel from '../../models/invoiceModel.js';
 import notificationModel from '../../models/notificationModel.js';

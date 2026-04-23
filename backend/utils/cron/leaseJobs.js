@@ -2,18 +2,11 @@
 //  LEASE JOBS (Lifecycle Automation: Expiry, Activation, Unit Sync)
 // ============================================================================
 
-import db from '../db.js';
+import db from '../../config/db.js';
 import leaseModel from '../../models/leaseModel.js';
 import invoiceModel from '../../models/invoiceModel.js';
 import notificationModel from '../../models/notificationModel.js';
-import leaseService from '../../services/leaseService.js';
-import {
-  today,
-  now,
-  formatToLocalDate,
-  addDays,
-  parseLocalDate,
-} from '../dateUtils.js';
+import emailService from '../emailService.js';
 import { ROLES } from '../roleUtils.js';
 import { runWithLock } from '../distributionLock.js';
 
@@ -393,4 +386,91 @@ export const activateUpcomingLeases = async () => {
       connection.release();
     }
   });
+};
+
+export const sendLeaseExpiryWarnings = async () => {
+  const currentToday = now();
+  const lockName = `send_lease_expiry_warnings_${currentToday.getFullYear()}_${currentToday.getMonth() + 1}_${currentToday.getDate()}`;
+
+  const lockResult = await runWithLock(lockName, 1800, async () => {
+    console.log('Running lease expiry warning check...');
+    // Warn at 30 and 60 days
+
+    const dateStr30 = formatToLocalDate(addDays(currentToday, 30));
+    const dateStr60 = formatToLocalDate(addDays(currentToday, 60));
+
+    try {
+      // Find leases expiring exactly in 30 or 60 days
+      const [expiringLeases] = await db.query(
+        `
+              SELECT l.*, t.email as tenant_email, u_owner.email as owner_email, p.name as property_name, un.unit_number
+              FROM leases l
+              JOIN users t ON l.tenant_id = t.user_id
+              JOIN units un ON l.unit_id = un.unit_id
+              JOIN properties p ON un.property_id = p.property_id
+              LEFT JOIN users u_owner ON p.owner_id = u_owner.user_id
+              WHERE l.status = 'active'
+              AND l.end_date IN (?, ?)
+          `,
+        [dateStr30, dateStr60]
+      );
+
+      if (expiringLeases.length > 0) {
+        console.log(
+          `Found ${expiringLeases.length} leases expiring soon. Sending warnings...`
+        );
+        for (const lease of expiringLeases) {
+          const daysCount = lease.end_date === dateStr30 ? 30 : 60;
+
+          // 1. Notify Tenant
+          await notificationModel.create({
+            userId: lease.tenant_id,
+            message: `Your lease is expiring in ${daysCount} days (on ${lease.end_date}). Please contact us if you wish to renew.`,
+            type: 'system',
+            severity: 'warning',
+          });
+
+          // 1b. Email Tenant
+          if (lease.tenant_email) {
+            await emailService.sendLeaseExpiryReminder(lease.tenant_email, {
+              daysCount,
+              endDate: lease.end_date,
+              propertyName: lease.property_name,
+              unitNumber: lease.unit_number,
+              role: ROLES.TENANT,
+            });
+          }
+
+          // 2. Notify Owner
+          if (lease.owner_id) {
+            await notificationModel.create({
+              userId: lease.owner_id,
+              message: `Lease for Unit ${lease.unit_number} is expiring in ${daysCount} days (on ${lease.end_date}).`,
+              type: 'system',
+              severity: 'warning',
+            });
+
+            // 2b. Email Owner
+            if (lease.owner_email) {
+              await emailService.sendLeaseExpiryReminder(lease.owner_email, {
+                daysCount,
+                endDate: lease.end_date,
+                propertyName: lease.property_name,
+                unitNumber: lease.unit_number,
+                role: ROLES.OWNER,
+              });
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error sending expiry warnings:', error);
+    }
+  });
+
+  if (!lockResult.success) {
+    console.log(
+      `[Cron] Skipping Lease Expiry Warnings: A process for "${lockName}" is already running.`
+    );
+  }
 };

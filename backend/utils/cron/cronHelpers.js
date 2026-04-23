@@ -7,7 +7,7 @@
 //  - Cloudinary SDK configuration
 // ============================================================================
 
-import db from '../db.js';
+import db from '../../config/db.js';
 import { v2 as cloudinary } from 'cloudinary';
 import { extractPublicId } from '../cloudinaryUtils.js';
 

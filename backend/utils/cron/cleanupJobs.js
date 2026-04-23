@@ -2,7 +2,7 @@
 //  CLEANUP & COMMUNICATION JOBS (Data Hygiene & Scheduled Reminders)
 // ============================================================================
 
-import db from '../db.js';
+import db from '../../config/db.js';
 import emailService from '../emailService.js';
 import billingEngine from '../billingEngine.js';
 import {
@@ -16,6 +16,8 @@ import {
 import { fromCents } from '../moneyUtils.js';
 import { ROLES } from '../roleUtils.js';
 import { runWithLock } from '../distributionLock.js';
+import { mainQueue } from '../../config/queue.js';
+import { cloudinary, extractPublicId } from './cronHelpers.js';
 
 // RENT REMINDERS: Sends 3-day warnings for upcoming rent due dates
 export const sendRentReminders = async () => {
@@ -230,6 +232,107 @@ export const autoAcknowledgeRefunds = async () => {
       }
     } catch (error) {
       console.error('Error auto-acknowledging refunds:', error.message);
+    }
+  });
+};
+
+export const cleanupCloudinaryAsset = async (job) => {
+  const { publicId } = job.data;
+  if (!publicId) return;
+
+  try {
+    const result = await cloudinary.uploader.destroy(publicId);
+    if (result.result === 'ok' || result.result === 'not_found') {
+      console.log(`[Queue] Successfully removed Cloudinary asset: ${publicId}`);
+    } else {
+      throw new Error(`Cloudinary deletion failed: ${result.result}`);
+    }
+  } catch (err) {
+    console.error(
+      `[Queue] Failed to delete Cloudinary asset ${publicId}:`,
+      err
+    );
+    throw err; // Allow BullMQ retry
+  }
+};
+
+export const reconcileCloudinaryAssets = async () => {
+  return await runWithLock('reconcile_cloudinary', 7200, async () => {
+    console.log('[Sync] Starting Cloudinary asset reconciliation...');
+
+    try {
+      // 1. Fetch all unique Image URLs from Database
+      const [propertyImages] = await db.query(
+        'SELECT DISTINCT image_url FROM property_images'
+      );
+      const [unitImages] = await db.query(
+        'SELECT DISTINCT image_url FROM unit_images'
+      );
+      const [maintenanceImgs] = await db.query(
+        'SELECT DISTINCT image_url FROM maintenance_images'
+      );
+
+      const dbUrls = new Set([
+        ...propertyImages.map((r) => r.image_url),
+        ...unitImages.map((r) => r.image_url),
+        ...maintenanceImgs.map((r) => r.image_url),
+      ]);
+
+      const activePublicIds = new Set();
+      dbUrls.forEach((url) => {
+        const pid = extractPublicId(url);
+        if (pid) activePublicIds.add(pid);
+      });
+
+      console.log(
+        `[Sync] Found ${activePublicIds.size} active asset references in Database.`
+      );
+
+      // 2. Fetch all assets from Cloudinary (pms_uploads folder)
+      let nextCursor = null;
+      let orphanedCount = 0;
+      const safetyBufferMs = 1000 * 60 * 60 * 4; // 4 hours safety buffer
+      const nowThreshold = Date.now() - safetyBufferMs;
+
+      do {
+        const resources = await cloudinary.api.resources({
+          type: 'upload',
+          prefix: 'pms_uploads/',
+          max_results: 500,
+          next_cursor: nextCursor,
+        });
+
+        for (const resource of resources.resources) {
+          const createdDate = new Date(resource.created_at).getTime();
+
+          // Skip newly uploaded files (avoid race conditions with active requests)
+          if (createdDate > nowThreshold) continue;
+
+          if (!activePublicIds.has(resource.public_id)) {
+            console.warn(
+              `[Sync] Orphan found: ${resource.public_id}. Enqueueing for deletion.`
+            );
+            await mainQueue.add(
+              'cleanup_cloudinary_asset_task',
+              { publicId: resource.public_id },
+              { attempts: 3, backoff: 30000 }
+            );
+            orphanedCount++;
+          }
+        }
+
+        nextCursor = resources.next_cursor;
+      } while (nextCursor);
+
+      console.log(
+        `[Sync] Reconciliation complete. ${orphanedCount} orphans identified.`
+      );
+    } catch (error) {
+      console.error(
+        '[Sync] Critical error during Cloudinary reconciliation:',
+        error.message
+      );
+      throw error;
     }
   });
 };
