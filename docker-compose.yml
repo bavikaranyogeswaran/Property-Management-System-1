@@ -44,10 +44,14 @@ services:
     image: redis:7-alpine
     container_name: pms-redis
     restart: unless-stopped
+    # BullMQ stores queued/repeatable jobs as Redis keys with no TTL, so any
+    # eviction policy can silently drop pending background work. Everything else
+    # on this instance (cache, rate limits, locks) sets its own TTL, so nothing
+    # here depends on eviction to reclaim memory.
     command: >
       redis-server
       --maxmemory 128mb
-      --maxmemory-policy allkeys-lru
+      --maxmemory-policy noeviction
       --activedefrag yes
     ports:
       - "6379:6379"
@@ -58,7 +62,11 @@ services:
     deploy:
       resources:
         limits:
-          memory: 160M
+          # Kept at 2x --maxmemory: RDB snapshots fork the process, and
+          # copy-on-write can push RSS well above the dataset size. At the
+          # previous 160M a full 128mb dataset risked a Docker OOM-kill,
+          # which drops queued jobs — the very thing noeviction prevents.
+          memory: 256M
         reservations:
           memory: 64M
     logging:

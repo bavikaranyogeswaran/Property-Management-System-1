@@ -54,7 +54,10 @@ export const mainQueue = new Queue('pms_background_tasks', {
       delay: 5000,
     },
     removeOnComplete: true,
-    removeOnFail: false, // Keep for debugging
+    // Keep failures for debugging, but bounded. Redis runs with
+    // `maxmemory-policy noeviction`, so unbounded retention would eventually
+    // fill the instance and start rejecting job writes.
+    removeOnFail: { age: 7 * 24 * 3600 }, // 7 days
   },
 });
 

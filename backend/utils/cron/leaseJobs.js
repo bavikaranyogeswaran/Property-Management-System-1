@@ -9,10 +9,13 @@ import notificationModel from '../../models/notificationModel.js';
 import emailService from '../emailService.js';
 import { ROLES } from '../roleUtils.js';
 import { runWithLock } from '../distributionLock.js';
+import { now, today, formatToLocalDate, addDays } from '../dateUtils.js';
 
 export const checkLeaseExpiration = async () => {
-  const currentToday = today();
-  const lockName = `check_lease_expiration_${currentToday.getFullYear()}_${currentToday.getMonth() + 1}_${currentToday.getDate()}`;
+  // `now()` returns a Date (for the date-part lock key); `today()` returns a
+  // YYYY-MM-DD string and is used below for DATE column comparisons.
+  const lockMoment = now();
+  const lockName = `check_lease_expiration_${lockMoment.getFullYear()}_${lockMoment.getMonth() + 1}_${lockMoment.getDate()}`;
 
   const lockResult = await runWithLock(lockName, 1800, async () => {
     console.log('Running lease expiration check...');
@@ -119,8 +122,9 @@ export const checkLeaseExpiration = async () => {
 };
 
 export const syncUnitStatuses = async () => {
+  const lockMoment = now();
   const currentToday = today();
-  const lockName = `sync_unit_statuses_${currentToday.getFullYear()}_${currentToday.getMonth() + 1}_${currentToday.getDate()}`;
+  const lockName = `sync_unit_statuses_${lockMoment.getFullYear()}_${lockMoment.getMonth() + 1}_${lockMoment.getDate()}`;
 
   const lockResult = await runWithLock(lockName, 1800, async () => {
     console.log('Running unit status synchronization...');

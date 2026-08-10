@@ -97,11 +97,17 @@ const initWorker = async () => {
         for (const staff of staffToNotify) {
           await notificationModel.create({
             userId: staff.id,
-            message: `URGENT: Background task [${name}] failed after ${job.attemptsMade} retries. Reason: ${err.message}`,
+            message: `URGENT: Background task [${name}] (job ${id}) failed after ${job.attemptsMade} retries. Reason: ${err.message}`,
             type: 'system',
             severity: 'urgent',
-            entityType: 'system',
-            entityId: id,
+            // `entity_id` is INT UNSIGNED and references a domain record, so the
+            // BullMQ job id (a string) belongs in the message, not this column.
+            entityType: data.invoiceId
+              ? 'invoice'
+              : data.leaseId
+                ? 'lease'
+                : 'system',
+            entityId: data.invoiceId || data.leaseId || null,
           });
         }
 
